@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../../api/client";
 import { claimsKey } from "../../api/keys";
 import { ErrorMessage } from "../ErrorMessage";
+import { localDay } from "../placementTimeline";
 import { useFieldSettings } from "../useFieldSettings";
 import { type Claim, CURRENCIES, FIELD_LABEL } from "./claims";
 import { LinkPicker } from "./LinkPicker";
@@ -87,7 +88,7 @@ export function ClaimRow({ claim, permissions, selected, onSelect, onView, onDel
         <div className="field">
           <label htmlFor={id("date")}>Receipt date</label>
           <input id={id("date")} key={`d${claim.receiptDate ?? ""}`} type="date" defaultValue={claim.receiptDate ?? ""} {...mark("receiptDate")}
-            max={new Date().toISOString().slice(0, 10)}
+            max={localDay()}
             onBlur={(e) => { if (e.target.value !== (claim.receiptDate ?? "")) save({ receiptDate: e.target.value || null }); }} />
         </div>
         <div className="field">

@@ -481,7 +481,8 @@ for each of their jobs, with **Score fit** / **Score again**.
   share the most words with its description and ad (a keyword search of CVs,
   not the AI, so it works without one), best first, with where their CV has
   those words. Those who withdrew consent, and those the user may not see, are
-  left out. **Add to job** puts them on it (and scores them).
+  left out. **Add to job** puts them on it (and scores them). A job with no
+  description or ad yet asks for one instead.
 - **Later:** finding possible candidates by meaning rather than words
   (embeddings).
 

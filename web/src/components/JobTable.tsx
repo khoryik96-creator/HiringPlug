@@ -1,9 +1,10 @@
 import type { JobOrderSummary } from "../api/client";
 import { JOB_STATUS } from "../labels";
 
-/** Jobs in a table, linking to each job (and its company, if shown). */
+/** Jobs in a table, linking to each job (and its company, if shown); on a phone it scrolls sideways in its box, not the page. */
 export function JobTable({ jobs, showCompany = false, empty }: { jobs: JobOrderSummary[]; showCompany?: boolean; empty: string }) {
   return (
+    <div className="table-scroll">
     <table>
       <thead>
         <tr>
@@ -27,5 +28,6 @@ export function JobTable({ jobs, showCompany = false, empty }: { jobs: JobOrderS
         {jobs.length === 0 && <tr><td colSpan={showCompany ? 5 : 4} className="muted">{empty}</td></tr>}
       </tbody>
     </table>
+    </div>
   );
 }

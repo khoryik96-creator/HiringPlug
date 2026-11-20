@@ -4869,6 +4869,12 @@ class MatchSuggestion(BaseModel):
 
 class MatchSuggestionList(BaseModel):
     items: list[MatchSuggestion]
+    needsText: Annotated[
+        bool,
+        Field(
+            description="The job has no description or ad text to search with yet, so there are no suggestions (items is empty)."
+        ),
+    ]
 
 
 class MatchScoreJob(BaseModel):

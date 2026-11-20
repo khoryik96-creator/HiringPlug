@@ -43,13 +43,14 @@ type View struct {
 
 const onePerApplication = "placement_tenant_id_application_id_key"
 
+// today is the agency's date (an invoice or payment marked today is dated
+// where the agency works, not where the server is), at midnight UTC.
 func (s *Service) today() time.Time {
 	now := time.Now
 	if s.now != nil {
 		now = s.now
 	}
-	y, m, d := now().Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	return s.Today(now())
 }
 
 func notAllowed(message string) error { return apperr.New(api.ErrorCodePLACEMENTNOTALLOWED, message) }

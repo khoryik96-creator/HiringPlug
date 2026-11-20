@@ -132,7 +132,12 @@ func TestPossibleCandidatesShareTheJobsWords(t *testing.T) {
 
 	bare := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Clerk"})
 	res = a.request(http.MethodGet, "/v1/matches/suggestions?jobId="+bare.Id, token, nil)
-	assert.Equal(t, api.ErrorCodeMATCHNEEDSTEXT, res.Error().Error.Code)
+	require.Equal(t, http.StatusOK, res.Status, "a job without text is no error: the job page asks on every visit")
+	var none api.MatchSuggestionList
+	res.JSON(&none)
+	assert.True(t, none.NeedsText)
+	assert.Empty(t, none.Items)
+	assert.False(t, list.NeedsText)
 	other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/matches/suggestions?jobId="+job.Id, other, nil).Status)
 }

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Permission } from "../api/client";
-import { failure, ok, renderWithClient, sentBody } from "../test-utils";
+import { ok, renderWithClient, sentBody } from "../test-utils";
 import { Highlighted, PossibleCandidates, tidySnippet } from "./PossibleCandidates";
 
 afterEach(() => {
@@ -22,7 +22,7 @@ describe("possible candidates", () => {
 
   it("show where the CV has the job's words, and add someone to the job", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{ candidateId: "cand_1", candidateName: "Aina", currentTitle: "Auditor", rank: 0.6,
-      snippet: "Aina aina@x.com +60 12 345 6789 statutory [[audit]] of listed [[groups]] … [[Audit]] lead" }] }));
+      snippet: "Aina aina@x.com +60 12 345 6789 statutory [[audit]] of listed [[groups]] … [[Audit]] lead" }], needsText: false }));
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({}));
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={[...SEE, "pipeline:update"]} />);
     expect(await screen.findByText("Aina")).toBeTruthy();
@@ -38,9 +38,12 @@ describe("possible candidates", () => {
   });
 
   it("ask for the job's text when there is none", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(failure("MATCH_NEEDS_TEXT", "No text.", undefined, 409));
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], needsText: true })); // an answer, not an error the browser logs
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={SEE} />);
     expect(await screen.findByText(/Add a description or an ad/)).toBeTruthy();
+    expect(screen.queryByText("No CV matches.")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(document.querySelector(".count-chip")).toBeNull();
   });
 
   it("highlight only what is marked", () => {

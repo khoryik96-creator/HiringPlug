@@ -88,14 +88,14 @@ func TestPlacements(t *testing.T) {
 
 	t.Run("invoiced and paid, with fee totals", func(t *testing.T) {
 		p = a.placement(http.MethodPatch, "/v1/placements/"+p.Id, recruiter.Token, map[string]any{
-			"version": p.Version, "invoiceStatus": "invoiced", "invoiceNumber": "INV-0042", "invoicedOn": time.Now().UTC().AddDate(0, 0, -2).Format(time.DateOnly),
+			"version": p.Version, "invoiceStatus": "invoiced", "invoiceNumber": "INV-0042", "invoicedOn": time.Now().In(a.deps.Config.TimeZone).AddDate(0, 0, -2).Format(time.DateOnly),
 		}, http.StatusOK)
 		assert.Equal(t, http.StatusConflict, a.request(http.MethodPatch, "/v1/placements/"+p.Id, recruiter.Token, map[string]any{"version": p.Version - 1}).Status)
 		totals := *a.placements(recruiter.Token, "").FeeTotals
 		assert.Equal(t, []api.FeeTotal{{Currency: "MYR", Total: "20400.00", NotInvoiced: "0.00", Invoiced: "20400.00", Paid: "0.00"}}, totals)
 		p = a.placement(http.MethodPatch, "/v1/placements/"+p.Id, recruiter.Token, map[string]any{"version": p.Version, "invoiceStatus": "paid"}, http.StatusOK)
 		paidOn, _ := p.PaidOn.Get()
-		assert.Equal(t, time.Now().UTC().Format(time.DateOnly), paidOn.String(), "paid today unless said otherwise")
+		assert.Equal(t, time.Now().In(a.deps.Config.TimeZone).Format(time.DateOnly), paidOn.String(), "paid today unless said otherwise")
 		assert.Len(t, a.placements(recruiter.Token, "?invoiceStatus=paid").Items, 1)
 		assert.Empty(t, a.placements(recruiter.Token, "?invoiceStatus=invoiced").Items)
 	})

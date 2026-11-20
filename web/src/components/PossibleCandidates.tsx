@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
-import { api, ApiError, type Permission, unwrap } from "../api/client";
+import { api, type Permission, unwrap } from "../api/client";
 import { applicationsKey, jobSuggestionsKey } from "../api/keys";
 import { IconButton, PlusIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
@@ -53,7 +53,7 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
   const allowed = ["matching:read", "candidates:read", "documents:read", "pipeline:read"].every((p) => permissions.includes(p as Permission));
   const list = useQuery({
     queryKey: jobSuggestionsKey(jobId),
-    queryFn: async () => unwrap(await api.GET("/v1/matches/suggestions", { params: { query: { jobId } } })).items,
+    queryFn: async () => unwrap(await api.GET("/v1/matches/suggestions", { params: { query: { jobId } } })),
     enabled: allowed,
   });
   const add = useMutation({
@@ -65,17 +65,19 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
     },
   });
   if (!allowed) return null;
-  const noText = list.error instanceof ApiError && list.error.code === "MATCH_NEEDS_TEXT";
+  const noText = list.data?.needsText === true;
+  const found = list.data?.items;
   return (
     <details className="fold" aria-label="Possible candidates">
       <summary>
         <span className="fold-title">Possible candidates</span>
-        {list.data && <span className="count-chip">{String(list.data.length)}</span>}
+        {found && !noText && <span className="count-chip">{String(found.length)}</span>}
       </summary>
-      {noText ? <p className="muted">Add a description or an ad to find matches.</p> : <ErrorMessage error={list.error ?? add.error} />}
-      {list.data?.length === 0 && <p className="muted">No CV matches.</p>}
+      {noText && <p className="muted">Add a description or an ad to find matches.</p>}
+      <ErrorMessage error={list.error ?? add.error} />
+      {found?.length === 0 && !noText && <p className="muted">No CV matches.</p>}
       <ul className="suggestions scroll-box">
-        {list.data?.map((s) => {
+        {found?.map((s) => {
           const words = matchedWords(s.snippet);
           return (
             <li key={s.candidateId} className="suggestion">

@@ -112,12 +112,12 @@ func skipIfExpected(err error) error {
 // Suggest returns possible candidates for a job: those not on it whose CVs
 // share the most words with the job's text, best first, leaving out those
 // who withdrew consent and (by the database) those the user may not see.
-func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) ([]Suggestion, error) {
+// needsText is true, with no suggestions, for a job with no text to search with yet.
+func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) (out []Suggestion, needsText bool, err error) {
 	if !p.Can(api.PermissionCandidatesRead) || !p.Can(api.PermissionDocumentsRead) || !p.Can(api.PermissionPipelineRead) {
-		return nil, apperr.New(api.ErrorCodeFORBIDDEN, "Finding possible candidates reads CVs and the job's pipeline, which you may not see.")
+		return nil, false, apperr.New(api.ErrorCodeFORBIDDEN, "Finding possible candidates reads CVs and the job's pipeline, which you may not see.")
 	}
-	var out []Suggestion
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if !p.Can(api.PermissionJobsRead) {
 			return apperr.NotFound("job")
 		}
@@ -126,7 +126,8 @@ func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) 
 			return err
 		}
 		if _, ok := JobText(j); !ok {
-			return apperr.New(api.ErrorCodeMATCHNEEDSTEXT, "This job has no description or ad text to look for candidates with yet: add one first.")
+			needsText = true
+			return nil
 		}
 		onJob, err := s.deps.Applications.CandidatesOnJob(ctx, tx, jobID)
 		if err != nil {
@@ -158,7 +159,7 @@ func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) 
 		}
 		return nil
 	})
-	return out, err
+	return out, needsText, err
 }
 
 func (s *Service) consentWithdrawn(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error) {

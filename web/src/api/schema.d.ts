@@ -3841,7 +3841,7 @@ export interface paths {
         };
         /**
          * Possible candidates for a job - people not on it whose CVs share the most words with the job's text
-         * @description A keyword search of CVs (not the AI, so it works without one), best first, at most 20. Leaves out candidates already on the job, those who withdrew consent, and those you may not see.
+         * @description A keyword search of CVs (not the AI, so it works without one), best first, at most 20. Leaves out candidates already on the job, those who withdrew consent, and those you may not see. A job without text yet gets an empty list marked needsText, not an error, as the job page asks for it on every visit.
          */
         get: operations["suggestCandidates"];
         put?: never;
@@ -9255,6 +9255,8 @@ export interface components {
         };
         MatchSuggestionList: {
             items: components["schemas"]["MatchSuggestion"][];
+            /** @description The job has no description or ad text to search with yet, so there are no suggestions (items is empty). */
+            needsText: boolean;
         };
         MatchScoreJob: {
             matchId: components["schemas"]["MatchId"];

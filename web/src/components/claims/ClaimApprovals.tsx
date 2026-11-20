@@ -8,6 +8,7 @@ import { claimsKey } from "../../api/keys";
 import { formatDay, formatMoney } from "../../labels";
 import { ErrorMessage } from "../ErrorMessage";
 import { FileViewer } from "../FileViewer";
+import { localDay } from "../placementTimeline";
 import { useFieldSettings } from "../useFieldSettings";
 import { type Claim, CLAIM_STATUS, type ClaimStatus, claimsCsv, formatTotals, totals } from "./claims";
 import { linkWords } from "./LinkPicker";
@@ -60,7 +61,7 @@ export function ClaimApprovals() {
   const download = () => {
     const csv = claimsCsv(items, { receiptType: (k) => fs.label("claim_receipt_type", k), claimType: (k) => fs.label("claim_type", k) });
     const a = Object.assign(document.createElement("a"), {
-      href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: `claims-${new Date().toISOString().slice(0, 10)}.csv`,
+      href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: `claims-${localDay()}.csv`,
     });
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); }, 10_000);

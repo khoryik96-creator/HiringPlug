@@ -8,6 +8,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { claimsKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { fieldErrors } from "../components/forms";
+import { localDay } from "../components/placementTimeline";
 import { formatWhen } from "../labels";
 import "./claims-storage.css";
 
@@ -19,7 +20,7 @@ export const PROVIDER_NAMES: Record<Provider, string> = { google_drive: "Google 
 
 /** Where a receipt would go, e.g. Claims/2026-11/Aisyah Rahman/Grab fare/2026-11-03 Grab MYR 23.00.pdf */
 export function examplePath(root: string, today = new Date()): string {
-  const day = today.toISOString().slice(0, 10);
+  const day = localDay(today.toISOString()); // the user's date, as the folder is named
   const top = root.split(/[/\\]/).map((s) => s.trim()).filter((s) => s && s !== "." && s !== "..").join("/") || "Claims";
   return `${top}/${day.slice(0, 7)}/Aisyah Rahman/Grab fare/${day} Grab MYR 23.00.pdf`;
 }
