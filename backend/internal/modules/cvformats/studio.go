@@ -107,7 +107,7 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 		if src.CandidateID != candidateID || src.Source == "formatted" || !formattable[src.ContentType] {
 			return apperr.New(api.ErrorCodeSTUDIOCVSOURCE, "Choose a CV this candidate sent (PDF or Word), not one made by the app.")
 		}
-		access, on, err := s.deps.AI.Allowed(ctx, tx)
+		access, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID)
 		if err != nil {
 			return err
 		}

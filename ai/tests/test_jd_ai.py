@@ -87,3 +87,17 @@ def test_the_job_sends_the_ais_details_with_the_text() -> None:
     assert on.payload.aiDetails is not None
     assert on.payload.aiDetails.title == "Senior Production Planner"
     assert on.payload.aiTokens == 460
+
+
+def test_multiline_salary_table_is_removed_from_the_provider_prompt() -> None:
+    ai = FakeAI(ANSWER)
+    jd_ai.read(
+        "Compensation and Benefits Manager\nMonthly salary (MYR)\nMinimum | Maximum\n"
+        "\n8,000 \u2013 10,000 per month\nLocation: Shah Alam",
+        ai,
+    )
+    prompt = ai.calls[0][1]
+    assert "8,000" not in prompt
+    assert "10,000" not in prompt
+    assert "Location: Shah Alam" in prompt
+    assert "Compensation and Benefits Manager" in prompt

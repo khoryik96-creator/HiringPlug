@@ -75,7 +75,7 @@ const formOf = (draft?: Draft) => draft ? {
   to: draft.to.join(", "), cc: draft.cc.join(", "), bcc: draft.bcc.join(", "), subject: draft.subject, html: markupOf(draft),
 } : emptyDraft;
 type Operation = "save" | "send" | "schedule" | "discard";
-type DraftAction = Operation | "reload" | { file: File } | { remove: string };
+type DraftAction = Operation | "reload" | { file: File | (() => Promise<File>) } | { remove: string };
 
 function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permissions, about }: {
   opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; setBusy: (pending: boolean) => void;
@@ -110,9 +110,9 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   const [at, setAt] = useState(() => opened?.schedule ? zonedInput(new Date(opened.schedule.sendAt), zone) : "");
   const plan = draft?.schedule;
   const locked = plan?.status === "confirming" || plan?.status === "uncertain";
+  const operationInFlight = useRef(false);
   const action = useMutation({
-    onMutate: () => { setBusy(true); },
-    onSettled: () => { setBusy(false); },
+    onSettled: () => { operationInFlight.current = false; setBusy(false); },
     mutationFn: async (operation: DraftAction) => {
       if (operation === "reload") {
         if (draft) {
@@ -129,14 +129,16 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       if (typeof operation !== "string") {
         let opened = draft;
         if ("file" in operation) {
-          if (operation.file.size === 0 || operation.file.size > maxDraftFileSize) {
+          const file = typeof operation.file === "function" ? await operation.file() : operation.file;
+          if (file.size === 0 || file.size > maxDraftFileSize) {
             throw new Error("Choose a non-empty file up to 10 MB.");
           }
           if (!opened) {
             opened = unwrap(await api.POST("/v1/outlook/drafts", { body: inputOf(form) }));
             setDraft(opened);
           }
-          setDraft(await uploadOutlookDraftFile(opened.messageId, opened.version, operation.file));
+          setDraft(await uploadOutlookDraftFile(opened.messageId, opened.version, file));
+          return { attached: file.name };
         } else if (opened) {
           setDraft(unwrap(await api.DELETE("/v1/outlook/drafts/{messageId}/attachments/{attachmentId}", {
             params: { path: { messageId: opened.messageId, attachmentId: operation.remove }, query: { version: opened.version } },
@@ -184,9 +186,9 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       void client.invalidateQueries({ queryKey: outlookScheduledKey });
       if (operation === "save") {
         setNotice("Saved in Outlook Drafts.");
-      } else if (operation === "files") {
+      } else if (operation === "files" || typeof operation === "object") {
         void client.invalidateQueries({ queryKey: ["outlook", "attachments"] });
-        setNotice("");
+        setNotice(typeof operation === "object" ? `Attached ${operation.attached}` : "");
       } else {
         onClose(operation);
       }
@@ -195,6 +197,14 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       if (typeof operation !== "string") void client.invalidateQueries({ queryKey: outlookScheduledKey });
     },
   });
+  function run(operation: DraftAction) {
+    // Cover the gap before the disabled fieldset is painted, including a slow CV download.
+    if (operationInFlight.current) return;
+    operationInFlight.current = true;
+    setBusy(true);
+    setNotice("");
+    action.mutate(operation);
+  }
   const errors = fieldErrors(action.error);
   const errorFor = (name: string) => errors[name] ?? Object.entries(errors).find(([field]) => field.startsWith(`${name}.`) || field.startsWith(`${name}[`))?.[1];
   const update = (field: keyof typeof form, value: string) => { setForm({ ...form, [field]: value }); setNotice(""); };
@@ -205,7 +215,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       <h3 id="outlook-draft-heading">{draft ? "Outlook draft" : "New Outlook message"}</h3>
       <IconButton label="Close" icon={<CloseIcon />} disabled={action.isPending} onClick={() => { onClose(); }} />
     </div>
-    <form className="form-grid" onSubmit={(event) => { event.preventDefault(); action.mutate("save"); }}>
+    <form className="form-grid" onSubmit={(event) => { event.preventDefault(); run("save"); }}>
       <fieldset disabled={locked || action.isPending} className="full outlook-draft-fields">
         <Field label="To" error={errorFor("to")}><input value={form.to} onChange={(e) => { update("to", e.target.value); }}/></Field>
         {!copies && <button type="button" className="link" onClick={() => { setCopies(true); }}>Cc / Bcc</button>}
@@ -224,7 +234,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
           onSignature={() => { replaceMessage(withSignature(form.html, tools.signature)); }}
           disabled={locked || action.isPending} />}
         {!draft?.bodyTruncated && permissions.includes("candidates:read") && <OutlookCandidateDetails packages={packages} permissions={permissions}
-          onAttach={(file) => { action.mutate({ file }); }} />}
+          onAttach={(file) => { run({ file }); }} />}
         {draft?.bodyTruncated ? <Field label="Message"><textarea readOnly rows={9} value={draft.body} /></Field> :
           <div className="field">
             <span>Message</span>
@@ -235,7 +245,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
           </div>}
       </fieldset>
       <OutlookDraftFiles draft={draft} disabled={locked || action.isPending}
-        onAdd={(file) => { action.mutate({ file }); }} onRemove={(attachment) => { action.mutate({ remove: attachment.id }); }} />
+        onAdd={(file) => { run({ file }); }} onRemove={(attachment) => { run({ remove: attachment.id }); }} />
       {(draft?.bodyTruncated || draft?.webUrl) && <div className="full row outlook-actions small">
         {draft.bodyTruncated && <span className="muted">Edit the full message in Outlook.</span>}
         {draft.webUrl && <a href={draft.webUrl} target="_blank" rel="noreferrer">Open in Outlook</a>}
@@ -248,19 +258,19 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       </p>}
       {later && !locked && <div className="full row outlook-actions outlook-schedule-time">
         <Field label={`Send at · ${zone}`} error={errorFor("sendAt")}><input type="datetime-local" value={at} onChange={(e) => { setAt(e.target.value); }}/></Field>
-        <button type="button" disabled={!at || !readyToSend || action.isPending} onClick={() => { action.mutate("schedule"); }}>{plan ? "Update schedule" : "Schedule email"}</button>
+        <button type="button" disabled={!at || !readyToSend || action.isPending} onClick={() => { run("schedule"); }}>{plan ? "Update schedule" : "Schedule email"}</button>
       </div>}
       <div className="full"><ErrorMessage error={action.error}/></div>
       {notice && <p className="full" role="status">{notice}</p>}
       <div className="row full outlook-actions">
         <button type="submit" className="primary" disabled={locked || action.isPending}>Save draft</button>
-        {(!plan || plan.status === "needs_review") && <button type="button" disabled={!readyToSend || action.isPending} onClick={() => { action.mutate("send"); }}>Send now</button>}
+        {(!plan || plan.status === "needs_review") && <button type="button" disabled={!readyToSend || action.isPending} onClick={() => { run("send"); }}>Send now</button>}
         <button type="button" disabled={locked || action.isPending} aria-expanded={later} onClick={() => { setLater(!later); }}>
           {draft?.scheduleNeedsReview ? "Review schedule" : plan ? "Change time" : "Send later"}
         </button>
-        {draft && <IconButton label="Reload draft" icon={<RefreshIcon />} disabled={action.isPending} onClick={() => { action.mutate("reload"); }} />}
+        {draft && <IconButton label="Reload draft" icon={<RefreshIcon />} disabled={action.isPending} onClick={() => { run("reload"); }} />}
         {draft && !plan && <IconButton label="Discard draft" icon={<TrashIcon />} danger disabled={action.isPending} onClick={() => {
-          if (window.confirm("Move this draft to Outlook Deleted Items?")) action.mutate("discard");
+          if (window.confirm("Move this draft to Outlook Deleted Items?")) run("discard");
         }} />}
       </div>
     </form>

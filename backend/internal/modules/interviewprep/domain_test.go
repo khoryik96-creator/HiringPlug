@@ -112,3 +112,20 @@ func TestPrepIsLaidOutToReadInAFile(t *testing.T) {
 	assert.False(t, has(simpledoc.Section, "Technical"), "no empty section")
 	assert.True(t, has(simpledoc.Section, "Questions to ask them"))
 }
+
+func TestRecordedQuestionsTakePriorityAcrossBothSections(t *testing.T) {
+	c := api.InterviewPrepContent{}
+	for range 6 {
+		c.SoftSkills = append(c.SoftSkills, api.InterviewPrepItem{Question: "Suggestion"})
+	}
+	for range 12 {
+		c.Technical = append(c.Technical, api.InterviewPrepItem{Question: "Recorded", FromInterviews: true})
+	}
+	limited := Short(c)
+	assert.Len(t, limited.Technical, 12)
+	assert.Len(t, limited.SoftSkills, 2)
+	c.SoftSkills, c.Technical = c.Technical, c.SoftSkills
+	limited = Short(c)
+	assert.Len(t, limited.SoftSkills, 12)
+	assert.Len(t, limited.Technical, 2)
+}

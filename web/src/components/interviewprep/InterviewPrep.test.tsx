@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../../api/client";
@@ -54,6 +54,19 @@ describe("questions asked at a job's interviews", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ question: "What if the nightly batch is late on month end?", kind: "situational", round: "hiring_manager",
       askedOn: null, source: "Candidate after round 2", notes: null });
+  });
+
+  it("submits the version seen when editing began after a background refresh", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [question()] }));
+    const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(question()));
+    const { client } = renderWithClient(<InterviewQuestions jobId="jo_1" canManage />);
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit "/ }));
+    await act(async () => {
+      client.setQueryData(["interview-questions", "jo_1", false], [question({ notes: "Another edit", version: 2 })]);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(sentBody(patch)).toMatchObject({ version: 1 }); });
   });
 
   it("archives a question and brings it back from the archive", async () => {

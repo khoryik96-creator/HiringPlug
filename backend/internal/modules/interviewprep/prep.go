@@ -49,7 +49,7 @@ func (s *Service) StartPrep(ctx context.Context, p authz.Principal, jobID string
 		var access *api.AiAccess
 		on := false
 		if s.deps.AI != nil {
-			if access, on, err = s.deps.AI.Allowed(ctx, tx); err != nil {
+			if access, on, err = s.deps.AI.Allowed(ctx, tx, p.TenantID); err != nil {
 				return err
 			}
 		}

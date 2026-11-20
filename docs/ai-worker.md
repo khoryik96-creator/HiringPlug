@@ -110,12 +110,12 @@ what to use; nothing a person entered is replaced unless they tick it.
 
 **The AI's work history** (`jobs/cv_history.py`, with `useAi`): the rules'
 layout guesses confuse a client, a department, a team or a career break with
-the employer, so when the company has the AI on, the AI reads the whole work
-history (from the salary-free text) and returns each job's employer, title
+the employer. When enabled, the AI reads up to 14,000 characters of the
+salary-free CV and returns each job's employer, title
 and dates, copied from the CV, and the newest employer's industry, chosen
 from the company's industry list (`industries` in the job, from Go's
-catalogue). A job whose employer is not CV text is dropped; when none is
-left, the rules' reading stands. Go grounds every quote again, picks the
+catalogue). Quoted jobs are reconciled with the rules. Unmatched jobs from
+the rules stay in the history, including jobs outside the AI input limit. Go grounds every quote again, picks the
 current employer from the dates, and tags the AI's industry only when its
 own employer-name rules cannot tell and the pick names that employer and is
 on the list. Then the older fill (`cv_ai.py`) asks for name, email, phone or

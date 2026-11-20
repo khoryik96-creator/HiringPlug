@@ -4,12 +4,12 @@
 // each candidate's CV, attached to the message from their row.
 import type { Permission } from "../../api/client";
 import { ErrorMessage } from "../ErrorMessage";
-import { AttachCv } from "./AttachCv";
+import { AttachCv, type AttachCandidateCv } from "./AttachCv";
 import { ShortlistPanel, useShortlist } from "../clientEmail/Shortlist";
 import type { useCandidatePackages } from "../clientEmail/useCandidatePackages";
 
 export function OutlookCandidateDetails({ packages, permissions, onAttach }: {
-  packages: ReturnType<typeof useCandidatePackages>; permissions: Permission[]; onAttach: (file: File) => void;
+  packages: ReturnType<typeof useCandidatePackages>; permissions: Permission[]; onAttach: AttachCandidateCv;
 }) {
   const canAttach = permissions.includes("documents:read");
   const list = useShortlist(packages.people, false);

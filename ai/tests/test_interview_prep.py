@@ -168,3 +168,13 @@ def test_the_answer_asked_for_fits_the_length_allowed() -> None:
     assert "never more than 14 questions in all" in user
     # About 350 tokens a card: 14 cards and the rest fit, with room to spare.
     assert ai.max_tokens >= 14 * 350 + 1500
+
+
+def test_all_twelve_recorded_questions_fit_in_one_section_before_suggestions() -> None:
+    recorded = [{"question": f"Recorded {i}", "fromInterviews": True} for i in range(12)]
+    extras = [{"question": f"Extra {i}"} for i in range(8)]
+    for section, other in [("softSkills", "technical"), ("technical", "softSkills")]:
+        result = interview_prep.read({section: extras + recorded, other: extras})
+        cards = result.softSkills + result.technical
+        assert len(cards) == 14
+        assert sum(c.fromInterviews for c in cards) == 12

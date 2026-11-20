@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from ..contracts import ParsedJob, ParsedProfile, SourcedText
@@ -148,9 +149,52 @@ def prompt(text: str, industries: list[str]) -> str:
     )
 
 
+def _same_text(left: SourcedText | None, right: SourcedText | None) -> bool:
+    return bool(left and right and _plain(left.value) == _plain(right.value))
+
+
+def _match_score(job: ParsedJob, old: ParsedJob) -> int:
+    dates = _same_text(job.dates, old.dates)
+    company = _same_text(job.company, old.company)
+    title = _same_text(job.title, old.title)
+    if job.dates and old.dates and not dates:
+        return 0
+    if company and title:
+        return 4 + int(dates)
+    if dates and (company or title or not old.company):
+        return 3
+    # The rules sometimes included the title in the employer's name.
+    if dates and job.company and old.company and _plain(job.company.value) in _plain(old.company.value):
+        return 2
+    return 0
+
+
+def merged_jobs(found: list[ParsedJob], existing: list[ParsedJob]) -> list[ParsedJob]:
+    """Keep rules-only jobs, replacing each matching employment at most once."""
+    unmatched = existing.copy()
+    merged = []
+    for job in found:
+        score = partial(_match_score, job)
+        match = max(unmatched, key=score, default=None)
+        if match is not None and score(match):
+            unmatched.remove(match)
+            if _same_text(job.company, match.company):
+                if not job.title:
+                    job.title = match.title
+                if not job.dates:
+                    job.dates, job.startDate, job.endDate, job.current = (
+                        match.dates,
+                        match.startDate,
+                        match.endDate,
+                        match.current,
+                    )
+        merged.append(job)
+    merged.extend(unmatched)
+    return sorted(merged, key=lambda j: (j.current, j.startDate or ""), reverse=True)[:30]
+
+
 def read(profile: ParsedProfile, text: str, ai: Provider, industries: list[str] | None = None) -> History:
-    """The profile with the AI's work history in place of the rules' when it named at least one
-    employer it could quote; otherwise as it was."""
+    """Reconcile grounded AI work history with the jobs found by the rules."""
     try:
         done = ai.complete(SYSTEM, prompt(text, industries or []), max_tokens=MAX_ANSWER_TOKENS)
     except ProviderError:
@@ -161,7 +205,10 @@ def read(profile: ParsedProfile, text: str, ai: Provider, industries: list[str] 
     if not found:
         return History(profile, tokens)
     p = profile.model_copy(deep=True)
-    p.experience = found
-    p.industry = industry(answer or {}, found[0]) or p.industry
+    p.experience = merged_jobs(found, profile.experience)
+    first = (answer or {})["jobs"][0]
+    newest = p.experience[0]
+    if isinstance(first, dict) and newest.company == _quoted(first.get("company"), _plain(text)):
+        p.industry = industry(answer or {}, newest) or p.industry
     p.parser = f"{profile.parser}+ai-history"
     return History(p, tokens)

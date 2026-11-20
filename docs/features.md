@@ -1360,7 +1360,7 @@ reading is done the candidate is filled in from it: name, email, phone,
 location, nationality, country of residence, LinkedIn link, current title and
 company (the latest job), industry, notice period, skills, work history and
 education. **The latest employer and its industry:** with an AI provider (and
-allowance left), the AI reads the whole work history, telling the employer
+allowance left), the AI helps read the work history, telling the employer
 from the job title, a client the candidate was placed at, a department, a
 team or a career break, and names the latest employer's industry from the
 company's own industry list; every employer and title must be text from the
@@ -1733,8 +1733,8 @@ your own signature (Settings > Your account), and Send later; **Candidate
 details & CVs** puts candidates in as a block each (or one table) with the
 details chosen, salary included for roles that may see salaries, as the
 client email does, and each candidate's row has **📎 Attach CV…** to attach
-one of their CVs to the message (the candidate chosen for fields is added to
-the list). The page uses the width of the screen: drag
+a stored CV or its formatted Word or PDF version when available. Send and
+Schedule wait for the selected attachment to finish uploading. The page uses the width of the screen: drag
 the bars between the folders, the list and the reading pane, or either side of
 the editor, to resize them (kept in this browser). Download attachments of up to
 20 MiB from the reading pane. **Import CV** imports a CV attachment as a candidate

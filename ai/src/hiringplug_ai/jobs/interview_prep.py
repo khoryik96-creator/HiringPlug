@@ -118,7 +118,7 @@ def _lines(value: Any, most: int, size: int) -> list[str]:
     return out[:most]
 
 
-def _items(value: Any, most: int) -> list[dict[str, Any]]:
+def _items(value: Any) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for raw in value if isinstance(value, list) else []:
         if not isinstance(raw, dict):
@@ -138,18 +138,31 @@ def _items(value: Any, most: int) -> list[dict[str, Any]]:
                 "fromInterviews": raw.get("fromInterviews") is True,
             }
         )
-        if len(out) == most:
-            break
     return out
 
 
 def read(answer: dict[str, Any]) -> InterviewPrepContent:
     """The model's JSON as the contract has it: short, within its limits."""
+    soft = _items(answer.get("softSkills"))
+    technical = _items(answer.get("technical"))
+    # Reserve space for recorded questions across both sections before taking suggestions.
+    recorded = sum(1 for item in soft + technical if item["fromInterviews"])
+    remaining = {True: min(MAX_ITEMS, recorded), False: max(0, MAX_ITEMS - recorded)}
+
+    def within_limit(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        kept = []
+        for item in items:
+            kind = bool(item["fromInterviews"])
+            if remaining[kind]:
+                remaining[kind] -= 1
+                kept.append(item)
+        return kept
+
     content = {
         "summary": _text(answer.get("summary"), 600),
         "focusAreas": _lines(answer.get("focusAreas"), 8, 160),
-        "softSkills": _items(answer.get("softSkills"), 10),
-        "technical": _items(answer.get("technical"), 12),
+        "softSkills": within_limit(soft),
+        "technical": within_limit(technical),
         "questionsToAsk": _lines(answer.get("questionsToAsk"), 6, 250),
     }
     if not content["softSkills"] and not content["technical"]:

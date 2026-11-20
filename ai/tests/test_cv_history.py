@@ -102,3 +102,43 @@ def test_nothing_quotable_or_a_provider_error_keeps_the_rules_reading() -> None:
     got = cv_history.read(before, CV, FakeAI(ProviderError("busy")), INDUSTRIES)
     assert got.profile == before
     assert got.tokens == 0
+
+
+def test_partial_ai_history_keeps_an_older_job_outside_the_prompt() -> None:
+    text = CV + ("An achievement in the role.\n" * 600) + "Developer, Daya Berhad | Jan 2011 - Dec 2013\n"
+    before = rules(text)
+    ai = FakeAI(
+        answer(
+            jobs=[
+                {
+                    "company": "CONTOH GDC MALAYSIA",
+                    "title": "Systems Engineer",
+                    "dates": "Mar 2018 - Present",
+                    "current": True,
+                }
+            ]
+        )
+    )
+    after = cv_history.read(before, text, ai).profile
+    assert "Daya Berhad" not in ai.calls[0][1]
+    assert len(after.experience) == len(before.experience)
+    assert any(j.company and "Daya Berhad" in j.company.value for j in after.experience)
+
+
+def test_industry_is_not_attributed_to_the_next_surviving_employer() -> None:
+    before = rules(CV)
+    partial = answer(
+        jobs=[
+            {"company": "Imaginary Holdings"},
+            {"company": "Contoh Bank Berhad", "dates": "Jan 2015 - Feb 2018"},
+        ]
+    )
+    assert cv_history.read(before, CV, FakeAI(partial)).profile.industry == before.industry
+
+
+def test_client_customer_and_vendor_titles_are_preserved() -> None:
+    for title in ("Customer Care Representative", "Client Account Manager", "Vendor Management Analyst"):
+        text = (
+            f"Nur Aina\nWORK EXPERIENCE\nJob Title: {title}\nCompany: Contoh Bank Berhad\nJan 2021 - Present"
+        )
+        assert any(job.title and job.title.value == title for job in rules(text).experience)

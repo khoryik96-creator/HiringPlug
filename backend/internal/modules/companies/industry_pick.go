@@ -24,7 +24,7 @@ import (
 
 // AI is the company's AI provider, if it has one and allowance left this month.
 type AI interface {
-	Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
 }
 
 // IndustryChoice is an industry or subindustry the AI may pick: its id and
@@ -42,7 +42,7 @@ func (s *Service) queueIndustryAsk(ctx context.Context, tx pgx.Tx, tenantID, com
 		return nil
 	}
 	// No "the AI is picking" when no AI will: off, or none set up for the agency.
-	if _, on, err := s.ai.Allowed(ctx, tx); err != nil || !on {
+	if _, on, err := s.ai.Allowed(ctx, tx, tenantID); err != nil || !on {
 		return err
 	}
 	now := time.Now()
@@ -87,7 +87,7 @@ func (s *Service) askIndustry(ctx context.Context, tx pgx.Tx, tenantID, companyI
 	if err != nil || len(chosen.Ids) > 0 {
 		return done(err)
 	}
-	access, on, err := s.ai.Allowed(ctx, tx)
+	access, on, err := s.ai.Allowed(ctx, tx, tenantID)
 	if err != nil || !on {
 		return done(err)
 	}

@@ -26,7 +26,7 @@ import (
 
 // AI is the company's AI provider, if it has one and allowance left this month.
 type AI interface {
-	Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
 }
 
 // RewriteOptions are how a blind ad is rewritten.
@@ -72,7 +72,7 @@ func (s *Service) startRewrite(ctx context.Context, tx pgx.Tx, p authz.Principal
 	on := false
 	if s.ai != nil {
 		var err error
-		if access, on, err = s.ai.Allowed(ctx, tx); err != nil {
+		if access, on, err = s.ai.Allowed(ctx, tx, p.TenantID); err != nil {
 			return BlindRewrite{}, err
 		}
 	}

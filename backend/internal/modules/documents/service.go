@@ -38,7 +38,7 @@ type Service struct {
 // AIAllowance says whether the AI may be used now (the company has one,
 // and allowance left this month), and which (nil: the server's own).
 type AIAllowance interface {
-	Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
 }
 
 // ReadDoneHook runs when reading a document has ended, in the same

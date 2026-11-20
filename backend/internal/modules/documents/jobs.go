@@ -103,7 +103,7 @@ func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, ro
 	var ai *api.AiAccess
 	if s.ai != nil {
 		var err error
-		if ai, useAI, err = s.ai.Allowed(ctx, tx); err != nil {
+		if ai, useAI, err = s.ai.Allowed(ctx, tx, tenantID); err != nil {
 			return err
 		}
 	}

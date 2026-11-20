@@ -62,7 +62,7 @@ type Deps struct {
 	}
 	// AI is the company's AI provider, if it has one and allowance left this month.
 	AI interface {
-		Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
+		Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
 	}
 }
 

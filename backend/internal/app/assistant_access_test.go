@@ -79,4 +79,8 @@ func TestAssistantAllowanceIncludesAllAgencyRecords(t *testing.T) {
 	appl := a.addToJob(recruiter, job.Id, own.Id)
 	res = a.request(http.MethodPost, "/v1/matches", recruiter, map[string]any{"applicationId": appl.Id})
 	require.Equal(t, http.StatusTooManyRequests, res.Status, "%s", res.Body)
+	a.interviewQuestion(recruiter, job.Id, map[string]any{"question": "How would you approach this role?", "kind": "technical"})
+	res = a.request(http.MethodPost, "/v1/jobs/"+job.Id+"/interview-preps", recruiter, map[string]any{})
+	require.Equal(t, api.ErrorCodeINTERVIEWPREPAIOFF, res.Error().Error.Code)
+
 }

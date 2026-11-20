@@ -3937,9 +3937,9 @@ class InterviewPrepContent(BaseModel):
     focusAreas: Annotated[list[FocusArea], Field(max_length=8)]
     softSkills: Annotated[
         list[InterviewPrepItem],
-        Field(description="Situational, what-if and behavioural questions.", max_length=10),
+        Field(description="Situational, what-if and behavioural questions.", max_length=14),
     ]
-    technical: Annotated[list[InterviewPrepItem], Field(max_length=12)]
+    technical: Annotated[list[InterviewPrepItem], Field(max_length=14)]
     questionsToAsk: Annotated[
         list[QuestionsToAskItem],
         Field(description="Good questions for the candidate to ask the interviewer.", max_length=6),

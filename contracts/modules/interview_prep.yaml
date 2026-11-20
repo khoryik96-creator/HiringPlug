@@ -340,12 +340,12 @@ components:
           items: { type: string, maxLength: 160 }
         softSkills:
           type: array
-          maxItems: 10
+          maxItems: 14
           description: Situational, what-if and behavioural questions.
           items: { $ref: '#/components/schemas/InterviewPrepItem' }
         technical:
           type: array
-          maxItems: 12
+          maxItems: 14
           items: { $ref: '#/components/schemas/InterviewPrepItem' }
         questionsToAsk:
           type: array

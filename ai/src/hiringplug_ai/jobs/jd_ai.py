@@ -35,10 +35,14 @@ TASK = """Read these details from the job description:
   "openings": how many people are wanted, as a number; null when it does not say
 }"""
 
-_PAY = re.compile(
-    r"(?i)(?:\b(?:rm|myr|sgd|usd|idr|eur|gbp)|s\$|\$)\s?\d|"
-    r"\b(?:salary|salaries|remuneration|compensation|package|pay|budget|allowance|bonus|ctc|gaji)\b.*\d"
+_PAY_TERM = r"\b(?:salary|salaries|remuneration|compensation|package|pay|budget|allowance|bonus|ctc|gaji)\b"
+_CURRENCY = r"(?:rm|myr|sgd|usd|idr|eur|gbp|s\$|\$|€|£)"
+_PAY = re.compile(rf"(?i){_CURRENCY}\s*\d|{_PAY_TERM}.*\d")
+_PAY_HEADING = re.compile(
+    rf"(?i){_PAY_TERM}(?:[\s\W]*(?:range|offered|details|per|month|year|annual|monthly|{_CURRENCY})\b)*[\s():|/-]*$"
 )
+_PAY_VALUE = re.compile(r"(?i)^\s*(?:(?:from|up to|between|to|and|[-\u2013\u2014|])\s*)*\d")
+_PAY_COLUMNS = re.compile(rf"(?i)(?:[\s()|/:-]|{_CURRENCY}|minimum|maximum|min|max)+")
 _SPACES = re.compile(r"\s+")
 _TYPES = {"full_time", "part_time", "contract", "temporary", "internship"}
 _ARRANGEMENTS = {"onsite", "hybrid", "remote"}
@@ -52,7 +56,17 @@ class Read:
 
 def without_pay(text: str) -> str:
     """The description without any line naming pay: the AI never sees salary."""
-    return "\n".join(line for line in text.split("\n") if not _PAY.search(line))
+    kept = []
+    pay_section = False
+    for line in text.splitlines():
+        if _PAY_HEADING.search(line) or _PAY.search(line):
+            pay_section = True
+            continue
+        if pay_section and (not line.strip() or _PAY_VALUE.match(line) or _PAY_COLUMNS.fullmatch(line)):
+            continue
+        pay_section = False
+        kept.append(line)
+    return "\n".join(kept)
 
 
 def _plain(text: str) -> str:

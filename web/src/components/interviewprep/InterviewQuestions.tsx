@@ -63,7 +63,7 @@ export function InterviewQuestions({ jobId, canManage }: { jobId: string; canMan
 
 function QuestionRow({ jobId, q, canManage }: { jobId: string; q: Question; canManage: boolean }) {
   const client = useQueryClient();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<Question | null>(null);
   const change = useMutation({
     mutationFn: async (body: Schemas["InterviewQuestionPatch"]) => unwrap(await api.PATCH("/v1/interview-questions/{questionId}", {
       params: { path: { questionId: q.id } }, body,
@@ -74,7 +74,7 @@ function QuestionRow({ jobId, q, canManage }: { jobId: string; q: Question; canM
     mutationFn: async () => { unwrap(await api.DELETE("/v1/interview-questions/{questionId}", { params: { path: { questionId: q.id } } })); },
     onSuccess: () => client.invalidateQueries({ queryKey: interviewQuestionsKey(jobId) }),
   });
-  if (editing) return <li className="iq-item"><QuestionForm jobId={jobId} question={q} onDone={() => { setEditing(false); }} /></li>;
+  if (editing) return <li className="iq-item"><QuestionForm jobId={jobId} question={editing} onDone={() => { setEditing(null); }} /></li>;
   return (
     <li className="iq-item">
       <div className="iq-text">
@@ -90,7 +90,7 @@ function QuestionRow({ jobId, q, canManage }: { jobId: string; q: Question; canM
       </div>
       {canManage && (
         <span className="row iq-actions">
-          {!q.archived && <IconButton label={`Edit "${q.question}"`} tip="Edit" icon={<EditIcon />} onClick={() => { setEditing(true); }} />}
+          {!q.archived && <IconButton label={`Edit "${q.question}"`} tip="Edit" icon={<EditIcon />} onClick={() => { setEditing(q); }} />}
           <IconButton label={q.archived ? `Bring back "${q.question}"` : `Archive "${q.question}"`} tip={q.archived ? "Bring back" : "Archive"}
             icon={q.archived ? <RefreshIcon /> : <ArchiveIcon />} disabled={change.isPending}
             onClick={() => { change.mutate({ version: q.version, archived: !q.archived }); }} />

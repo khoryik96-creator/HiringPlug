@@ -53,11 +53,11 @@ _NUMBERING = re.compile(r"^\(?\d{1,2}[.)]\s+")
 # Neither an employer nor a title: a client or customer served, a team or its
 # size, vendors, a career break, or a bracketed aside ("(Solutioned from KL Hub)").
 _NOT_A_JOB_PART = re.compile(
-    r"^(?:\(|(?:clients?|customers?|vendors?|sabbatical|career\s+break)\b(?!\s+(?:manager|lead|service|success|"
-    r"relations|experience|support|executive|officer|engineer|analyst|specialist|director|head))|"
+    r"^(?:\(|(?:clients?|customers?|vendors?)\s*[:：]|(?:sabbatical|career\s+break)\b|"
     r"team\s*(?:[:\[(]|size|of\b)|project\s*(?:[:\[(]|name\b)|(?:management|department|division|unit)\s*,)",
     re.IGNORECASE,
 )
+_ACCOUNT_PREFIX = re.compile(r"^(?:clients?|customers?|vendors?)\b", re.I)
 _TEAM_SIZE = re.compile(r"\s*[·|•,-]?\s*\bteam\s*(?:size)?\s*:?\s*[\[(]?\s*\d+\s*[\])]?\s*$", re.IGNORECASE)
 _SHOUTED = re.compile(r"^(?=.*[A-Z]{2})[A-Z0-9&.,()'/ -]+$")  # "IBM GDC MALAYSIA": an employer's name
 _PROMOTED = re.compile(r"^(?:promoted|appointed|transferred|elevated)\s+(?:to|as)\s+", re.IGNORECASE)
@@ -368,9 +368,12 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
             title = name
         elif company is None and name != title:
             company = name
-    if title and _NOT_A_JOB_PART.match(title):
+    if title and (
+        _NOT_A_JOB_PART.match(title)
+        or (title != lt and _ACCOUNT_PREFIX.match(title) and not ROLE_RE.search(title))
+    ):
         title = None
-    if company and _NOT_A_JOB_PART.match(company):
+    if company and (_NOT_A_JOB_PART.match(company) or (company != lc and _ACCOUNT_PREFIX.match(company))):
         company = None
     if title:
         # "Promoted to X · Team:[4]" -> X

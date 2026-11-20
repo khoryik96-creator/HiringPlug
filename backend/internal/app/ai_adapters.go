@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 type tokensSince interface {
@@ -46,11 +47,16 @@ type cvReadingAI struct {
 	now func() time.Time
 }
 
-func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error) {
+func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error) {
 	access, on, err := a.ai.Access(ctx, tx)
 	if err != nil || !on {
 		return nil, false, err
 	}
-	used, err := a.all.TokensSince(ctx, tx, assistant.MonthStart(a.now(), a.tz))
+	var used int64
+	err = database.AsSystem(ctx, tx, tenantID, func() error {
+		var err error
+		used, err = a.all.TokensSince(ctx, tx, assistant.MonthStart(a.now(), a.tz))
+		return err
+	})
 	return access, used < a.cfg.MonthlyTokens, err
 }

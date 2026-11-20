@@ -136,13 +136,17 @@ describe("candidate details in an Outlook message", () => {
     vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
       path === "/v1/email-signature" ? ok({ bodyHtml: "", version: 0, updatedAt: null })
         : path === "/v1/email-templates" ? ok({ items: [], fields })
-          : path === "/v1/candidates/{candidateId}/documents" ? ok({ items: [{ id: "doc_cv", fileName: "Safwat Ahmad CV.pdf", contentType: "application/pdf" }] })
+          : path === "/v1/candidates/{candidateId}/documents" ? ok({ items: [{ id: "doc_cv", fileName: "Safwat Ahmad CV.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", source: "formatted", pdfStatus: "ready", createdAt: "2026-11-20T00:00:00Z" }] })
             : ok({ items: [], more: false })));
     vi.spyOn(api, "POST").mockImplementation((path) => Promise.resolve(path === "/v1/outlook/drafts" ? ok(draft)
       : ok({ subject: "", bodyHtml: "", missing: [], salary: false, fieldValues: { "[Full name]": "Safwat Ahmad" } })));
-    const fetched = vi.fn<(url: string, options?: RequestInit) => Promise<Response>>().mockImplementation((url) => Promise.resolve(
-      url === "/v1/documents/doc_cv/file" ? new Response("%PDF-cv", { status: 200 })
-        : new Response(JSON.stringify({ ...draft, hasAttachments: true, version: "attached" }))));
+    let finishDownload!: (res: Response) => void;
+    const download = new Promise<Response>((resolve) => { finishDownload = resolve; });
+    let finishUpload!: (res: Response) => void;
+    const uploaded = new Promise<Response>((resolve) => { finishUpload = resolve; });
+    const fetched = vi.fn<(url: string, options?: RequestInit) => Promise<Response>>().mockImplementation((url) =>
+      url === "/v1/documents/doc_cv/pdf" ? download
+        : uploaded);
     vi.stubGlobal("fetch", fetched);
     renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} about={{ candidateId: "cand_safwat" }}
       permissions={["candidates:read", "documents:read"]} />);
@@ -150,11 +154,27 @@ describe("candidate details in an Outlook message", () => {
     expect(screen.getByText(/Candidate details & CVs/)).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "Attach CV" }), "not in the toolbar any more").toBeNull();
     const pick = await within(panel).findByRole("combobox", { name: /Attach a CV of/ });
-    fireEvent.change(pick, { target: { value: "doc_cv" } });
+    expect(within(pick).getByRole("option", { name: /Word/ })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "client@example.test" } });
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Candidate CV" } });
+    const message = screen.getByRole("textbox", { name: "Message" });
+    message.innerHTML = "<p>Here is the profile.</p>";
+    fireEvent.input(message);
+    const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send now" });
+    expect(send.disabled).toBe(false);
+    fireEvent.change(pick, { target: { value: "doc_cv:pdf" } });
+    await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save draft" }).disabled).toBe(true); });
+    expect(send.disabled).toBe(true);
+    expect(screen.queryByText(/^Attached /)).toBeNull();
+    finishDownload(new Response("%PDF-cv"));
     await waitFor(() => { expect(fetched.mock.calls.map((c) => c[0])).toContain("/v1/outlook/drafts/omg_cv/attachments?version=created"); });
     const upload = fetched.mock.calls.find((c) => c[0].startsWith("/v1/outlook/drafts/"));
     expect(upload?.[1]?.body instanceof FormData && (upload[1].body.get("file") as File).name).toBe("Safwat Ahmad CV.pdf");
-    expect(await within(panel).findByText("Attached Safwat Ahmad CV.pdf")).toBeTruthy();
+    expect(send.disabled).toBe(true);
+    expect(screen.queryByText(/^Attached /)).toBeNull();
+    finishUpload(new Response(JSON.stringify({ ...draft, hasAttachments: true, version: "attached" })));
+    expect(await screen.findByText("Attached Safwat Ahmad CV.pdf")).toBeTruthy();
+    expect(send.disabled).toBe(false);
     vi.unstubAllGlobals();
   });
 
