@@ -68,10 +68,12 @@ export async function afterContactAdded(contact: Contact, withCompanion: boolean
   if (!check) return; // the company has no LinkedIn page
   let body: Schemas["ContactLinkedinCheckAnswer"];
   try {
-    const company = await companionCall<{ company_id: string }>("companyId", { operation_id: operationId(), company_url: started.companyUrl });
-    const read = await companionCall<{ url: string; company_url: string; company_id: string; joined: string; left: string; current: boolean | null }>("employment",
-      { operation_id: check.id, url: check.profileUrl, company_url: started.companyUrl, company_id: company.company_id });
-    body = { profileUrl: read.url, companyUrl: read.company_url, linkedinCompanyId: read.company_id, joined: read.joined, left: read.left, current: read.current };
+    const company = await companionCall<{ company_id: string; company_name?: string }>("companyId", { operation_id: operationId(), company_url: started.companyUrl });
+    const read = await companionCall<{ url: string; company_url: string; company_id: string; joined: string; left: string; current: boolean | null; matched_by_name?: boolean }>("employment",
+      { operation_id: check.id, url: check.profileUrl, company_url: started.companyUrl, company_id: company.company_id,
+        company_names: [started.companyName, company.company_name ?? ""].filter(Boolean) });
+    body = { profileUrl: read.url, companyUrl: read.company_url, linkedinCompanyId: read.company_id, joined: read.joined, left: read.left, current: read.current,
+      ...(read.matched_by_name ? { matchedByName: true } : {}) };
   } catch (e) {
     body = { error: e instanceof Error ? e.message.slice(0, 300) : "Could not be read." };
   }

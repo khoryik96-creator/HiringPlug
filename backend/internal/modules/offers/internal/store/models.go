@@ -630,6 +630,7 @@ type ContactLinkedinCheck struct {
 	CreatedAt         time.Time
 	CheckedAt         *time.Time
 	MovedTo           []byte
+	MatchedByName     bool
 }
 
 type ContactMailboxCheck struct {

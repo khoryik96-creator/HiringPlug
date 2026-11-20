@@ -625,12 +625,16 @@ for each of their jobs, with **Score fit** / **Score again**.
   by whoever asked, within 15 minutes) and checks the dates make sense. A
   contact whose time there ended, with no current role there, becomes **has
   left** (audited; change it back with Edit); unclear changes nothing. The
-  company's contacts show what LinkedIn showed under each status. When their
-  Experience has loaded and none of their roles links to the company's page,
-  the check says so (the company's LinkedIn page in HiringPlug is probably not
-  the one their role links to) instead of waiting for it; when LinkedIn never
-  finishes, it names what it did not show (the Experience section, the roles,
-  or the dates at the company) (companion 1.4.1).
+  company's contacts show what LinkedIn showed under each status. A role
+  typed in on LinkedIn (linked to no company page, shown with a grey logo)
+  matches by the company's exact name, in HiringPlug or on its LinkedIn page
+  (case, punctuation and legal suffixes such as Sdn Bhd aside; never a similar
+  name): the result says "matched by the company's name" and never marks the
+  contact as left (mark them yourself with Edit if right). When their
+  Experience has loaded and no role is at the company's page or name, the
+  check says so instead of waiting for it; when LinkedIn never finishes, it
+  names what it did not show (the Experience section, the roles, or the dates
+  at the company) (companion 1.5.0).
 - **Follow leavers** ✅: when LinkedIn shows a contact has left, the companion
   also reads their current roles elsewhere (up to three: company, LinkedIn
   page, title, since when). The contact shows **Now at ...** with **Add at

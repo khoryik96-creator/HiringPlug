@@ -866,7 +866,7 @@
     else main.scrollBy({top:Math.min(main.clientHeight || 600,900),behavior:'instant'});
     return true;
   }
-  function readHRJoined(expectedURL, expectedCompany, companyId) {
+  function readHRJoined(expectedURL, expectedCompany, companyId, companyNames) {
     const unknown=()=>({joined:'',left:'',current:null});
     assertPage('', 'employment');
     if (employmentProfileURL(location.href) !== expectedURL || !companyURL(expectedCompany) || !/^[0-9]{1,24}$/.test(companyId)) throw Error('The HR profile identity changed.');
@@ -898,20 +898,58 @@
       const start=date(match[1]), current=/^present$/i.test(match[2]), end=current ? null : date(match[2]);
       return start && (current || end && end.year*12+(end.month || 12) >= start.order) ? {start,end,current} : null;
     };
-    const matches = []; let pending=false, ambiguous=false, undated=0;
+    const captions='p, .pvs-entity__caption-wrapper, span[aria-hidden="true"], time';
+    const dated = n=>[...n.querySelectorAll(captions)].some(e=>visible(e) && ranges(text(e)));
+    const expandable = card=>[...card.querySelectorAll('a, button')].some(n=>visible(n) && /(?:show|see) all|more (?:positions|roles|experiences)/i.test(text(n)));
+    // A role linked to no LinkedIn page at all may match the company by its
+    // exact name (legal suffixes such as Sdn Bhd aside): shown as such, never by a similar one.
+    const names = (Array.isArray(companyNames) ? companyNames : []).map(companyKey).filter(Boolean);
+    const byName = card=>names.length>0 && ![...card.querySelectorAll('a[href*="/company/"]')].some(visible) &&
+      [...card.querySelectorAll('p, span[aria-hidden="true"]')].some(n=>visible(n) && names.includes(companyKey(text(n).split(' · ')[0])));
+    // One employer's roles: their time there ('pending' until the dates show, 'ambiguous' when unclear).
+    const employment = observed => {
+      const unique = [...new Map(observed.map(r=>[r.start.value+'|'+(r.current?'present':r.end.value),r])).values()];
+      // The company logo and role link can arrive before the date paragraph.
+      // Poll within the existing lookup budget; never derive dates from tenure.
+      if (!unique.length) return 'pending';
+      const current = unique.filter(r=>r.current);
+      // Multiple roles marked Present overlap by definition. Within one exact
+      // employer group they establish continuity from the earliest such start.
+      const latest=current.length ? current.reduce((a,b)=>b.start.order<a.start.order?b:a) : unique.reduce((a,b)=>b.end.order>a.end.order?b:a);
+      // Year-only end dates cannot order two stints in the same year.
+      if (!current.length && unique.some(r=>r!==latest && r.end.year===latest.end.year && (!r.end.month || !latest.end.month))) return 'ambiguous';
+      let first=latest.start;
+      // Walk only directly adjacent/overlapping roles in this company group.
+      // A gap (or imprecise end date) cannot prove continuity after rejoining.
+      for (const role of unique.filter(r=>r!==latest && !r.current).sort((a,b)=>b.end.order-a.end.order)) {
+        if (role.start.order < first.order) {
+          if (!first.month || !role.end.month || role.end.order < first.order-1) return 'ambiguous';
+          first=role.start;
+        }
+      }
+      return {joined:first.value,left:latest.current?'':latest.end.value,current:latest.current};
+    };
+    // Of the employers found: the current one, else the one left last (else unclear).
+    const pick = matches => {
+      const current=matches.filter(r=>r.current);
+      if (current.length) return current.length===1?current[0]:unknown();
+      const endBound=(value,last)=>Number(value.slice(0,4))*12+(value.length===7?Number(value.slice(5)):last?12:1);
+      const latest=matches.filter(r=>matches.every(other=>r===other || endBound(r.left,false)>endBound(other.left,true)));
+      return latest.length===1?latest[0]:unknown();
+    };
+    const matches = []; const named = []; let pending=false, ambiguous=false, undated=0;
     for (const card of cards) {
       const links = [...card.querySelectorAll('a[href*="/company/"]')].filter(n=>visible(n) && [expectedCompany,'https://www.linkedin.com/company/'+companyId+'/'].includes(companyURL(n.href)));
       if (!links.length) {
-        // Another employer: counted as shown once its dates are.
-        if (![...card.querySelectorAll('p, .pvs-entity__caption-wrapper, span[aria-hidden="true"], time')].some(n=>visible(n) && ranges(text(n)))) undated++;
+        if (byName(card)) named.push(card);
+        else if (!dated(card)) undated++; // another employer: counted as shown once its dates are
         continue;
       }
       // An expandable group may hide the actual first role. A current role's
       // date alone must not be presented as the company joining date.
-      if ([...card.querySelectorAll('a, button')].some(n=>visible(n) && /(?:show|see) all|more (?:positions|roles|experiences)/i.test(text(n)))) { ambiguous=true; continue; }
+      if (expandable(card)) { ambiguous=true; continue; }
       const linked = n=>[...n.querySelectorAll('a[href*="/company/"]')].some(a=>visible(a) && [expectedCompany,'https://www.linkedin.com/company/'+companyId+'/'].includes(companyURL(a.href)));
       const roles=[...card.querySelectorAll('ul > li, [role="list"] > [role="listitem"]')].filter(n=>visible(n) && linked(n));
-      const captions='p, .pvs-entity__caption-wrapper, span[aria-hidden="true"], time';
       if (roles.some(n=>![...n.querySelectorAll('a[href*="/company/"] p, a[href*="/company/"] span[aria-hidden="true"], .pvs-entity__caption-wrapper')].filter(visible).some(n=>ranges(text(n))))) { pending=true; continue; }
       const observed = links.flatMap(n=>[...n.querySelectorAll(captions)].filter(visible).map(n=>ranges(text(n))).filter(Boolean));
       // Legacy date captions can sit beside the company link, within the same
@@ -919,45 +957,31 @@
       if (!observed.length && card.matches?.('li.artdeco-list__item')) {
         observed.push(...[...card.querySelectorAll('.pvs-entity__caption-wrapper')].filter(visible).map(n=>ranges(text(n))).filter(Boolean));
       }
-      const unique = [...new Map(observed.map(r=>[r.start.value+'|'+(r.current?'present':r.end.value),r])).values()];
-      if (!unique.length) {
-        // The company logo and role link can arrive before the date paragraph.
-        // Poll within the existing lookup budget; never derive dates from tenure.
-        // A duration/company summary is not proof that role metadata finished
-        // hydrating. Keep polling; never convert a tenure into a joining date.
-        pending=true;
-        continue;
-      }
-      const current = unique.filter(r=>r.current);
-      // Multiple roles marked Present overlap by definition. Within one exact
-      // employer group they establish continuity from the earliest such start.
-      const latest=current.length ? current.reduce((a,b)=>b.start.order<a.start.order?b:a) : unique.reduce((a,b)=>b.end.order>a.end.order?b:a);
-      // Year-only end dates cannot order two stints in the same year.
-      if (!current.length && unique.some(r=>r!==latest && r.end.year===latest.end.year && (!r.end.month || !latest.end.month))) { ambiguous=true; continue; }
-      let first=latest.start;
-      // Walk only directly adjacent/overlapping roles in this company group.
-      // A gap (or imprecise end date) cannot prove continuity after rejoining.
-      let complete=true;
-      for (const role of unique.filter(r=>r!==latest && !r.current).sort((a,b)=>b.end.order-a.end.order)) {
-        if (role.start.order < first.order) {
-          if (!first.month || !role.end.month || role.end.order < first.order-1) { complete=false; break; }
-          first=role.start;
-        }
-      }
-      if (complete) matches.push({joined:first.value,left:latest.current?'':latest.end.value,current:latest.current});
-      else ambiguous=true;
+      const found = employment(observed);
+      if (found === 'pending') pending=true;
+      else if (found === 'ambiguous') ambiguous=true;
+      else matches.push(found);
     }
     if (pending) return {loading:true,wait:'dates'};
     if (ambiguous) return unknown();
-    const current=matches.filter(r=>r.current);
-    if (current.length) return current.length===1?current[0]:unknown();
+    if (matches.length) return pick(matches);
+    // None at the company's page: a role linked to no page, by the company's exact name.
+    if (named.length) {
+      const found = named.map(card=>expandable(card) ? 'ambiguous' : employment([...card.querySelectorAll(captions)].filter(visible).map(n=>ranges(text(n))).filter(Boolean)));
+      if (found.includes('pending')) return {loading:true,wait:'dates'};
+      if (found.includes('ambiguous')) return unknown();
+      const chosen = pick(found);
+      return chosen.current === null ? chosen : {...chosen, by_name:true};
+    }
     // An Experience skeleton (or other employers hydrating first) does not
     // establish that the requested company's employment is absent: only every
     // role shown with its dates, none of them at the company's page, does.
-    if (!matches.length) return undated ? {loading:true,wait:'roles'} : {absent:true};
-    const endBound=(value,last)=>Number(value.slice(0,4))*12+(value.length===7?Number(value.slice(5)):last?12:1);
-    const latest=matches.filter(r=>matches.every(other=>r===other || endBound(r.left,false)>endBound(other.left,true)));
-    return latest.length===1?latest[0]:unknown();
+    return undated ? {loading:true,wait:'roles'} : {absent:true};
+  }
+  // A company's name to compare: lower case, punctuation and legal suffixes (Sdn Bhd, Berhad, Ltd...) aside.
+  function companyKey(value) {
+    return compact(value).toLowerCase().replace(/&/g,' and ').replace(/[^\p{L}\p{N} ]+/gu,' ')
+      .replace(/\b(?:sdn|bhd|berhad|pte|ltd|limited|inc|incorporated|plc|llc|corp|corporation|co|m)\b/g,' ').replace(/\s+/g,' ').trim();
   }
   function nextHRSearch(signature, company, country, keywords) {
     const snapshot = readHRSearch(company,country,keywords);
@@ -966,6 +990,6 @@
     button.click(); return true;
   }
   globalThis.SourcerReader = {readSearch, next, search, readProfile, profileURL, readJob, readJobSearch, nextJobSearch, scrollJobSearch, jobSearchContext, readJobPick, jobTargets,
-    readCompanyJobsID, openCompanyJobs, readHRCompany, hrCompanyOpen, hrCompanyOnly, hrCompanyApply, hrCountryOpen, hrCountryType, hrCountryPick, hrCountryApply, peopleCountrySelected, readHRSearch, nextHRSearch, readHRJoined, prepareHRJoined,jobUnavailable};
+    readCompanyJobsID, openCompanyJobs, readHRCompany, hrCompanyOpen, hrCompanyOnly, hrCompanyApply, hrCountryOpen, hrCountryType, hrCountryPick, hrCountryApply, peopleCountrySelected, readHRSearch, nextHRSearch, readHRJoined, prepareHRJoined,jobUnavailable,companyKey};
 })();
 

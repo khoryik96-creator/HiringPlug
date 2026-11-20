@@ -136,3 +136,31 @@ func TestCheckingOnLinkedInWhetherAContactHasLeft(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodPost, "/v1/contacts/linkedin-checks", stranger, map[string]any{"contactId": wei.Id}).Status)
 	assert.Equal(t, http.StatusNotFound, answer(stranger, checks["Wei"].Id, former).Status)
 }
+
+func TestALinkedInRoleMatchedByNameIsShownNeverActedOn(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	company := a.createCompany(token, map[string]any{"name": "Payments Network Malaysia Sdn Bhd", "linkedinUrl": "linkedin.com/company/paynet-example/"})
+	rashid := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Rashid", "linkedinUrl": "linkedin.com/in/rashid-example"})
+
+	started := a.startLinkedinChecks(token, map[string]any{"contactId": rashid.Id})
+	assert.Equal(t, "Payments Network Malaysia Sdn Bhd", started.CompanyName, "for a role typed in on LinkedIn")
+	require.Len(t, started.Checks, 1)
+
+	// Their time there ended, by the company's name only: shown, the contact left as they are.
+	res := a.request(http.MethodPost, "/v1/contacts/linkedin-checks/"+started.Checks[0].Id+"/answer", token, map[string]any{
+		"profileUrl": started.Checks[0].ProfileUrl, "companyUrl": started.CompanyUrl, "linkedinCompanyId": "555",
+		"joined": "2017-08", "left": "2025-06", "current": false, "matchedByName": true})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	var check api.ContactLinkedinCheck
+	res.JSON(&check)
+	assert.True(t, check.MatchedByName)
+	assert.False(t, check.MarkedLeft, "never marked as left by a name")
+	got := a.contact(token, rashid.Id)
+	assert.Equal(t, api.ContactStatusActive, got.Status)
+	assert.Equal(t, rashid.Version, got.Version)
+	assert.Equal(t, "2025-06", got.LinkedinCheck.MustGet().Left.MustGet())
+	assert.True(t, got.LinkedinCheck.MustGet().MatchedByName)
+}

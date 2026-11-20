@@ -240,15 +240,29 @@ test("reads a new contact's name and current roles from their profile", async ()
 
 test('says when their Experience shows no role at the company, instead of waiting for it', async () => {
   // Every role shown with its dates, none linked to the company's page: twice, so not a page still drawing.
-  const b = browser({page: (tab, args) => (args.length === 3 ? {absent: true} : true), fast: true});
+  const b = browser({page: (tab, args) => (args.length === 4 ? {absent: true} : true), fast: true});
   const reply = await b.send(check);
-  assert.match(reply.error, /shows no role at this company's LinkedIn page/);
+  assert.match(reply.error, /shows no role at this company.s LinkedIn page, nor one typed in/);
   assert.equal(b.tabs.size, 1, 'its tab is closed');
 });
 
 test('names what LinkedIn never finished showing', async () => {
   for (const [wait, said] of [['dates', /dates of their role at this company/], ['section', /did not show their Experience section/], [undefined, /did not finish loading/]]) {
-    const b = browser({page: (tab, args) => (args.length === 3 ? {loading: true, wait} : true), fast: true});
+    const b = browser({page: (tab, args) => (args.length === 4 ? {loading: true, wait} : true), fast: true});
     assert.match((await b.send(check)).error, said);
   }
+});
+
+test('passes on the company names, and says when the role matched by name only', async () => {
+  let given;
+  const b = browser({page: (tab, args) => {
+    if (args.length === 4) { given = args[3]; return {joined: '2017-08', left: '', current: true, by_name: true}; }
+    return true;
+  }, fast: true});
+  const reply = await b.send({...check, args: {...check.args, company_names: ['Payments Network Malaysia', 7, 'x'.repeat(201), 'PayNet', 'A', 'B']}});
+  assert.deepEqual([...given], ['Payments Network Malaysia', 'PayNet', 'A'], 'names only, up to three');
+  assert.equal(reply.result.matched_by_name, true);
+  assert.equal(reply.result.current, true);
+  const linked = await browser({page: (tab, args) => (args.length === 4 ? {joined: '2019-04', left: '', current: true} : true), fast: true}).send(check);
+  assert.equal(linked.result.matched_by_name, undefined);
 });

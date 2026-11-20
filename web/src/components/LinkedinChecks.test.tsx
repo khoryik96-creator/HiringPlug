@@ -20,7 +20,7 @@ function companion(answer: (action: string, args: Record<string, unknown>) => { 
 }
 
 const started = {
-  companyUrl: "https://www.linkedin.com/company/maju-logistik/",
+  companyUrl: "https://www.linkedin.com/company/maju-logistik/", companyName: "Maju Logistik Sdn Bhd",
   checks: [
     { id: "clc_01jbz6w0m0k8q9x2r3s4t5v6w1", contactId: "cont_ana", contactName: "Ana Lim", profileUrl: "https://www.linkedin.com/in/ana" },
     { id: "clc_01jbz6w0m0k8q9x2r3s4t5v6w2", contactId: "cont_wei", contactName: "Wei", profileUrl: "https://www.linkedin.com/in/wei" },
@@ -85,5 +85,23 @@ describe("checking employment on LinkedIn", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check employment on LinkedIn" }));
     expect(screen.getByText(/Install the HiringPlug LinkedIn Companion first/)).toBeTruthy();
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("matches a role typed in on LinkedIn by the company's name, and says so", async () => {
+    const asked = companion((action, args) => {
+      if (action === "companyId") return { result: { company_url: args.company_url, company_id: "123456", company_name: "Maju Logistik" } };
+      return { result: { url: args.url, company_url: args.company_url, company_id: args.company_id, joined: "2017-08", left: "", current: true, matched_by_name: true } };
+    });
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/contacts/linkedin-checks"
+      ? { ...started, checks: [started.checks[0]], skipped: [] }
+      : { id: "clc_x", contactId: "cont_ana", status: "observed", joined: "2017-08", left: null, current: true, markedLeft: false, matchedByName: true,
+        movedTo: [], error: null, createdAt: "2026-11-20T00:00:00Z", checkedAt: "2026-11-20T00:00:00Z" }))) as never);
+    renderWithClient(<LinkedinChecks companyId="comp_1" />);
+    await new Promise((r) => setTimeout(r, 50));
+    fireEvent.click(screen.getByRole("button", { name: "Check employment on LinkedIn" }));
+    expect(await screen.findByText(/Still there, since Aug 2017 · matched by the company's name: their role links to no LinkedIn page/)).toBeTruthy();
+    expect(asked[1]?.args).toMatchObject({ company_names: ["Maju Logistik Sdn Bhd", "Maju Logistik"] });
+    const answer = (post.mock.calls as unknown[][]).find((c) => c[0] === "/v1/contacts/linkedin-checks/{checkId}/answer")?.[1] as { body: unknown } | undefined;
+    expect(answer?.body).toMatchObject({ matchedByName: true, current: true, joined: "2017-08" });
   });
 });

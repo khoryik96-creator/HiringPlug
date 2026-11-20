@@ -6717,6 +6717,8 @@ export interface components {
         ContactLinkedinChecksStarted: {
             /** @description The company's LinkedIn page, https://www.linkedin.com/company/.../ */
             companyUrl: string;
+            /** @description The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name. */
+            companyName: string;
             checks: components["schemas"]["ContactLinkedinCheckRequest"][];
             /** @description Contacts not checked this time, and why. */
             skipped: components["schemas"]["ContactLinkedinCheckSkipped"][];
@@ -6743,6 +6745,8 @@ export interface components {
             current?: boolean | null;
             /** @description With current false, their current roles elsewhere, as the profile shows them. */
             movedTo?: components["schemas"]["LinkedinMove"][];
+            /** @description The role is linked to no LinkedIn company page and matched the company by its exact name (never marks the contact as left). */
+            matchedByName?: boolean;
             /** @description Why the profile could not be read (then nothing else). */
             error?: string;
         };
@@ -6769,6 +6773,8 @@ export interface components {
             current: boolean | null;
             /** @description This check set the contact to "has left". */
             markedLeft: boolean;
+            /** @description The role was matched by the company's exact name (it links to no LinkedIn page): confirm it before acting on it. */
+            matchedByName: boolean;
             /** @description Where they work now, when their time at the company ended (from the same profile). */
             movedTo: components["schemas"]["LinkedinMove"][];
             error: string | null;

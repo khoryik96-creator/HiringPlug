@@ -10614,9 +10614,10 @@ components:
         profileUrl: {type: string, description: "https://www.linkedin.com/in/..."}
     ContactLinkedinChecksStarted:
       type: object
-      required: [companyUrl, checks, skipped]
+      required: [companyUrl, companyName, checks, skipped]
       properties:
         companyUrl: {type: string, description: "The company's LinkedIn page, https://www.linkedin.com/company/.../"}
+        companyName: {type: string, description: "The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name."}
         checks:
           type: array
           items: {$ref: '#/components/schemas/ContactLinkedinCheckRequest'}
@@ -10652,6 +10653,11 @@ components:
           maxItems: 3
           description: With current false, their current roles elsewhere, as the profile shows them.
           items: {$ref: '#/components/schemas/LinkedinMove'}
+        matchedByName:
+          type: boolean
+          description: >
+            The role is linked to no LinkedIn company page and matched the company by its exact name (never marks the contact as left).
+
         error: {type: string, maxLength: 300, description: "Why the profile could not be read (then nothing else)."}
     LinkedinMove:
       type: object
@@ -10664,7 +10670,7 @@ components:
         since: {type: string, maxLength: 7, description: "YYYY or YYYY-MM; empty when not shown."}
     ContactLinkedinCheck:
       type: object
-      required: [id, contactId, status, joined, left, current, markedLeft, movedTo, error, createdAt, checkedAt]
+      required: [id, contactId, status, joined, left, current, markedLeft, matchedByName, movedTo, error, createdAt, checkedAt]
       properties:
         id: {$ref: '#/components/schemas/ContactLinkedinCheckId'}
         contactId: {$ref: '#/components/schemas/ContactId'}
@@ -10680,6 +10686,7 @@ components:
           nullable: true
         current: {type: boolean, nullable: true, description: "true = a current role there; false = their time there ended; null = unclear."}
         markedLeft: {type: boolean, description: This check set the contact to "has left".}
+        matchedByName: {type: boolean, description: "The role was matched by the company's exact name (it links to no LinkedIn page): confirm it before acting on it."}
         movedTo:
           type: array
           description: Where they work now, when their time at the company ended (from the same profile).

@@ -254,15 +254,18 @@ async function employment(op, args) {
   if (!profileRe.test(args.url || '') || !companyRe.test(args.company_url || '') || !/^[0-9]{1,24}$/.test(args.company_id || '')) {
     throw safeError('Choose a contact with a LinkedIn profile, at a company with a LinkedIn page.');
   }
+  // The company's names (in HiringPlug, on LinkedIn), for a role linked to no LinkedIn page.
+  const names = Array.isArray(args.company_names)
+    ? args.company_names.filter(n => typeof n === 'string' && n.trim() && n.length <= 200).slice(0, 3) : [];
   let moves = [];
   let absent = 0;
   const value = await withTab(op, args.url + '/details/experience/', async tabId => {
-    const read = await inject(tabId, (url, company, id) => {
-      try { return globalThis.SourcerReader.readHRJoined(url, company, id); } catch { return {failed: true}; }
-    }, [args.url, args.company_url, args.company_id], 'The LinkedIn profile could not be read.');
+    const read = await inject(tabId, (url, company, id, known) => {
+      try { return globalThis.SourcerReader.readHRJoined(url, company, id, known); } catch { return {failed: true}; }
+    }, [args.url, args.company_url, args.company_id, names], 'The LinkedIn profile could not be read.');
     // Every role shown with its dates, none at the company's page: twice in a row, so not a page still drawing.
-    if (read?.absent === true) {
-      if (++absent >= 2) throw safeError("Their LinkedIn Experience shows no role at this company's LinkedIn page. Check the company's LinkedIn page in HiringPlug (it must be the page their role links to), or update the contact by hand.");
+    if (read?.absent === true) { // (a role matching by name is never absent)
+      if (++absent >= 2) throw safeError("Their LinkedIn Experience shows no role at this company's LinkedIn page, nor one typed in under the company's name. Check the company's LinkedIn page and name in HiringPlug, or update the contact by hand.");
       return {loading: true};
     }
     absent = 0;
@@ -283,7 +286,8 @@ async function employment(op, args) {
       (left && (joined.length === 4 ? joined + '-01' : joined) > (left.length === 4 ? left + '-12' : left))) {
     throw safeError('The employment dates could not be confirmed.');
   }
-  return {url: args.url, company_url: args.company_url, company_id: args.company_id, joined, left, current: now, ...(now === false ? {moved_to: moves} : {})};
+  return {url: args.url, company_url: args.company_url, company_id: args.company_id, joined, left, current: now,
+    ...(value.by_name === true && names.length && now !== null ? {matched_by_name: true} : {}), ...(now === false ? {moved_to: moves} : {})};
 }
 
 // What a company's About page says of it, for a new company in HiringPlug.

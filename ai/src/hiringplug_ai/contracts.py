@@ -2144,6 +2144,12 @@ class ContactLinkedinCheck(BaseModel):
         Field(description="true = a current role there; false = their time there ended; null = unclear."),
     ]
     markedLeft: Annotated[bool, Field(description='This check set the contact to "has left".')]
+    matchedByName: Annotated[
+        bool,
+        Field(
+            description="The role was matched by the company's exact name (it links to no LinkedIn page): confirm it before acting on it."
+        ),
+    ]
     movedTo: Annotated[
         list[LinkedinMove],
         Field(
@@ -6586,6 +6592,12 @@ class ContactLinkedinChecksStarted(BaseModel):
     companyUrl: Annotated[
         str, Field(description="The company's LinkedIn page, https://www.linkedin.com/company/.../")
     ]
+    companyName: Annotated[
+        str,
+        Field(
+            description="The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name."
+        ),
+    ]
     checks: list[ContactLinkedinCheckRequest]
     skipped: Annotated[
         list[ContactLinkedinCheckSkipped], Field(description="Contacts not checked this time, and why.")
@@ -6613,6 +6625,12 @@ class ContactLinkedinCheckAnswer(BaseModel):
         Field(
             description="With current false, their current roles elsewhere, as the profile shows them.",
             max_length=3,
+        ),
+    ] = None
+    matchedByName: Annotated[
+        bool | None,
+        Field(
+            description="The role is linked to no LinkedIn company page and matched the company by its exact name (never marks the contact as left).\n"
         ),
     ] = None
     error: Annotated[

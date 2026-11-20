@@ -7,7 +7,9 @@ package contacts
 // company's LinkedIn page; only whoever asked may answer it, within 15
 // minutes, with the dates of the contact's time at that exact company.
 // "Their time there ended, with no current role there" makes a contact who
-// works there one who has left; anything unclear changes nothing.
+// works there one who has left; anything unclear changes nothing. A role
+// linked to no LinkedIn page may match by the company's exact name: that is
+// shown, never acted on.
 
 import (
 	"context"
@@ -41,9 +43,10 @@ type LinkedinCheckRequest struct {
 
 // LinkedinChecks are the checks started for a company (or one contact).
 type LinkedinChecks struct {
-	CompanyURL string
-	Checks     []LinkedinCheckRequest
-	Skipped    []LinkedinCheckRequest // no usable profile address
+	CompanyURL  string
+	CompanyName string // in HiringPlug, for a role linked to no LinkedIn page
+	Checks      []LinkedinCheckRequest
+	Skipped     []LinkedinCheckRequest // no usable profile address
 }
 
 // LinkedinCheck is a check and its answer.
@@ -52,6 +55,7 @@ type LinkedinCheck struct {
 	Joined, Left, Error   *string
 	Current               *bool
 	MarkedLeft            bool           // it set the contact to "has left"
+	MatchedByName         bool           // by the company's name: the role links to no LinkedIn page
 	MovedTo               []LinkedinMove // where they work now, when they left
 	CreatedAt             time.Time
 	CheckedAt             *time.Time
@@ -59,7 +63,7 @@ type LinkedinCheck struct {
 
 func linkedinCheckFrom(r store.ContactLinkedinCheck) LinkedinCheck {
 	out := LinkedinCheck{ID: r.ID, ContactID: r.ContactID, Status: r.Status, Joined: r.Joined, Left: r.LeftOn, Error: r.Error,
-		Current: r.CurrentJob, MarkedLeft: r.MarkedLeft, MovedTo: []LinkedinMove{}, CreatedAt: r.CreatedAt, CheckedAt: r.CheckedAt}
+		Current: r.CurrentJob, MarkedLeft: r.MarkedLeft, MatchedByName: r.MatchedByName, MovedTo: []LinkedinMove{}, CreatedAt: r.CreatedAt, CheckedAt: r.CheckedAt}
 	_ = json.Unmarshal(r.MovedTo, &out.MovedTo) // checked when saved
 	return out
 }
@@ -70,6 +74,7 @@ type LinkedinAnswer struct {
 	Joined, Left                              string
 	Current                                   *bool
 	MovedTo                                   []LinkedinMove
+	MatchedByName                             bool
 	Error                                     string
 }
 
@@ -110,6 +115,11 @@ func (s *Service) StartLinkedinChecks(ctx context.Context, p authz.Principal, co
 			errs.Add("companyId", "add the company's LinkedIn page first (linkedin.com/company/...)")
 			return errs.Err()
 		}
+		names, err := s.companies.Names(ctx, tx, []string{*companyID})
+		if err != nil {
+			return err
+		}
+		out.CompanyName = names[*companyID]
 		for _, person := range people {
 			r := LinkedinCheckRequest{ContactID: person.ID, ContactName: FullName(person.FirstName, person.LastName)}
 			if person.LinkedinUrl != nil {
@@ -188,11 +198,12 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 				return err
 			}
 			params.Status, params.CurrentJob, params.LinkedinCompanyID = "observed", a.Current, &a.LinkedinCompanyID
+			params.MatchedByName = a.MatchedByName
 			params.Joined, params.LeftOn = optional(a.Joined), optional(a.Left)
 			if params.MovedTo, err = json.Marshal(moves); err != nil {
 				return err
 			}
-			if a.Current != nil && !*a.Current {
+			if a.Current != nil && !*a.Current && !a.MatchedByName { // by name: shown for the person to confirm
 				if params.MarkedLeft, err = s.markLeft(ctx, q, check); err != nil {
 					return err
 				}
@@ -206,7 +217,8 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 			return err
 		}
 		out = linkedinCheckFrom(saved)
-		changes := map[string]any{"status": out.Status, "current": out.Current, "joined": out.Joined, "left": out.Left, "movedTo": len(out.MovedTo)}
+		changes := map[string]any{"status": out.Status, "current": out.Current, "joined": out.Joined, "left": out.Left, "movedTo": len(out.MovedTo),
+			"matchedByName": out.MatchedByName}
 		if out.MarkedLeft {
 			changes["contactStatus"] = map[string]any{"from": "active", "to": "left"}
 		}
@@ -245,7 +257,7 @@ func (h *HTTP) StartContactLinkedinChecks(ctx context.Context, req api.StartCont
 	if err != nil {
 		return nil, err
 	}
-	out := api.StartContactLinkedinChecks201JSONResponse{CompanyUrl: started.CompanyURL,
+	out := api.StartContactLinkedinChecks201JSONResponse{CompanyUrl: started.CompanyURL, CompanyName: started.CompanyName,
 		Checks: make([]api.ContactLinkedinCheckRequest, len(started.Checks)), Skipped: make([]api.ContactLinkedinCheckSkipped, len(started.Skipped))}
 	for i, r := range started.Checks {
 		out.Checks[i] = api.ContactLinkedinCheckRequest{Id: r.ID, ContactId: r.ContactID, ContactName: r.ContactName, ProfileUrl: r.ProfileURL}
@@ -260,7 +272,7 @@ func (h *HTTP) StartContactLinkedinChecks(ctx context.Context, req api.StartCont
 func (h *HTTP) AnswerContactLinkedinCheck(ctx context.Context, req api.AnswerContactLinkedinCheckRequestObject) (api.AnswerContactLinkedinCheckResponseObject, error) {
 	b := req.Body
 	a := LinkedinAnswer{ProfileURL: deref(b.ProfileUrl), CompanyURL: deref(b.CompanyUrl), LinkedinCompanyID: deref(b.LinkedinCompanyId),
-		Joined: deref(b.Joined), Left: deref(b.Left), Error: deref(b.Error)}
+		Joined: deref(b.Joined), Left: deref(b.Left), Error: deref(b.Error), MatchedByName: b.MatchedByName != nil && *b.MatchedByName}
 	if v, err := b.Current.Get(); err == nil {
 		a.Current = &v
 	}
@@ -279,7 +291,7 @@ func (h *HTTP) AnswerContactLinkedinCheck(ctx context.Context, req api.AnswerCon
 func linkedinCheckToAPI(r LinkedinCheck) api.ContactLinkedinCheck {
 	return api.ContactLinkedinCheck{
 		Id: r.ID, ContactId: r.ContactID, Status: api.ContactLinkedinCheckStatus(r.Status), Joined: c.OrNull(r.Joined), Left: c.OrNull(r.Left),
-		Current: c.OrNull(r.Current), MarkedLeft: r.MarkedLeft, MovedTo: movesToAPI(r.MovedTo), Error: c.OrNull(r.Error), CreatedAt: r.CreatedAt, CheckedAt: c.OrNull(r.CheckedAt),
+		Current: c.OrNull(r.Current), MarkedLeft: r.MarkedLeft, MatchedByName: r.MatchedByName, MovedTo: movesToAPI(r.MovedTo), Error: c.OrNull(r.Error), CreatedAt: r.CreatedAt, CheckedAt: c.OrNull(r.CheckedAt),
 	}
 }
 

@@ -12,15 +12,20 @@ type Row = { name: string; contactId: string; text: string; tone: "left" | "ther
 
 interface Read {
   url: string; company_url: string; company_id: string; joined: string; left: string; current: boolean | null;
+  matched_by_name?: boolean;
   moved_to?: { company_url: string; company_name: string; title: string; since: string }[];
 }
+
+/** A role typed in on LinkedIn (linked to no company page), matched by the company's name. */
+const BY_NAME = " · matched by the company's name: their role links to no LinkedIn page";
 
 function rowFor(name: string, contactId: string, check: Schemas["ContactLinkedinCheck"]): Row {
   if (check.status !== "observed") return { name, contactId, tone: "failed", text: check.error ?? "Could not be read." };
   if (check.current === false) {
-    return { name, contactId, check, tone: "left", text: `Left ${linkedinDates(check.left)}${check.markedLeft ? " · marked as Has left" : ""}` };
+    return { name, contactId, check, tone: "left", text: `Left ${linkedinDates(check.left)}${check.markedLeft ? " · marked as Has left" : ""}${
+      check.matchedByName ? `${BY_NAME} (if right, mark them as Has left with Edit)` : ""}` };
   }
-  if (check.current) return { name, contactId, tone: "there", text: `Still there, since ${linkedinDates(check.joined)}` };
+  if (check.current) return { name, contactId, tone: "there", text: `Still there, since ${linkedinDates(check.joined)}${check.matchedByName ? BY_NAME : ""}` };
   return { name, contactId, tone: "unclear", text: "LinkedIn does not show clearly: nothing changed" };
 }
 
@@ -67,7 +72,9 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
       setRecent(started.skipped.filter((s) => s.reason === "recent").length);
       if (started.checks.length === 0) return;
       token.operation = operationId();
-      const company = await companionCall<{ company_id: string }>("companyId", { operation_id: token.operation, company_url: started.companyUrl });
+      const company = await companionCall<{ company_id: string; company_name?: string }>("companyId", { operation_id: token.operation, company_url: started.companyUrl });
+      // A role typed in on LinkedIn may match by name: the company's in HiringPlug, or its page's.
+      const names = [started.companyName, company.company_name ?? ""].filter(Boolean);
       for (const check of started.checks) {
         if (stopped()) break;
         token.operation = check.id;
@@ -75,9 +82,10 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
         let body: Schemas["ContactLinkedinCheckAnswer"];
         try {
           const read = await companionCall<Read>("employment", {
-            operation_id: check.id, url: check.profileUrl, company_url: started.companyUrl, company_id: company.company_id,
+            operation_id: check.id, url: check.profileUrl, company_url: started.companyUrl, company_id: company.company_id, company_names: names,
           });
-          body = { profileUrl: read.url, companyUrl: read.company_url, linkedinCompanyId: read.company_id, joined: read.joined, left: read.left, current: read.current };
+          body = { profileUrl: read.url, companyUrl: read.company_url, linkedinCompanyId: read.company_id, joined: read.joined, left: read.left, current: read.current,
+            ...(read.matched_by_name ? { matchedByName: true } : {}) };
           if (read.moved_to?.length) {
             body.movedTo = read.moved_to.map((m) => ({ companyUrl: m.company_url, companyName: m.company_name, title: m.title, since: m.since }));
           }
