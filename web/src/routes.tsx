@@ -37,6 +37,7 @@ const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
 const StageTemplates = page(() => import("./pages/StageTemplates"), "StageTemplates");
+const EmailSignature = page(() => import("./components/EmailSignature"), "EmailSignature");
 const ClaimsStorage = page(() => import("./pages/ClaimsStorage"), "ClaimsStorage");
 const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
 export const Calendar = page(() => import("./pages/Calendar"), "Calendar");
@@ -178,7 +179,8 @@ export const ROUTES: Route[] = [
   { section: "bin", path: /^#\/bin/, permission: "bin:manage", menu: { in: "settings", label: "Bin", href: "#/bin" },
     render: () => <Bin /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
-    render: (c) => <main><h2>Your account</h2>{can(c, "calendars:use") && <p><a href="#/calendar">Outlook calendar</a></p>}{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
+    render: (c) => <main><h2>Your account</h2>{can(c, "calendars:use") && <p><a href="#/calendar">Outlook calendar</a></p>}{can(c, "scheduling:use") && <BookingHours />}
+      {can(c, "emails:send") && <EmailSignature canUploadBanners={can(c, "emails.templates:manage")} />}<ChangePassword /></main> },
   { section: "my-dropdowns", path: /^#\/my-dropdowns/, menu: { in: "settings", label: "My dropdowns", href: "#/my-dropdowns" },
     render: () => <MyDropdowns /> },
   { section: "companion", path: /^#\/companion/, menu: { in: "settings", label: "LinkedIn companion", href: "#/companion" },

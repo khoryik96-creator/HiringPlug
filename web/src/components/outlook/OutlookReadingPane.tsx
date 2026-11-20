@@ -40,7 +40,7 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
   canSaveCv: boolean;
   canImportCv: boolean;
   onThread: () => void;
-  onOpenDraft: (id: string, focusMessage?: boolean) => void;
+  onOpenDraft: (id: string, focusMessage?: boolean, fresh?: boolean) => void;
 }) {
   const client = useQueryClient();
   const [reply, setReply] = useState("");
@@ -153,7 +153,7 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
         holdPictures={folders.find((f) => f.id === message.folderId)?.kind === "junkemail"} />
       : b && <div className="outlook-body">{b.text}</div>}
     {b?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
-    {mode === "forward" && <OutlookForward messageId={message.id} onOpen={onOpenDraft} onClose={() => { setMode(null); }} />}
+    {mode === "forward" && <OutlookForward messageId={message.id} onOpen={(id) => { onOpenDraft(id, false, true); }} onClose={() => { setMode(null); }} />}
     {(mode === "reply" || mode === "replyAll") && <form className="outlook-reply" onSubmit={(e) => { e.preventDefault(); send.mutate(false); }}>
       <label className="field">{mode === "replyAll" ? "Reply to all recipients" : "Reply to sender"}
         <textarea rows={5} maxLength={10000} required value={reply} onChange={(e) => { setReply(e.target.value); }} />

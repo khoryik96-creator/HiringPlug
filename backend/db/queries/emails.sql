@@ -168,3 +168,14 @@ DELETE FROM email_mail_app WHERE provider = @provider;
 
 -- name: MarkBounced :exec
 UPDATE email SET bounced_to = @bounced_to, bounced_at = coalesce(bounced_at, now()) WHERE id = @id;
+
+-- Email signatures: each person's own (row-level security).
+
+-- name: GetEmailSignature :one
+SELECT * FROM email_signature WHERE user_id = app_current_user();
+
+-- name: SaveEmailSignature :one
+INSERT INTO email_signature (tenant_id, user_id, body_html) VALUES (app_current_tenant(), app_current_user(), @body_html)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET body_html = excluded.body_html, version = email_signature.version + 1, updated_at = now()
+  WHERE email_signature.version = @version
+RETURNING *;

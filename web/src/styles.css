@@ -1365,3 +1365,4 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .score-btn svg { width: 15px; height: 15px; color: var(--accent); }
 .step-tools { display: flex; justify-content: flex-end; margin: 0.2rem 0; font-size: 0.85rem; }
 .score-btn { min-height: 34px; }
+.email-signature .rich { margin: .6rem 0; }

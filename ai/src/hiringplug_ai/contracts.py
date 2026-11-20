@@ -2903,6 +2903,25 @@ class EmailAttachmentId(RootModel[str]):
     ]
 
 
+class EmailSignature(BaseModel):
+    bodyHtml: Annotated[
+        str,
+        Field(
+            description="The signature, formatted (made safe as a message is): text, links and banners. Empty: none."
+        ),
+    ]
+    version: Annotated[int, Field(description="0 until saved.")]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class EmailSignatureInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    bodyHtml: Annotated[str, Field(max_length=20000)]
+    version: int
+
+
 class EmailBanner(BaseModel):
     id: EmailBannerId
     name: str

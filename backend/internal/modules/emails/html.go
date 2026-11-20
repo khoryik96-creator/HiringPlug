@@ -38,6 +38,8 @@ func messageHTMLPolicy(keepInline bool) *bluemonday.Policy {
 	p.AllowAttrs("data-banner-id").Matching(bannerIDRe).OnElements("img")
 	p.AllowAttrs("data-field").Matching(fieldKeyRe).OnElements("span")
 	p.AllowAttrs("data-candidate-summary").Matching(regexp.MustCompile(`^true$`)).OnElements("div")
+	// The person's signature, so it is added to a message once.
+	p.AllowAttrs("data-signature").Matching(regexp.MustCompile(`^true$`)).OnElements("div")
 	p.AllowAttrs("data-candidate-id").Matching(regexp.MustCompile(`^cand_[0-9a-hjkmnp-tv-z]{26}$`)).OnElements("p", "tr")
 	p.AllowAttrs("alt").OnElements("img")
 	if keepInline {

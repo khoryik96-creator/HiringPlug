@@ -894,6 +894,14 @@ type EmailOutlookSync struct {
 	SyncError   *string
 }
 
+type EmailSignature struct {
+	TenantID  string
+	UserID    string
+	BodyHtml  string
+	Version   int32
+	UpdatedAt time.Time
+}
+
 type EmailTemplate struct {
 	ID        string
 	TenantID  string

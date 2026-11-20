@@ -1276,6 +1276,41 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
 
+  /v1/email-signature:
+    get:
+      operationId: getEmailSignature
+      tags: [emails]
+      summary: Your email signature (empty until you write one)
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailSignature' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: saveEmailSignature
+      tags: [emails]
+      summary: Save your email signature, added to the emails you write in Outlook Mail
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailSignatureInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailSignature' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /v1/email-banners:
     get:
       operationId: listEmailBanners
@@ -2173,6 +2208,22 @@ components:
       type: string
       pattern: '^eat_[0-9a-hjkmnp-tv-z]{26}$'
       example: eat_01jbz6w0m0k8q9x2r3s4t5v6w7
+    EmailSignature:
+      type: object
+      required: [bodyHtml, version, updatedAt]
+      properties:
+        bodyHtml:
+          type: string
+          description: "The signature, formatted (made safe as a message is): text, links and banners. Empty: none."
+        version: { type: integer, description: "0 until saved." }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    EmailSignatureInput:
+      type: object
+      additionalProperties: false
+      required: [bodyHtml, version]
+      properties:
+        bodyHtml: { type: string, maxLength: 20000 }
+        version: { type: integer }
     EmailBanner:
       type: object
       required: [id, name, contentType, sizeBytes, createdAt]

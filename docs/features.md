@@ -1653,7 +1653,11 @@ It looks and works like Outlook: folders with unread counts, a list showing
 each sender, subject and date, and a reading pane showing the message in its
 own formatting (tables, colours, signature logos and banners; in Junk Email,
 pictures from the web load only on **Show pictures**). Browse, search by subject, name or address, delete,
-archive, move, flag, mark read or unread, and reply in the original thread. Download file attachments of up to 20 MiB from the reading pane.
+archive, move, flag, mark read or unread, and reply in the original thread.
+Replies, forwards and new messages use HiringPlug's email tools: templates
+(use, save, save as new, delete), candidate fields including salary, banners,
+the candidate's CV and your own signature (Settings > Your account), and Send
+later. Download file attachments of up to 20 MiB from the reading pane.
 Use **Save CV** to put an attachment in the selected candidate's **CV & files**.
 Use **Import CV** to open it in the candidate importer, with its usual source
 selection, duplicate checks and CV parsing.

@@ -180,7 +180,20 @@ message list (sender, subject and attachment mark; beside each date, its
 **Flag** and **Move to**), then the reading pane. The command bar above them
 holds **New mail**, then **Delete** (to Deleted Items), **Archive** and **Mark
 as read/unread** as icons named in tooltips; **Reply**, **Reply all** and
-**Forward** sit as icons beside the sender. Opening a message marks it read, as Outlook
+**Forward** sit as icons beside the sender.
+
+New messages, replies and forwards are written with HiringPlug's email tools:
+**templates** (use one: it goes above the quoted message, and fills the subject
+of a new message; save what you wrote as a new template, or save changes to the
+one you used, without the quoted message or your signature), a **candidate for
+fields** (the profile's candidate when opened from one) whose details fill
+fields such as [Expected salary] (salary fields only for roles that may see
+salaries; fields still in brackets are named before you send), **banners**
+(attached to the Outlook draft as pictures in the email, so recipients see
+them), the candidate's **CV** to attach, and your **signature**, set in
+Settings > Your account and added once to each new message, reply and forward
+above the quoted message (delete it from any one email; **Insert signature**
+puts it back). **Send later** schedules the message as before. Opening a message marks it read, as Outlook
 does.
 
 For a CV attachment, choose **Save CV**, select the right candidate and confirm

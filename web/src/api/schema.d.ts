@@ -2322,6 +2322,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/email-signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your email signature (empty until you write one) */
+        get: operations["getEmailSignature"];
+        /** Save your email signature, added to the emails you write in Outlook Mail */
+        put: operations["saveEmailSignature"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/email-banners": {
         parameters: {
             query?: never;
@@ -7415,6 +7433,18 @@ export interface components {
         EmailBannerId: string;
         /** @example eat_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         EmailAttachmentId: string;
+        EmailSignature: {
+            /** @description The signature, formatted (made safe as a message is): text, links and banners. Empty: none. */
+            bodyHtml: string;
+            /** @description 0 until saved. */
+            version: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        EmailSignatureInput: {
+            bodyHtml: string;
+            version: number;
+        };
         EmailBanner: {
             id: components["schemas"]["EmailBannerId"];
             name: string;
@@ -15189,6 +15219,56 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             413: components["responses"]["PayloadTooLarge"];
+        };
+    };
+    getEmailSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailSignature"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveEmailSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailSignatureInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailSignature"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
         };
     };
     listEmailBanners: {

@@ -263,6 +263,25 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 	return i, err
 }
 
+const getEmailSignature = `-- name: GetEmailSignature :one
+
+SELECT tenant_id, user_id, body_html, version, updated_at FROM email_signature WHERE user_id = app_current_user()
+`
+
+// Email signatures: each person's own (row-level security).
+func (q *Queries) GetEmailSignature(ctx context.Context) (EmailSignature, error) {
+	row := q.db.QueryRow(ctx, getEmailSignature)
+	var i EmailSignature
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.BodyHtml,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getTemplate = `-- name: GetTemplate :one
 SELECT id, tenant_id, version, name, subject, body, created_by, created_at, updated_at, body_html FROM email_template WHERE id = $1
 `
@@ -897,6 +916,31 @@ type RefreshMailboxSecretParams struct {
 func (q *Queries) RefreshMailboxSecret(ctx context.Context, arg RefreshMailboxSecretParams) error {
 	_, err := q.db.Exec(ctx, refreshMailboxSecret, arg.SealedSecret, arg.ID)
 	return err
+}
+
+const saveEmailSignature = `-- name: SaveEmailSignature :one
+INSERT INTO email_signature (tenant_id, user_id, body_html) VALUES (app_current_tenant(), app_current_user(), $1)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET body_html = excluded.body_html, version = email_signature.version + 1, updated_at = now()
+  WHERE email_signature.version = $2
+RETURNING tenant_id, user_id, body_html, version, updated_at
+`
+
+type SaveEmailSignatureParams struct {
+	BodyHtml string
+	Version  int32
+}
+
+func (q *Queries) SaveEmailSignature(ctx context.Context, arg SaveEmailSignatureParams) (EmailSignature, error) {
+	row := q.db.QueryRow(ctx, saveEmailSignature, arg.BodyHtml, arg.Version)
+	var i EmailSignature
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.BodyHtml,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const saveMailApp = `-- name: SaveMailApp :exec

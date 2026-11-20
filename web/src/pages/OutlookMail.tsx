@@ -47,8 +47,9 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   const [scheduled, setScheduled] = useState(false);
   const [atsComposer, setATSComposer] = useState(false);
   // A null message starts a new draft.
-  const [draft, setDraft] = useState<{ id: string | null; focusMessage: boolean }>();
-  const openDraft = (id: string | null, focusMessage = false) => { setDraft({ id, focusMessage }); };
+  // fresh: just created here (new, reply, forward), so the signature goes in.
+  const [draft, setDraft] = useState<{ id: string | null; focusMessage: boolean; fresh: boolean }>();
+  const openDraft = (id: string | null, focusMessage = false, fresh = id === null || focusMessage) => { setDraft({ id, focusMessage, fresh }); };
 
   const queryParams = {
     ...(linked ? profile : {}),
@@ -178,9 +179,10 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
         </div>
       </section>
     </>}
-    {scheduled && <OutlookScheduledList onOpen={openDraft}/>}
+    {scheduled && <OutlookScheduledList onOpen={(id) => { openDraft(id); }}/>}
     {atsComposer && <OutlookATSComposer permissions={permissions} profile={profile} onClose={() => { setATSComposer(false); }} />}
-    {draft && <OutlookDraftEditor key={draft.id ?? "new"} id={draft.id} focusMessage={draft.focusMessage} onClose={(operation) => {
+    {draft && <OutlookDraftEditor key={draft.id ?? "new"} id={draft.id} focusMessage={draft.focusMessage} fresh={draft.fresh}
+      permissions={permissions} about={profile ?? {}} onClose={(operation) => {
       setDraft(undefined);
       if (operation === "send" || operation === "schedule") setScheduled(true);
     }}/>}

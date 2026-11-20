@@ -218,3 +218,18 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
   .outlook-send-row { flex-wrap: wrap; }
   .outlook-copy-fields { grid-template-columns: 1fr; }
 }
+
+/* HiringPlug's tools in the Outlook editor: template, candidate, signature, CV. */
+.outlook-compose-tools { border: 1px solid var(--line, #ded8eb); border-radius: 10px; padding: .55rem .65rem; margin: 0; min-width: 0; background: var(--soft, #f7f5fc); }
+.outlook-tools-row { flex-wrap: wrap; gap: .4rem; align-items: center; }
+.outlook-tools-row select { max-width: 14rem; }
+.outlook-candidate-picker { position: relative; }
+.outlook-candidate-picker input { width: 13rem; }
+.outlook-candidate-picker .outlook-move-menu { top: calc(100% + 2px); min-width: 16rem; }
+.outlook-candidate-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .55rem; border-radius: 999px; background: var(--accent-soft, #eee8ff); color: var(--accent-dark, #5d3dc2); font-weight: 500; font-size: .88rem; }
+.outlook-candidate-chip .link { padding: 0 .2rem; font-size: 1rem; line-height: 1; }
+.outlook-template-save { margin-top: .45rem; }
+.outlook-template-save summary { cursor: pointer; font-size: .88rem; color: var(--accent-dark, #5d3dc2); font-weight: 500; }
+.outlook-template-save .row { flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+.outlook-compose-tools > p { margin: .4rem 0 0; }
+[data-signature] { margin-top: .6rem; }

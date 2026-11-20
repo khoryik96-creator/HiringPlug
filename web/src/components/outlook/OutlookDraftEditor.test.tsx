@@ -105,12 +105,14 @@ it("creates a draft on the first attachment and keeps unsaved text when removing
     schedule: null, scheduleNeedsReview: false, webUrl: null,
   };
   const file = new File(["%PDF-test"], "Resume.pdf", { type: "application/pdf" });
-  const post = vi.spyOn(api, "POST").mockResolvedValue(ok(draft));
+  const post = vi.spyOn(api, "POST").mockImplementation((path) => Promise.resolve(
+    path === "/v1/email-previews" ? ok({ subject: "", bodyHtml: "", missing: [], fieldValues: {} }) : ok(draft)));
   const upload = vi.fn<(url: string, options: RequestInit) => Promise<Response>>().mockResolvedValue(new Response(JSON.stringify({ ...draft, hasAttachments: true, version: "attached" })));
   vi.stubGlobal("fetch", upload);
-  vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{
-    id: "test-file", fileName: file.name, sizeBytes: file.size, downloadable: true, savable: true,
-  }], more: false }));
+  vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+    path === "/v1/outlook/messages/{messageId}/attachments" ? ok({ items: [{
+      id: "test-file", fileName: file.name, sizeBytes: file.size, downloadable: true, savable: true,
+    }], more: false }) : path === "/v1/email-signature" ? ok({ bodyHtml: "", version: 0, updatedAt: null }) : ok({ items: [], fields: [] })));
   const remove = vi.spyOn(api, "DELETE").mockResolvedValue(ok({ ...draft, version: "removed" }));
   vi.spyOn(window, "confirm").mockReturnValue(true);
   const send = vi.spyOn(api, "PUT");
@@ -120,8 +122,9 @@ it("creates a draft on the first attachment and keeps unsaved text when removing
   fireEvent.input(message, { target: { innerHTML: "<p><strong>Tuesday</strong> is available.</p>" } });
   fireEvent.change(screen.getByLabelText("Attachment file"), { target: { files: [file] } });
   expect(await screen.findByText(file.name)).toBeTruthy();
-  expect(post).toHaveBeenCalledTimes(1);
-  expect(sentBody(post)).toMatchObject({ subject: draft.subject, bodyHtml: "<p><strong>Tuesday</strong> is available.</p>" });
+  const creates = (post.mock.calls as unknown[][]).filter((call) => call[0] === "/v1/outlook/drafts");
+  expect(creates).toHaveLength(1);
+  expect((creates[0]?.[1] as { body: unknown } | undefined)?.body).toMatchObject({ subject: draft.subject, bodyHtml: "<p><strong>Tuesday</strong> is available.</p>" });
   const [url, options] = upload.mock.calls[0] ?? [];
   expect(url).toBe("/v1/outlook/drafts/omg_test/attachments?version=created");
   expect(options?.method).toBe("POST");

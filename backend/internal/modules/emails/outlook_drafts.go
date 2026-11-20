@@ -67,7 +67,7 @@ func draftPatch(in api.OutlookDraftInput) map[string]any {
 		out["subject"] = strings.TrimSpace(*in.Subject)
 	}
 	if in.BodyHtml != nil {
-		out["body"] = map[string]string{"contentType": "html", "content": WithoutFieldMarks(sanitizeOutlookHTML(*in.BodyHtml))}
+		out["body"] = map[string]string{"contentType": "html", "content": draftBodyHTML(*in.BodyHtml)}
 	} else if in.Body != nil {
 		out["body"] = map[string]string{"contentType": "text", "content": *in.Body}
 	}
@@ -248,11 +248,19 @@ func (s *Service) writeOutlookDraft(ctx context.Context, p authz.Principal, id, 
 			out = draftView(row, remote, active)
 			return nil
 		}
+		if in.BodyHtml != nil {
+			if err := s.checkBanners(ctx, q, draftBodyHTML(*in.BodyHtml)); err != nil {
+				return err
+			}
+		}
 		updated, err := s.patchRemoteDraft(ctx, draft, patch)
 		if err != nil {
 			return err
 		}
 		providerChanged = true
+		if updated, err = s.withDraftBanners(ctx, q, token, updated, in); err != nil {
+			return outlookDraftWriteFailure(err)
+		}
 		row, err = saveOutlookDraftIndex(ctx, q, box.ID, row.FolderID, updated)
 		if err != nil {
 			return err
@@ -298,10 +306,18 @@ func (s *Service) newOutlookDraft(ctx context.Context, q *store.Queries, p authz
 	if err != nil {
 		return zero, false, outlookFailure(err, false)
 	}
+	if in.BodyHtml != nil {
+		if err := s.checkBanners(ctx, q, draftBodyHTML(*in.BodyHtml)); err != nil {
+			return zero, false, err
+		}
+	}
 	var remote outlookRemoteMessage
 	err = s.outlookRequest(ctx, token, http.MethodPost, s.outlookRoot()+"/messages", draftPatch(in), &remote)
 	if err != nil {
 		return zero, false, outlookFailure(err, true)
+	}
+	if remote, err = s.withDraftBanners(ctx, q, token, remote, in); err != nil {
+		return zero, true, outlookFailure(err, true)
 	}
 	draft, err := indexNewOutlookDraft(ctx, q, box.ID, folder.ID, remote)
 	return draft, true, err
