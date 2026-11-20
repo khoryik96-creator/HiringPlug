@@ -43,7 +43,14 @@ func TestBookingInvitationsGoFromTheRecruitersOwnMailbox(t *testing.T) {
 	link := a.bookingLink(recruiter, map[string]any{"candidateId": cand.Id, "title": "Call", "durationMinutes": 30})
 	token := tokenInURL.FindStringSubmatch(link.Url.MustGet())[1]
 
-	res = a.request(http.MethodPost, "/v1/public/bookings/"+token, "", map[string]any{"startsAt": a.publicBooking(token).Slots[0]})
+	book := func(token string) *response {
+		slots := a.publicBooking(token).Slots
+		require.GreaterOrEqual(t, len(slots), 2)
+		// A later slot stays eligible if the minimum notice cutoff moves
+		// between listing the available slots and booking one.
+		return a.request(http.MethodPost, "/v1/public/bookings/"+token, "", map[string]any{"startsAt": slots[1]})
+	}
+	res = book(token)
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 
@@ -65,7 +72,7 @@ func TestBookingInvitationsGoFromTheRecruitersOwnMailbox(t *testing.T) {
 	other := a.createCandidate(recruiter, map[string]any{"firstName": "Mei", "email": "mei." + tenant.ID + "@mail.test"})
 	link = a.bookingLink(recruiter, map[string]any{"candidateId": other.Id, "title": "Call", "durationMinutes": 30})
 	token = tokenInURL.FindStringSubmatch(link.Url.MustGet())[1]
-	res = a.request(http.MethodPost, "/v1/public/bookings/"+token, "", map[string]any{"startsAt": a.publicBooking(token).Slots[0]})
+	res = book(token)
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	require.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, "/v1/mailbox", recruiter, nil).Status)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
