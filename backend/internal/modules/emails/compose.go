@@ -360,7 +360,11 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err := s.keepShortlist(ctx, tx, row.ID, r.Candidates, filled.To); err != nil {
 			return err
 		}
-		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+		consentID := r.RecipientCandidateID
+		if len(r.Candidates) == 0 {
+			consentID = candidateID
+		}
+		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID, ConsentCandidateId: consentID}); err != nil {
 			return err
 		}
 		files, err := q.EmailAttachments(ctx, []string{row.ID})

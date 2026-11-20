@@ -4,19 +4,20 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-// Restore puts backup name (a folder under o.Dir) back: the database first
-// (everything in it is replaced), then the files (the files folder is
-// emptied and refilled). Stop the API and workers before restoring.
-func Restore(ctx context.Context, o Options, name string) error {
+// Restore stages every file on the destination volume before replacing the
+// database in one transaction. Stop the API and workers before restoring.
+func Restore(ctx context.Context, o Options, name string) (result error) {
 	if !nameRe.MatchString(name) {
 		return fmt.Errorf("%q is not a backup name (hiringplug-YYYYMMDD-HHMMSS)", name)
 	}
@@ -45,33 +46,130 @@ func Restore(ctx context.Context, o Options, name string) error {
 	if err != nil {
 		return err
 	}
-	out, err := exec.CommandContext(ctx, pgRestore, "--clean", "--if-exists", "--single-transaction", //nolint:gosec // a PostgreSQL tool; our own setting and file
-		"--dbname", o.AdminURL, filepath.Join(dir, "database.dump")).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("pg_restore (the database is unchanged): %w: %s", err, hidePassword(string(out), o.AdminURL))
+	if o.FilesDir == "" {
+		return errors.New("a files folder is required")
 	}
-	if err := emptyDir(o.FilesDir); err != nil {
-		return fmt.Errorf("emptying the files folder: %w", err)
+	if err := os.MkdirAll(o.FilesDir, 0o700); err != nil {
+		return err
 	}
-	if inFolder {
-		return copyTree(files, o.FilesDir)
-	}
-	return untar(packed, o.FilesDir)
-}
-
-func emptyDir(dir string) error {
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, os.ErrNotExist) {
-		return os.MkdirAll(dir, 0o700)
-	}
+	// Keep the volume root: it may be a Docker mount point.
+	const stageName = ".hp-restore"
+	source, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return err
 	}
-	var errs []error
-	for _, e := range entries {
-		errs = append(errs, os.RemoveAll(filepath.Join(dir, e.Name())))
+	dest, err := filepath.EvalSymlinks(o.FilesDir)
+	if err != nil {
+		return err
 	}
-	return errors.Join(errs...)
+	for _, pair := range [][2]string{{source, dest}, {dest, source}} {
+		rel, err := filepath.Rel(pair[0], pair[1])
+		if err == nil && (rel == "." || filepath.IsLocal(rel)) {
+			return errors.New("backup and destination folders must be separate")
+		}
+	}
+	stage := filepath.Join(o.FilesDir, stageName)
+	if err := os.Mkdir(stage, 0o700); err != nil {
+		return fmt.Errorf("cannot stage restore at %s (check for an interrupted restore): %w", stage, err)
+	}
+	cleanup := true
+	defer func() {
+		if cleanup {
+			if err := os.RemoveAll(stage); err != nil {
+				result = errors.Join(result, fmt.Errorf("cleaning restore staging directory: %w", err))
+			}
+		}
+	}()
+	next, old := filepath.Join(stage, "next"), filepath.Join(stage, "previous")
+	for _, d := range []string{next, old} {
+		if err := os.Mkdir(d, 0o700); err != nil {
+			return err
+		}
+	}
+	if inFolder {
+		err = copyTree(files, next)
+	} else {
+		err = untar(packed, next)
+	}
+	if err != nil {
+		return fmt.Errorf("staging backup files: %w", err)
+	}
+	if err := checkFileCount(filepath.Join(dir, "manifest.json"), next); err != nil {
+		return err
+	}
+	previous, err := os.ReadDir(o.FilesDir)
+	if err != nil {
+		return err
+	}
+	incoming, err := os.ReadDir(next)
+	if err != nil {
+		return err
+	}
+	var moves [][2]string
+	move := func(from, to string) error {
+		if err := os.Rename(from, to); err != nil {
+			return err
+		}
+		moves = append(moves, [2]string{from, to})
+		return nil
+	}
+	undo := func(cause error) error {
+		for i := len(moves) - 1; i >= 0; i-- {
+			if err := os.Rename(moves[i][1], moves[i][0]); err != nil {
+				cleanup = false
+				return errors.Join(cause, fmt.Errorf("recover previous files from %s: %w", stage, err))
+			}
+		}
+		return cause
+	}
+	for _, e := range previous {
+		if e.Name() != stageName {
+			if err := move(filepath.Join(o.FilesDir, e.Name()), filepath.Join(old, e.Name())); err != nil {
+				return undo(err)
+			}
+		}
+	}
+	for _, e := range incoming {
+		if e.Name() == stageName {
+			return undo(errors.New("reserved restore directory in backup"))
+		}
+		if err := move(filepath.Join(next, e.Name()), filepath.Join(o.FilesDir, e.Name())); err != nil {
+			return undo(err)
+		}
+	}
+	out, err := exec.CommandContext(ctx, pgRestore, "--clean", "--if-exists", "--single-transaction", //nolint:gosec // configured PostgreSQL tool
+		"--dbname", o.AdminURL, filepath.Join(dir, "database.dump")).CombinedOutput()
+	if err != nil {
+		return undo(fmt.Errorf("pg_restore: %w: %s", err, hidePassword(string(out), o.AdminURL)))
+	}
+	return nil
+}
+
+func checkFileCount(manifest, staged string) error {
+	raw, err := os.ReadFile(manifest) //nolint:gosec // own named backup manifest
+	if err != nil {
+		return err
+	}
+	var info struct {
+		Files *int `json:"files"`
+	}
+	if err := json.Unmarshal(raw, &info); err != nil {
+		return err
+	}
+	if info.Files == nil {
+		return nil
+	} // legacy manifest without a count
+	count := 0
+	err = filepath.WalkDir(staged, func(_ string, d fs.DirEntry, err error) error {
+		if err == nil && d.Type().IsRegular() {
+			count++
+		}
+		return err
+	})
+	if err == nil && count != *info.Files {
+		return fmt.Errorf("backup lists %d files but contains %d", *info.Files, count)
+	}
+	return err
 }
 
 // untar extracts regular files only, and only inside dir.
@@ -93,7 +191,13 @@ func untar(path, dir string) error {
 	for {
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {
-			return nil
+			// Read through the gzip trailer to verify its checksum.
+			const maxPadding = 1 << 20
+			n, err := io.Copy(io.Discard, io.LimitReader(gz, maxPadding+1))
+			if n > maxPadding {
+				return errors.New("excess padding after the files archive")
+			}
+			return err
 		}
 		if err != nil {
 			return err

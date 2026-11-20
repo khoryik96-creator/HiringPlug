@@ -6,26 +6,20 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // PurgeCandidate deletes a candidate's documents for good (the Bin); after
 // commits, their stored files (and PDF copies) are removed.
-func (m *Module) PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) (after func(), err error) {
+func (m *Module) PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]string, error) {
 	rows, err := store.New(tx).PurgeCandidateDocuments(ctx, candidateID)
-	return func() {
-		for _, r := range rows {
-			keys := []string{r.StorageKey}
-			if r.PdfKey != nil {
-				keys = append(keys, *r.PdfKey)
-			}
-			for _, k := range keys {
-				if err := m.service.files.Delete(k); err != nil {
-					logx.From(ctx).Warn("a deleted candidate's file could not be removed", "error", err)
-				}
-			}
+	var keys []string
+	for _, r := range rows {
+		keys = append(keys, r.StorageKey)
+		if r.PdfKey != nil {
+			keys = append(keys, *r.PdfKey)
 		}
-	}, err
+	}
+	return keys, err
 }
 
 // CVTextOf returns a document's candidate, kind (source) and text, in the

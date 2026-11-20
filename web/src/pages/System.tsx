@@ -23,6 +23,7 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "aiprovider.checked": "Saving an AI key check",
   "aiprovider.reported": "Noting whether the AI answered",
   "assistant.ask": "AI assistant questions",
+  "bin.remove_files": "Remove purged files",
   "bin.purge": "Deleting from the Bin after 30 days",
   "assistant.answered": "Saving AI assistant answers",
   "assistant.email": "AI writing emails",

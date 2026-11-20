@@ -53,9 +53,10 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (AssistantEmail, erro
 
 const insertAnswer = `-- name: InsertAnswer :one
 
-INSERT INTO assistant_answer (tenant_id, user_id, subject_type, subject_id, kind, question)
-VALUES (app_current_tenant(), app_current_user(), $1, $2, $3, $4)
-RETURNING id, tenant_id, user_id, subject_type, subject_id, kind, question, status, answer, error, model, input_tokens, output_tokens, created_at, answered_at
+INSERT INTO assistant_answer (tenant_id, user_id, subject_type, subject_id, kind, question, used_cv, market_scope)
+VALUES (app_current_tenant(), app_current_user(), $1, $2, $3, $4, $5,
+        CASE WHEN $3 = 'market_map' THEN current_setting('app.scope_users', true) || ':' || current_setting('app.scope_jobs', true) END)
+RETURNING id, tenant_id, user_id, subject_type, subject_id, kind, question, status, answer, error, model, input_tokens, output_tokens, created_at, answered_at, used_cv, market_scope
 `
 
 type InsertAnswerParams struct {
@@ -63,6 +64,7 @@ type InsertAnswerParams struct {
 	SubjectID   string
 	Kind        string
 	Question    *string
+	UsedCv      bool
 }
 
 // Queries owned by the assistant module. Run inside a tenant-scoped transaction.
@@ -72,6 +74,7 @@ func (q *Queries) InsertAnswer(ctx context.Context, arg InsertAnswerParams) (Ass
 		arg.SubjectID,
 		arg.Kind,
 		arg.Question,
+		arg.UsedCv,
 	)
 	var i AssistantAnswer
 	err := row.Scan(
@@ -90,6 +93,8 @@ func (q *Queries) InsertAnswer(ctx context.Context, arg InsertAnswerParams) (Ass
 		&i.OutputTokens,
 		&i.CreatedAt,
 		&i.AnsweredAt,
+		&i.UsedCv,
+		&i.MarketScope,
 	)
 	return i, err
 }
@@ -122,8 +127,14 @@ func (q *Queries) InsertEmail(ctx context.Context, mode string) (AssistantEmail,
 }
 
 const listAnswers = `-- name: ListAnswers :many
-SELECT id, tenant_id, user_id, subject_type, subject_id, kind, question, status, answer, error, model, input_tokens, output_tokens, created_at, answered_at FROM assistant_answer
+SELECT id, tenant_id, user_id, subject_type, subject_id, kind, question, status, answer, error, model, input_tokens, output_tokens, created_at, answered_at, used_cv, market_scope FROM assistant_answer
 WHERE user_id = app_current_user() AND subject_type = $1 AND subject_id = $2
+  AND (NOT used_cv OR app_has_permission('documents:read'))
+  AND (subject_type NOT IN ('candidate','application') OR app_has_permission('candidates:read'))
+  AND (subject_type NOT IN ('job','application') OR app_has_permission('jobs:read'))
+  AND (subject_type <> 'application' OR app_has_permission('pipeline:read'))
+  AND (kind <> 'market_map' OR (app_has_permission('candidates:read') AND
+       (app_scope_all() OR market_scope = current_setting('app.scope_users', true) || ':' || current_setting('app.scope_jobs', true))))
 ORDER BY created_at DESC, id DESC
 LIMIT 20
 `
@@ -159,6 +170,8 @@ func (q *Queries) ListAnswers(ctx context.Context, arg ListAnswersParams) ([]Ass
 			&i.OutputTokens,
 			&i.CreatedAt,
 			&i.AnsweredAt,
+			&i.UsedCv,
+			&i.MarketScope,
 		); err != nil {
 			return nil, err
 		}

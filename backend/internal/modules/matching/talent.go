@@ -53,7 +53,7 @@ func (s *Service) StartTalentSearch(ctx context.Context, p authz.Principal, in a
 		if err != nil {
 			return err
 		}
-		if err := s.withinAllowance(ctx, tx); err != nil {
+		if err := s.withinAllowance(ctx, tx, p.TenantID); err != nil {
 			return err
 		}
 		pool, err := s.deps.Candidates.Pool(ctx, tx, p, in.Search, TalentPool)

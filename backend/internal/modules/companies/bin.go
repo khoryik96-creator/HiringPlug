@@ -13,7 +13,6 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // ErrNameTaken: a company in the Bin cannot be restored while another has its name.
@@ -48,17 +47,6 @@ func (m *Module) Restore(ctx context.Context, tx pgx.Tx, id string) error {
 
 // Purge deletes a binned company for good (its terms, benefits and documents
 // with it); after commits, its stored files are removed.
-func (m *Module) Purge(ctx context.Context, tx pgx.Tx, id string) (after func(), err error) {
-	keys, err := store.New(tx).PurgeCompany(ctx, id)
-	return func() { removeFiles(ctx, m.service.files, keys) }, err
-}
-
-type remover interface{ Delete(key string) error }
-
-func removeFiles(ctx context.Context, files remover, keys []string) {
-	for _, k := range keys {
-		if err := files.Delete(k); err != nil {
-			logx.From(ctx).Warn("a deleted company's file could not be removed", "error", err)
-		}
-	}
+func (m *Module) Purge(ctx context.Context, tx pgx.Tx, id string) ([]string, error) {
+	return store.New(tx).PurgeCompany(ctx, id)
 }

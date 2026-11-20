@@ -56,7 +56,7 @@ func (s *Service) autoScore(ctx context.Context, tx pgx.Tx, tenantID string, app
 	if err != nil || !on {
 		return err
 	}
-	if err := s.withinAllowance(ctx, tx); err != nil {
+	if err := s.withinAllowance(ctx, tx, tenantID); err != nil {
 		return skipIfExpected(err)
 	}
 	p := authz.System(tenantID)

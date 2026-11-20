@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
@@ -199,4 +199,40 @@ describe("importing CVs and LinkedIn PDFs", () => {
     expect(ask).toBeTruthy();
     expect(post).toHaveBeenCalledWith("/v1/cv-imports", expect.anything());
   });
+});
+
+it("keeps the latest CSV selection and downloads retry rows from that import", async () => {
+  let finishRead!: (value: string) => void;
+  const first = { name: "old.csv", text: () => new Promise<string>((resolve) => { finishRead = resolve; }) };
+  const second = { name: "current.csv", text: () => Promise.resolve("First Name,Last Name\nNadia,Example\n") };
+  let finishPost!: () => void;
+  vi.spyOn(api, "POST").mockImplementation(() => new Promise((resolve) => {
+    finishPost = () => { resolve(failure("VALIDATION_FAILED", "Check this row")); };
+  }));
+  renderWithClient(<ImportPage permissions={["candidates:create", "companies:create"]} />);
+  const input = screen.getByLabelText<HTMLInputElement>("CSV file");
+  fireEvent.change(input, { target: { files: [first] } });
+  fireEvent.change(input, { target: { files: [second] } });
+  await screen.findByText(/current.csv: 1 rows/);
+  await act(() => Promise.resolve().then(() => { finishRead("First Name,Last Name\nOld,Record\n"); }));
+  fireEvent.click(screen.getByRole("button", { name: "Import 1 candidates" }));
+  expect(input.disabled).toBe(true);
+  expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "What:" }).disabled).toBe(true);
+  await act(() => Promise.resolve().then(finishPost));
+  expect(input.disabled).toBe(false);
+  let download = "";
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { download = this.download; });
+  const create = vi.fn<(blob: Blob) => string>().mockReturnValue("blob:csv");
+  vi.stubGlobal("URL", class extends URL { static override createObjectURL = create; static override revokeObjectURL = vi.fn(); });
+  fireEvent.click(await screen.findByRole("button", { name: /Download the rows to fix/ }));
+  expect(download).toBe("to-fix-current.csv");
+  const blob = create.mock.calls[0]?.[0];
+  if (!blob) throw new Error("missing CSV download");
+  const text = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => { resolve(typeof reader.result === "string" ? reader.result : ""); };
+    reader.readAsText(blob);
+  });
+  expect(text).toContain("Nadia,Example");
+  expect(text).not.toContain("Old,Record");
 });

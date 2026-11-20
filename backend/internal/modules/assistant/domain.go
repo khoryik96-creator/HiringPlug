@@ -163,7 +163,7 @@ func CandidateSections(c Candidate, cvText string) []Section {
 		out = append(out, Section{Title: "Education", Text: strings.TrimSpace(clean(b.String()))})
 	}
 	if t := strings.TrimSpace(cvText); t != "" {
-		out = append(out, Section{Title: "CV text (contact details and name removed)", Text: clip(clean(t), maxCVText)})
+		out = append(out, Section{Title: cvSectionTitle, Text: clip(clean(t), maxCVText)})
 	}
 	return out
 }
@@ -226,3 +226,5 @@ func clip(s string, n int) string {
 	}
 	return s
 }
+
+const cvSectionTitle = "CV text (contact details and name removed)"

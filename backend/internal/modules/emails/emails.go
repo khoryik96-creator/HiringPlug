@@ -25,6 +25,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -135,6 +137,10 @@ type Deps struct {
 	Consent interface {
 		DoNotContact(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
 	}
+	Invoices interface {
+		MayDeliver(ctx context.Context, tx pgx.Tx, emailID string) (bool, error)
+		Delivered(ctx context.Context, tx pgx.Tx, emailID string, failed bool) error
+	}
 	InterviewReminders interface {
 		ReminderBody(context.Context, pgx.Tx, string, api.InterviewReminderDelivery, []string) (string, error)
 		ReminderSent(context.Context, pgx.Tx, api.InterviewReminderDelivery) error
@@ -198,7 +204,8 @@ type Notice struct {
 	// ShowsFees: it shows a fee (an invoice), so only roles that may see
 	// fees (placements.fees:read) see it, and its subject stays out of the
 	// audit log.
-	ShowsFees bool
+	ShowsFees     bool
+	AccountNotice bool
 	// SenderName is who it is from ("HiringPlug" when empty).
 	SenderName string
 	// SentBy, when given, is the user it is sent for: from their connected
@@ -219,5 +226,24 @@ type NoticeFile struct {
 // Notify records a notice and queues it for sending, in the caller's
 // transaction (a job's, scoped to tenantID).
 func (m *Module) Notify(ctx context.Context, tx pgx.Tx, tenantID string, n Notice) error {
+	_, err := m.QueueNotice(ctx, tx, tenantID, n)
+	return err
+}
+
+func (m *Module) QueueNotice(ctx context.Context, tx pgx.Tx, tenantID string, n Notice) (string, error) {
 	return m.service.notify(ctx, tx, tenantID, n)
+}
+
+// InvoicePDF returns the actual attachment on the fee-protected email.
+func (m *Module) InvoicePDF(ctx context.Context, tx pgx.Tx, emailID string) ([]byte, error) {
+	files, err := store.New(tx).EmailAttachments(ctx, []string{emailID})
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		if file.ContentType == "application/pdf" {
+			return m.service.read(file.StorageKey)
+		}
+	}
+	return nil, apperr.NotFound("invoice PDF")
 }

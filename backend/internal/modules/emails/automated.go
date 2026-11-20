@@ -106,7 +106,11 @@ func (s *Service) sendAutomated(ctx context.Context, tx pgx.Tx, p authz.Principa
 	if _, err := s.bindDelivery(ctx, tx, row.ID, p.UserID); err != nil {
 		return "", err
 	}
-	if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+	var consentID *string
+	if e.To == ToCandidate {
+		consentID = &e.CandidateID
+	}
+	if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID, ConsentCandidateId: consentID}); err != nil {
 		return "", err
 	}
 	return row.ID, audit.Record(ctx, tx, audit.Entry{

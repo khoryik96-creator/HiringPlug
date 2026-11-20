@@ -123,6 +123,12 @@ disk. To make one now from the command line:
 docker compose -f deploy/docker-compose.yml run --rm backup /app/hp backup
 ```
 
+Allow enough free space on the uploads volume for a full copy of the backup's
+files. Restore stages the files and checks their count before installing the
+database in a transaction. After an interrupted process, keep services stopped
+and preserve the `.hp-restore` directory on the uploads volume. Its
+`previous` directory contains the original entries moved so far.
+
 To put one back (it replaces every company's data and files):
 
 ```bash

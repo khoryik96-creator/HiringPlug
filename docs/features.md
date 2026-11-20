@@ -1136,7 +1136,11 @@ placement shows the job and company with its type and PO number, four figures
 **billing timeline** (start, invoice, payment due, overdue once past, or paid,
 guarantee end, contract end) and, folded under **Details**, the salary, fee %,
 recruiter and the rest. The invoice's preview, PDF and Word are in one Invoice
-menu beside Send now. The **Placements** page is a table (candidate, job, type,
+menu beside Send now. A numbered invoice shows as queued until the mail provider
+accepts it. If delivery fails, correct the billing contact and choose **Retry
+email** to reuse the invoice number. The client and recipient are checked again
+at delivery. PDF and Word downloads preserve the issued documents. For older
+invoices, the original emailed PDF is available if its attachment was retained. The **Placements** page is a table (candidate, job, type,
 dates, fee, invoice) with each row's actions in a ⋯ menu.
 
 **Retainer (a retained search).** On the job page, those who may see fees

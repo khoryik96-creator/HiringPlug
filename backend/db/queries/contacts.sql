@@ -275,3 +275,8 @@ RETURNING *;
 SELECT id, btrim(first_name || ' ' || last_name)::text AS name, coalesce(linkedin_url, '')::text AS linkedin_url
 FROM contact
 WHERE linkedin_url = ANY(@urls::text[]) OR lower(btrim(first_name || ' ' || last_name)) = ANY(@names::text[]);
+
+-- Keep a billing contact's current company and address stable during handoff to the mail provider.
+-- name: LockInvoiceRecipient :one
+SELECT id FROM contact WHERE id = @id AND company_id = @company_id AND lower(email) = lower(@address::text)
+FOR SHARE;

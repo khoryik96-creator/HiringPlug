@@ -112,6 +112,8 @@ type AssistantAnswer struct {
 	OutputTokens int32
 	CreatedAt    time.Time
 	AnsweredAt   *time.Time
+	UsedCv       bool
+	MarketScope  *string
 }
 
 type AssistantEmail struct {
@@ -1378,6 +1380,17 @@ type PlacementInvoice struct {
 	UpdatedBy        string
 	UpdatedAt        time.Time
 	ScheduledFor     *time.Time
+	DeliveryEmail    *string
+	DeliveryCompany  *string
+	DeliveryTo       *string
+	IssuedNumber     *string
+}
+
+type PlacementInvoiceCopy struct {
+	TenantID    string
+	PlacementID string
+	Docx        []byte
+	Pdf         []byte
 }
 
 type PlacementMoney struct {

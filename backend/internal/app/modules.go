@@ -125,7 +125,7 @@ func NewModules(d Deps) *Modules {
 		Candidates: emailCandidates{m.Candidates, m.Industries, m.Settings}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy, Users: m.Identity,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
-		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts, InterviewReminders: calendarReminderMail{m},
+		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts, InterviewReminders: calendarReminderMail{m}, Invoices: invoiceDelivery{m},
 	}, d.Mail, d.Files)
 	mode := mail.DeliveryMode(d.Config.SMTP.Addr)
 	m.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
@@ -195,7 +195,7 @@ func NewModules(d Deps) *Modules {
 		Placements: automationPlacements{m.Placements}, Companies: m.Companies, Users: m.Identity,
 		Mailer: automationMailer{m.Emails}, TimeZone: d.Config.TimeZone,
 	})
-	m.Bin = bin.New(d.Pool, binDeps(m))
+	m.Bin = bin.New(d.Pool, binDeps(m, d.Files.Delete))
 	m.Folders = folders.New(d.Pool, folderUsers{m.Identity}, folderRecords{m.Candidates, m.Contacts, m.Companies})
 	// The lists show a folder's records.
 	m.Candidates.UseFolders(m.Folders.ItemsOf(folders.Candidates))

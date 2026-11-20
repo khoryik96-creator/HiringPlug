@@ -122,15 +122,16 @@ export function PlacementInvoice({ p, permissions, variant = "full", extra }: {
   const to = inv.contactName ?? null;
   let status: string;
   if (inv.sentAt) status = `Emailed to ${to ?? "the client"} on ${dayOf(inv.sentAt)}`;
+  else if (inv.deliveryStatus === "queued") status = "Queued for email delivery";
   else if (p.invoiceStatus !== "not_invoiced") status = `Invoiced${p.invoiceNumber ? ` · ${p.invoiceNumber}` : ""}`;
   else if (inv.sendsAt) status = `Emails to ${to ?? "the client"} on ${dayOf(inv.sendsAt)}`;
   else status = to ? `To ${to} · not emailed automatically` : "No invoice recipient yet";
-  const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus === "not_invoiced" && !inv.sentAt && p.status !== "cancelled" && p.status !== "backed_out";
+  const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus !== "paid" && (inv.deliveryStatus === "failed" || (p.invoiceStatus === "not_invoiced" && !inv.deliveryStatus)) && !inv.sentAt && p.status !== "cancelled" && p.status !== "backed_out";
   const sendNow = () => {
     if (window.confirm(`Email the invoice to ${to ?? "the client"}${inv.contactEmail ? ` (${inv.contactEmail})` : ""} now?`)) { send.mutate(); setViewing(false); }
   };
   const sendButton = (className: string) => (
-    <button type="button" className={className} disabled={send.isPending || !inv.contactEmail} onClick={sendNow}>Send now</button>
+    <button type="button" className={className} disabled={send.isPending || !inv.contactEmail} onClick={sendNow}>{inv.deliveryStatus === "failed" ? "Retry email" : "Send now"}</button>
   );
   const items = (close: () => void) => {
     const pick = (f: () => void) => () => { close(); f(); };
@@ -140,7 +141,7 @@ export function PlacementInvoice({ p, permissions, variant = "full", extra }: {
         <button type="button" onClick={pick(() => { get("pdf"); })}>PDF</button>
         <button type="button" onClick={pick(() => { get("docx"); })}>Word</button>
         {canSend && variant === "menu" && (
-          <button type="button" disabled={send.isPending || !inv.contactEmail} onClick={pick(sendNow)}>Send invoice now</button>
+          <button type="button" disabled={send.isPending || !inv.contactEmail} onClick={pick(sendNow)}>{inv.deliveryStatus === "failed" ? "Retry invoice email" : "Send invoice now"}</button>
         )}
       </>
     );

@@ -132,7 +132,7 @@ func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID st
 			return apperr.New(api.ErrorCodeMATCHCONSENTWITHDRAWN,
 				"This candidate withdrew consent to their data being used, so it is not sent to the AI.")
 		}
-		if err := s.withinAllowance(ctx, tx); err != nil {
+		if err := s.withinAllowance(ctx, tx, p.TenantID); err != nil {
 			return err
 		}
 		job, err := s.jobText(ctx, tx, p, a.JobID)
@@ -171,7 +171,7 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 		if !p.Can(api.PermissionPipelineRead) {
 			return apperr.NotFound("job")
 		}
-		if err := s.withinAllowance(ctx, tx); err != nil {
+		if err := s.withinAllowance(ctx, tx, p.TenantID); err != nil {
 			return err
 		}
 		apps, err := s.deps.Applications.OpenOnJob(ctx, tx, jobID)
@@ -235,7 +235,11 @@ func (s *Service) on(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
 
 // withinAllowance refuses once the company used this month's AI allowance
 // (matching and the assistant together).
-func (s *Service) withinAllowance(ctx context.Context, tx pgx.Tx) error {
+func (s *Service) withinAllowance(ctx context.Context, tx pgx.Tx, tenant string) error {
+	return database.AsSystem(ctx, tx, tenant, func() error { return s.checkTenantAllowance(ctx, tx) })
+}
+
+func (s *Service) checkTenantAllowance(ctx context.Context, tx pgx.Tx) error {
 	since := monthStart(s.now(), s.settings.TimeZone)
 	used, err := store.New(tx).TokensSince(ctx, since)
 	if err != nil {

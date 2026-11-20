@@ -18,6 +18,7 @@ export function ApplicationPlacement({ applicationId, stage, permissions }: { ap
   const list = useQuery({
     queryKey: applicationPlacementKey(applicationId),
     queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { applicationId } } })).items,
+    refetchInterval: (q) => q.state.data?.some((p) => p.invoicing.deliveryStatus === "queued") ? 5000 : false,
     enabled: stage === "offer" || stage === "placed",
   });
   const placement = list.data?.[0];

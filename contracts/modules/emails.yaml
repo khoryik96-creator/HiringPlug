@@ -2562,6 +2562,8 @@ components:
       required: [emailId]
       properties:
         emailId: { $ref: '#/components/schemas/EmailId' }
+        accountNotice: { type: boolean, description: Account administration email to an ATS user. }
+        consentCandidateId: { $ref: '#/components/schemas/CandidateId' }
         interviewReminder: { $ref: '#/components/schemas/InterviewReminderDelivery' }
     InterviewReminderDelivery:
       type: object

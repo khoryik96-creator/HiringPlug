@@ -3,6 +3,7 @@ package bin
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -43,7 +44,7 @@ func (s *Service) purge(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error 
 	if err != nil {
 		return err
 	}
-	after, err := s.purgeRecords(ctx, sp, e)
+	keys, err := s.purgeRecords(ctx, sp, e)
 	var fk *pgconn.PgError
 	if errors.As(err, &fk) && fk.Code == "23503" {
 		_ = sp.Rollback(ctx)
@@ -62,19 +63,34 @@ func (s *Service) purge(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error 
 		Changes: addLabel(map[string]any{"binnedBy": e.BinnedName, "binnedAt": e.BinnedAt}, e.Kind, e.Label)}); err != nil {
 		return err
 	}
-	for _, f := range after {
-		f()
+	if len(keys) == 0 {
+		return nil
+	}
+	_, err = jobqueue.Enqueue(ctx, tx, job.TenantID, api.JobKindBinRemoveFiles, api.BinRemoveFilesJob{Keys: keys})
+	return err
+}
+
+func (s *Service) removeFiles(_ context.Context, _ pgx.Tx, job jobqueue.Job) error {
+	var payload api.BinRemoveFilesJob
+	if err := job.Decode(&payload); err != nil {
+		return err
+	}
+	for _, key := range payload.Keys {
+		if !strings.HasPrefix(key, job.TenantID+"/") {
+			return errors.New("purged file belongs to a different tenant")
+		}
+		if err := s.deps.DeleteFile(key); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (s *Service) purgeRecords(ctx context.Context, tx pgx.Tx, e store.BinEntry) ([]func(), error) {
+func (s *Service) purgeRecords(ctx context.Context, tx pgx.Tx, e store.BinEntry) ([]string, error) {
 	d := s.deps
-	var after []func()
-	keep := func(f func(), err error) error {
-		if f != nil {
-			after = append(after, f)
-		}
+	var keys []string
+	keep := func(removed []string, err error) error {
+		keys = append(keys, removed...)
 		return err
 	}
 	switch e.Kind {
@@ -92,9 +108,9 @@ func (s *Service) purgeRecords(ctx context.Context, tx pgx.Tx, e store.BinEntry)
 		if err == nil {
 			err = d.Candidates.Purge(ctx, tx, e.RecordID)
 		}
-		return after, err
+		return keys, err
 	case "contact":
-		return after, s.purgeContacts(ctx, tx, []string{e.RecordID})
+		return keys, s.purgeContacts(ctx, tx, []string{e.RecordID})
 	}
 	went := decodeWentWith(e.WentWith)
 	err := s.purgeContacts(ctx, tx, went.Contacts)
@@ -116,7 +132,7 @@ func (s *Service) purgeRecords(ctx context.Context, tx pgx.Tx, e store.BinEntry)
 	if err == nil {
 		err = keep(d.Companies.Purge(ctx, tx, e.RecordID))
 	}
-	return after, err
+	return keys, err
 }
 
 func (s *Service) purgeContacts(ctx context.Context, tx pgx.Tx, ids []string) error {

@@ -141,3 +141,15 @@ describe("invoicing a placement", () => {
     expect(autoDueOn("", "30")).toBe("");
   });
 });
+
+it("allows retry only after the queued invoice email fails", () => {
+  const permissions = RECRUITER.concat("placements.fees:read", "placements:manage");
+  const data = placement({ invoiceStatus: "invoiced", invoiceNumber: "INV-0042" });
+  renderWithClient(<PlacementInvoice p={{ ...data, invoicing: { ...data.invoicing, deliveryStatus: "queued" } }} permissions={permissions} />);
+  expect(screen.getByText("Queued for email delivery")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Retry email|Send now/ })).toBeNull();
+  cleanup();
+  renderWithClient(<PlacementInvoice p={{ ...data, invoicing: { ...data.invoicing, deliveryStatus: "failed", sendError: "Check the billing contact." } }} permissions={permissions} />);
+  expect(screen.getByRole("alert").textContent).toContain("Check the billing contact.");
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Retry email" }).disabled).toBe(false);
+});

@@ -40,6 +40,7 @@ type InvoicingView struct {
 	DueOnSet, AutoSend                   bool
 	SendsAt, SentAt                      *time.Time
 	SendError                            *string
+	DeliveryStatus                       *api.PlacementInvoicingDeliveryStatus
 }
 
 // InvoicingInput is a person's choice of recipient, terms, due date and emailing.
@@ -92,7 +93,7 @@ func (s *Service) hiringContact(ctx context.Context, tx pgx.Tx, app Application)
 	if err != nil {
 		return nil, err
 	}
-	if c, ok := contacts[*app.ContactID]; ok && c.Email != nil {
+	if c, ok := contacts[*app.ContactID]; ok && c.CompanyID == app.CompanyID && c.Email != nil {
 		return app.ContactID, nil
 	}
 	return nil, nil //nolint:nilnil // a contact without an email address is no recipient
@@ -268,7 +269,7 @@ func (s *Service) invoiceJob(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	if err != nil {
 		return err
 	}
-	if !inv.AutoSend || inv.SentAt != nil || row.Status != Active || row.InvoiceStatus != NotInvoiced {
+	if !inv.AutoSend || inv.DeliveryEmail != nil || inv.SentAt != nil || row.Status != Active || row.InvoiceStatus != NotInvoiced {
 		return nil
 	}
 	settings, err := s.settingsIn(ctx, tx, job.TenantID)
@@ -344,7 +345,17 @@ func (s *Service) invoicingViews(ctx context.Context, tx pgx.Tx, tenantID string
 				v.ContactName, v.ContactEmail = &c.Name, c.Email
 			}
 		}
-		if inv.AutoSend && inv.SentAt == nil && inv.SendError == nil && r.Status == Active && r.InvoiceStatus == NotInvoiced && v.ContactEmail != nil {
+		if inv.DeliveryEmail != nil {
+			status := api.PlacementInvoicingDeliveryStatusQueued
+			if inv.SentAt != nil {
+				status = api.PlacementInvoicingDeliveryStatusSent
+				v.ContactName, v.ContactEmail = inv.DeliveryTo, inv.DeliveryTo
+			} else if inv.SendError != nil {
+				status = api.PlacementInvoicingDeliveryStatusFailed
+			}
+			v.DeliveryStatus = &status
+		}
+		if inv.DeliveryEmail == nil && inv.AutoSend && inv.SentAt == nil && inv.SendError == nil && r.Status == Active && r.InvoiceStatus == NotInvoiced && v.ContactEmail != nil {
 			if hour < 0 {
 				settings, err := s.settingsIn(ctx, tx, tenantID)
 				if err != nil {

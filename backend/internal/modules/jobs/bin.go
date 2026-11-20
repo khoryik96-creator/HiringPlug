@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs/internal/store"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // Bin hides jobs.
@@ -42,19 +41,14 @@ func (m *Module) ClearContacts(ctx context.Context, tx pgx.Tx, contactIDs []stri
 // Purge deletes binned jobs for good (their salary, ads and files with them;
 // their applications are removed by the pipeline first); after commits,
 // their stored files are removed.
-func (m *Module) Purge(ctx context.Context, tx pgx.Tx, ids []string) (after func(), err error) {
+func (m *Module) Purge(ctx context.Context, tx pgx.Tx, ids []string) ([]string, error) {
 	rows, err := store.New(tx).PurgeJobs(ctx, ids)
-	return func() {
-		for _, r := range rows {
-			keys := []string{r.StorageKey}
-			if r.PdfKey != nil {
-				keys = append(keys, *r.PdfKey) // its PDF copy too
-			}
-			for _, k := range keys {
-				if err := m.service.files.Delete(k); err != nil {
-					logx.From(ctx).Warn("a deleted job's file could not be removed", "error", err)
-				}
-			}
+	var keys []string
+	for _, r := range rows {
+		keys = append(keys, r.StorageKey)
+		if r.PdfKey != nil {
+			keys = append(keys, *r.PdfKey)
 		}
-	}, err
+	}
+	return keys, err
 }

@@ -16,6 +16,9 @@ import (
 	"context"
 	"net"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -89,4 +92,12 @@ func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[strin
 // removes it), in the caller's transaction.
 func (m *Module) CountWithRole(ctx context.Context, tx pgx.Tx, role string) (int, error) {
 	return m.service.CountWithRole(ctx, tx, role)
+}
+
+func (m *Module) LockInvoiceRecipient(ctx context.Context, tx pgx.Tx, id, companyID, address string) (bool, error) {
+	_, err := store.New(tx).LockInvoiceRecipient(ctx, store.LockInvoiceRecipientParams{ID: id, CompanyID: companyID, Address: address})
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	return err == nil, err
 }

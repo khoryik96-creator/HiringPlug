@@ -116,6 +116,6 @@ func invoicingToAPI(v InvoicingView) api.PlacementInvoicing {
 	return api.PlacementInvoicing{
 		ContactId: c.OrNull(v.ContactID), ContactName: c.OrNull(v.ContactName), ContactEmail: c.OrNull(v.ContactEmail),
 		PaymentTermsDays: v.PaymentTermsDays, DueOn: openapi_types.Date{Time: v.DueOn}, DueOnSet: v.DueOnSet, AutoSend: v.AutoSend,
-		SendsAt: c.OrNull(v.SendsAt), SentAt: c.OrNull(v.SentAt), SendError: c.OrNull(v.SendError),
+		DeliveryStatus: v.DeliveryStatus, SendsAt: c.OrNull(v.SendsAt), SentAt: c.OrNull(v.SentAt), SendError: c.OrNull(v.SendError),
 	}
 }

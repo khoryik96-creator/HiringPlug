@@ -22,6 +22,11 @@ x-module:
       status: 409
       description: Another record now has this one's email or name; the message says which. Change one of them, then restore.
   jobs:
+    bin.remove_files:
+      queue: core
+      payload: BinRemoveFilesJob
+      priority: low
+      description: Remove stored files after the deletion of their records has committed.
     bin.purge:
       queue: core
       payload: BinPurgeJob
@@ -165,3 +170,9 @@ components:
       required: [entryId]
       properties:
         entryId: { $ref: '#/components/schemas/BinEntryId' }
+    BinRemoveFilesJob:
+      type: object
+      additionalProperties: false
+      required: [keys]
+      properties:
+        keys: { type: array, items: { type: string } }

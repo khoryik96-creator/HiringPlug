@@ -39,6 +39,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
       params: { query: { ...(dates.from ? { startFrom: dates.from } : {}), ...(dates.to ? { startTo: dates.to } : {}) } },
     })),
     enabled: customReady,
+    refetchInterval: (q) => q.state.data?.items.some((p) => p.invoicing.deliveryStatus === "queued") ? 5000 : false,
   });
   useEffect(() => { saveView(view); }, [view]);
   const change = (patch: Partial<View>) => { setView((v) => ({ ...v, ...patch })); setShown(PAGE); };
@@ -201,7 +202,10 @@ function PlacementRow({ p, permissions, today, seesFees, onEdit }: {
       </td>
       {seesFees && <td className="num">{fee ? <strong className={p.status === "active" ? undefined : "fee-void"} title={p.status === "active" ? undefined : "Not counted in the fees"}>{fee}</strong> : <span className="muted">—</span>}
         {p.money?.retainer?.balance && <div className="muted small">balance {formatMoney(p.money.retainer.balance, p.money.retainer.currency)}</div>}</td>}
-      <td><span className={`pill ${badge.state}`}>{badge.label}</span>{badge.note && <div className="muted small">{badge.note}</div>}</td>
+      <td><span className={`pill ${badge.state}`}>{badge.label}</span>{badge.note && <div className="muted small">{badge.note}</div>}
+        {p.invoicing.deliveryStatus === "failed" && <div className="warning small">Email delivery failed</div>}
+        {p.invoicing.deliveryStatus === "queued" && <div className="muted small">Email queued</div>}
+      </td>
       <td className="small">{p.recruiterName ?? <span className="muted">—</span>}</td>
       <td className="actions"><PlacementInvoice p={p} permissions={permissions} variant="menu" extra={change} /></td>
     </tr>

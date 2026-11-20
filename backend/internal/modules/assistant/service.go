@@ -2,6 +2,8 @@ package assistant
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -40,7 +42,7 @@ func (s *Service) Status(ctx context.Context, p authz.Principal) (Status, error)
 		if _, out.Enabled, err = s.deps.AI.Access(ctx, tx); err != nil {
 			return err
 		}
-		out.UsedTokens, err = s.used(ctx, tx)
+		out.UsedTokens, err = s.used(ctx, tx, p.TenantID)
 		return err
 	})
 	return out, err
@@ -52,6 +54,22 @@ func (s *Service) List(ctx context.Context, p authz.Principal, subjectType, subj
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
 		out, err = store.New(tx).ListAnswers(ctx, store.ListAnswersParams{SubjectType: subjectType, SubjectID: subjectID})
+		if err != nil || len(out) == 0 {
+			return err
+		}
+		switch subjectType {
+		case "candidate":
+			_, err = s.deps.Candidates.ForAssistant(ctx, tx, p, subjectID)
+		case "application":
+			_, err = s.deps.Applications.ForAssistant(ctx, tx, subjectID)
+		case "job":
+			_, err = s.deps.Jobs.ForAssistant(ctx, tx, p, subjectID)
+		}
+		var hidden *apperr.Error
+		if errors.As(err, &hidden) && hidden.Code == api.ErrorCodeNOTFOUND {
+			out = nil
+			return nil
+		}
 		return err
 	})
 	return out, err
@@ -67,7 +85,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 	var out store.AssistantAnswer
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		qs := store.New(tx)
-		ai, err := s.ready(ctx, tx)
+		ai, err := s.ready(ctx, tx, p.TenantID)
 		if err != nil {
 			return err
 		}
@@ -76,7 +94,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 			return err
 		}
 		out, err = qs.InsertAnswer(ctx, store.InsertAnswerParams{
-			SubjectType: q.SubjectType, SubjectID: q.SubjectID, Kind: q.Kind, Question: q.Question,
+			SubjectType: q.SubjectType, SubjectID: q.SubjectID, Kind: q.Kind, Question: q.Question, UsedCv: slices.ContainsFunc(sections, func(s Section) bool { return s.Title == cvSectionTitle }),
 		})
 		if err != nil {
 			return err
@@ -97,7 +115,17 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 
 // used is the AI tokens the company used this month, the assistant's and
 // matching's together.
-func (s *Service) used(ctx context.Context, tx pgx.Tx) (int64, error) {
+func (s *Service) used(ctx context.Context, tx pgx.Tx, tenant string) (int64, error) {
+	var total int64
+	err := database.AsSystem(ctx, tx, tenant, func() error {
+		var err error
+		total, err = s.tenantUsage(ctx, tx)
+		return err
+	})
+	return total, err
+}
+
+func (s *Service) tenantUsage(ctx context.Context, tx pgx.Tx) (int64, error) {
 	since := MonthStart(s.now(), s.settings.TimeZone)
 	used, err := store.New(tx).TokensSince(ctx, since)
 	if err != nil || s.deps.OtherAIUse == nil {

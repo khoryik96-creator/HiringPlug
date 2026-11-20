@@ -50,7 +50,7 @@ type Companies interface {
 	Label(ctx context.Context, tx pgx.Tx, id string) (string, error)
 	Bin(ctx context.Context, tx pgx.Tx, id string) (string, error)
 	Restore(ctx context.Context, tx pgx.Tx, id string) error // ErrTaken when another has its name
-	Purge(ctx context.Context, tx pgx.Tx, id string) (after func(), err error)
+	Purge(ctx context.Context, tx pgx.Tx, id string) ([]string, error)
 }
 
 // Jobs is the jobs module.
@@ -61,7 +61,7 @@ type Jobs interface {
 	Binned(ctx context.Context, tx pgx.Tx, ids []string) ([]string, error)
 	MoveToCompany(ctx context.Context, tx pgx.Tx, fromID, toID string) error
 	ClearContacts(ctx context.Context, tx pgx.Tx, contactIDs []string) error
-	Purge(ctx context.Context, tx pgx.Tx, ids []string) (after func(), err error)
+	Purge(ctx context.Context, tx pgx.Tx, ids []string) ([]string, error)
 }
 
 // Application is one pipeline entry, by candidate and job.
@@ -79,7 +79,7 @@ type Pipeline interface {
 // (notes module) and what the AI said about them (assistant module, deleted
 // with a candidate's or job's notes, and with applications).
 type Files interface {
-	PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) (after func(), err error)
+	PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]string, error)
 	DeleteNotes(ctx context.Context, tx pgx.Tx, subjectType string, ids []string) error
 }
 
@@ -95,6 +95,7 @@ type Deps struct {
 	Pipeline   Pipeline
 	Files      Files
 	Taken      Taken
+	DeleteFile func(string) error
 }
 
 // Module is the bin module.
@@ -111,5 +112,5 @@ func New(pool *pgxpool.Pool, deps Deps) *Module {
 
 // JobHandlers returns the handlers for the module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindBinPurge: m.service.purge}
+	return jobqueue.Handlers{api.JobKindBinPurge: m.service.purge, api.JobKindBinRemoveFiles: m.service.removeFiles}
 }

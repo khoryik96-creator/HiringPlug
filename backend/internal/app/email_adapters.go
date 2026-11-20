@@ -231,7 +231,7 @@ func (a interviewMailer) EmailUsers(ctx context.Context, tx pgx.Tx, tenantID str
 type identityMailer struct{ modules *Modules }
 
 func (a identityMailer) Notify(ctx context.Context, tx pgx.Tx, tenantID string, to []string, subject, body string) error {
-	return a.modules.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: subject, Body: body})
+	return a.modules.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: subject, Body: body, AccountNotice: true})
 }
 
 // emailContacts gives the emails module a client's contact to write to.

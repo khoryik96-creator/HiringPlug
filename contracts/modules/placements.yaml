@@ -446,6 +446,7 @@ components:
         dueOnSet: { type: boolean, description: "true: someone set the due date; false: it follows the start date and the terms." }
         autoSend: { type: boolean, description: Email the invoice to the contact on the start date. }
         sendsAt: { type: string, format: date-time, nullable: true, description: When it will be emailed (null when it will not be). }
+        deliveryStatus: { type: string, enum: [queued, failed, sent], description: Delivery state of the numbered invoice email. }
         sentAt: { type: string, format: date-time, nullable: true }
         sendError: { type: string, nullable: true, description: Why it could not be emailed on its own. }
     PlacementInvoicingInput:

@@ -117,14 +117,29 @@ INSERT INTO placement_invoice (tenant_id, placement_id, contact_id, payment_term
 VALUES (app_current_tenant(), @placement_id, sqlc.narg(contact_id), @payment_terms_days, sqlc.narg(due_on), @auto_send, app_current_user())
 ON CONFLICT (tenant_id, placement_id) DO UPDATE SET
   contact_id = EXCLUDED.contact_id, payment_terms_days = EXCLUDED.payment_terms_days, due_on = EXCLUDED.due_on,
-  auto_send = EXCLUDED.auto_send, send_error = NULL, updated_by = EXCLUDED.updated_by, updated_at = now();
+  auto_send = EXCLUDED.auto_send, send_error = CASE WHEN placement_invoice.delivery_email IS NOT NULL THEN placement_invoice.send_error END, updated_by = EXCLUDED.updated_by, updated_at = now();
 
 -- One sender at a time (the start-date job and "send now").
 -- name: LockPlacementInvoicing :one
 SELECT * FROM placement_invoice WHERE placement_id = @placement_id FOR UPDATE;
 
--- name: MarkInvoiceSent :exec
-UPDATE placement_invoice SET sent_at = now(), send_error = NULL, due_on = @due_on WHERE placement_id = @placement_id;
+-- name: QueueInvoiceDelivery :exec
+UPDATE placement_invoice SET delivery_email = @delivery_email, delivery_company = @delivery_company, delivery_to = @delivery_to, issued_number = @issued_number,
+    sent_at = NULL, send_error = NULL, due_on = @due_on WHERE placement_id = @placement_id;
+
+-- name: InvoiceForDelivery :one
+SELECT * FROM placement_invoice WHERE delivery_email = @delivery_email FOR UPDATE;
+
+-- name: FinishInvoiceDelivery :exec
+UPDATE placement_invoice SET sent_at = CASE WHEN sqlc.narg(send_error)::text IS NULL THEN now() END,
+  send_error = sqlc.narg(send_error) WHERE delivery_email = @delivery_email;
+
+-- name: PutInvoiceCopy :exec
+INSERT INTO placement_invoice_copy (tenant_id, placement_id, docx, pdf) VALUES (app_current_tenant(), @placement_id, @docx, @pdf)
+ON CONFLICT (tenant_id, placement_id) DO UPDATE SET docx = EXCLUDED.docx, pdf = EXCLUDED.pdf;
+
+-- name: InvoiceCopy :one
+SELECT (CASE WHEN @format::text = 'docx' THEN docx ELSE pdf END)::bytea AS data FROM placement_invoice_copy WHERE placement_id = @placement_id;
 
 -- name: SetInvoiceError :exec
 UPDATE placement_invoice SET send_error = @send_error WHERE placement_id = @placement_id;

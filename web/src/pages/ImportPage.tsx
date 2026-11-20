@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { Permission } from "../api/client";
 import { CvImports } from "../components/CvImports";
@@ -42,37 +42,59 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
   const [mapping, setMapping] = useState<string[]>([]);
   const [createCompanies, setCreateCompanies] = useState(true);
   const [progress, setProgress] = useState<number | null>(null);
-  const [results, setResults] = useState<RowResult[] | null>(null);
+  const [report, setReport] = useState<{ source: NonNullable<typeof file>; results: RowResult[] } | null>(null);
+  const [error, setError] = useState("");
+  const reading = useRef(0);
+  const kindRef = useRef(kind);
+  const results = report?.results;
 
   if (allowed.length === 0) return cvs ? null : <p className="muted">Your role cannot add records.</p>;
 
   const choose = (k: ImportKind, f = file) => {
     setKind(k);
-    setResults(null);
+    kindRef.current = k;
+    setReport(null);
+    setError("");
     if (f) setMapping(autoMap(k, f.header));
   };
   const load = async (picked: File) => {
-    const [header = [], ...rows] = parseCsv(await picked.text());
-    const f = { name: picked.name, header, rows };
-    setFile(f);
-    choose(kind, f);
+    const id = ++reading.current;
+    setFile(null);
+    setReport(null);
+    setError("");
+    try {
+      const [header = [], ...rows] = parseCsv(await picked.text());
+      if (reading.current !== id) return;
+      const f = { name: picked.name, header, rows };
+      setFile(f);
+      choose(kindRef.current, f);
+    } catch {
+      if (reading.current === id) setError("Could not read the CSV file.");
+    }
   };
   const problems = file ? mappingProblems(kind, mapping) : [];
   const start = async () => {
     if (!file) return;
-    setResults(null);
+    setReport(null);
+    setError("");
     setProgress(0);
-    const r = await runImport(kind, file.rows, mapping, { createCompanies }, setProgress);
-    setProgress(null);
-    setResults(r);
-    void queryClient.invalidateQueries();
+    try {
+      const rows = await runImport(kind, file.rows, mapping, { createCompanies }, setProgress);
+      setReport({ source: file, results: rows });
+    } catch {
+      setError("Import stopped. Check the records already added before retrying.");
+    } finally {
+      setProgress(null);
+      void queryClient.invalidateQueries();
+    }
   };
   const toFix = results?.filter((r) => r.status === "fix" || r.status === "failed") ?? [];
   const downloadToFix = () => {
-    if (!file) return;
-    const rows = [[...file.header, "Problem"], ...toFix.map((r) => [...(file.rows[r.line - 2] ?? []), r.message])];
+    if (!report) return;
+    const source = report.source;
+    const rows = [[...source.header, "Problem"], ...toFix.map((r) => [...(source.rows[r.line - 2] ?? []), r.message])];
     const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: `to-fix-${file.name}` });
+    const a = Object.assign(document.createElement("a"), { href: url, download: `to-fix-${source.name}` });
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -83,13 +105,14 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
         <h3>From a spreadsheet</h3>
         <p className="muted small">CSV, with column names in the first row.</p>
         <div className="row">
-          <label className="row">What: <select value={kind} onChange={(e) => { choose(e.target.value as ImportKind); }}>
+          <label className="row">What: <select disabled={progress !== null} value={kind} onChange={(e) => { choose(e.target.value as ImportKind); }}>
             {allowed.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
           </select></label>
-          <input type="file" accept=".csv,text/csv" aria-label="CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); }} />
+          <input disabled={progress !== null} type="file" accept=".csv,text/csv" aria-label="CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); }} />
         </div>
       </section>
 
+      {error && <p role="alert" className="error">{error}</p>}
       {file && (
         <section className="panel" aria-label="Columns">
           <h3>{file.name}: {file.rows.length} rows. Which column is what?</h3>
@@ -100,7 +123,7 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
                 <tr key={`${h}-${String(i)}`}>
                   <td>{h}</td>
                   <td>
-                    <select aria-label={`Column ${h}`} value={mapping[i] ?? ""} onChange={(e) => { setMapping((m) => m.map((v, j) => (j === i ? e.target.value : v))); }}>
+                    <select disabled={progress !== null} aria-label={`Column ${h}`} value={mapping[i] ?? ""} onChange={(e) => { setMapping((m) => m.map((v, j) => (j === i ? e.target.value : v))); }}>
                       <option value="">— not imported —</option>
                       {FIELDS[kind].map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
                     </select>
@@ -111,7 +134,7 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
             </tbody>
           </table>
           {kind === "contacts" && (
-            <label className="row"><input type="checkbox" checked={createCompanies} onChange={(e) => { setCreateCompanies(e.target.checked); }} /> Add companies that do not exist yet</label>
+            <label className="row"><input type="checkbox" disabled={progress !== null} checked={createCompanies} onChange={(e) => { setCreateCompanies(e.target.checked); }} /> Add companies that do not exist yet</label>
           )}
           {problems.map((p) => <p key={p} className="error">{p}</p>)}
           <div className="row">

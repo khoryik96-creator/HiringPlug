@@ -346,10 +346,10 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, cont
 }
 
 // notify records a notice from the app itself and queues it.
-func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Notice) error {
+func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Notice) (string, error) {
 	o, errs := NormalizeOutgoing(Outgoing{To: n.To, Subject: n.Subject, Body: n.Body})
 	if err := errs.Err(); err != nil {
-		return err
+		return "", err
 	}
 	sender := n.SenderName
 	if sender == "" {
@@ -361,10 +361,10 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees, SentBy: n.SentBy,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := s.bindDelivery(ctx, tx, row.ID, row.SentBy); err != nil {
-		return err
+		return "", err
 	}
 	for _, f := range n.Files {
 		key := tenantID + "/eat_" + newKey()
@@ -372,33 +372,37 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 			key = tenantID + "/eat_" + storageName(f.Key)
 		}
 		if err := s.files.Put(key, f.Data); err != nil {
-			return err
+			return "", err
 		}
 		if _, err := q.InsertAttachment(ctx, store.InsertAttachmentParams{
 			EmailID: &row.ID, FileName: clip(f.Name, 255), ContentType: clip(f.ContentType, 255),
 			SizeBytes: int32(len(f.Data)), StorageKey: key, //nolint:gosec // a generated invoice is small
 		}); err != nil {
 			_ = s.files.Delete(key)
-			return err
+			return "", err
 		}
 	}
 	if n.Calendar != "" {
 		if err := store.New(tx).SetEmailCalendar(ctx, store.SetEmailCalendarParams{ID: row.ID, Calendar: &n.Calendar}); err != nil {
-			return err
+			return "", err
 		}
 	}
 	kind := api.JobKindEmailSend
 	if n.InterviewReminder != nil {
 		kind = api.JobKindEmailInterviewReminder
 	}
-	if _, err := jobqueue.EnqueueAt(ctx, tx, tenantID, kind, api.EmailSendJob{EmailId: row.ID, InterviewReminder: n.InterviewReminder}, n.DeliverAt); err != nil {
-		return err
+	payload := api.EmailSendJob{EmailId: row.ID, InterviewReminder: n.InterviewReminder}
+	if n.AccountNotice {
+		payload.AccountNotice = &n.AccountNotice
+	}
+	if _, err := jobqueue.EnqueueAt(ctx, tx, tenantID, kind, payload, n.DeliverAt); err != nil {
+		return "", err
 	}
 	changes := map[string]any{"to": o.To, "subject": o.Subject, "automatic": true}
 	if n.ShowsFees {
 		changes["subject"] = audit.Redacted // it may show the amount
 	}
-	return audit.Record(ctx, tx, audit.Entry{Action: "email.queued", EntityType: "email", EntityID: row.ID, Changes: changes})
+	return row.ID, audit.Record(ctx, tx, audit.Entry{Action: "email.queued", EntityType: "email", EntityID: row.ID, Changes: changes})
 }
 
 // storageName is a name as storage keys take it: lower case letters, digits

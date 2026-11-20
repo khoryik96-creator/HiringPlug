@@ -75,7 +75,7 @@ func (s *Service) DraftEmail(ctx context.Context, p authz.Principal, a EmailAsk)
 	}
 	var out store.AssistantEmail
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		ai, err := s.ready(ctx, tx)
+		ai, err := s.ready(ctx, tx, p.TenantID)
 		if err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func (s *Service) DraftEmail(ctx context.Context, p authz.Principal, a EmailAsk)
 
 // ready is the company's AI provider, when it is on and the month's allowance
 // is not used up.
-func (s *Service) ready(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
+func (s *Service) ready(ctx context.Context, tx pgx.Tx, tenant string) (*api.AiAccess, error) {
 	ai, on, err := s.deps.AI.Access(ctx, tx)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func (s *Service) ready(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
 	if !on {
 		return nil, apperr.New(api.ErrorCodeASSISTANTOFF, "The AI assistant is switched off: no AI provider is set up yet.")
 	}
-	used, err := s.used(ctx, tx)
+	used, err := s.used(ctx, tx, tenant)
 	if err != nil {
 		return nil, err
 	}

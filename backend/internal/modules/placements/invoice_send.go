@@ -44,7 +44,9 @@ func (s *Service) SendNow(ctx context.Context, p authz.Principal, id string) (Vi
 			return err
 		}
 		switch {
-		case row.InvoiceStatus != NotInvoiced || inv.SentAt != nil:
+		case inv.SentAt != nil || row.InvoiceStatus == Paid ||
+			(inv.DeliveryEmail != nil && inv.SendError == nil) ||
+			(row.InvoiceStatus != NotInvoiced && (inv.IssuedNumber == nil || inv.SendError == nil)):
 			return notAllowed("This placement is already invoiced.")
 		case row.Status == Cancelled:
 			return notAllowed("This placement was cancelled: there is nothing to invoice.")
@@ -103,7 +105,10 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 		return invoice{}, err
 	}
 	contact, ok := contacts[*inv.ContactID]
-	if !ok || contact.Email == nil {
+	if !ok || contact.CompanyID != app.CompanyID || (inv.DeliveryCompany != nil && *inv.DeliveryCompany != app.CompanyID) {
+		return invoice{}, &notReady{"Choose a billing contact who still belongs to this client."}
+	}
+	if contact.Email == nil {
 		return invoice{}, &notReady{"The invoice recipient has no email address."}
 	}
 	moneyRows, err := q.PlacementMoney(ctx, []string{row.ID})
@@ -167,9 +172,13 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 	billTo := []string{app.CompanyName, contact.Name, *contact.Email}
 	doc := InvoiceDoc(settings, values, billTo, totals.Tax != "0.00")
 	out := invoice{values: values, contact: contact, app: app, from: agency, number: number, due: due}
-	if format == "docx" {
+	if format != "pdf" {
 		out.docx, err = doc.Docx()
-	} else {
+		if err != nil {
+			return invoice{}, err
+		}
+	}
+	if format != "docx" {
 		out.pdf, err = doc.PDF()
 	}
 	return out, err
@@ -179,66 +188,65 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 // placement invoiced. inv is locked.
 func (s *Service) send(ctx context.Context, tx pgx.Tx, tenantID string, row store.Placement, inv store.PlacementInvoice, auto bool) error {
 	q := store.New(tx)
-	// Check it can be made before a number is taken.
-	if err := s.ready(ctx, tx, row, inv); err != nil {
-		return err
-	}
-	if err := s.ensureSettings(ctx, tx, tenantID); err != nil {
-		return err
-	}
-	number, err := s.takeNumber(ctx, q)
+	// Keep number allocation and rendering in a savepoint: the automatic
+	// sender can record a validation error without spending a number.
+	sp, err := tx.Begin(ctx)
 	if err != nil {
 		return err
 	}
+	defer func() { _ = sp.Rollback(ctx) }()
+	var number string
 	today := s.localToday()
-	made, err := s.makeInvoice(ctx, tx, tenantID, row, inv, number, today, "pdf")
+	if inv.IssuedNumber != nil {
+		number = *inv.IssuedNumber
+		if row.InvoicedOn != nil {
+			today = *row.InvoicedOn
+		}
+	} else {
+		if err := s.ensureSettings(ctx, sp, tenantID); err != nil {
+			return err
+		}
+		number, err = s.takeNumber(ctx, store.New(sp))
+		if err != nil {
+			return err
+		}
+	}
+	made, err := s.makeInvoice(ctx, sp, tenantID, row, inv, number, today, "both")
 	if err != nil {
+		return err
+	}
+	if err := sp.Commit(ctx); err != nil {
 		return err
 	}
 	settings, err := s.settingsIn(ctx, tx, tenantID)
 	if err != nil {
 		return err
 	}
-	if err := s.inv.Mailer.SendInvoice(ctx, tx, tenantID, InvoiceMail{
+	fileKey := "invoice_" + row.ID + "_" + number
+	if inv.DeliveryEmail != nil {
+		fileKey += "_after_" + *inv.DeliveryEmail
+	}
+	emailID, err := s.inv.Mailer.SendInvoice(ctx, tx, tenantID, InvoiceMail{
 		To: *made.contact.Email, From: made.from, ApplicationID: row.ApplicationID,
 		Subject: FillInvoice(settings.EmailSubject, made.values), Body: FillInvoice(settings.EmailBody, made.values),
-		FileName: "Invoice " + number + ".pdf", FileKey: "invoice_" + row.ID + "_" + number, PDF: made.pdf,
-	}); err != nil {
+		FileName: "Invoice " + number + ".pdf", FileKey: fileKey, PDF: made.pdf,
+	})
+	if err != nil {
 		return err
 	}
 	if err := q.MarkPlacementInvoiced(ctx, store.MarkPlacementInvoicedParams{ID: row.ID, InvoiceNumber: &number, InvoicedOn: &today}); err != nil {
 		return err
 	}
-	if err := q.MarkInvoiceSent(ctx, store.MarkInvoiceSentParams{PlacementID: row.ID, DueOn: &made.due}); err != nil {
+	if err := q.PutInvoiceCopy(ctx, store.PutInvoiceCopyParams{PlacementID: row.ID, Docx: made.docx, Pdf: made.pdf}); err != nil {
+		return err
+	}
+	if err := q.QueueInvoiceDelivery(ctx, store.QueueInvoiceDeliveryParams{PlacementID: row.ID, DueOn: &made.due, DeliveryEmail: &emailID, DeliveryCompany: &made.app.CompanyID, IssuedNumber: &number, DeliveryTo: made.contact.Email}); err != nil {
 		return err
 	}
 	// The number and recipient, never the amounts.
-	return audit.Record(ctx, tx, audit.Entry{Action: "placement.invoice_sent", EntityType: "placement", EntityID: row.ID, Changes: map[string]any{
+	return audit.Record(ctx, tx, audit.Entry{Action: "placement.invoice_queued", EntityType: "placement", EntityID: row.ID, Changes: map[string]any{
 		"invoiceNumber": number, "to": *made.contact.Email, "automatic": auto, "dueOn": made.due.Format(time.DateOnly),
 	}})
-}
-
-// ready reports why a placement's invoice cannot be made yet (no
-// recipient with an email address, no fee), without making it.
-func (s *Service) ready(ctx context.Context, tx pgx.Tx, row store.Placement, inv store.PlacementInvoice) error {
-	if inv.ContactID == nil {
-		return &notReady{"Choose who receives the invoice (one of the client's contacts)."}
-	}
-	contacts, err := s.inv.Contacts.Contacts(ctx, tx, []string{*inv.ContactID})
-	if err != nil {
-		return err
-	}
-	if c, ok := contacts[*inv.ContactID]; !ok || c.Email == nil {
-		return &notReady{"The invoice recipient has no email address."}
-	}
-	money, err := store.New(tx).PlacementMoney(ctx, []string{row.ID})
-	if err != nil {
-		return err
-	}
-	if len(money) == 0 || !money[0].FeeAmount.Valid || money[0].FeeCurrency == nil {
-		return &notReady{"Record the placement's fee first."}
-	}
-	return nil
 }
 
 // takeNumber takes the next invoice number, passing over any already on an
@@ -291,6 +299,20 @@ func (s *Service) File(ctx context.Context, p authz.Principal, id, format string
 			return notAllowed("Choose who receives the invoice first.")
 		}
 		inv := invs[0]
+		if inv.DeliveryEmail != nil && inv.IssuedNumber != nil {
+			out.FileName = "Invoice " + *inv.IssuedNumber + "." + format
+			out.Data, err = q.InvoiceCopy(ctx, store.InvoiceCopyParams{PlacementID: id, Format: format})
+			if database.IsNoRows(err) {
+				if format == "docx" {
+					return notAllowed("This invoice predates saved Word copies. Download the original PDF.")
+				}
+				out.Data, err = s.inv.Mailer.InvoicePDF(ctx, tx, *inv.DeliveryEmail)
+			}
+			return err
+		}
+		if inv.SentAt != nil {
+			return notAllowed("The original invoice attachment is unavailable.")
+		}
 		number, date := "(numbered when sent)", row.StartDate
 		if row.InvoiceNumber != nil {
 			number = *row.InvoiceNumber

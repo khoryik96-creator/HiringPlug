@@ -44,10 +44,27 @@ func (a placementContacts) Contacts(ctx context.Context, tx pgx.Tx, ids []string
 // placementMailer emails invoices for the placements module.
 type placementMailer struct{ emails *emails.Module }
 
-func (a placementMailer) SendInvoice(ctx context.Context, tx pgx.Tx, tenantID string, m placements.InvoiceMail) error {
-	return a.emails.Notify(ctx, tx, tenantID, emails.Notice{
+func (a placementMailer) SendInvoice(ctx context.Context, tx pgx.Tx, tenantID string, m placements.InvoiceMail) (string, error) {
+	return a.emails.QueueNotice(ctx, tx, tenantID, emails.Notice{
 		To: []string{m.To}, Subject: m.Subject, Body: m.Body, ApplicationID: &m.ApplicationID, SenderName: m.From,
 		Files:     []emails.NoticeFile{{Name: m.FileName, ContentType: "application/pdf", Key: m.FileKey, Data: m.PDF}},
 		ShowsFees: true,
 	})
+}
+
+func (a placementMailer) InvoicePDF(ctx context.Context, tx pgx.Tx, emailID string) ([]byte, error) {
+	return a.emails.InvoicePDF(ctx, tx, emailID)
+}
+
+type invoiceDelivery struct{ m *Modules }
+
+func (a invoiceDelivery) MayDeliver(ctx context.Context, tx pgx.Tx, emailID string) (bool, error) {
+	return a.m.Placements.MayDeliverInvoice(ctx, tx, emailID)
+}
+func (a invoiceDelivery) Delivered(ctx context.Context, tx pgx.Tx, emailID string, failed bool) error {
+	return a.m.Placements.InvoiceDelivered(ctx, tx, emailID, failed)
+}
+
+func (a placementContacts) LockInvoiceRecipient(ctx context.Context, tx pgx.Tx, id, companyID, address string) (bool, error) {
+	return a.contacts.LockInvoiceRecipient(ctx, tx, id, companyID, address)
 }

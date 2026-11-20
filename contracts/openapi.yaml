@@ -7980,6 +7980,7 @@ components:
         - automation.event
         - automation.run
         - bin.purge
+        - bin.remove_files
         - calendar.push
         - calendar.refresh
         - calendar.source_changed
@@ -8549,6 +8550,12 @@ components:
       required: [entryId]
       properties:
         entryId: {$ref: '#/components/schemas/BinEntryId'}
+    BinRemoveFilesJob:
+      type: object
+      additionalProperties: false
+      required: [keys]
+      properties:
+        keys: {type: array, items: {type: string}}
     CalendarEventId:
       type: string
       pattern: ^cev_[0-9a-hjkmnp-tv-z]{26}$
@@ -12248,6 +12255,8 @@ components:
       required: [emailId]
       properties:
         emailId: {$ref: '#/components/schemas/EmailId'}
+        accountNotice: {type: boolean, description: Account administration email to an ATS user.}
+        consentCandidateId: {$ref: '#/components/schemas/CandidateId'}
         interviewReminder: {$ref: '#/components/schemas/InterviewReminderDelivery'}
     InterviewReminderDelivery:
       type: object
@@ -14548,6 +14557,7 @@ components:
         dueOnSet: {type: boolean, description: "true: someone set the due date; false: it follows the start date and the terms."}
         autoSend: {type: boolean, description: Email the invoice to the contact on the start date.}
         sendsAt: {type: string, format: date-time, nullable: true, description: When it will be emailed (null when it will not be).}
+        deliveryStatus: {type: string, enum: [queued, failed, sent], description: Delivery state of the numbered invoice email.}
         sentAt: {type: string, format: date-time, nullable: true}
         sendError: {type: string, nullable: true, description: Why it could not be emailed on its own.}
     PlacementInvoicingInput:
@@ -16000,6 +16010,12 @@ x-jobs:
     payload: BinPurgeJob
     priority: low
     description: Delete a binned record for good once its 30 days in the Bin are over (nothing happens if it was restored).
+  bin.remove_files:
+    module: bin
+    queue: core
+    payload: BinRemoveFilesJob
+    priority: low
+    description: Remove stored files after the deletion of their records has committed.
   calendar.push:
     module: calendars
     queue: core

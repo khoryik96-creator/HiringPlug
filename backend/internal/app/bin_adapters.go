@@ -18,8 +18,9 @@ import (
 )
 
 // binDeps gives the Bin the modules that own the records it hides, restores and deletes.
-func binDeps(m *Modules) bin.Deps {
+func binDeps(m *Modules, deleteFile func(string) error) bin.Deps {
 	return bin.Deps{
+		DeleteFile: deleteFile,
 		Candidates: m.Candidates, Contacts: m.Contacts, Companies: m.Companies, Jobs: m.Jobs,
 		Pipeline: binPipeline{m.Pipeline, m.Placements, m.Assistant, m},
 		Files:    binFiles{m.Documents, m.Notes, m.Assistant},
@@ -85,7 +86,7 @@ type binFiles struct {
 	assistant *assistant.Module
 }
 
-func (a binFiles) PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) (func(), error) {
+func (a binFiles) PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]string, error) {
 	return a.documents.PurgeCandidate(ctx, tx, candidateID)
 }
 

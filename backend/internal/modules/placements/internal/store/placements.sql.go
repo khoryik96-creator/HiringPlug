@@ -196,6 +196,21 @@ func (q *Queries) DeleteRetainerStages(ctx context.Context, jobOrderID string) e
 	return err
 }
 
+const finishInvoiceDelivery = `-- name: FinishInvoiceDelivery :exec
+UPDATE placement_invoice SET sent_at = CASE WHEN $1::text IS NULL THEN now() END,
+  send_error = $1 WHERE delivery_email = $2
+`
+
+type FinishInvoiceDeliveryParams struct {
+	SendError     *string
+	DeliveryEmail *string
+}
+
+func (q *Queries) FinishInvoiceDelivery(ctx context.Context, arg FinishInvoiceDeliveryParams) error {
+	_, err := q.db.Exec(ctx, finishInvoiceDelivery, arg.SendError, arg.DeliveryEmail)
+	return err
+}
+
 const firstPlacementOf = `-- name: FirstPlacementOf :one
 SELECT id, start_date FROM placement
 WHERE application_id = ANY($1::text[]) AND status NOT IN ('cancelled', 'backed_out')
@@ -454,6 +469,49 @@ func (q *Queries) InsertRetainerStage(ctx context.Context, arg InsertRetainerSta
 	return err
 }
 
+const invoiceCopy = `-- name: InvoiceCopy :one
+SELECT (CASE WHEN $1::text = 'docx' THEN docx ELSE pdf END)::bytea AS data FROM placement_invoice_copy WHERE placement_id = $2
+`
+
+type InvoiceCopyParams struct {
+	Format      string
+	PlacementID string
+}
+
+func (q *Queries) InvoiceCopy(ctx context.Context, arg InvoiceCopyParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, invoiceCopy, arg.Format, arg.PlacementID)
+	var data []byte
+	err := row.Scan(&data)
+	return data, err
+}
+
+const invoiceForDelivery = `-- name: InvoiceForDelivery :one
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for, delivery_email, delivery_company, delivery_to, issued_number FROM placement_invoice WHERE delivery_email = $1 FOR UPDATE
+`
+
+func (q *Queries) InvoiceForDelivery(ctx context.Context, deliveryEmail *string) (PlacementInvoice, error) {
+	row := q.db.QueryRow(ctx, invoiceForDelivery, deliveryEmail)
+	var i PlacementInvoice
+	err := row.Scan(
+		&i.TenantID,
+		&i.PlacementID,
+		&i.ContactID,
+		&i.PaymentTermsDays,
+		&i.DueOn,
+		&i.AutoSend,
+		&i.SentAt,
+		&i.SendError,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+		&i.ScheduledFor,
+		&i.DeliveryEmail,
+		&i.DeliveryCompany,
+		&i.DeliveryTo,
+		&i.IssuedNumber,
+	)
+	return i, err
+}
+
 const invoiceNumberUsed = `-- name: InvoiceNumberUsed :one
 SELECT EXISTS (SELECT 1 FROM placement WHERE invoice_number = $1)
 `
@@ -498,7 +556,7 @@ func (q *Queries) ListAwaitingInvoices(ctx context.Context) ([]ListAwaitingInvoi
 }
 
 const listPlacementInvoicing = `-- name: ListPlacementInvoicing :many
-SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for FROM placement_invoice WHERE placement_id = ANY ($1::text[])
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for, delivery_email, delivery_company, delivery_to, issued_number FROM placement_invoice WHERE placement_id = ANY ($1::text[])
 `
 
 // Invoicing: who receives the invoice, the terms and due date, and the
@@ -524,6 +582,10 @@ func (q *Queries) ListPlacementInvoicing(ctx context.Context, placementIds []str
 			&i.UpdatedBy,
 			&i.UpdatedAt,
 			&i.ScheduledFor,
+			&i.DeliveryEmail,
+			&i.DeliveryCompany,
+			&i.DeliveryTo,
+			&i.IssuedNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -605,7 +667,7 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 }
 
 const lockPlacementInvoicing = `-- name: LockPlacementInvoicing :one
-SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for FROM placement_invoice WHERE placement_id = $1 FOR UPDATE
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for, delivery_email, delivery_company, delivery_to, issued_number FROM placement_invoice WHERE placement_id = $1 FOR UPDATE
 `
 
 // One sender at a time (the start-date job and "send now").
@@ -624,6 +686,10 @@ func (q *Queries) LockPlacementInvoicing(ctx context.Context, placementID string
 		&i.UpdatedBy,
 		&i.UpdatedAt,
 		&i.ScheduledFor,
+		&i.DeliveryEmail,
+		&i.DeliveryCompany,
+		&i.DeliveryTo,
+		&i.IssuedNumber,
 	)
 	return i, err
 }
@@ -645,20 +711,6 @@ func (q *Queries) MarkInvoiceScheduled(ctx context.Context, arg MarkInvoiceSched
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const markInvoiceSent = `-- name: MarkInvoiceSent :exec
-UPDATE placement_invoice SET sent_at = now(), send_error = NULL, due_on = $1 WHERE placement_id = $2
-`
-
-type MarkInvoiceSentParams struct {
-	DueOn       *time.Time
-	PlacementID string
-}
-
-func (q *Queries) MarkInvoiceSent(ctx context.Context, arg MarkInvoiceSentParams) error {
-	_, err := q.db.Exec(ctx, markInvoiceSent, arg.DueOn, arg.PlacementID)
-	return err
 }
 
 const markPlacementInvoiced = `-- name: MarkPlacementInvoiced :exec
@@ -856,12 +908,28 @@ func (q *Queries) PlacementOfApplication(ctx context.Context, applicationID stri
 	return i, err
 }
 
+const putInvoiceCopy = `-- name: PutInvoiceCopy :exec
+INSERT INTO placement_invoice_copy (tenant_id, placement_id, docx, pdf) VALUES (app_current_tenant(), $1, $2, $3)
+ON CONFLICT (tenant_id, placement_id) DO UPDATE SET docx = EXCLUDED.docx, pdf = EXCLUDED.pdf
+`
+
+type PutInvoiceCopyParams struct {
+	PlacementID string
+	Docx        []byte
+	Pdf         []byte
+}
+
+func (q *Queries) PutInvoiceCopy(ctx context.Context, arg PutInvoiceCopyParams) error {
+	_, err := q.db.Exec(ctx, putInvoiceCopy, arg.PlacementID, arg.Docx, arg.Pdf)
+	return err
+}
+
 const putPlacementInvoicing = `-- name: PutPlacementInvoicing :exec
 INSERT INTO placement_invoice (tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, updated_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
 ON CONFLICT (tenant_id, placement_id) DO UPDATE SET
   contact_id = EXCLUDED.contact_id, payment_terms_days = EXCLUDED.payment_terms_days, due_on = EXCLUDED.due_on,
-  auto_send = EXCLUDED.auto_send, send_error = NULL, updated_by = EXCLUDED.updated_by, updated_at = now()
+  auto_send = EXCLUDED.auto_send, send_error = CASE WHEN placement_invoice.delivery_email IS NOT NULL THEN placement_invoice.send_error END, updated_by = EXCLUDED.updated_by, updated_at = now()
 `
 
 type PutPlacementInvoicingParams struct {
@@ -914,6 +982,32 @@ func (q *Queries) PutPlacementMoney(ctx context.Context, arg PutPlacementMoneyPa
 		arg.FeePercent,
 		arg.FeeAmount,
 		arg.FeeCurrency,
+	)
+	return err
+}
+
+const queueInvoiceDelivery = `-- name: QueueInvoiceDelivery :exec
+UPDATE placement_invoice SET delivery_email = $1, delivery_company = $2, delivery_to = $3, issued_number = $4,
+    sent_at = NULL, send_error = NULL, due_on = $5 WHERE placement_id = $6
+`
+
+type QueueInvoiceDeliveryParams struct {
+	DeliveryEmail   *string
+	DeliveryCompany *string
+	DeliveryTo      *string
+	IssuedNumber    *string
+	DueOn           *time.Time
+	PlacementID     string
+}
+
+func (q *Queries) QueueInvoiceDelivery(ctx context.Context, arg QueueInvoiceDeliveryParams) error {
+	_, err := q.db.Exec(ctx, queueInvoiceDelivery,
+		arg.DeliveryEmail,
+		arg.DeliveryCompany,
+		arg.DeliveryTo,
+		arg.IssuedNumber,
+		arg.DueOn,
+		arg.PlacementID,
 	)
 	return err
 }

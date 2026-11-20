@@ -854,6 +854,25 @@ func (q *Queries) LockHrScan(ctx context.Context, companyID string) (HrScan, err
 	return i, err
 }
 
+const lockInvoiceRecipient = `-- name: LockInvoiceRecipient :one
+SELECT id FROM contact WHERE id = $1 AND company_id = $2 AND lower(email) = lower($3::text)
+FOR SHARE
+`
+
+type LockInvoiceRecipientParams struct {
+	ID        string
+	CompanyID string
+	Address   string
+}
+
+// Keep a billing contact's current company and address stable during handoff to the mail provider.
+func (q *Queries) LockInvoiceRecipient(ctx context.Context, arg LockInvoiceRecipientParams) (string, error) {
+	row := q.db.QueryRow(ctx, lockInvoiceRecipient, arg.ID, arg.CompanyID, arg.Address)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const markContactLeft = `-- name: MarkContactLeft :one
 UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
 WHERE id = $1 AND status = 'active' AND company_id = $2

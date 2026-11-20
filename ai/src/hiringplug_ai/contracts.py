@@ -185,6 +185,7 @@ class JobKind(StrEnum):
     automation_event = "automation.event"
     automation_run = "automation.run"
     bin_purge = "bin.purge"
+    bin_remove_files = "bin.remove_files"
     calendar_push = "calendar.push"
     calendar_refresh = "calendar.refresh"
     calendar_source_changed = "calendar.source_changed"
@@ -771,6 +772,13 @@ class BinPurgeJob(BaseModel):
         extra="forbid",
     )
     entryId: BinEntryId
+
+
+class BinRemoveFilesJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    keys: list[str]
 
 
 class CalendarEventId(RootModel[str]):
@@ -5152,6 +5160,12 @@ class InvoiceFormat(StrEnum):
     docx = "docx"
 
 
+class DeliveryStatus(StrEnum):
+    queued = "queued"
+    failed = "failed"
+    sent = "sent"
+
+
 class PlacementInvoicing(BaseModel):
     contactId: Annotated[
         ContactId | None, Field(description="Who receives the invoice (one of the client's contacts).")
@@ -5173,6 +5187,9 @@ class PlacementInvoicing(BaseModel):
     sendsAt: Annotated[
         AwareDatetime | None, Field(description="When it will be emailed (null when it will not be).")
     ]
+    deliveryStatus: Annotated[
+        DeliveryStatus | None, Field(description="Delivery state of the numbered invoice email.")
+    ] = None
     sentAt: Annotated[AwareDatetime | None, Field(...)]
     sendError: Annotated[str | None, Field(description="Why it could not be emailed on its own.")]
 
@@ -7091,6 +7108,10 @@ class EmailSendJob(BaseModel):
         extra="forbid",
     )
     emailId: EmailId
+    accountNotice: Annotated[
+        bool | None, Field(description="Account administration email to an ATS user.")
+    ] = None
+    consentCandidateId: CandidateId | None = None
     interviewReminder: InterviewReminderDelivery | None = None
 
 

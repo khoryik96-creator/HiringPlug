@@ -82,10 +82,12 @@ type Invoicing struct {
 		Terms(ctx context.Context, tx pgx.Tx, companyID string) (ClientTerms, error)
 	}
 	Contacts interface {
+		LockInvoiceRecipient(ctx context.Context, tx pgx.Tx, id, companyID, address string) (bool, error)
 		Contacts(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Contact, error)
 	}
 	Mailer interface {
-		SendInvoice(ctx context.Context, tx pgx.Tx, tenantID string, m InvoiceMail) error
+		SendInvoice(ctx context.Context, tx pgx.Tx, tenantID string, m InvoiceMail) (string, error)
+		InvoicePDF(ctx context.Context, tx pgx.Tx, emailID string) ([]byte, error)
 	}
 	Tenants interface {
 		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)

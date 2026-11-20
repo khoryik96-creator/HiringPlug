@@ -93,15 +93,24 @@ func (s *Service) checkOutlookEnvelope(ctx context.Context, tx pgx.Tx, tenant st
 	if err := fields.Err(); err != nil {
 		return err
 	}
+	return s.checkRecipientConsent(ctx, tx, tenant, nil, slices.Concat(clean.To, clean.Cc, clean.Bcc))
+}
+
+func (s *Service) checkRecipientConsent(ctx context.Context, tx pgx.Tx, tenant string, pinned *string, addresses []string) error {
 	if s.deps.Consent == nil || s.deps.Candidates == nil {
 		return nil
 	}
 	// A recruiter may know an address without having access to the candidate
 	// record. Enforce consent across the tenant without revealing that record.
 	return database.AsSystem(ctx, tx, tenant, func() error {
-		ids, err := s.deps.Candidates.IDsByEmails(ctx, tx, slices.Concat(clean.To, clean.Cc, clean.Bcc))
+		ids, err := s.deps.Candidates.IDsByEmails(ctx, tx, addresses)
 		if err != nil {
 			return err
+		}
+		if pinned != nil {
+			if err := s.contactable(ctx, tx, *pinned); err != nil {
+				return err
+			}
 		}
 		for _, id := range ids {
 			withdrawn, err := s.deps.Consent.DoNotContact(ctx, tx, id)

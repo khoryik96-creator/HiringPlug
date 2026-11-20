@@ -165,7 +165,7 @@ func (s *Service) SendSeparately(ctx context.Context, p authz.Principal, r Batch
 					}
 				}
 			}
-			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID, ConsentCandidateId: rec.CandidateID}); err != nil {
 				return err
 			}
 			if err := audit.Record(ctx, tx, audit.Entry{
