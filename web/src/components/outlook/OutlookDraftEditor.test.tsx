@@ -138,3 +138,19 @@ it("creates a draft on the first attachment and keeps unsaved text when removing
   expect(message.innerHTML).toBe("<p>What about <em>Wednesday</em>?</p>");
   expect(send).not.toHaveBeenCalled();
 });
+
+it("opens a new message with the caret in the message, not on a resize bar", () => {
+  // As a browser does: opening the window focuses its first control.
+  vi.spyOn(HTMLDialogElement.prototype, "showModal").mockImplementation(function (this: HTMLDialogElement) {
+    this.open = true;
+    this.querySelector<HTMLElement>('button, input, select, textarea, [tabindex="0"], [contenteditable="true"]')?.focus();
+  });
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], fields: [] }));
+  vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], salary: false, fieldValues: {} }));
+  renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} />);
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Message" }));
+  const bars = screen.getAllByRole("separator");
+  expect(bars.map((b) => b.getAttribute("aria-label"))).toEqual(["Editor width, left edge", "Editor width, right edge"]);
+  expect(bars[0]?.compareDocumentPosition(screen.getByRole("textbox", { name: "Message" })) ?? 0, "after the content")
+    .toBe(Node.DOCUMENT_POSITION_PRECEDING);
+});

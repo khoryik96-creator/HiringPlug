@@ -206,9 +206,13 @@ with the same email, or already in HiringPlug), or for the reason and **Try
 again**. The message in the list is outlined the same way, and the icon beside
 Settings counts the CVs imported and failed since you last opened it (the
 browser tab's title shows the counts too). Which message each import came from
-is kept in this browser (ids only); the outcome and the candidate come from the
-import, which **Import profiles** also lists. The Outlook message stays
-private.
+is kept in this browser, per person (its ids, the file's name and the outcome,
+the latest 100); the candidate comes from the import, which **Import profiles**
+also lists. An import cut off before its file was sent (the tab closed) shows
+as failed, to try again. The server's checks apply: the same file already in
+HiringPlug is not imported again, and a CV with a candidate's email joins that
+candidate; unlike **Import profiles**, no question is asked about files that
+share a name with one already there. The Outlook message stays private.
 
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook

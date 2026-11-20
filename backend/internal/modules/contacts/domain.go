@@ -58,9 +58,10 @@ type Summary struct {
 
 // LinkedinEmployment is what the latest LinkedIn check saw.
 type LinkedinEmployment struct {
-	Current      *bool
-	Joined, Left *string
-	CheckedAt    time.Time
+	Current       *bool
+	Joined, Left  *string
+	MatchedByName bool // by the company's name: their role links to no LinkedIn page
+	CheckedAt     time.Time
 }
 
 // Patch is a partial update of Details.

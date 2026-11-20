@@ -35,6 +35,14 @@ describe("the message box", () => {
     expect([...box.children].map((c) => c.textContent)).toEqual(["Hi Mei, please see the candidates:", "1. Nurul Huda", "Regards, Aisyah"]);
   });
 
+  it("puts candidate details above a reply's quoted message, wrapped as Outlook writes it, before the cursor was in it", () => {
+    const props = { html: "<p>Thanks Mei,</p><div><hr><p>From: Mei</p><p>Earlier message</p></div>", resetKey: 0, onChange: vi.fn(), fields, banners: [], bannerUrls: {} };
+    const { rerender } = render(<RichEditor {...props} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    rerender(<RichEditor {...props} inserting={{ id: 1, managed: true, html: '<div data-candidate-summary="true"><p>1. Nurul Huda</p></div>' }} />);
+    expect([...box.children].map((c) => c.textContent)).toEqual(["Thanks Mei,", "1. Nurul Huda", "From: MeiEarlier message"]);
+  });
+
   it("inserts a field where the cursor was, even after a toolbar dropdown took the focus", () => {
     const onChange = vi.fn();
     render(<RichEditor html="<p>She expects  per month.</p>" resetKey={0} onChange={onChange} fields={fields} banners={[]} bannerUrls={{}} />);

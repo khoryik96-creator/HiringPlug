@@ -70,7 +70,7 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
 .outlook-columns {
   border-top: 1px solid var(--line, #ded8eb);
   display: grid;
-  grid-template-columns: min(var(--outlook-list, 380px), 55%) 6px minmax(0, 1fr);
+  grid-template-columns: var(--outlook-list, 380px) 6px minmax(0, 1fr);
   min-height: 30rem;
 }
 .outlook-messages { max-height: 75vh; overflow: auto; }

@@ -47,4 +47,13 @@ describe("a company's contacts", () => {
     await screen.findByRole("link", { name: "Ana" });
     expect(screen.queryByRole("button", { name: "Verify emails" })).toBeNull();
   });
+
+  it("says when LinkedIn's dates came from a role matched by the company's name", async () => {
+    const byName = { ...contact("Rashidah", null, null), linkedinEmployment: { current: false, joined: "2017-08", left: "2025-06", matchedByName: true, checkedAt: "2026-11-20T00:00:00Z" } };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/contacts" ? { items: [byName], nextCursor: null } : testFieldSettings(),
+    ))) as never);
+    renderWithClient(<CompanyContacts company={company} canCreate={false} canCheck />);
+    expect(await screen.findByText(/LinkedIn: left Jun 2025 \(by the company's name, not acted on\)/)).toBeTruthy();
+  });
 });

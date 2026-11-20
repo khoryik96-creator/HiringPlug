@@ -16,7 +16,8 @@ import { useFieldSettings } from "./useFieldSettings";
 
 /** What LinkedIn showed of a contact's time at the company, under their status. */
 function LinkedinNote({ e }: { e: NonNullable<ContactSummary["linkedinEmployment"]> }) {
-  const text = e.current === null ? "LinkedIn: unclear" : e.current ? `LinkedIn: since ${linkedinDates(e.joined)}` : `LinkedIn: left ${linkedinDates(e.left)}`;
+  const text = (e.current === null ? "LinkedIn: unclear" : e.current ? `LinkedIn: since ${linkedinDates(e.joined)}` : `LinkedIn: left ${linkedinDates(e.left)}`)
+    + (e.matchedByName && e.current !== null ? " (by the company's name, not acted on)" : "");
   return <span className="muted small linkedin-note" title={`Checked ${formatWhen(e.checkedAt)}`}>{text} · {timeAgo(e.checkedAt)}</span>;
 }
 

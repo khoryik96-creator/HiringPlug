@@ -306,7 +306,7 @@ func linkedinEmploymentToAPI(l *LinkedinEmployment) *api.LinkedinEmployment {
 	if l == nil {
 		return nil
 	}
-	return &api.LinkedinEmployment{Current: c.OrNull(l.Current), Joined: c.OrNull(l.Joined), Left: c.OrNull(l.Left), CheckedAt: l.CheckedAt}
+	return &api.LinkedinEmployment{Current: c.OrNull(l.Current), Joined: c.OrNull(l.Joined), Left: c.OrNull(l.Left), MatchedByName: l.MatchedByName, CheckedAt: l.CheckedAt}
 }
 
 func movesToAPI(in []LinkedinMove) []api.LinkedinMove {

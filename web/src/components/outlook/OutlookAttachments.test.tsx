@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../../api/client";
@@ -14,6 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   resetCvImports();
+  window.localStorage.removeItem("hiringplug.outlook.cvImports");
 });
 
 it("shows Outlook-only attachments and downloads a file from the current message", async () => {
@@ -118,4 +120,56 @@ it("outlines the message a CV came from, and counts imports beside Settings", as
 it("puts the counts in the tab's title, and takes them out", () => {
   expect(titleWithCounts("HiringPlug", { importing: 1, done: 2, failed: 1 })).toBe("(1… 2✓ 1✗) HiringPlug");
   expect(titleWithCounts("(1… 2✓ 1✗) HiringPlug", { importing: 0, done: 0, failed: 0 })).toBe("HiringPlug");
+});
+
+it("shows an import cut off on its way (the tab closed) as failed, to try again", async () => {
+  serveImport(importItem("created"));
+  window.localStorage.setItem("hiringplug.outlook.cvImports", JSON.stringify([{ userId: me.user.id, messageId: "omg_test", attachmentId: "cvFile",
+    fileName: "Nadia.PDF", status: "uploading", at: new Date(Date.now() - 10 * 60_000).toISOString(), seen: false }]));
+  renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv userId={me.user.id} />);
+  const failed = await screen.findByLabelText("Failed: Nadia.PDF");
+  expect(failed.className).toContain("failed");
+  expect(screen.getByRole("status").textContent).toContain("interrupted");
+  expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+it("follows an import still being read that is no longer among the latest, by its own address", async () => {
+  vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+    path === "/v1/outlook/messages/{messageId}/attachments" ? ok({ items: [nadia], more: false })
+      : path === "/v1/cv-imports" ? ok({ items: [] })
+        : path === "/v1/cv-imports/{cvImportId}" ? ok({ id: "cvi_old", source: "direct", createdAt: "2026-11-01T00:00:00Z", counts, items: [importItem("added")] })
+          : ok({ lists: [] }),
+  ));
+  window.localStorage.setItem("hiringplug.outlook.cvImports", JSON.stringify([{ userId: me.user.id, messageId: "omg_test", attachmentId: "cvFile",
+    fileName: "Nadia.PDF", status: "reading", importId: "cvi_old", itemId: "cvit_1", at: "2026-11-01T00:00:00Z", seen: false }]));
+  renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv userId={me.user.id} />);
+  const done = await screen.findByLabelText("Uploaded: Nadia.PDF");
+  fireEvent.click(done);
+  expect((await screen.findByRole("status")).textContent).toBe("Added to Nadia Aziz");
+});
+
+it("reads finished imports once, not on every page", async () => {
+  const get = vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+    path === "/v1/cv-imports" ? ok({ items: [{ id: "cvi_1", source: "direct", createdAt: "2026-11-20T05:00:00Z", counts, items: [importItem("created")] }] }) : ok({ lists: [] })));
+  window.localStorage.setItem("hiringplug.outlook.cvImports", JSON.stringify([{ userId: me.user.id, messageId: "omg_test", attachmentId: "cvFile",
+    fileName: "Nadia.PDF", status: "created", importId: "cvi_1", itemId: "cvit_1", candidateId: "cand_nadia", at: "2026-11-20T05:00:00Z", seen: true }]));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = render(<QueryClientProvider client={client}><CvImportIndicator userId={me.user.id} /></QueryClientProvider>);
+  await waitFor(() => { expect(get).toHaveBeenCalledTimes(1); });
+  view.unmount();
+  render(<QueryClientProvider client={client}><CvImportIndicator userId={me.user.id} /></QueryClientProvider>);
+  window.dispatchEvent(new Event("focus"));
+  await new Promise((r) => setTimeout(r, 50));
+  expect(get, "nothing being read: not fetched again").toHaveBeenCalledTimes(1);
+});
+
+it("takes the counts out of the tab's title when the badge goes (signed out)", async () => {
+  serveImport(importItem("created"));
+  document.title = "HiringPlug";
+  window.localStorage.setItem("hiringplug.outlook.cvImports", JSON.stringify([{ userId: me.user.id, messageId: "omg_test", attachmentId: "cvFile",
+    fileName: "Nadia.PDF", status: "failed", error: "Not a CV.", at: "2026-11-20T05:00:00Z", seen: false }]));
+  const view = render(<QueryClientProvider client={new QueryClient()}><CvImportIndicator userId={me.user.id} /></QueryClientProvider>);
+  await waitFor(() => { expect(document.title).toBe("(1✗) HiringPlug"); });
+  view.unmount();
+  expect(document.title).toBe("HiringPlug");
 });

@@ -1,8 +1,9 @@
 // CVs imported from Outlook attachments, followed from the click to the
 // candidate: in progress (orange), done (green) or failed (red). What was
-// imported from which message is kept in this browser (ids only, per
-// person), so the message, the button and the indicator in the top bar show
-// it again later; the outcome and the candidate come from the import itself.
+// imported from which message is kept in this browser (the ids, the file's
+// name and the outcome, per person, the latest 100), so the message, the
+// button and the indicator in the top bar show it again later; the outcome
+// and the candidate come from the import itself.
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
@@ -50,14 +51,28 @@ export function messageState(views: CvImportView[], messageId: string): CvImport
 
 const KEY = "hiringplug.outlook.cvImports";
 const KEEP = 100;
+/** Files on their way from this page (a key per attachment). */
+const sending = new Set<string>();
+const keyOf = (e: Pick<CvImportEntry, "userId" | "messageId" | "attachmentId">) => `${e.userId} ${e.messageId} ${e.attachmentId}`;
+/** Longer than a file takes to send: one still "on its way", not from this page, was cut off (the tab closed). */
+const SEND_LIMIT = 2 * 60_000;
+const INTERRUPTED = "The import was interrupted before the file was sent. Try again.";
+
+/** An entry as it now stands: one cut off on its way (not sent from this page, and long since) is failed. */
+function current(e: CvImportEntry, now: number): CvImportEntry {
+  if (e.status !== "uploading" || sending.has(keyOf(e)) || now - Date.parse(e.at) < SEND_LIMIT) return e;
+  return { ...e, status: "error", error: INTERRUPTED };
+}
 const listeners = new Set<() => void>();
-let entries: CvImportEntry[] = load();
+let entries: CvImportEntry[] = [];
+entries = load();
 
 function load(): CvImportEntry[] {
   try {
     const raw = window.localStorage.getItem(KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as CvImportEntry[]) : [];
+    const now = Date.now();
+    return Array.isArray(parsed) ? (parsed as CvImportEntry[]).map((e) => current(e, now)) : [];
   } catch {
     return [];
   }
@@ -70,6 +85,7 @@ function save(next: CvImportEntry[]) {
 }
 
 function subscribe(listener: () => void) {
+  if (listeners.size === 0) entries = load(); // what other tabs saved while nothing here followed it
   listeners.add(listener);
   const other = (e: StorageEvent) => { if (e.key === KEY) { entries = load(); listener(); } }; // another tab
   window.addEventListener("storage", other);
@@ -102,6 +118,7 @@ export async function importOutlookCv(client: QueryClient, { userId, messageId, 
   const entry: CvImportEntry = { userId, messageId, attachmentId, fileName, status: "uploading", at: new Date().toISOString(), seen: false };
   save([...entries.filter((e) => !same(e, userId, messageId, attachmentId)), entry]);
   const token = getToken();
+  sending.add(keyOf(entry));
   try {
     const blob = await fetchFile(outlookAttachmentFilePath(messageId, attachmentId), "application/octet-stream");
     if (getToken() !== token) throw new Error("Your sign-in changed. Open the message again to import this CV.");
@@ -116,6 +133,8 @@ export async function importOutlookCv(client: QueryClient, { userId, messageId, 
     });
   } catch (e) {
     update(userId, messageId, attachmentId, { status: "error", error: e instanceof Error ? e.message : String(e) });
+  } finally {
+    sending.delete(keyOf(entry));
   }
   void client.invalidateQueries({ queryKey: outlookCvImportsKey });
   void client.invalidateQueries({ queryKey: cvImportsKey });
@@ -130,17 +149,35 @@ export function markCvImportsSeen(userId: string) {
   }
 }
 
+/** The imports' files, from the person's latest imports, and each one still being read that is not among them. */
+async function importItems(following: CvImportEntry[]): Promise<Schemas["CvImportItem"][]> {
+  const items = unwrap(await api.GET("/v1/cv-imports")).items.flatMap((i) => i.items);
+  const missing = [...new Set(following.filter((e) => e.importId && !items.some((it) => it.id === e.itemId)).map((e) => e.importId ?? ""))].slice(0, 10);
+  for (const cvImportId of missing) {
+    const res = await api.GET("/v1/cv-imports/{cvImportId}", { params: { path: { cvImportId } } });
+    if (res.response.status === 404) {
+      for (const e of following.filter((f) => f.importId === cvImportId)) {
+        update(e.userId, e.messageId, e.attachmentId, { status: "error", error: "This import is no longer available." });
+      }
+    } else items.push(...unwrap(res).items);
+  }
+  return items;
+}
+
 /** The signed-in person's Outlook CV imports, newest last, with what each import says now. */
 export function useCvImports(userId: string | undefined): CvImportView[] {
   const all = useSyncExternalStore(subscribe, () => entries);
   const mine = all.filter((e) => e.userId === userId);
-  const following = mine.some((e) => e.importId && stateOf(e.status) === "importing");
+  const reading = mine.filter((e) => e.importId && stateOf(e.status) === "importing");
   const live = useQuery({
     queryKey: outlookCvImportsKey,
     enabled: mine.some((e) => e.importId),
-    refetchInterval: following ? 3000 : false,
+    // Read again only while one is being read: a finished import does not change.
+    refetchInterval: reading.length ? 3000 : false,
+    staleTime: reading.length ? 0 : 5 * 60_000,
+    refetchOnWindowFocus: reading.length > 0,
     queryFn: async () => {
-      const items = unwrap(await api.GET("/v1/cv-imports")).items.flatMap((i) => i.items);
+      const items = await importItems(reading);
       // Keeps the outcome, so it shows once the import is no longer among the latest.
       for (const e of entries) {
         const item = items.find((it) => it.id === e.itemId);

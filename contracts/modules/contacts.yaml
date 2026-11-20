@@ -799,7 +799,7 @@ components:
       description: A year (2020) or year and month (2020-06), as precise as the profile shows.
     LinkedinEmployment:
       type: object
-      required: [current, joined, left, checkedAt]
+      required: [current, joined, left, matchedByName, checkedAt]
       properties:
         current:
           type: boolean
@@ -811,6 +811,7 @@ components:
         left:
           allOf: [{ $ref: '#/components/schemas/LinkedinYearMonth' }]
           nullable: true
+        matchedByName: { type: boolean, description: "Matched by the company's name (their role links to no LinkedIn page): shown, not acted on." }
         checkedAt: { type: string, format: date-time }
     ContactLinkedinChecksStart:
       type: object

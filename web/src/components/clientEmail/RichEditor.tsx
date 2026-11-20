@@ -143,7 +143,7 @@ export function RichEditor({ compact = false, iconTools = false, invalid = false
       // introduction, which would delete that writing with the candidate.
       const paragraph = blockAt(box.current, cursor.current);
       // No cursor yet: above the signature and the quoted message (a reply's), else at the end.
-      const below = paragraph ? null : [...box.current.children].find((n) => n.matches("[data-signature], hr, blockquote"));
+      const below = paragraph ? null : [...box.current.children].find((n) => n.matches("[data-signature], hr, blockquote") || n.querySelector(":scope > hr"));
       if (paragraph) paragraph.insertAdjacentHTML("afterend", inserting.html);
       else if (below) below.insertAdjacentHTML("beforebegin", inserting.html);
       else box.current.insertAdjacentHTML("beforeend", inserting.html);

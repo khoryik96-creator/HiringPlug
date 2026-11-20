@@ -6697,6 +6697,8 @@ export interface components {
             current: boolean | null;
             joined: components["schemas"]["LinkedinYearMonth"] | null;
             left: components["schemas"]["LinkedinYearMonth"] | null;
+            /** @description Matched by the company's name (their role links to no LinkedIn page): shown, not acted on. */
+            matchedByName: boolean;
             /** Format: date-time */
             checkedAt: string;
         };

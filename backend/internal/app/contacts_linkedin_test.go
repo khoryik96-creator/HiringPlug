@@ -163,4 +163,12 @@ func TestALinkedInRoleMatchedByNameIsShownNeverActedOn(t *testing.T) {
 	assert.Equal(t, rashid.Version, got.Version)
 	assert.Equal(t, "2025-06", got.LinkedinCheck.MustGet().Left.MustGet())
 	assert.True(t, got.LinkedinCheck.MustGet().MatchedByName)
+
+	// The company's contact list says so too.
+	res = a.request(http.MethodGet, "/v1/contacts?companyId="+company.Id, token, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	var list api.ContactPage
+	res.JSON(&list)
+	require.Len(t, list.Items, 1)
+	assert.True(t, list.Items[0].LinkedinEmployment.MustGet().MatchedByName)
 }

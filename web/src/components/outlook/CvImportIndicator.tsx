@@ -21,7 +21,11 @@ export function CvImportIndicator({ userId }: { userId: string }) {
   const importing = views.filter((v) => stateOf(v.status) === "importing").length;
   const done = views.filter((v) => !v.seen && stateOf(v.status) === "done").length;
   const failed = views.filter((v) => !v.seen && stateOf(v.status) === "failed").length;
-  useEffect(() => { document.title = titleWithCounts(document.title, { importing, done, failed }); }, [importing, done, failed]);
+  useEffect(() => {
+    document.title = titleWithCounts(document.title, { importing, done, failed });
+    // Gone (signed out): the title without the counts.
+    return () => { document.title = titleWithCounts(document.title, { importing: 0, done: 0, failed: 0 }); };
+  }, [importing, done, failed]);
   if (views.length === 0) return null;
   const state = importing ? "importing" : failed ? "failed" : done ? "done" : "idle";
   const label = [importing && `${String(importing)} importing`, done && `${String(done)} imported`, failed && `${String(failed)} failed`].filter(Boolean).join(", ");

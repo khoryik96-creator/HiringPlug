@@ -3,7 +3,7 @@ import { afterEach, beforeAll, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient, sentBody } from "../test-utils";
-import { OutlookMail } from "./OutlookMail";
+import { listLimit, OutlookMail } from "./OutlookMail";
 
 beforeAll(() => {
   if (typeof HTMLDialogElement.prototype.showModal !== "function") {
@@ -155,4 +155,11 @@ it.each([
     params: { path: { messageId: forwardSource.id } }, body: { replyAll },
   });
   expect(send).not.toHaveBeenCalled();
+});
+
+it("keeps the message list to about half of what the folders leave, so dragging back starts where the bar is", () => {
+  expect(listLimit(1280, 200)).toBe(550);
+  expect(listLimit(900, 200)).toBe(341);
+  expect(listLimit(600, 200), "never narrower than the list's least").toBe(260);
+  expect(listLimit(4000, 200), "nor wider than its most").toBe(760);
 });

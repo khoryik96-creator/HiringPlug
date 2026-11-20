@@ -274,7 +274,8 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 			}
 			page.Items[i].MailboxCheckedAt = r.MailboxCheckedAt
 			if r.LinkedinCheckedAt != nil {
-				page.Items[i].Linkedin = &LinkedinEmployment{Current: r.LinkedinCurrent, Joined: r.LinkedinJoined, Left: r.LinkedinLeft, CheckedAt: *r.LinkedinCheckedAt}
+				page.Items[i].Linkedin = &LinkedinEmployment{Current: r.LinkedinCurrent, Joined: r.LinkedinJoined, Left: r.LinkedinLeft,
+					MatchedByName: r.LinkedinMatchedByName, CheckedAt: *r.LinkedinCheckedAt}
 			}
 		}
 		return nil

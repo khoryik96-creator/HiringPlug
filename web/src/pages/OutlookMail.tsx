@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useState, useSyncExternalStore } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ClockIcon, FileIcon, IconActions, IconButton, IconLink, PowerIcon, RefreshIcon, StepsIcon } from "../components/ActionIcons";
@@ -17,6 +17,16 @@ import { messageState, useCvImports } from "../components/outlook/outlookCvImpor
 import "./outlook-workspace.css";
 
 type Folder = Schemas["OutlookMailFolder"];
+
+function watchWidth(change: () => void) {
+  window.addEventListener("resize", change);
+  return () => { window.removeEventListener("resize", change); };
+}
+
+/** The widest the message list may be: about half of what the folders leave, so the reading pane keeps room. */
+export function listLimit(screen: number, folders: number): number {
+  return Math.max(260, Math.min(760, Math.round((screen - folders - 80) * 0.55)));
+}
 
 export function OutlookMail({ canImportCv = false, permissions = [], userId }: {
   canImportCv?: boolean; permissions?: Permission[];
@@ -103,7 +113,10 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
   const change = useOutlookChange();
   // The folder pane and the message list are as wide as last dragged.
   const [foldersWidth, setFoldersWidth] = useStoredWidth("hiringplug.outlook.foldersWidth", 200, 140, 360);
-  const [listWidth, setListWidth] = useStoredWidth("hiringplug.outlook.listWidth", 380, 260, 760);
+  const [storedList, setListWidth] = useStoredWidth("hiringplug.outlook.listWidth", 380, 260, 760);
+  const screen = useSyncExternalStore(watchWidth, () => window.innerWidth);
+  const listMax = listLimit(screen, foldersWidth);
+  const listWidth = Math.min(storedList, listMax); // as shown, so dragging back starts where the bar is
   const imports = useCvImports(userId);
   const items = data?.items ?? [];
   /** Opens a message; Outlook marks it read as it opens. */
@@ -181,7 +194,7 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
                 <button type="button" disabled={data.nextOffset == null} onClick={() => { setOffset(data.nextOffset ?? offset); }}>Next</button>
               </div>}
             </div>
-            <Splitter label="Message list width" value={listWidth} min={260} max={760} onChange={setListWidth} />
+            <Splitter label="Message list width" value={listWidth} min={260} max={listMax} onChange={(w) => { setListWidth(Math.min(w, listMax)); }} />
             {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
               canImportCv={canImportCv} userId={userId} onOpenDraft={openDraft}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />

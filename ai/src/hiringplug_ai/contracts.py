@@ -2066,6 +2066,12 @@ class LinkedinEmployment(BaseModel):
     ]
     joined: Annotated[LinkedinYearMonth | None, Field(...)]
     left: Annotated[LinkedinYearMonth | None, Field(...)]
+    matchedByName: Annotated[
+        bool,
+        Field(
+            description="Matched by the company's name (their role links to no LinkedIn page): shown, not acted on."
+        ),
+    ]
     checkedAt: AwareDatetime
 
 

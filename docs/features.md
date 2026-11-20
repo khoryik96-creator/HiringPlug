@@ -1679,7 +1679,8 @@ salaries, as the client email does. The page uses the width of the screen: drag
 the bars between the folders, the list and the reading pane, or either side of
 the editor, to resize them (kept in this browser). Download attachments of up to
 20 MiB from the reading pane. **Import CV** imports a CV attachment as a candidate
-in place (source Direct, the usual duplicate checks and CV parsing): orange
+in place (source Direct and CV parsing; the same file is not imported twice and
+a CV with a candidate's email joins them): orange
 while importing, a green outline and **Uploaded** when done (click it for the
 candidate), red and **Failed** with the reason and **Try again**. The message
 in the list gets the same outline, and an icon beside Settings counts what was

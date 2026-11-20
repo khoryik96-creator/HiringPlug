@@ -711,10 +711,10 @@ const listContacts = `-- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
   contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
   m.status AS mailbox_status, m.checked_at AS mailbox_checked_at, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
-  l.checked_at AS linkedin_checked_at
+  l.checked_at AS linkedin_checked_at, coalesce(l.matched_by_name, false)::boolean AS linkedin_matched_by_name
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
   LEFT JOIN LATERAL (
-    SELECT lc.current_job, lc.joined, lc.left_on, lc.checked_at FROM contact_linkedin_check lc
+    SELECT lc.current_job, lc.joined, lc.left_on, lc.checked_at, lc.matched_by_name FROM contact_linkedin_check lc
     WHERE lc.contact_id = contact.id AND lc.status = 'observed' ORDER BY lc.checked_at DESC LIMIT 1
   ) l ON true
 WHERE ($1::text IS NULL OR contact.id < $1::text)
@@ -751,24 +751,25 @@ type ListContactsParams struct {
 }
 
 type ListContactsRow struct {
-	ID                string
-	CompanyID         string
-	FirstName         string
-	LastName          string
-	Title             *string
-	Email             *string
-	EmailCheckStatus  *string
-	Phone             *string
-	Mobile            *string
-	Status            string
-	Role              *string
-	UpdatedAt         time.Time
-	MailboxStatus     *string
-	MailboxCheckedAt  *time.Time
-	LinkedinCurrent   *bool
-	LinkedinJoined    *string
-	LinkedinLeft      *string
-	LinkedinCheckedAt *time.Time
+	ID                    string
+	CompanyID             string
+	FirstName             string
+	LastName              string
+	Title                 *string
+	Email                 *string
+	EmailCheckStatus      *string
+	Phone                 *string
+	Mobile                *string
+	Status                string
+	Role                  *string
+	UpdatedAt             time.Time
+	MailboxStatus         *string
+	MailboxCheckedAt      *time.Time
+	LinkedinCurrent       *bool
+	LinkedinJoined        *string
+	LinkedinLeft          *string
+	LinkedinCheckedAt     *time.Time
+	LinkedinMatchedByName bool
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
@@ -813,6 +814,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 			&i.LinkedinJoined,
 			&i.LinkedinLeft,
 			&i.LinkedinCheckedAt,
+			&i.LinkedinMatchedByName,
 		); err != nil {
 			return nil, err
 		}
