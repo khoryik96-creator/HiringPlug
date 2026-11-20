@@ -21,6 +21,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
 )
 
 // StartPrep queues the AI writing the job's prep material.
@@ -36,6 +37,9 @@ func (s *Service) StartPrep(ctx context.Context, p authz.Principal, jobID string
 		recorded, err := q.QuestionsForPrep(ctx, jobID)
 		if err != nil {
 			return err
+		}
+		if len(recorded) > MaxRecordedQuestions {
+			recorded = recorded[:MaxRecordedQuestions] // the newest: what one answer can cover
 		}
 		text := JobText(job.Description, job.AdText)
 		if !EnoughToPrepare(text, len(recorded)) {
@@ -63,13 +67,14 @@ func (s *Service) StartPrep(ctx context.Context, p authz.Principal, jobID string
 		}
 		questions := make([]api.InterviewPrepQuestion, len(recorded))
 		for i, r := range recorded {
-			questions[i] = api.InterviewPrepQuestion{Question: r.Question, Kind: api.InterviewQuestionKind(r.Kind),
-				Round: nullRound(r.Round), Notes: orNull(r.Notes)}
+			// What people typed may hold pay ("said RM 12k"): never for the AI.
+			questions[i] = api.InterviewPrepQuestion{Question: redact.WithoutMoney(r.Question), Kind: api.InterviewQuestionKind(r.Kind),
+				Round: nullRound(r.Round), Notes: orNull(withoutMoney(r.Notes))}
 		}
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindInterviewPrepWrite, api.InterviewPrepWriteJob{
 			PrepId: row.ID, JobTitle: job.Title, CompanyName: job.CompanyName, CompanyIndustry: orNull(company.Industry),
-			CompanyAbout: orNull(clipped(company.About, 2000)), Location: orNull(job.Location), WorkArrangement: orNull(job.WorkArrangement),
-			JobDescription: text, Questions: questions, Focus: orNull(focus), Ai: access,
+			CompanyAbout: orNull(withoutMoney(clipped(company.About, 2000))), Location: orNull(job.Location),
+			WorkArrangement: orNull(job.WorkArrangement), JobDescription: text, Questions: questions, Focus: orNull(withoutMoney(focus)), Ai: access,
 		}); err != nil {
 			return err
 		}
@@ -84,7 +89,7 @@ func (s *Service) StartPrep(ctx context.Context, p authz.Principal, jobID string
 func (s *Service) Preps(ctx context.Context, p authz.Principal, jobID string, archived bool) ([]Prep, error) {
 	var out []Prep
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if _, err := s.deps.Jobs.ForInterviewPrep(ctx, tx, p, jobID); err != nil {
+		if err := s.jobExists(ctx, tx, jobID); err != nil {
 			return err
 		}
 		rows, err := store.New(tx).ListInterviewPreps(ctx, store.ListInterviewPrepsParams{JobID: jobID, Archived: archived})
@@ -110,7 +115,7 @@ func (s *Service) ArchivePrep(ctx context.Context, p authz.Principal, id string,
 		if err != nil {
 			return err
 		}
-		if _, err := s.deps.Jobs.ForInterviewPrep(ctx, tx, p, row.JobID); err != nil {
+		if err := s.jobExists(ctx, tx, row.JobID); err != nil {
 			return apperr.NotFound("interview prep")
 		}
 		var at *time.Time
@@ -193,6 +198,14 @@ func nullRound(s *string) nullable.Nullable[api.InterviewRound] {
 		return nullable.NewNullNullable[api.InterviewRound]()
 	}
 	return nullable.NewNullableWithValue(api.InterviewRound(*s))
+}
+
+func withoutMoney(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := redact.WithoutMoney(*s)
+	return &t
 }
 
 func clipped(s *string, size int) *string {

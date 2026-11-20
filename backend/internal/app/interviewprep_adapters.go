@@ -15,6 +15,10 @@ import (
 // its newest ad's text; its salary is never passed on.
 type interviewPrepJobs struct{ jobs *jobs.Module }
 
+func (a interviewPrepJobs) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error) {
+	return a.jobs.Exists(ctx, tx, id)
+}
+
 func (a interviewPrepJobs) ForInterviewPrep(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (interviewprep.Job, error) {
 	v, err := a.jobs.ViewIn(ctx, tx, p, id)
 	if err != nil {

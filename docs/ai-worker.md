@@ -386,12 +386,16 @@ part of a key) are replaced by fixed messages. See
 
 `jobs/interview_prep.py` writes a job's interview prep in one call. Go sends the
 job's title, location, description and newest ad (`interviewprep.JobText`:
-lines repeated in both kept once, salary taken out by `redact.WithoutSalary`
-and any line with a currency amount dropped), the client's name, industry and
-what it does, the questions recorded at its interviews (not archived) and an
-optional focus. The model is told to give guidance, not answers, in short
-points: per question why it is asked, 3 to 5 steps, 1 to 3 example lines with
-[placeholders], trade-offs and pitfalls, covering every recorded question.
+lines repeated in both kept once, salary taken out by `redact.WithoutSalary`,
+and any line with a currency amount, or an amount beside a pay word such as
+package, budget, monthly or up to, dropped), the client's name, industry and
+what it does, the 12 newest questions recorded at its interviews (not
+archived) and an optional focus; the questions, their notes, the focus and
+the client's description go through `redact.WithoutMoney`. The model is told
+to give guidance, not answers, in short points: per question why it is asked,
+3 or 4 steps, 1 or 2 example lines with [placeholders], trade-offs and
+pitfalls, covering every recorded question, 14 questions at most. That fits
+the 8000 tokens the answer may take; a longer one would be cut off.
 `read()` clips every text and list to the contract's limits and drops items
 without a question; an answer with no questions, unreadable JSON or a provider
 error comes back as the reason, with the tokens used, on

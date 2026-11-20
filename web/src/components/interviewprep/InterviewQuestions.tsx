@@ -46,7 +46,7 @@ export function InterviewQuestions({ jobId, canManage }: { jobId: string; canMan
         <div className="row">
           <div className="segmented" role="group" aria-label="Which questions">
             <button type="button" aria-pressed={!archived} className={archived ? undefined : "on"} onClick={() => { setArchived(false); }}>In use</button>
-            <button type="button" aria-pressed={archived} className={archived ? "on" : undefined} onClick={() => { setArchived(true); }}>Archived</button>
+            <button type="button" aria-pressed={archived} className={archived ? "on" : undefined} onClick={() => { setArchived(true); setAdding(false); }}>Archived</button>
           </div>
           {canManage && !archived && !adding && <button type="button" className="primary" onClick={() => { setAdding(true); }}>Record a question</button>}
         </div>

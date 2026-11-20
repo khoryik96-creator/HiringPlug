@@ -26,8 +26,11 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 RESULT_QUEUE = "core"  # checked against the contract by tests/test_contract_wiring.py
-MAX_ANSWER_TOKENS = 6000
-MAX_QUESTIONS = 60
+# A dozen recorded questions and 14 short cards fit well inside this (about
+# 350 tokens a card): a longer answer would be cut off and unreadable.
+MAX_ANSWER_TOKENS = 8000
+MAX_QUESTIONS = 12  # Go sends at most this many (interviewprep.MaxRecordedQuestions)
+MAX_ITEMS = 14
 
 SYSTEM = """You are an interview coach at a recruitment agency in Malaysia, preparing a candidate
 for a client's interviews. Use the job, the client and the questions recorded at its interviews.
@@ -43,8 +46,8 @@ Reply with this JSON object:
 {
   "summary": "2 to 3 sentences: what the interviews will probe and how to prepare",
   "focusAreas": ["4 to 6 areas to brush up on, a few words each"],
-  "softSkills": [ITEM, ...  5 to 8 situational, what-if and behavioural questions],
-  "technical": [ITEM, ...  6 to 10 technical questions on the job's skills, tools and seniority],
+  "softSkills": [ITEM, ...  4 to 6 situational, what-if and behavioural questions],
+  "technical": [ITEM, ...  5 to 7 technical questions on the job's skills, tools and seniority],
   "questionsToAsk": ["3 to 5 sharp questions the candidate can ask the interviewer"]
 }
 
@@ -52,21 +55,22 @@ Each ITEM is:
 {
   "question": "the question as an interviewer would ask it",
   "kind": "Situational, What-if, Behavioural, Technical, System design or Case",
-  "whyAsked": "1 sentence, at most 30 words: what the interviewer is really testing",
-  "approach": ["3 to 5 steps, at most 15 words each: how to structure the answer"],
-  "phrasing": ["1 to 3 example lines, at most 30 words each, showing how to phrase a key point
+  "whyAsked": "1 sentence, at most 25 words: what the interviewer is really testing",
+  "approach": ["3 to 4 steps, at most 12 words each: how to structure the answer"],
+  "phrasing": ["1 to 2 example lines, at most 28 words each, showing how to phrase a key point
                (an opening, a framing, a trade-off), with [placeholders] for their own example"],
-  "tradeOffs": ["1 to 3, at most 15 words each: e.g. speed vs accuracy, and when each wins"],
-  "pitfalls": ["1 to 3, at most 15 words each: what weakens an answer"],
+  "tradeOffs": ["1 to 2, at most 12 words each: e.g. speed vs accuracy, and when each wins"],
+  "pitfalls": ["1 to 2, at most 12 words each: what weakens an answer"],
   "fromInterviews": true when it is one of the recorded interview questions, else false
 }
 
 Rules:
 - Cover every recorded interview question, worded as asked, with fromInterviews true; put each in
-  softSkills or technical where it belongs, then add your own to reach the counts.
+  softSkills or technical where it belongs. They count toward the numbers above: add your own
+  only to reach them, and never more than {MAX_ITEMS} questions in all.
 - Tailor everything to this role, its seniority and this client's industry: nothing generic.
 - The example lines are illustrations to adapt, not answers to memorise: keep them short and natural.
-- Plain words. No markdown, no numbering inside the texts."""
+- Plain words. No markdown, no numbering inside the texts.""".replace("{MAX_ITEMS}", str(MAX_ITEMS))
 
 
 class _FailedError(Exception):

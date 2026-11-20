@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../../api/client";
+import { MODULE } from "../../labels";
 import { JobDetail } from "../../pages/JobDetail";
 import { ok, renderWithClient, sentBody, testFieldSettings } from "../../test-utils";
 import { InterviewPrepPanel, prepText } from "./InterviewPrepPanel";
@@ -73,6 +74,15 @@ describe("questions asked at a job's interviews", () => {
     expect(sentBody(patch, 1)).toEqual({ version: 2, archived: false });
   });
 
+  it("closes the record form when switching to the archived questions", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [] }));
+    renderWithClient(<InterviewQuestions jobId="jo_1" canManage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record a question" }));
+    expect(screen.getByRole("form", { name: "Record a question" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+    expect(screen.queryByRole("form", { name: "Record a question" }), "a question saved there would vanish from view").toBeNull();
+  });
+
   it("lets a sourcer without manage rights only read", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [question()] }));
     renderWithClient(<InterviewQuestions jobId="jo_1" canManage={false} />);
@@ -117,6 +127,39 @@ describe("interview prep written by the AI", () => {
     expect((await screen.findByText(/the AI provider is busy/)).textContent).toContain("Try again");
   });
 
+  it("keeps the last good prep open when a newer one failed", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [
+      prep({ id: "ivp_2", status: "failed", content: null, error: "the AI provider is busy", createdAt: "2026-11-20T02:00:00Z" }),
+      prep(),
+    ] }));
+    renderWithClient(<InterviewPrepPanel jobId="jo_1" jobTitle="Data Engineer" canManage />);
+    expect((await screen.findByText(/the AI provider is busy/)).textContent).toBe("the AI provider is busy. Try again.");
+    const summary = screen.getByText("Expect depth on streaming reliability and calm incident handling.");
+    expect((summary.closest("details.prep-card") as HTMLDetailsElement).open).toBe(true);
+    expect(summary.closest(".prep-earlier"), "not folded away under Earlier prep").toBeNull();
+  });
+
+  it("shows a line the AI repeated twice, without duplicate keys", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const twice = { ...content, softSkills: [item({ pitfalls: ["Jumping to the fix", "Jumping to the fix"] })], focusAreas: ["Kafka", "Kafka"] };
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [prep({ content: twice })] }));
+    renderWithClient(<InterviewPrepPanel jobId="jo_1" jobTitle="Data Engineer" canManage />);
+    expect(await screen.findAllByText("Jumping to the fix")).toHaveLength(2);
+    expect(errors.mock.calls.flat().join(" ")).not.toMatch(/same key/);
+  });
+
+  it("copies over plain http too, and says so for a moment", async () => {
+    const exec = vi.fn(() => true);
+    Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
+    expect((navigator as { clipboard?: unknown }).clipboard, "no Clipboard API, as on http").toBeUndefined();
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [prep()] }));
+    renderWithClient(<InterviewPrepPanel jobId="jo_1" jobTitle="Data Engineer" canManage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Copy as text" }));
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+    expect(exec).toHaveBeenCalledWith("copy");
+    expect(await screen.findByRole("button", { name: "Copy as text" }, { timeout: 3000 }), "back after a moment").toBeTruthy();
+  });
+
   it("archives a prep", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [prep()] }));
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(prep({ archived: true })));
@@ -137,6 +180,10 @@ describe("interview prep written by the AI", () => {
 });
 
 describe("the job page's interview insights tab", () => {
+  it("is named in Roles and access", () => {
+    expect(MODULE.interview_prep).toBe("Interview insights");
+  });
+
   const job = { id: "jo_1", title: "Data Engineer", companyId: "comp_1", companyName: "Maju Bank Berhad", status: "open", location: "Kuala Lumpur",
     country: "MY", openings: 1, ownerId: null, ownerName: null, description: null, intakeDate: null, createdAt: "2026-11-01T00:00:00Z",
     updatedAt: "2026-11-01T00:00:00Z" };

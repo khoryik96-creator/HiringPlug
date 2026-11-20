@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviewprep"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -176,4 +177,35 @@ func TestInterviewPrepNeedsTheAI(t *testing.T) {
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Data Engineer", "description": "Build and run the bank's data platform on Kafka and Spark."})
 	res := a.request(http.MethodPost, "/v1/jobs/"+job.Id+"/interview-preps", token, map[string]any{})
 	assert.Equal(t, api.ErrorCodeINTERVIEWPREPAIOFF, res.Error().Error.Code)
+}
+
+func TestInterviewPrepNeverSendsPayAndCoversTheNewestQuestions(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, matchingOn)
+	aiConn := aiConnFor(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	company := a.createCompany(token, map[string]any{"name": "Maju Bank Berhad", "about": "A digital bank paying RM 9,000 to juniors."})
+	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Data Engineer",
+		"description": "Build and run the bank's data platform on Kafka and Spark.\nPackage: 12,000 - 15,000 monthly"})
+	for i := range interviewprep.MaxRecordedQuestions {
+		a.interviewQuestion(token, job.Id, map[string]any{"question": "Technical question " + string(rune('A'+i)), "kind": "technical"})
+	}
+	a.interviewQuestion(token, job.Id, map[string]any{"question": "What do you expect? (she said RM 14k)", "kind": "culture",
+		"notes": "Client budget is 15,000 a month"})
+
+	res := a.request(http.MethodPost, "/v1/jobs/"+job.Id+"/interview-preps", token, map[string]any{"focus": "Expects RM 13,500, strong on Spark"})
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	var prep api.InterviewPrep
+	res.JSON(&prep)
+	assert.Equal(t, interviewprep.MaxRecordedQuestions, prep.QuestionCount, "the newest questions, as many as one answer covers")
+
+	claimed := claimAIJobWhere(t, aiConn, "prepId", prep.Id)
+	payload := string(claimed.Payload)
+	for _, pay := range []string{"9,000", "12,000", "15,000", "14k", "13,500"} {
+		assert.NotContains(t, payload, pay, "pay never goes to the AI")
+	}
+	assert.Contains(t, payload, "strong on Spark")
+	assert.Contains(t, payload, "What do you expect? (she said", "the question is kept, its pay taken out")
+	assert.NotContains(t, payload, "Technical question A", "the oldest question is past the newest twelve")
 }

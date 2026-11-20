@@ -1457,17 +1457,20 @@ to see it, `interview_prep:manage` to change it).
 - **Interview prep with AI**: **Write prep with AI** (optionally with a focus,
   e.g. "strong technically, new to banking") prepares material from the job
   description and newest ad (salary lines taken out), the client's industry and
-  what it does, and the questions recorded (not archived). It is guidance on
+  what it does, and the newest questions recorded (up to 12, not archived);
+  pay figures typed in a question, a note or the focus are taken out first. It
+  is guidance on
   how to approach each question, never a model answer to memorise, and short:
   a two-line summary and areas to brush up on, then **soft skills**
-  (situational, what-if, behavioural) and **technical** questions, each a card
-  with *why they ask* (one line), *how to approach* (3 to 5 short steps),
-  *say it like* (1 to 3 example lines with [placeholders] for the candidate's
-  own story), *trade-offs* and what to *avoid*. Recorded questions are all
+  (situational, what-if, behavioural) and **technical** questions (14 at
+  most), each a card with *why they ask* (one line), *how to approach* (3 or 4
+  short steps), *say it like* (1 or 2 example lines with [placeholders] for
+  the candidate's own story), *trade-offs* and what to *avoid*. Recorded questions are all
   covered and marked **Asked at interview**. It ends with questions the
   candidate can ask. **Copy as text** gives it plain, to paste to a candidate.
-  Each prep is kept with the job; older ones fold under **Earlier prep**, and
-  any can be archived. It uses the company's AI allowance like the other AI
+  Each prep is kept with the job; the newest finished one stays open (with any
+  newer one being written or failed above it), older ones fold under
+  **Earlier prep**, and any can be archived. It uses the company's AI allowance like the other AI
   features, and says why when the AI could not write it.
 
 ## Data protection (PDPA) ✅

@@ -327,6 +327,6 @@ export const CANDIDATE_SCOPE: Record<Schemas["CandidateScope"], string> = {
 export const MODULE: Record<string, string> = {
   assistant: "AI assistant", candidates: "Candidates", careers: "Careers page", companies: "Companies", contacts: "Contacts",
   cvformats: "Formatted CVs", documents: "CVs and documents", emails: "Email", identity: "Team and sign-in", integrations: "Integrations",
-  interviews: "Interviews", jobs: "Jobs", leads: "Leads", matching: "Fit scores", notes: "Notes", offers: "Offers", pipeline: "Pipeline",
+  interview_prep: "Interview insights", interviews: "Interviews", jobs: "Jobs", leads: "Leads", matching: "Fit scores", notes: "Notes", offers: "Offers", pipeline: "Pipeline",
   placements: "Placements", privacy: "Data protection", reports: "Reports",
 };

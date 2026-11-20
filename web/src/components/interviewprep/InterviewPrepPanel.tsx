@@ -3,11 +3,12 @@
 // each question with why it is asked, how to approach it, example phrasings,
 // trade-offs and what to avoid. Kept with the job; archived when old.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { formatWhen } from "../../labels";
 import { ArchiveIcon, IconButton, RefreshIcon } from "../ActionIcons";
+import { copyText } from "../CopyButton";
 import { ErrorMessage } from "../ErrorMessage";
 import "./interviewprep.css";
 
@@ -52,7 +53,12 @@ export function InterviewPrepPanel({ jobId, jobTitle, canManage }: { jobId: stri
     })),
     onSuccess: async () => { setArchived(false); await client.invalidateQueries({ queryKey: prepsKey(jobId) }); },
   });
-  const [latest, ...earlier] = preps.data ?? [];
+  // Open: the newest finished prep, and any newer one being written or failed
+  // (so a failed retry never hides the last good material).
+  const list = preps.data ?? [];
+  const lastDone = list.findIndex((p) => p.status === "done");
+  const shown = list.slice(0, lastDone + 1 || 1);
+  const earlier = list.slice(shown.length);
   return (
     <section className="panel interview-prep" aria-label="Interview prep">
       <div className="row spread">
@@ -69,10 +75,10 @@ export function InterviewPrepPanel({ jobId, jobTitle, canManage }: { jobId: stri
           <button type="submit" className="primary" disabled={write.isPending}>{write.isPending ? "Asking the AI…" : "Write prep with AI"}</button>
         </form>
       )}
-      <p className="muted small">From the job description, the client and the questions recorded above (not archived). Salary is never sent to the AI.</p>
+      <p className="muted small">From the job description, the client and the newest questions recorded above (up to 12, not archived). Salary is never sent to the AI.</p>
       <ErrorMessage error={write.error ?? preps.error} />
       {preps.data?.length === 0 && <p className="muted">{archived ? "No archived prep." : "No prep yet."}</p>}
-      {latest && <PrepCard key={latest.id} jobId={jobId} jobTitle={jobTitle} prep={latest} canManage={canManage} open />}
+      {shown.map((p) => <PrepCard key={p.id} jobId={jobId} jobTitle={jobTitle} prep={p} canManage={canManage} open />)}
       {earlier.length > 0 && (
         <details className="prep-earlier">
           <summary>Earlier prep ({earlier.length})</summary>
@@ -86,6 +92,11 @@ export function InterviewPrepPanel({ jobId, jobTitle, canManage }: { jobId: stri
 function PrepCard({ jobId, jobTitle, prep, canManage, open = false }: { jobId: string; jobTitle: string; prep: Prep; canManage: boolean; open?: boolean }) {
   const client = useQueryClient();
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => { setCopied(false); }, 1500);
+    return () => { clearTimeout(t); };
+  }, [copied]);
   const archive = useMutation({
     mutationFn: async () => unwrap(await api.PATCH("/v1/interview-preps/{prepId}", { params: { path: { prepId: prep.id } }, body: { archived: !prep.archived } })),
     onSuccess: () => client.invalidateQueries({ queryKey: prepsKey(jobId) }),
@@ -104,23 +115,23 @@ function PrepCard({ jobId, jobTitle, prep, canManage, open = false }: { jobId: s
     <details className={`prep-card ${prep.status}`} open={open || undefined}>
       <summary>{head}</summary>
       {prep.status === "queued" && <p className="muted" role="status">The AI is writing it… this takes a minute.</p>}
-      {prep.status === "failed" && <p className="error">{prep.error ?? "The AI could not write it."} Try again.</p>}
+      {prep.status === "failed" && <p className="error">{failure(prep.error)}</p>}
       {c && (
         <div className="prep-body">
           <div className="row prep-tools">
-            <button type="button" onClick={() => { void navigator.clipboard.writeText(prepText(jobTitle, c)).then(() => { setCopied(true); }); }}>
+            <button type="button" onClick={() => { void copyText(prepText(jobTitle, c)).then((ok) => { if (ok) setCopied(true); }); }}>
               {copied ? "Copied" : "Copy as text"}
             </button>
             {canManage && <IconButton label={prep.archived ? "Bring back this prep" : "Archive this prep"} tip={prep.archived ? "Bring back" : "Archive"}
               icon={prep.archived ? <RefreshIcon /> : <ArchiveIcon />} disabled={archive.isPending} onClick={() => { archive.mutate(); }} />}
           </div>
           {c.summary && <p className="prep-summary">{c.summary}</p>}
-          {c.focusAreas.length > 0 && <p className="prep-focus">{c.focusAreas.map((f) => <span key={f} className="prep-chip">{f}</span>)}</p>}
+          {c.focusAreas.length > 0 && <p className="prep-focus">{c.focusAreas.map((f, i) => <span key={i} className="prep-chip">{f}</span>)}</p>}
           <PrepItems title="Soft skills" hint="situational, what-if and behavioural" items={c.softSkills} />
           <PrepItems title="Technical" items={c.technical} />
           {c.questionsToAsk.length > 0 && <>
             <h4>Questions to ask them</h4>
-            <ul className="prep-asks">{c.questionsToAsk.map((q) => <li key={q}>{q}</li>)}</ul>
+            <ul className="prep-asks">{c.questionsToAsk.map((q, i) => <li key={i}>{q}</li>)}</ul>
           </>}
         </div>
       )}
@@ -131,6 +142,12 @@ function PrepCard({ jobId, jobTitle, prep, canManage, open = false }: { jobId: s
       <ErrorMessage error={archive.error} />
     </details>
   );
+}
+
+/** Why the AI could not write it, saying once to try again. */
+function failure(error: string | null): string {
+  const why = (error ?? "The AI could not write it").trim().replace(/[.\s]+$/, "");
+  return /try again/i.test(why) ? `${why}.` : `${why}. Try again.`;
 }
 
 function PrepItems({ title, hint, items }: { title: string; hint?: string; items: Item[] }) {
@@ -144,7 +161,7 @@ function PrepItems({ title, hint, items }: { title: string; hint?: string; items
       </div>
       <ol className="prep-items">
         {items.map((it, i) => (
-          <li key={`${String(i)}-${it.question}`}>
+          <li key={i}>
             <details className="prep-item" open={all ?? i === 0}>
               <summary>
                 <span className="prep-q">{it.question}</span>
@@ -154,13 +171,13 @@ function PrepItems({ title, hint, items }: { title: string; hint?: string; items
                 </span>
               </summary>
               {it.whyAsked && <p className="prep-why"><span>Why they ask</span> {it.whyAsked}</p>}
-              {it.approach.length > 0 && <div className="prep-block"><span>How to approach</span><ol>{it.approach.map((a) => <li key={a}>{a}</li>)}</ol></div>}
+              {it.approach.length > 0 && <div className="prep-block"><span>How to approach</span><ol>{it.approach.map((a, j) => <li key={j}>{a}</li>)}</ol></div>}
               {it.phrasing.length > 0 && (
-                <div className="prep-block prep-say"><span>Say it like</span>{it.phrasing.map((p) => <blockquote key={p}>{p}</blockquote>)}</div>
+                <div className="prep-block prep-say"><span>Say it like</span>{it.phrasing.map((p, j) => <blockquote key={j}>{p}</blockquote>)}</div>
               )}
               <div className="prep-pair">
-                {it.tradeOffs.length > 0 && <div className="prep-block"><span>Trade-offs</span><ul>{it.tradeOffs.map((t) => <li key={t}>{t}</li>)}</ul></div>}
-                {it.pitfalls.length > 0 && <div className="prep-block prep-avoid"><span>Avoid</span><ul>{it.pitfalls.map((t) => <li key={t}>{t}</li>)}</ul></div>}
+                {it.tradeOffs.length > 0 && <div className="prep-block"><span>Trade-offs</span><ul>{it.tradeOffs.map((t, j) => <li key={j}>{t}</li>)}</ul></div>}
+                {it.pitfalls.length > 0 && <div className="prep-block prep-avoid"><span>Avoid</span><ul>{it.pitfalls.map((t, j) => <li key={j}>{t}</li>)}</ul></div>}
               </div>
             </details>
           </li>

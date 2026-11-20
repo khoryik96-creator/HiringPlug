@@ -40,8 +40,10 @@ type Company struct{ Industry, About *string }
 
 // Deps are the other modules this one needs, passed in by internal/app.
 type Deps struct {
-	// Jobs returns a job the user may see (a NotFound error when not).
+	// Jobs: whether a job exists in the company, and what the AI is told of
+	// it (a NotFound error when there is no such job).
 	Jobs interface {
+		Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error)
 		ForInterviewPrep(ctx context.Context, tx pgx.Tx, p authz.Principal, jobID string) (Job, error)
 	}
 	Companies interface {
@@ -59,9 +61,12 @@ type Module struct {
 	HTTP    *HTTP
 }
 
-// New wires the module.
-func New(pool *pgxpool.Pool, deps Deps) *Module {
-	svc := &Service{pool: pool, deps: deps, now: time.Now}
+// New wires the module; zone is where the company works (its "today").
+func New(pool *pgxpool.Pool, deps Deps, zone *time.Location) *Module {
+	if zone == nil {
+		zone = time.UTC
+	}
+	svc := &Service{pool: pool, deps: deps, now: time.Now, zone: zone}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 

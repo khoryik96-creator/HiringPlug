@@ -35,6 +35,26 @@ func TestTheAIIsToldTheJobWithoutItsSalary(t *testing.T) {
 	assert.Len(t, []rune(JobText(strings.Repeat("a", MaxJobText+50), "")), MaxJobText)
 }
 
+func TestPayWithoutACurrencyOrSalaryWordIsLeftOut(t *testing.T) {
+	text := JobText("Package: 12,000 - 15,000 monthly\nBudget up to 15k + bonus\nPay 8500 per month\n"+
+		"Process 10,000 transactions a day\nMonthly reporting to the CFO since 2019", "")
+	assert.NotContains(t, text, "12,000")
+	assert.NotContains(t, text, "15k")
+	assert.NotContains(t, text, "8500")
+	assert.Contains(t, text, "Process 10,000 transactions a day", "an amount that is not pay stays")
+	assert.Contains(t, text, "Monthly reporting to the CFO since 2019", "a year is not pay")
+}
+
+func TestTodayIsTheCompanysDate(t *testing.T) {
+	kl, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	assert.NoError(t, err)
+	// 07:30 on 20 November in Kuala Lumpur is still 19 November in UTC.
+	s := &Service{now: func() time.Time { return time.Date(2026, 11, 19, 23, 30, 0, 0, time.UTC) }, zone: kl}
+	asked := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	_, errs := Clean(QuestionFields{Question: "Why us?", Kind: "culture", AskedOn: &asked}, s.today())
+	assert.NoError(t, errs.Err(), "a question asked today, early in the morning, is not ahead of today")
+}
+
 func TestThereMustBeSomethingToPrepareFrom(t *testing.T) {
 	assert.False(t, EnoughToPrepare("Engineer", 0))
 	assert.True(t, EnoughToPrepare("Engineer", 1))

@@ -20,6 +20,7 @@ type Service struct {
 	pool *pgxpool.Pool
 	deps Deps
 	now  func() time.Time
+	zone *time.Location
 }
 
 // QuestionChange is an edit of a question: nil fields are left as they are
@@ -33,8 +34,9 @@ type QuestionChange struct {
 	Archived                 *bool
 }
 
+// today is the company's date, at midnight UTC (as dates are kept).
 func (s *Service) today() time.Time {
-	y, m, d := s.now().Date()
+	y, m, d := s.now().In(s.zone).Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
@@ -46,7 +48,7 @@ func (s *Service) AddQuestion(ctx context.Context, p authz.Principal, jobID stri
 	}
 	var out Question
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if _, err := s.deps.Jobs.ForInterviewPrep(ctx, tx, p, jobID); err != nil {
+		if err := s.jobExists(ctx, tx, jobID); err != nil {
 			return err
 		}
 		row, err := store.New(tx).InsertInterviewQuestion(ctx, store.InsertInterviewQuestionParams{
@@ -66,7 +68,7 @@ func (s *Service) AddQuestion(ctx context.Context, p authz.Principal, jobID stri
 func (s *Service) Questions(ctx context.Context, p authz.Principal, jobID string, archived bool) ([]Question, error) {
 	var out []Question
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if _, err := s.deps.Jobs.ForInterviewPrep(ctx, tx, p, jobID); err != nil {
+		if err := s.jobExists(ctx, tx, jobID); err != nil {
 			return err
 		}
 		rows, err := store.New(tx).ListInterviewQuestions(ctx, store.ListInterviewQuestionsParams{JobID: jobID, Archived: archived})
@@ -84,7 +86,7 @@ func (s *Service) ChangeQuestion(ctx context.Context, p authz.Principal, id stri
 	var out Question
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		row, err := s.ownQuestion(ctx, tx, p, id)
+		row, err := s.ownQuestion(ctx, tx, id)
 		if err != nil {
 			return err
 		}
@@ -129,7 +131,7 @@ func (s *Service) ChangeQuestion(ctx context.Context, p authz.Principal, id stri
 // DeleteQuestion deletes a question recorded by mistake.
 func (s *Service) DeleteQuestion(ctx context.Context, p authz.Principal, id string) error {
 	return database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		row, err := s.ownQuestion(ctx, tx, p, id)
+		row, err := s.ownQuestion(ctx, tx, id)
 		if err != nil {
 			return err
 		}
@@ -142,7 +144,7 @@ func (s *Service) DeleteQuestion(ctx context.Context, p authz.Principal, id stri
 }
 
 // ownQuestion is a question of a job the user may see.
-func (s *Service) ownQuestion(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (store.InterviewQuestion, error) {
+func (s *Service) ownQuestion(ctx context.Context, tx pgx.Tx, id string) (store.InterviewQuestion, error) {
 	row, err := store.New(tx).GetInterviewQuestion(ctx, id)
 	if database.IsNoRows(err) {
 		return row, apperr.NotFound("interview question")
@@ -150,10 +152,22 @@ func (s *Service) ownQuestion(ctx context.Context, tx pgx.Tx, p authz.Principal,
 	if err != nil {
 		return row, err
 	}
-	if _, err := s.deps.Jobs.ForInterviewPrep(ctx, tx, p, row.JobID); err != nil {
+	if err := s.jobExists(ctx, tx, row.JobID); err != nil {
 		return row, apperr.NotFound("interview question")
 	}
 	return row, nil
+}
+
+// jobExists is a NotFound error when the job is not the company's (or gone).
+func (s *Service) jobExists(ctx context.Context, tx pgx.Tx, jobID string) error {
+	ok, err := s.deps.Jobs.Exists(ctx, tx, jobID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperr.NotFound("job")
+	}
+	return nil
 }
 
 func apply(f *QuestionFields, c QuestionChange) {

@@ -16,9 +16,11 @@ class FakeAI:
     def __init__(self, answer: str | ProviderError) -> None:
         self.answer = answer
         self.calls: list[tuple[str, str]] = []
+        self.max_tokens = 0
 
     def complete(self, system: str, user: str, *, max_tokens: int) -> Completion:
         self.calls.append((system, user))
+        self.max_tokens = max_tokens
         if isinstance(self.answer, ProviderError):
             raise self.answer
         return Completion(text=self.answer, model="test-model", input_tokens=3000, output_tokens=1200)
@@ -149,3 +151,20 @@ def test_no_provider_or_a_provider_error_is_the_reason() -> None:
     out = run(FakeAI(ProviderError("the AI provider is busy")), payload())
     assert out.error == "the AI provider is busy"
     assert out.content is None
+
+
+def test_the_answer_asked_for_fits_the_length_allowed() -> None:
+    many = payload()
+    many.questions = many.questions * 20
+    ai = FakeAI(
+        json.dumps(
+            {"summary": "x", "focusAreas": [], "softSkills": [ITEM], "technical": [], "questionsToAsk": []}
+        )
+    )
+    run(ai, many)
+    user = ai.calls[0][1]
+    assert "12. [situational" in user
+    assert "13. [situational" not in user, "at most a dozen recorded questions"
+    assert "never more than 14 questions in all" in user
+    # About 350 tokens a card: 14 cards and the rest fit, with room to spare.
+    assert ai.max_tokens >= 14 * 350 + 1500

@@ -62,12 +62,42 @@ func optional(s *string) *string {
 // MaxJobText is how much of the job's description and ad goes to the AI.
 const MaxJobText = 12000
 
-// money is an amount with its currency, e.g. "RM 8,000" or "SGD7k".
-var money = regexp.MustCompile(`(?i)(?:\brm|\bmyr|\bsgd|\busd|\bidr|s\$|\$)\s?\d`)
+// MaxRecordedQuestions is how many recorded questions (the newest) one prep
+// covers: each becomes a card, and the AI's answer has a set length.
+const MaxRecordedQuestions = 12
+
+var (
+	// money is an amount with its currency, e.g. "RM 8,000" or "SGD7k".
+	money = regexp.MustCompile(`(?i)(?:\brm|\bmyr|\bsgd|\busd|\bidr|\beur|\bgbp|s\$|\$)\s?\d`)
+	// payCue is a word saying a line is about pay, even without "salary":
+	// "Package: 12,000 - 15,000 monthly", "Budget up to 15k".
+	payCue = regexp.MustCompile(`(?i)\b(?:package|budget|monthly|per\s+month|p\.\s?m\.?|/\s?month|per\s+annum|p\.\s?a\.?|annually|per\s+year|up\s+to|wages?|allowance|bonus|ctc|pay)\b`)
+	// amount is a figure written as pay is: 12,000 / 8.5k / 9000 (not a year).
+	amount = regexp.MustCompile(`(?i)\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+(?:\.\d+)?\s?k\b|\b\d{4,7}\b`)
+	year   = regexp.MustCompile(`^(?:19|20)\d\d$`)
+)
+
+// aboutPay reports a line naming pay: an amount with a currency, or an
+// amount on a line with a pay word.
+func aboutPay(line string) bool {
+	if money.MatchString(line) {
+		return true
+	}
+	if !payCue.MatchString(line) {
+		return false
+	}
+	for _, a := range amount.FindAllString(line, -1) {
+		if !year.MatchString(a) {
+			return true
+		}
+	}
+	return false
+}
 
 // JobText is what the AI is told of the job: its description and its ad's
 // text (a line the ad repeats, once), without salary: lines naming pay are
-// cut at the salary word, and lines with a currency amount left out.
+// cut at the salary word, and lines with a currency amount, or an amount
+// beside a pay word (package, budget, monthly, up to...), left out.
 func JobText(description, ad string) string {
 	description, ad = strings.TrimSpace(description), strings.TrimSpace(ad)
 	known := map[string]bool{}
@@ -89,7 +119,7 @@ func JobText(description, ad string) string {
 	}
 	var kept []string
 	for _, line := range strings.Split(redact.WithoutSalary(text), "\n") {
-		if !money.MatchString(line) {
+		if !aboutPay(line) {
 			kept = append(kept, line)
 		}
 	}
