@@ -2737,6 +2737,10 @@ class OutlookReplyInput(BaseModel):
     saveDraft: bool
 
 
+class OutlookReplyDraftInput(BaseModel):
+    replyAll: bool
+
+
 class OutlookForwardInput(BaseModel):
     to: Annotated[list[ToItem], Field(max_length=50, min_length=1)]
     note: Annotated[str | None, Field(max_length=10000)] = None

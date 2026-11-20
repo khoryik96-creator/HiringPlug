@@ -20,13 +20,14 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
   canSaveCv: boolean;
   canImportCv: boolean;
   onThread: () => void;
-  onOpenDraft: (id: string) => void;
+  onOpenDraft: (id: string, focusMessage?: boolean) => void;
 }) {
   const client = useQueryClient();
   const [reply, setReply] = useState("");
   const [mode, setMode] = useState<"reply" | "replyAll" | "forward" | null>(null);
   const [destination, setDestination] = useState("");
   const [notice, setNotice] = useState("");
+  const draftsReady = folders.some((folder) => folder.kind === "drafts");
   const path = { messageId: message.id };
   const params = { path };
   const body = useQuery({
@@ -53,6 +54,20 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
       setReply("");
     },
   });
+  const draftReply = useMutation({
+    mutationFn: async (replyAll: boolean) => unwrap(await api.POST("/v1/outlook/messages/{messageId}/reply-draft", {
+      params, body: { replyAll },
+    })),
+    onSuccess: () => { void client.invalidateQueries({ queryKey: ["outlook", "list"] }); },
+  });
+  const startReply = (replyAll: boolean) => {
+    setNotice("");
+    if (!draftsReady) {
+      setMode(replyAll ? "replyAll" : "reply");
+      return;
+    }
+    draftReply.mutate(replyAll, { onSuccess: (draft) => { onOpenDraft(draft.messageId, true); } });
+  };
   const link = useMutation({
     mutationFn: async (remove: boolean) => {
       if (remove) {
@@ -95,9 +110,10 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
           : <button type="button" disabled={link.isPending} onClick={() => { link.mutate(false); }}>Link to {profile.candidateId ? "candidate" : "contact"}</button>}
       </>}
     </div>
-    <ErrorMessage error={body.error ?? change.error ?? send.error ?? link.error}/>
+    <ErrorMessage error={body.error ?? change.error ?? send.error ?? draftReply.error ?? link.error}/>
     {notice && <p role="status">{notice}</p>}
     {body.isPending && <p className="muted">Opening message…</p>}
+    {draftReply.isPending && <p className="muted" role="status">Opening reply…</p>}
     {body.data && <p className="outlook-body">{body.data.text}</p>}
     {body.data?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
     {/* The candidate is suggested only for their own linked mail, never for any message read from their page. */}
@@ -105,10 +121,10 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
       canSaveCv={canSaveCv} canImportCv={canImportCv} candidateId={linked ? profile?.candidateId : undefined} />}
     {!message.isDraft && mode === null && <div className="outlook-response-actions">
       <IconActions label="Message responses">
-        <IconButton label="Reply" icon={<ReplyIcon />} onClick={() => { setMode("reply"); setNotice(""); }} />
-        <IconButton label="Reply all" icon={<ReplyAllIcon />} onClick={() => { setMode("replyAll"); setNotice(""); }} />
-        {folders.some((folder) => folder.kind === "drafts") &&
-          <IconButton label="Forward" icon={<ForwardIcon />} onClick={() => { setMode("forward"); setNotice(""); }} />}
+        <IconButton label="Reply" icon={<ReplyIcon />} disabled={draftReply.isPending} onClick={() => { startReply(false); }} />
+        <IconButton label="Reply all" icon={<ReplyAllIcon />} disabled={draftReply.isPending} onClick={() => { startReply(true); }} />
+        {draftsReady && <IconButton label="Forward" icon={<ForwardIcon />} disabled={draftReply.isPending}
+          onClick={() => { setMode("forward"); setNotice(""); }} />}
       </IconActions>
     </div>}
     {mode === "forward" && <OutlookForward messageId={message.id} onOpen={onOpenDraft} onClose={() => { setMode(null); }} />}

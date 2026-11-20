@@ -3759,6 +3759,38 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/OutlookReplyInput'
+  /v1/outlook/messages/{messageId}/reply-draft:
+    post:
+      operationId: createOutlookReplyDraft
+      tags: [emails]
+      summary: Create a reply draft in the original Outlook conversation
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^omg_[0-9a-z]{26}$'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OutlookReplyDraftInput'}
+      responses:
+        '201':
+          description: Reply draft
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutlookDraft'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '503':
+          description: Outlook is unavailable or the draft creation outcome is uncertain
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/outlook/messages/{messageId}/forward:
     post:
       operationId: createOutlookForwardDraft
@@ -11585,6 +11617,12 @@ components:
             - reply
             - replyAll
         saveDraft:
+          type: boolean
+    OutlookReplyDraftInput:
+      type: object
+      required: [replyAll]
+      properties:
+        replyAll:
           type: boolean
     OutlookForwardInput:
       type: object

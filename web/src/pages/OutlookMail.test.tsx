@@ -84,14 +84,14 @@ const forwardDraft: Schemas["OutlookDraft"] = {
   hasAttachments: true, bodyTruncated: false, schedule: null, scheduleNeedsReview: false, webUrl: null,
 };
 
-function showForwardInbox() {
+function showForwardInbox(draft = forwardDraft) {
   vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
     path === "/v1/outlook/mail" ? ok({
       connected: true, enabled: true, folders: [
         { id: "omf_inbox", name: "Inbox", kind: "inbox" }, { id: "omf_drafts", name: "Drafts", kind: "drafts" },
       ],
       items: [forwardSource, { ...forwardSource, id: "omg_other", subject: "Another message" }],
-    }) : path === "/v1/outlook/drafts/{messageId}" ? ok(forwardDraft)
+    }) : path === "/v1/outlook/drafts/{messageId}" ? ok(draft)
       : path === "/v1/outlook/messages/{messageId}/attachments" ? ok({
         items: [{ id: "cvFile", fileName: "Nadia CV.pdf", sizeBytes: 4400, downloadable: true, savable: true }], more: false,
       }) : ok({ text: "I can make Tuesday." }),
@@ -156,4 +156,32 @@ it("opens the existing ATS composer and its profile context from Outlook", async
     expect(post.mock.calls[0]?.[0]).toBe("/v1/email-previews");
     expect(sentBody(post)).toMatchObject({ contactId: "cont_test" });
   });
+});
+
+it.each([
+  ["Reply", false],
+  ["Reply all", true],
+] as const)("opens %s with the caret ready to type above the quoted message", async (action, replyAll) => {
+  const draft: Schemas["OutlookDraft"] = {
+    ...forwardDraft, subject: "RE: Availability for interview", body: "I can make Tuesday.",
+    bodyHtml: "<p><br></p><blockquote>I can make Tuesday.</blockquote>", hasAttachments: false,
+    to: replyAll ? ["nadia@example.test", "lina@example.test"] : ["nadia@example.test"],
+  };
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok(draft));
+  const send = vi.spyOn(api, "PUT");
+  showForwardInbox(draft);
+  fireEvent.click(await screen.findByRole("button", { name: /Availability for interview/ }));
+  fireEvent.click(screen.getByRole("button", { name: action }));
+  const message = await screen.findByRole("textbox", { name: "Message" });
+  expect(document.activeElement).toBe(message);
+  expect(message.querySelector("blockquote")?.textContent).toBe("I can make Tuesday.");
+  expect(screen.getByLabelText<HTMLInputElement>("To").value).toBe(draft.to.join(", "));
+  const sendNow = screen.getByRole<HTMLButtonElement>("button", { name: "Send now" });
+  expect(sendNow.disabled).toBe(true);
+  fireEvent.input(message, { target: { innerHTML: "<p><b>Tuesday works.</b></p><blockquote>I can make Tuesday.</blockquote>" } });
+  expect(sendNow.disabled).toBe(false);
+  expect(post).toHaveBeenCalledWith("/v1/outlook/messages/{messageId}/reply-draft", {
+    params: { path: { messageId: forwardSource.id } }, body: { replyAll },
+  });
+  expect(send).not.toHaveBeenCalled();
 });

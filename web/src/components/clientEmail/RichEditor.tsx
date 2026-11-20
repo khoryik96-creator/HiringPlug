@@ -18,6 +18,7 @@ type Props = {
   invalid?: boolean;
   readOnly?: boolean;
   plainPaste?: boolean;
+  focusAtStart?: boolean;
   /** What the box starts with; changing `resetKey` puts it back in. */
   html: string;
   resetKey: number;
@@ -43,7 +44,7 @@ type Props = {
   onFocus?: () => void;
 };
 
-export function RichEditor({ compact = false, iconTools = false, invalid = false, readOnly = false, plainPaste = false, html, resetKey, onChange, fields: fieldOptions, banners, bannerUrls = NONE, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
+export function RichEditor({ compact = false, iconTools = false, invalid = false, readOnly = false, plainPaste = false, focusAtStart = false, html, resetKey, onChange, fields: fieldOptions, banners, bannerUrls = NONE, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const extras = !compact || expanded;
   const vals = values ?? NONE;
@@ -60,6 +61,14 @@ export function RichEditor({ compact = false, iconTools = false, invalid = false
     // Only when the message is replaced (a template), not on every change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
+  useEffect(() => {
+    if (!focusAtStart || !box.current) return;
+    const range = document.createRange();
+    range.selectNodeContents(box.current);
+    range.collapse(true);
+    restoreRange(box.current, range);
+    cursor.current = range;
+  }, [focusAtStart]);
   useEffect(() => {
     if (!box.current) return;
     showBanners(box.current, bannerUrls);

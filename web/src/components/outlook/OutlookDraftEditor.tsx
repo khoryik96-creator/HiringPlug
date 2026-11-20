@@ -20,7 +20,9 @@ type DraftInput = Schemas["OutlookDraftInput"];
 export const outlookScheduledKey = ["outlook", "scheduled"];
 const draftKey = (id: string | null) => ["outlook", "draft", id];
 
-export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose: (operation?: "send" | "schedule" | "discard") => void }) {
+export function OutlookDraftEditor({ id, onClose, focusMessage = false }: {
+  id: string | null; onClose: (operation?: "send" | "schedule" | "discard") => void; focusMessage?: boolean;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const busy = useRef(false);
   const query = useQuery({
@@ -43,7 +45,7 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
       </div>
       <ErrorMessage error={query.error}/>
       {query.isPending && <p className="muted">Opening draft…</p>}
-    </> : <DraftFields key={query.dataUpdatedAt} opened={query.data} setBusy={(pending) => { busy.current = pending; }}
+    </> : <DraftFields key={query.dataUpdatedAt} opened={query.data} focusMessage={focusMessage} setBusy={(pending) => { busy.current = pending; }}
       onClose={onClose}/>}
   </dialog>;
 }
@@ -68,12 +70,14 @@ const formOf = (draft?: Draft) => draft ? {
 type Operation = "save" | "send" | "schedule" | "discard";
 type DraftAction = Operation | "reload" | { file: File } | { remove: string };
 
-function DraftFields({ opened, onClose, setBusy }: {
+function DraftFields({ opened, onClose, setBusy, focusMessage }: {
   opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; setBusy: (pending: boolean) => void;
+  focusMessage: boolean;
 }) {
   const client = useQueryClient();
   const [draft, setDraft] = useState(opened);
   const [form, setForm] = useState(() => formOf(opened));
+  const [originalReplyText] = useState(() => focusMessage ? editorText(form.html).replace(/\s+/g, " ") : undefined);
   const [editorReset, setEditorReset] = useState(0);
   const [copies, setCopies] = useState(!!(form.cc || form.bcc));
   const [later, setLater] = useState(false);
@@ -170,7 +174,8 @@ function DraftFields({ opened, onClose, setBusy }: {
   const errors = fieldErrors(action.error);
   const errorFor = (name: string) => errors[name] ?? Object.entries(errors).find(([field]) => field.startsWith(`${name}.`) || field.startsWith(`${name}[`))?.[1];
   const update = (field: keyof typeof form, value: string) => { setForm({ ...form, [field]: value }); setNotice(""); };
-  const readyToSend = !!form.to.trim() && !!form.subject.trim() && !!editorText(form.html);
+  const messageText = editorText(form.html).replace(/\s+/g, " ");
+  const readyToSend = !!form.to.trim() && !!form.subject.trim() && !!messageText && messageText !== originalReplyText;
   return <>
     <div className="row spread outlook-draft-head">
       <h3 id="outlook-draft-heading">{draft ? "Outlook draft" : "New Outlook message"}</h3>
@@ -188,7 +193,7 @@ function DraftFields({ opened, onClose, setBusy }: {
         {draft?.bodyTruncated ? <Field label="Message"><textarea readOnly rows={9} value={draft.body} /></Field> :
           <div className="field">
             <span>Message</span>
-            <RichEditor compact iconTools plainPaste readOnly={locked || action.isPending} html={form.html} resetKey={editorReset}
+            <RichEditor compact iconTools plainPaste focusAtStart={focusMessage} readOnly={locked || action.isPending} html={form.html} resetKey={editorReset}
               invalid={!!(errorFor("bodyHtml") ?? errorFor("body"))} onChange={(html) => { update("html", html); }} />
           </div>}
       </fieldset>

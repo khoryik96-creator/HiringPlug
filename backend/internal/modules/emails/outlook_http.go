@@ -50,6 +50,18 @@ func (h *HTTP) ReplyOutlookMessage(ctx context.Context, r api.ReplyOutlookMessag
 	}
 	return api.ReplyOutlookMessage202Response{}, h.svc.replyOutlook(ctx, p, r.MessageId, *r.Body)
 }
+func (h *HTTP) CreateOutlookReplyDraft(ctx context.Context, r api.CreateOutlookReplyDraftRequestObject) (api.CreateOutlookReplyDraftResponseObject, error) {
+	p, err := mailboxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	operation := "createReply"
+	if r.Body.ReplyAll {
+		operation = "createReplyAll"
+	}
+	draft, err := h.svc.createOutlookThreadDraft(ctx, p, r.MessageId, operation, nil)
+	return api.CreateOutlookReplyDraft201JSONResponse(draft), err
+}
 func (h *HTTP) CreateOutlookForwardDraft(ctx context.Context, r api.CreateOutlookForwardDraftRequestObject) (api.CreateOutlookForwardDraftResponseObject, error) {
 	p, err := mailboxUser(ctx)
 	if err != nil {

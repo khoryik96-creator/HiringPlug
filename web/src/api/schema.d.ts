@@ -2119,6 +2119,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/outlook/messages/{messageId}/reply-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a reply draft in the original Outlook conversation */
+        post: operations["createOutlookReplyDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/outlook/messages/{messageId}/forward": {
         parameters: {
             query?: never;
@@ -7281,6 +7298,9 @@ export interface components {
             /** @enum {string} */
             mode: "reply" | "replyAll";
             saveDraft: boolean;
+        };
+        OutlookReplyDraftInput: {
+            replyAll: boolean;
         };
         OutlookForwardInput: {
             to: string[];
@@ -14671,6 +14691,46 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             /** @description Outlook is unavailable or the outcome of a write is uncertain */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createOutlookReplyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlookReplyDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Reply draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlookDraft"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description Outlook is unavailable or the draft creation outcome is uncertain */
             503: {
                 headers: {
                     [name: string]: unknown;

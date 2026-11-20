@@ -184,9 +184,10 @@ A file whose upload fails stays selected so you can retry it.
 
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook
-address. **Reply** and **Reply all** use Microsoft's thread-aware actions. **Save
-in Outlook Drafts** creates the draft in the original thread. Open the draft
-from the Drafts folder to continue editing.
+address. **Reply** and **Reply all** open a rich Outlook draft with the
+original conversation and Outlook-chosen recipients. Add your response, then
+save, send, or schedule it. While the Drafts folder first syncs, you can still
+send a quick reply from the reading pane.
 Choose **Forward**, enter the recipients and an optional note, then select
 **Review forward**. Outlook copies the original message and attachments into a
 draft. Review, add or remove files before you send or schedule the draft.

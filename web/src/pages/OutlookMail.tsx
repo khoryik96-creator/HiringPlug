@@ -46,8 +46,9 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   const [selected, setSelected] = useState<string>();
   const [scheduled, setScheduled] = useState(false);
   const [atsComposer, setATSComposer] = useState(false);
-  // undefined closes the editor. A null message starts a new draft.
-  const [draft, setDraft] = useState<string | null>();
+  // A null message starts a new draft.
+  const [draft, setDraft] = useState<{ id: string | null; focusMessage: boolean }>();
+  const openDraft = (id: string | null, focusMessage = false) => { setDraft({ id, focusMessage }); };
 
   const queryParams = {
     ...(linked ? profile : {}),
@@ -104,7 +105,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
       <IconActions label="Outlook actions">
         {data?.enabled && <>
           <IconButton label="New message" icon={<ComposeIcon />} className="icon-primary"
-            disabled={!folders.some((item) => item.kind === "drafts")} onClick={() => { setDraft(null); }} />
+            disabled={!folders.some((item) => item.kind === "drafts")} onClick={() => { openDraft(null); }} />
           <IconButton label="Write with HiringPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />
         </>}
         <IconButton label={scheduled ? "Back to mail" : "Scheduled"} icon={<ClockIcon />} pressed={scheduled}
@@ -149,7 +150,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
               {data.items.length === 0 && <p className="muted">No messages to display.</p>}
               {data.items.map((item) => <button type="button" className="outlook-message" aria-pressed={item.id === selected} key={item.id}
                 onClick={() => {
-                  if (item.isDraft) setDraft(item.id);
+                  if (item.isDraft) openDraft(item.id);
                   else setSelected(item.id);
                 }}>
                 <span>{!item.isRead && !item.isDraft && <span className="outlook-unread" aria-label="Unread"/>}{subject(item)}</span>
@@ -161,16 +162,16 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
               </div>}
             </div>
             {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
-              canSaveCv={canSaveCv} canImportCv={canImportCv} onOpenDraft={setDraft}
+              canSaveCv={canSaveCv} canImportCv={canImportCv} onOpenDraft={openDraft}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />
               : <p className="outlook-empty muted">Select a message to read it.</p>}
           </div>
         </div>
       </section>
     </>}
-    {scheduled && <OutlookScheduledList onOpen={setDraft}/>}
+    {scheduled && <OutlookScheduledList onOpen={openDraft}/>}
     {atsComposer && <OutlookATSComposer permissions={permissions} profile={profile} onClose={() => { setATSComposer(false); }} />}
-    {draft !== undefined && <OutlookDraftEditor key={draft ?? "new"} id={draft} onClose={(operation) => {
+    {draft && <OutlookDraftEditor key={draft.id ?? "new"} id={draft.id} focusMessage={draft.focusMessage} onClose={(operation) => {
       setDraft(undefined);
       if (operation === "send" || operation === "schedule") setScheduled(true);
     }}/>}

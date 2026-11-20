@@ -139,17 +139,8 @@ func (s *Service) replyOutlook(ctx context.Context, p authz.Principal, id string
 		if row.IsDraft {
 			return apperr.Validation(apperr.FieldErrors{{Field: "message", Message: "open the draft in Outlook to edit it"}})
 		}
-		link, err := q.OutlookLink(ctx, store.OutlookLinkParams{MailboxID: box.ID, Conversation: row.Conversation})
-		if err != nil && !database.IsNoRows(err) {
+		if err := s.checkOutlookReplyCandidate(ctx, tx, p, box.ID, row.Conversation); err != nil {
 			return err
-		}
-		if link.CandidateID != nil {
-			if _, err := s.profileAddress(ctx, tx, p, link.CandidateID, nil); err != nil {
-				return err
-			}
-			if err := s.contactable(ctx, tx, *link.CandidateID); err != nil {
-				return err
-			}
 		}
 		token, err := s.mailboxAccess(ctx, box)
 		if err != nil {
@@ -177,6 +168,20 @@ func (s *Service) replyOutlook(ctx context.Context, p authz.Principal, id string
 		return outlookFailure(err, true)
 	}
 	return err
+}
+
+func (s *Service) checkOutlookReplyCandidate(ctx context.Context, tx pgx.Tx, p authz.Principal, mailbox, conversation string) error {
+	link, err := store.New(tx).OutlookLink(ctx, store.OutlookLinkParams{MailboxID: mailbox, Conversation: conversation})
+	if err != nil && !database.IsNoRows(err) {
+		return err
+	}
+	if link.CandidateID == nil {
+		return nil
+	}
+	if _, err := s.profileAddress(ctx, tx, p, link.CandidateID, nil); err != nil {
+		return err
+	}
+	return s.contactable(ctx, tx, *link.CandidateID)
 }
 
 func (s *Service) linkOutlook(ctx context.Context, p authz.Principal, id string, in *api.OutlookConversationLink) error {
