@@ -107,9 +107,10 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 		if err != nil {
 			return nil, err
 		}
+		ocr, problem := OcrShown(r.OcrStatus, r.OcrError, r.CreatedAt, s.now())
 		c := api.Claim{
 			Id: r.ID, UserId: r.UserID, UserName: names[r.UserID], Status: api.ClaimStatus(r.Status),
-			OcrStatus: api.ClaimOcrStatus(r.OcrStatus), OcrError: nullableOf(r.OcrError), FileName: r.FileName,
+			OcrStatus: api.ClaimOcrStatus(ocr), OcrError: nullableOf(problem), FileName: r.FileName,
 			ContentType: r.ContentType, SizeBytes: r.SizeBytes, Amount: nullableOf(v.Amount), Currency: r.Currency,
 			Merchant: nullableOf(r.Merchant), ReceiptType: nullableOf(r.ReceiptType), ClaimType: nullableOf(r.ClaimType),
 			Purpose: nullableOf(r.Purpose), FromReceipt: fields(r.FromReceipt), Missing: fields(Missing(v)),

@@ -17,8 +17,9 @@ Claims/2026-11/Aisyah Rahman/Grab - e-hailing fare/2026-11-03 Grab MYR 23.00 (t5
   short. The end of the claim's id keeps two alike receipts apart.
 - The top folder (default `Claims`, e.g. `Finance/Claims`) applies to receipts
   submitted after it is changed; files already uploaded stay where they are.
-- A claim rejected and submitted again replaces its earlier file. A deleted
-  claim's file is removed. Disconnecting keeps the files.
+- A claim rejected and submitted again replaces its earlier file. A withdrawn
+  or deleted claim's file is removed (also when it happens during the upload).
+  Disconnecting keeps the files.
 
 ## How it works
 
@@ -37,6 +38,9 @@ since) do nothing.
   another account) queues every unfinished upload again.
 - **Other refusals** (e.g. the drive is full): the claim shows *failed* with the
   reason; **Try again** in Settings queues the failed uploads again.
+- **Anything else** (the receipt cannot be read here, a database error): the
+  claim shows *failed* with a plain message, the detail goes to the log. A job
+  given up after its last attempt marks the claim *failed* too.
 
 Tokens are sealed with AES-GCM (keyed from `HP_MAIL_KEYS_SECRET`) and never
 shown or logged. Sign-in is OAuth with PKCE: the public callback only parks the

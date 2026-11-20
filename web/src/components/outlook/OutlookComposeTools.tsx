@@ -9,7 +9,7 @@ import { api, type Permission, unwrap } from "../../api/client";
 import { emailTemplatesKey } from "../../api/keys";
 import { getToken } from "../../auth";
 import { ErrorMessage } from "../ErrorMessage";
-import { valuesToTokens } from "../clientEmail/richText";
+import { plainToHtml, valuesToTokens } from "../clientEmail/richText";
 import { useBanners } from "../clientEmail/useBanners";
 import { atStart, ownPart } from "./outlookSignature";
 
@@ -54,7 +54,8 @@ export function OutlookComposeTools({ data, html, subject, permissions, candidat
   const use = () => {
     if (!selected) return;
     if (!subject.trim()) onSubject(selected.subject);
-    onInsert(atStart(html, selected.bodyHtml ?? `<p>${selected.body}</p>`));
+    // A plain-text template is text: escaped, never read as markup.
+    onInsert(atStart(html, selected.bodyHtml ?? plainToHtml(selected.body)));
   };
   const save = useMutation({
     mutationFn: async (asNew: boolean) => {

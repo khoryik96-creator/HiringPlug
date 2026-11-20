@@ -369,6 +369,15 @@ func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
 	return all
 }
 
+// DeadJobHandlers merges the modules' handlers for jobs given up.
+func (m *Modules) DeadJobHandlers() jobqueue.Handlers {
+	all := jobqueue.Handlers{}
+	for _, handlers := range []jobqueue.Handlers{m.Emails.DeadJobHandlers(), m.Claims.DeadJobHandlers()} {
+		maps.Copy(all, handlers)
+	}
+	return all
+}
+
 // JobHandlers merges every module's handlers for the core queue.
 func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 	all := jobqueue.Handlers{}

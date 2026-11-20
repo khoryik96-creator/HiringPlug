@@ -222,6 +222,18 @@ WHERE id = @id AND upload_sequence = @upload_sequence AND upload_status = 'pendi
 UPDATE claim SET upload_remote_id = NULL
 WHERE id = @id AND upload_remote_id = @upload_remote_id;
 
+-- A withdrawn claim lets go of its upload: the record is cleared, and a job
+-- still on its way finds a newer sequence and leaves it.
+-- name: ClearClaimUpload :exec
+UPDATE claim SET upload_status = 'none', upload_error = NULL, upload_path = NULL, upload_url = NULL, uploaded_at = NULL,
+  upload_provider = NULL, upload_account = NULL, upload_remote_id = NULL, upload_sequence = upload_sequence + 1
+WHERE id = @id;
+
+-- Whether a claim records this file as its upload (a provider that replaces
+-- a file in place keeps its id): such a file is never removed.
+-- name: ClaimHoldsUpload :one
+SELECT EXISTS (SELECT 1 FROM claim WHERE upload_provider = @upload_provider AND upload_remote_id = @upload_remote_id)::boolean;
+
 -- name: ResetClaimUpload :exec
 UPDATE claim SET upload_status = 'none', upload_error = NULL
 WHERE id = @id AND upload_sequence = @upload_sequence AND upload_status = 'pending';

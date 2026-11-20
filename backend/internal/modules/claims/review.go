@@ -131,6 +131,14 @@ func (s *Service) Withdraw(ctx context.Context, p authz.Principal, id string, ve
 		if err != nil {
 			return err
 		}
+		if s.storage != nil { // its receipt is no longer claimed: it leaves the drive
+			if err := s.storage.Withdrawn(ctx, tx, p.TenantID, saved); err != nil {
+				return err
+			}
+			if saved, err = q.GetClaim(ctx, id); err != nil {
+				return err
+			}
+		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "claim.withdrawn", EntityType: "claim", EntityID: id}); err != nil {
 			return err
 		}

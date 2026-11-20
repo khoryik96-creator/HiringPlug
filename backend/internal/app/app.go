@@ -126,7 +126,7 @@ func NewWorker(d Deps, m *Modules) (*jobqueue.Worker, error) {
 		ID:       fmt.Sprintf("go:%s:%d", host, os.Getpid()),
 		Handlers: handlers,
 		Outside:  m.OutsideJobHandlers(),
-		OnDead:   m.Emails.DeadJobHandlers(),
+		OnDead:   m.DeadJobHandlers(),
 		Logger:   d.Logger,
 		Lease:    5 * time.Minute,
 		Idle:     2 * time.Second,

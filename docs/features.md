@@ -1613,8 +1613,9 @@ is a suggestion: striped until someone changes it, and always editable. Each
 claim also takes its **purpose**, its **claim type** (travel, client
 entertainment, candidate meeting, staff welfare...) and, optionally, the
 **client or candidate** it was for: an existing company, contact or candidate,
-found by name. A value read later never replaces what the person typed. The
-same receipt cannot be claimed twice by one person.
+found by name. A value read later never replaces what the person typed. A
+receipt not read within 10 minutes (the reader is down) shows as not read, for
+the person to fill in. The same receipt cannot be claimed twice by one person.
 
 Claims are **submitted** (several at once, all or none; each needs its date,
 amount, both types and purpose, and says what is missing), then **approved**
@@ -1638,7 +1639,8 @@ or **Dropbox** account once, and each claim's receipt is uploaded to it when it
 is submitted, into a folder for the month, the person and the receipt type:
 `Claims/2026-11/Aisyah Rahman/Grab / e-hailing fare/2026-11-03 Grab MYR 23.00 (t5v6w7).pdf`
 (the top folder can be changed, e.g. `Finance/Claims`). A claim rejected and
-submitted again replaces its file; a deleted claim's file is removed. Each
+submitted again replaces its file; a withdrawn or deleted claim's file is
+removed. Each
 claim shows whether its receipt is in the drive (with a link), uploading, or
 why it failed; Settings counts the uploads and tries failed ones again. When
 the provider stops accepting HiringPlug's access, the page asks to connect

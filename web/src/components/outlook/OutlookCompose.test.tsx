@@ -124,4 +124,18 @@ describe("signature and template placement", () => {
       .toEqual(["[Client contact]", "[Notice period]"]);
     expect(unfilledFields("<p>All filled.</p>", "About [Full name]", tokens)).toEqual(["[Full name]"]);
   });
+
+  it("uses a plain-text template as text, never as markup", async () => {
+    serve("");
+    vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+      path === "/v1/email-templates" ? ok({ items: [{ ...template, bodyHtml: null, body: "Hi <img src=x onerror=alert(1)> & welcome" }], fields })
+        : path === "/v1/email-signature" ? ok({ bodyHtml: "", version: 0, updatedAt: null }) : ok({ items: [] })));
+    renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} permissions={[]} />);
+    await screen.findByRole("option", { name: "Profiles for client" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "etp_profiles" } });
+    fireEvent.click(screen.getByRole("button", { name: "Use template" }));
+    const message = screen.getByRole("textbox", { name: "Message" });
+    await waitFor(() => { expect(message.textContent).toContain("Hi <img src=x onerror=alert(1)> & welcome"); });
+    expect(message.querySelector("img")).toBeNull();
+  });
 });

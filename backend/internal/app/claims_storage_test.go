@@ -1,15 +1,22 @@
 package app_test
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/app"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -263,4 +270,73 @@ func TestStorageTokensAreRefreshedAndKept(t *testing.T) {
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	assert.Equal(t, api.ClaimUploadStatusFailed, a.claim(recruiter, third.Id).Upload.Status)
 	assert.Equal(t, api.ClaimStorageStatusReconnect, a.claimStorage(admin).Status, "a refresh token refused: connect again")
+}
+
+func TestAReceiptLeavesTheDriveWhenItIsNoLongerClaimed(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	drives := setupClaimStorage(t, a)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleAdmin)
+	recruiter, admin := tenant.Users[api.RoleRecruiter].Token, tenant.Users[api.RoleAdmin].Token
+	a.connectStorage(admin, "onedrive")
+
+	// Withdrawn once uploaded: back to a draft, and its receipt leaves the drive.
+	taxi := a.completeClaim(recruiter, "taxi.png", "20.00")
+	sent := a.submit(recruiter, taxi)[0]
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	require.Len(t, drives.paths(), 1)
+	res := a.request(http.MethodPost, "/v1/claims/"+taxi.Id+"/withdraw", recruiter, map[string]any{"version": sent.Version})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	var back api.Claim
+	res.JSON(&back)
+	assert.Equal(t, api.ClaimStatusDraft, back.Status)
+	assert.Equal(t, api.ClaimUploadStatusNone, back.Upload.Status)
+	assert.True(t, back.Upload.Path.IsNull())
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Empty(t, drives.paths())
+	a.submit(recruiter, back)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Equal(t, api.ClaimUploadStatusDone, a.claim(recruiter, taxi.Id).Upload.Status, "submitted again: uploaded again")
+	require.Len(t, drives.paths(), 1)
+
+	// Deleted while its receipt was on its way: the file does not stay behind.
+	hotel := a.completeClaim(recruiter, "hotel.png", "300.00")
+	a.submit(recruiter, hotel)
+	drives.mu.Lock()
+	drives.onPut = func() {
+		_, err := testutil.Current.Admin.Exec(context.Background(), `DELETE FROM claim WHERE id = $1`, hotel.Id)
+		assert.NoError(t, err)
+	}
+	drives.mu.Unlock()
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Len(t, drives.paths(), 1, "only the taxi's receipt")
+
+	// The receipt cannot be read here: the claim says so in plain words.
+	lost := a.completeClaim(recruiter, "lost.png", "15.00")
+	require.NoError(t, a.deps.Files.Delete(tenant.ID+"/"+lost.Id))
+	a.submit(recruiter, lost)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	got := a.claim(recruiter, lost.Id)
+	assert.Equal(t, api.ClaimUploadStatusFailed, got.Upload.Status)
+	assert.Equal(t, "The receipt could not be uploaded: try again later.", got.Upload.Error.MustGet())
+
+	// An upload job given up (an error on every try): failed, so it shows and
+	// can be tried again.
+	stuck := a.completeClaim(recruiter, "stuck.png", "16.00")
+	a.submit(recruiter, stuck)
+	var seq int
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), `SELECT upload_sequence FROM claim WHERE id = $1`, stuck.Id).Scan(&seq))
+	worker, err := app.NewWorker(a.deps, a.modules)
+	require.NoError(t, err)
+	dead := worker.OnDead[api.JobKindClaimUpload]
+	require.NotNil(t, dead, "the worker marks a dead upload")
+	payload, err := json.Marshal(api.ClaimUploadJob{ClaimId: stuck.Id, Sequence: seq})
+	require.NoError(t, err)
+	require.NoError(t, database.InTx(t.Context(), a.deps.Pool, authz.System(tenant.ID), func(tx pgx.Tx) error {
+		return dead(t.Context(), tx, jobqueue.Job{TenantID: tenant.ID, Kind: api.JobKindClaimUpload, Payload: payload})
+	}))
+	got = a.claim(recruiter, stuck.Id)
+	assert.Equal(t, api.ClaimUploadStatusFailed, got.Upload.Status)
+	assert.Equal(t, "The receipt could not be uploaded: try again later.", got.Upload.Error.MustGet())
+	assert.Equal(t, 2, a.claimStorage(admin).Uploads.Failed)
 }

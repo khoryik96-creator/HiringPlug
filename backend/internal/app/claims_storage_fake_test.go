@@ -35,6 +35,15 @@ type fakeDrives struct {
 	noRefresh bool   // the sign-in gives no refresh token
 	refused   bool   // refreshing answers invalid_grant
 	access    string // the access token handed out last
+	onPut     func() // runs once, as the next file is stored (the lock held)
+}
+
+// stored runs the onPut hook, once.
+func (f *fakeDrives) stored() {
+	if hook := f.onPut; hook != nil {
+		f.onPut = nil
+		hook()
+	}
 }
 
 type fakeFile struct {
@@ -139,6 +148,7 @@ func (f *fakeDrives) serve(w http.ResponseWriter, r *http.Request) {
 		name, _ := url.PathUnescape(graphContent.FindStringSubmatch(path)[1])
 		item := fakeFile{ID: f.id(), Data: body}
 		f.files[name] = item
+		f.stored()
 		_ = json.NewEncoder(w).Encode(map[string]string{"id": item.ID, "webUrl": "https://onedrive.test/" + item.ID})
 	case strings.HasPrefix(path, "/graph/me/drive/items/") && r.Method == "DELETE":
 		f.deleteID(w, strings.TrimPrefix(path, "/graph/me/drive/items/"))
@@ -150,6 +160,7 @@ func (f *fakeDrives) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &arg)
 		item := fakeFile{ID: "id:" + f.id(), Data: body}
 		f.files[strings.TrimPrefix(arg.Path, "/")] = item
+		f.stored()
 		_ = json.NewEncoder(w).Encode(map[string]string{"id": item.ID, "path_display": arg.Path})
 	case path == "/dropbox/api/files/delete_v2":
 		var arg struct{ Path string }
@@ -254,6 +265,7 @@ func (f *fakeDrives) google(w http.ResponseWriter, r *http.Request, path string,
 		}
 		item := fakeFile{ID: f.id(), Data: body}
 		f.files[r.URL.Query().Get("to")] = item
+		f.stored()
 		_ = json.NewEncoder(w).Encode(map[string]string{"id": item.ID, "webViewLink": "https://drive.test/" + item.ID})
 	default:
 		w.WriteHeader(404)

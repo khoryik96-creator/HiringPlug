@@ -248,11 +248,6 @@ func (s *Service) writeOutlookDraft(ctx context.Context, p authz.Principal, id, 
 			out = draftView(row, remote, active)
 			return nil
 		}
-		if in.BodyHtml != nil {
-			if err := s.checkBanners(ctx, q, draftBodyHTML(*in.BodyHtml)); err != nil {
-				return err
-			}
-		}
 		updated, err := s.patchRemoteDraft(ctx, draft, patch)
 		if err != nil {
 			return err
@@ -305,11 +300,6 @@ func (s *Service) newOutlookDraft(ctx context.Context, q *store.Queries, p authz
 	token, err := s.mailboxAccess(ctx, box)
 	if err != nil {
 		return zero, false, outlookFailure(err, false)
-	}
-	if in.BodyHtml != nil {
-		if err := s.checkBanners(ctx, q, draftBodyHTML(*in.BodyHtml)); err != nil {
-			return zero, false, err
-		}
 	}
 	var remote outlookRemoteMessage
 	err = s.outlookRequest(ctx, token, http.MethodPost, s.outlookRoot()+"/messages", draftPatch(in), &remote)

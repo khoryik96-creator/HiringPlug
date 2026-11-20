@@ -129,3 +129,19 @@ func TestDecisions(t *testing.T) {
 	assert.False(t, Editable(Submitted))
 	assert.False(t, Editable(Paid))
 }
+
+func TestAReceiptStillReadingTooLongShowsAsNotRead(t *testing.T) {
+	uploaded := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+	status, problem := OcrShown(OcrReading, nil, uploaded, uploaded.Add(9*time.Minute))
+	assert.Equal(t, OcrReading, status)
+	assert.Nil(t, problem)
+	status, problem = OcrShown(OcrReading, nil, uploaded, uploaded.Add(11*time.Minute))
+	assert.Equal(t, OcrFailed, status)
+	assert.Equal(t, tooLongReading, *problem)
+	read := "No text could be read."
+	status, problem = OcrShown(OcrFailed, &read, uploaded, uploaded.Add(time.Hour))
+	assert.Equal(t, OcrFailed, status)
+	assert.Equal(t, &read, problem)
+	status, _ = OcrShown(OcrDone, nil, uploaded, uploaded.Add(time.Hour))
+	assert.Equal(t, OcrDone, status)
+}

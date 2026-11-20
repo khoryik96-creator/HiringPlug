@@ -407,11 +407,29 @@ func (s *Storage) Submitted(ctx context.Context, tx pgx.Tx, tenant string, ids [
 
 // Deleted queues the removal of a deleted claim's uploaded receipt.
 func (s *Storage) Deleted(ctx context.Context, tx pgx.Tx, tenant string, row store.DeleteClaimRow) error {
-	if row.UploadRemoteID == nil || row.UploadProvider == nil || row.UploadAccount == nil {
+	return removeLater(ctx, tx, tenant, row.UploadProvider, row.UploadAccount, row.UploadRemoteID)
+}
+
+// Withdrawn lets go of a withdrawn claim's upload: its receipt leaves the
+// drive (queued), and an upload still on its way leaves it be.
+func (s *Storage) Withdrawn(ctx context.Context, tx pgx.Tx, tenant string, row store.Claim) error {
+	if row.UploadStatus == "none" && row.UploadRemoteID == nil {
+		return nil
+	}
+	return asSystem(ctx, tx, func(q *store.Queries) error {
+		if err := q.ClearClaimUpload(ctx, row.ID); err != nil {
+			return err
+		}
+		return removeLater(ctx, tx, tenant, row.UploadProvider, row.UploadAccount, row.UploadRemoteID)
+	})
+}
+
+func removeLater(ctx context.Context, tx pgx.Tx, tenant string, provider, account, remoteID *string) error {
+	if remoteID == nil || provider == nil || account == nil {
 		return nil
 	}
 	_, err := jobqueue.Enqueue(ctx, tx, tenant, api.JobKindClaimRemoveUpload, api.ClaimRemoveUploadJob{
-		Provider: api.ClaimStorageProvider(*row.UploadProvider), Account: *row.UploadAccount, RemoteId: *row.UploadRemoteID,
+		Provider: api.ClaimStorageProvider(*provider), Account: *account, RemoteId: *remoteID,
 	})
 	return err
 }

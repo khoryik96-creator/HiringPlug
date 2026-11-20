@@ -27,6 +27,23 @@ const (
 	OcrFailed  = "failed"
 )
 
+// readingPatience is how long a receipt may take to read. Past it the claim
+// shows as not read (the worker is down or its job died), so the person fills
+// it in; a reading that still arrives fills only the fields left empty.
+const readingPatience = 10 * time.Minute
+
+// tooLongReading is the message for a receipt still unread after readingPatience.
+const tooLongReading = "The receipt could not be read in time: fill it in."
+
+// OcrShown is how reading the receipt went, as the person sees it at now.
+func OcrShown(status string, problem *string, uploaded, now time.Time) (string, *string) {
+	if status == OcrReading && now.Sub(uploaded) > readingPatience {
+		msg := tooLongReading
+		return OcrFailed, &msg
+	}
+	return status, problem
+}
+
 // What a claim may be tagged to: a client (company or contact) or candidate.
 const (
 	LinkCompany   = "company"

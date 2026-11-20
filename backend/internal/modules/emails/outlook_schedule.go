@@ -192,11 +192,6 @@ func (s *Service) scheduleOutlook(ctx context.Context, p authz.Principal, id str
 		if in.Changes != nil {
 			patch := draftPatch(*in.Changes)
 			if len(patch) > 0 {
-				if in.Changes.BodyHtml != nil {
-					if err := s.checkBanners(ctx, q, draftBodyHTML(*in.Changes.BodyHtml)); err != nil {
-						return err
-					}
-				}
 				// The mailbox lock spans the Graph patch and the new schedule
 				// commit. The old job can never claim the revised content.
 				remote, err = s.patchRemoteDraft(ctx, draft, patch)

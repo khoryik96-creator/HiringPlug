@@ -74,7 +74,33 @@ func (s *Storage) upload(ctx context.Context, job jobqueue.Job) error {
 		return err // tried again later
 	}
 	logx.From(ctx).Warn("claim receipt upload failed", "claim_id", in.ClaimId, "error", err)
-	return s.failed(ctx, sys, in.ClaimId, seq, err.Error())
+	why := uploadFailed // the detail (paths, database errors) is for the log
+	if errors.As(err, &p) {
+		why = p.Error()
+	}
+	return s.failed(ctx, sys, in.ClaimId, seq, why)
+}
+
+// uploadFailed is what the claim shows when its upload failed for a reason
+// that is not the provider's.
+const uploadFailed = "The receipt could not be uploaded: try again later."
+
+// DeadJobHandlers mark a claim's upload failed when its job is given up (an
+// error on every attempt), so it shows and Settings can try it again.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindClaimUpload: uploadDead}
+}
+
+func uploadDead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var in api.ClaimUploadJob
+	if err := job.Decode(&in); err != nil {
+		return nil //nolint:nilerr // an invalid job names no claim to mark
+	}
+	why := uploadFailed
+	_, err := store.New(tx).FailClaimUpload(ctx, store.FailClaimUploadParams{
+		ID: in.ClaimId, UploadSequence: int32(in.Sequence), UploadError: &why, //nolint:gosec // a sequence number
+	})
+	return err
 }
 
 func (s *Storage) prepare(ctx context.Context, tx pgx.Tx, id string, seq int32) (uploadWork, error) {
@@ -179,17 +205,30 @@ func (s *Storage) send(ctx context.Context, w uploadWork) error {
 	if u, err := url.Parse(file.URL); err == nil && u.Scheme == "https" && len(file.URL) <= 2000 {
 		link = &file.URL
 	}
-	return database.InTx(ctx, s.pool, sys, func(tx pgx.Tx) error {
-		saved, err := store.New(tx).SaveClaimUpload(ctx, store.SaveClaimUploadParams{
+	orphan := false
+	err = database.InTx(ctx, s.pool, sys, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		saved, err := q.SaveClaimUpload(ctx, store.SaveClaimUploadParams{
 			ID: w.claim.ID, UploadSequence: w.claim.UploadSequence, UploadPath: &where, UploadUrl: link,
 			UploadProvider: &provider, UploadAccount: &account, UploadRemoteID: &file.ID,
 		})
-		if err != nil || saved == 0 {
+		if err != nil {
+			return err
+		}
+		if saved == 0 { // deleted, withdrawn or sent again meanwhile
+			held, err := q.ClaimHoldsUpload(ctx, store.ClaimHoldsUploadParams{UploadProvider: &provider, UploadRemoteID: &file.ID})
+			orphan = !held
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "claim.uploaded", EntityType: "claim", EntityID: w.claim.ID,
 			Changes: map[string]any{"provider": provider, "path": where}})
 	})
+	if err == nil && orphan {
+		if err := s.remove(ctx, provider, token, file.ID); err != nil {
+			logx.From(ctx).Warn("receipt of a claim changed during its upload left in the claims storage", "claim_id", w.claim.ID, "error", err)
+		}
+	}
+	return err
 }
 
 func (s *Storage) failed(ctx context.Context, p authz.Principal, id string, seq int32, why string) error {
@@ -252,20 +291,26 @@ func (s *Storage) access(ctx context.Context, row store.ClaimStorage) (string, e
 	return next.AccessToken, err
 }
 
-// removeUpload deletes a deleted claim's receipt, if its account is still
-// the one connected.
+// removeUpload deletes the receipt of a claim deleted or withdrawn, if its
+// account is still the one connected and no claim records the file again.
 func (s *Storage) removeUpload(ctx context.Context, job jobqueue.Job) error {
 	var in api.ClaimRemoveUploadJob
 	if err := job.Decode(&in); err != nil {
 		return err
 	}
 	var row store.ClaimStorage
+	held := false
+	provider := string(in.Provider)
 	err := database.InTx(ctx, s.pool, authz.System(job.TenantID), func(tx pgx.Tx) error {
+		q := store.New(tx)
 		var err error
-		row, err = store.New(tx).GetClaimStorage(ctx)
+		if held, err = q.ClaimHoldsUpload(ctx, store.ClaimHoldsUploadParams{UploadProvider: &provider, UploadRemoteID: &in.RemoteId}); err != nil || held {
+			return err
+		}
+		row, err = q.GetClaimStorage(ctx)
 		return err
 	})
-	if database.IsNoRows(err) || (err == nil && (deref(row.Provider) != string(in.Provider) || deref(row.Account) != in.Account || row.Status != "ok")) {
+	if held || database.IsNoRows(err) || (err == nil && (deref(row.Provider) != provider || deref(row.Account) != in.Account || row.Status != "ok")) {
 		return nil
 	}
 	if err != nil {

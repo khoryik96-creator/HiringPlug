@@ -64,7 +64,7 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, fileName string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
 		if id, err := q.MyClaimWithReceipt(ctx, digest); err == nil {
-			return apperr.New(api.ErrorCodeCLAIMDUPLICATE, "You already uploaded this receipt.").WithDetail("existingClaimId", id)
+			return duplicate(id)
 		} else if !database.IsNoRows(err) {
 			return err
 		}
@@ -109,7 +109,21 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, fileName string
 	if err != nil && storedKey != "" {
 		err = errors.Join(err, s.files.Delete(storedKey)) // rolled back: nothing refers to it
 	}
+	if database.IsUniqueViolation(err, "claim_receipt_once") { // the same receipt sent twice at the same moment
+		err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+			id, err := store.New(tx).MyClaimWithReceipt(ctx, digest)
+			if err != nil {
+				return err
+			}
+			return duplicate(id)
+		})
+	}
 	return out, err
+}
+
+// duplicate is the answer for a receipt the person already uploaded.
+func duplicate(existing string) error {
+	return apperr.New(api.ErrorCodeCLAIMDUPLICATE, "You already uploaded this receipt.").WithDetail("existingClaimId", existing)
 }
 
 // Filter narrows a list of claims.

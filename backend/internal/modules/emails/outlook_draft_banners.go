@@ -3,7 +3,10 @@ package emails
 // Banners in Outlook drafts: a banner the person inserts (or that a template
 // or their signature holds) is attached to the draft as an inline picture
 // (its content id is the banner's id), so the email shows it wherever it is
-// read. A banner taken out of the message leaves the draft too.
+// read. A banner taken out of the message leaves the draft too. Only the
+// company's own live banners are attached: a banner quoted from an earlier
+// message (deleted since, or another company's) is left as it is, so a reply
+// or forward is never refused for its history.
 
 import (
 	"context"
@@ -63,6 +66,9 @@ func (s *Service) syncDraftBanners(ctx context.Context, q *store.Queries, token,
 			return false, err
 		}
 		for _, b := range rows {
+			if b.DeletedAt != nil {
+				continue
+			}
 			f, err := s.files.Open(b.StorageKey)
 			if err != nil {
 				return changed, err

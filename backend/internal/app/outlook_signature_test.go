@@ -162,8 +162,25 @@ func TestBannersInOutlookDraftsAreSentWithThem(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
 	assert.Len(t, f.filesOf(remote), 1)
 
-	// A deleted banner is refused before anything is written.
+	// A reply quoting a banner deleted since, or another company's, is saved:
+	// the history is left as it is and nothing is attached for it.
 	require.Equal(t, http.StatusNoContent, a.request("DELETE", "/v1/email-banners/"+banner, admin, nil).Status)
-	res = a.request("POST", "/v1/outlook/drafts", recruiter, map[string]any{"subject": "Again", "bodyHtml": withBanner})
-	assert.Equal(t, http.StatusBadRequest, res.Status, "%s", res.Body)
+	foreign := "ebn_01jbz6w0m0k8q9x2r3s4t5v6w7"
+	quoted := `<p>Thanks!</p><hr><blockquote><img data-banner-id="` + banner + `"><img data-banner-id="` + foreign + `"></blockquote>`
+	res = a.request("POST", "/v1/outlook/drafts", recruiter, map[string]any{"subject": "RE: Profiles", "bodyHtml": quoted})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	assert.Empty(t, f.filesOf("draft-id-"+lastDraftSequence(f)), "no picture attached for a deleted or foreign banner")
+}
+
+// lastDraftSequence is the number in the id the fixture gave the newest draft.
+func lastDraftSequence(f *bannerDraftProvider) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	newest := ""
+	for id := range f.drafts {
+		if len(id) > len(newest) || id > newest {
+			newest = id
+		}
+	}
+	return strings.TrimPrefix(newest, "draft-id-")
 }

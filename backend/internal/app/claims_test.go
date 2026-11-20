@@ -1,6 +1,9 @@
 package app_test
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -145,6 +148,21 @@ func TestAReceiptIsReadIntoFieldsThePersonCanEdit(t *testing.T) {
 	blank = a.claim(token, blank.Id)
 	assert.Equal(t, api.ClaimOcrStatusFailed, blank.OcrStatus)
 	assert.Equal(t, "No text could be read from this photo.", blank.OcrError.MustGet())
+
+	// Never read (the reader is down, or its job died): after a while the
+	// claim is the person's to fill in; a late reading fills what is empty.
+	stuck := a.uploadReceipt(token, "taxi.png", receiptBytes("4"))
+	_, err := testutil.Current.Admin.Exec(t.Context(), `UPDATE claim SET created_at = now() - interval '11 minutes' WHERE id = $1`, stuck.Id)
+	require.NoError(t, err)
+	stuck = a.claim(token, stuck.Id)
+	assert.Equal(t, api.ClaimOcrStatusFailed, stuck.OcrStatus)
+	assert.Equal(t, "The receipt could not be read in time: fill it in.", stuck.OcrError.MustGet())
+	stuck = a.patchClaim(token, stuck, map[string]any{"amount": "18.00"}, http.StatusOK)
+	readReceipt(t, a, aiConn, stuck.Id, receiptRead(daysAgo(1), "99.00", "MYR", "Public Cab", "grab_fare"))
+	stuck = a.claim(token, stuck.Id)
+	assert.Equal(t, api.ClaimOcrStatusDone, stuck.OcrStatus)
+	assert.Equal(t, "18.00", stuck.Amount.MustGet())
+	assert.Equal(t, "Public Cab", stuck.Merchant.MustGet())
 }
 
 func TestClaimFieldsAreChecked(t *testing.T) {
@@ -218,4 +236,31 @@ func TestClaimsAreTaggedToClientsAndCandidatesThePersonMaySee(t *testing.T) {
 	res := a.request(http.MethodPost, "/v1/candidates/"+siti.Id+"/merge", admin, map[string]any{"duplicateId": dup.Id, "version": siti.Version})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	assert.Equal(t, siti.Id, a.claim(recruiter, c.Id).Link.MustGet().Id)
+}
+
+func TestTheSameReceiptSentTwiceAtOnceIsOneClaim(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	first := a.uploadReceipt(token, "first.png", receiptBytes("first"))
+	twice := receiptBytes("twice")
+	sum := sha256.Sum256(twice)
+
+	// The same receipt is on its way in another upload: written, not yet
+	// committed, so this upload finds nothing and waits on it.
+	tx, err := testutil.Current.Admin.Begin(t.Context())
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	_, err = tx.Exec(t.Context(), `UPDATE claim SET sha256 = $1 WHERE id = $2`, hex.EncodeToString(sum[:]), first.Id)
+	require.NoError(t, err)
+	done := make(chan *response, 1)
+	go func() { done <- a.upload("/v1/claims", token, "", "twice.png", twice) }()
+	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, tx.Commit(t.Context()))
+	res := <-done
+	require.Equal(t, http.StatusConflict, res.Status, "%s", res.Body)
+	assert.Equal(t, api.ErrorCodeCLAIMDUPLICATE, res.Error().Error.Code)
+	require.NotNil(t, res.Error().Error.Details)
+	assert.Equal(t, first.Id, (*res.Error().Error.Details)["existingClaimId"])
 }

@@ -77,6 +77,24 @@ func (q *Queries) ClaimFacts(ctx context.Context, arg ClaimFactsParams) ([]Claim
 	return items, nil
 }
 
+const claimHoldsUpload = `-- name: ClaimHoldsUpload :one
+SELECT EXISTS (SELECT 1 FROM claim WHERE upload_provider = $1 AND upload_remote_id = $2)::boolean
+`
+
+type ClaimHoldsUploadParams struct {
+	UploadProvider *string
+	UploadRemoteID *string
+}
+
+// Whether a claim records this file as its upload (a provider that replaces
+// a file in place keeps its id): such a file is never removed.
+func (q *Queries) ClaimHoldsUpload(ctx context.Context, arg ClaimHoldsUploadParams) (bool, error) {
+	row := q.db.QueryRow(ctx, claimHoldsUpload, arg.UploadProvider, arg.UploadRemoteID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const claimUploadCounts = `-- name: ClaimUploadCounts :one
 SELECT count(*) FILTER (WHERE upload_status = 'pending')::int AS pending,
        count(*) FILTER (WHERE upload_status = 'failed')::int AS failed,
@@ -121,6 +139,19 @@ func (q *Queries) ClaimsToUploadAgain(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const clearClaimUpload = `-- name: ClearClaimUpload :exec
+UPDATE claim SET upload_status = 'none', upload_error = NULL, upload_path = NULL, upload_url = NULL, uploaded_at = NULL,
+  upload_provider = NULL, upload_account = NULL, upload_remote_id = NULL, upload_sequence = upload_sequence + 1
+WHERE id = $1
+`
+
+// A withdrawn claim lets go of its upload: the record is cleared, and a job
+// still on its way finds a newer sequence and leaves it.
+func (q *Queries) ClearClaimUpload(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, clearClaimUpload, id)
+	return err
 }
 
 const connectClaimStorage = `-- name: ConnectClaimStorage :one
