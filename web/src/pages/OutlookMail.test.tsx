@@ -45,35 +45,6 @@ it("finds mail from the candidate context and explicitly links the selected conv
   expect(sentBody(post)).toMatchObject({ text: "Tuesday works.", mode: "reply", saveDraft: true });
 });
 
-it.each([
-  ["#/outlook?candidateId=cand_test", true],
-  ["#/outlook?candidateId=cand_test&search=nadia%40example.test", false],
-])("suggests the page's candidate for Save CV only in their linked mail (%s)", async (hash, suggested) => {
-  window.location.hash = hash;
-  const message = {
-    id: "omg_cv", folderId: "omf_inbox", conversation: "graph-thread", subject: "My CV",
-    sender: "someone@example.test", receivedAt: "2026-11-18T01:00:00Z", isRead: true, isDraft: false, hasAttachments: true,
-  };
-  const get = vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
-    path === "/v1/outlook/mail" ? ok({
-      connected: true, enabled: true, folders: [{ id: "omf_inbox", name: "Inbox", kind: "inbox" }], items: [message],
-    }) : path === "/v1/outlook/messages/{messageId}/attachments" ? ok({
-      items: [{ id: "cvFile", fileName: "CV.pdf", sizeBytes: 4400, downloadable: true, savable: true }], more: false,
-    }) : path === "/v1/candidates/{candidateId}" ? ok({ id: "cand_test", fullName: "Nadia Aziz" })
-      : ok({ text: "Attached." }),
-  ));
-  renderWithClient(<OutlookMail canSaveCv/>);
-  fireEvent.click(await screen.findByRole("button", { name: /My CV/ }));
-  fireEvent.click(await screen.findByRole("button", { name: "Save CV.pdf to candidate" }));
-  const submit = screen.getByRole("button", { name: "Save to CV & files" });
-  if (suggested) {
-    await waitFor(() => { expect(submit.hasAttribute("disabled")).toBe(false); });
-  } else {
-    expect(submit.hasAttribute("disabled")).toBe(true);
-  }
-  expect((get.mock.calls as unknown[][]).some((call) => call[0] === "/v1/candidates/{candidateId}")).toBe(suggested);
-});
-
 const forwardSource = {
   id: "omg_original", folderId: "omf_inbox", conversation: "thread", subject: "Availability for interview",
   sender: "nadia@example.test", receivedAt: "2026-11-18T01:00:00Z", isRead: true, isDraft: false,

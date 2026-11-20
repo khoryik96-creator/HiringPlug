@@ -1,12 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { downloadFrom, outlookAttachmentFilePath } from "../../api/files";
-import { IconButton, TrashIcon } from "../ActionIcons";
+import { DownloadIcon, IconButton, TrashIcon } from "../ActionIcons";
 import { isCvFileName } from "../DropZone";
 import { ErrorMessage } from "../ErrorMessage";
-import { OutlookSaveCv } from "./OutlookSaveCv";
+import { ImportCvButton } from "./ImportCvButton";
 
 type Attachment = Schemas["OutlookAttachment"];
 
@@ -16,15 +16,14 @@ function attachmentSize(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv = false, candidateId, remove, tools }: {
+export function OutlookAttachments({ messageId, canImportCv = false, userId, remove, tools }: {
   messageId: string;
-  canSaveCv?: boolean;
   canImportCv?: boolean;
-  candidateId?: string;
+  /** Who imports a CV (Import CV shows only with one). */
+  userId?: string;
   remove?: { disabled: boolean; onPick: (file: Attachment) => void };
   tools?: ReactNode;
 }) {
-  const [saveId, setSaveId] = useState<string>();
   const attachments = useQuery({
     queryKey: ["outlook", "attachments", messageId],
     queryFn: async ({ signal }) => unwrap(await api.GET("/v1/outlook/messages/{messageId}/attachments", { params: { path: { messageId } }, signal })),
@@ -38,7 +37,6 @@ export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv =
       "application/octet-stream",
     ),
   });
-  const chosen = attachments.data?.items.find((file) => file.id === saveId);
   return <section className="outlook-attachments" aria-label="Attachments">
     {tools ? <div className="row outlook-draft-file-head"><h4>Attachments</h4>{tools}</div> : <h4>Attachments</h4>}
     {attachments.isPending && <p className="muted" role="status">Loading attachments…</p>}
@@ -52,23 +50,13 @@ export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv =
         <span><strong>{file.fileName}</strong> <small className="muted">{attachmentSize(file.sizeBytes)}</small></span>
         <div className="row outlook-attachment-buttons">
           {file.downloadable ? <>
-            <button type="button" aria-label={`Download ${file.fileName}`} disabled={download.isPending}
-              onClick={() => { download.mutate(file); }}>
-              {download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
-            </button>
-            {canSaveCv && file.savable && isCvFileName(file.fileName) &&
-              <button type="button" aria-label={`Save ${file.fileName} to candidate`} disabled={chosen !== undefined}
-                onClick={() => { setSaveId(file.id); }}>Save CV</button>}
-            {canImportCv && file.savable && isCvFileName(file.fileName) && <a className="button"
-              aria-label={`Import ${file.fileName} as a candidate`}
-              href={`#/import?${new URLSearchParams({ outlookMessage: messageId, outlookAttachment: file.id }).toString()}`}>Import CV</a>}
+            <IconButton label={`Download ${file.fileName}`} tip={download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
+              icon={<DownloadIcon />} disabled={download.isPending} onClick={() => { download.mutate(file); }} />
+            {canImportCv && userId && file.savable && isCvFileName(file.fileName) && <ImportCvButton userId={userId} messageId={messageId} file={file} />}
           </> : <small className="muted">Available in Outlook</small>}
           {remove && <IconButton label={`Remove ${file.fileName}`} tip="Remove attachment" icon={<TrashIcon />} danger
             disabled={remove.disabled} onClick={() => { remove.onPick(file); }} />}
         </div>
-        {canSaveCv && chosen?.id === file.id && <OutlookSaveCv fileName={file.fileName}
-          filePath={outlookAttachmentFilePath(messageId, file.id)} candidateId={candidateId}
-          onClose={() => { setSaveId(undefined); }} />}
       </li>)}
     </ul>}
     {attachments.data?.more && <p className="muted">Open in Outlook to see the remaining attachments.</p>}

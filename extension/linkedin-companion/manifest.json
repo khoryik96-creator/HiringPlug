@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HiringPlug LinkedIn Companion",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Checks on LinkedIn, in your own browser, whether HiringPlug contacts still work at their company, and reads a new company's About page. No AI, no messages.",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "scripting", "storage", "tabGroups"],

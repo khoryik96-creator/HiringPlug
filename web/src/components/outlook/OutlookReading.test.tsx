@@ -45,6 +45,28 @@ function serve(items: Schemas["OutlookMessage"][]) {
 }
 
 describe("Outlook Mail reads like Outlook", () => {
+  it("lists a message's attachments once, when its body arrives after them", async () => {
+    // Two parts of the pane sharing a key: React draws the attachments twice in a production build.
+    const warn = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let arrive: (() => void) | undefined;
+    vi.spyOn(api, "GET").mockImplementation((path) => (
+      path === "/v1/outlook/mail" ? Promise.resolve(ok({ connected: true, enabled: true, syncing: false, lastSyncAt: null, error: null, folders, items: [message({ hasAttachments: true })], nextOffset: null }))
+        : path === "/v1/outlook/messages/{messageId}/attachments" ? Promise.resolve(ok({ items: [{ id: "att", fileName: "Letter.pdf", sizeBytes: 900, downloadable: true, savable: true }], more: false }))
+          : new Promise((resolve) => { arrive = () => { resolve(ok(body)); }; })
+    ) as never);
+    vi.spyOn(api, "PATCH").mockResolvedValue({ response: new Response(null, { status: 204 }) });
+    renderWithClient(<OutlookMail />);
+    fireEvent.click(await screen.findByRole("button", { name: /Profiles for SME Automation/ }));
+    const pane = await screen.findByRole("region", { name: "Outlook message" });
+    await within(pane).findByText("Letter.pdf");
+    await waitFor(() => { expect(arrive).toBeDefined(); });
+    arrive?.();
+    await within(pane).findByTitle(/^Message: /);
+    expect(within(pane).getAllByRole("region", { name: "Attachments" })).toHaveLength(1);
+    expect(within(pane).getAllByText("Letter.pdf")).toHaveLength(1);
+    expect(warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes("same key"))).toEqual([]);
+  });
+
   it("shows who it is from and to, and the message in its own formatting with its pictures", async () => {
     const patch = serve([message()]);
     renderWithClient(<OutlookMail />);

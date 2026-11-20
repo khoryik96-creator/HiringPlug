@@ -86,7 +86,7 @@ const keep = (key: string, value: unknown) => {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* only a convenience */ }
 };
 
-export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSeeSalary = false, allowEmpty = false, onRefresh, onInsert }: {
+export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSeeSalary = false, allowEmpty = false, attachProfiles = true, onRefresh, onInsert }: {
   jobId?: string;
   people: Shortlisted[];
   onPeople: (people: Shortlisted[]) => void;
@@ -94,6 +94,8 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
   canSeeCvs: boolean;
   canSeeSalary?: boolean;
   allowEmpty?: boolean;
+  /** false: details only, no profile to attach (the email has its own attachments), and no Refresh link. */
+  attachProfiles?: boolean;
   onRefresh?: () => void;
   onInsert: (html: string, snapshot: Shortlisted[]) => void;
 }) {
@@ -124,10 +126,10 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
         {people.map((p, i) => (
           <li key={p.candidateId} className="shortlist-row">
             <span className="shortlist-who">
-              <strong>{p.name}</strong>
+              <strong>{shown[i]?.name || p.name}</strong>
               <span className="muted small">{[p.title, p.stage ? STAGE[p.stage] : null].filter(Boolean).join(" · ")}</span>
             </span>
-            {canSeeCvs ? (
+            {!attachProfiles ? null : canSeeCvs ? (
               <select aria-label={`Profile to attach for ${p.name}`} value={choiceKey(list.profileOf(i))}
                 onChange={(e) => {
                   const picked = list.profiles[i]?.find((x) => choiceKey(x.choice) === e.target.value)?.choice ?? null;
@@ -180,16 +182,18 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
         </span>
         <button
           type="button"
+          aria-label="Insert candidates into the message"
           disabled={list.loading || !!list.error || people.length === 0}
           onClick={() => {
             const html = layout === "blocks" ? blocksHtml(shown, chosen) : tableHtml(shown, chosen);
             onInsert(html, list.snapshot(chosen.some((d) => d.salary)));
           }}
         >
-          Insert candidates into the message
+          Insert
         </button>
       </div>
-      {people.length > 0 && (
+      {/* Details only (Outlook): read again on adding a candidate and on coming back to the tab. */}
+      {people.length > 0 && attachProfiles && (
         <button type="button" className="link" onClick={() => { onRefresh?.(); void list.refresh(); }}>
           Refresh candidate details and CVs
         </button>

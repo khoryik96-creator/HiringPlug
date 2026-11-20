@@ -1,7 +1,9 @@
 .outlook-page .outlook-actions { flex-wrap: wrap; }
+/* Outlook uses the width of the screen; the panes are resized by dragging the bars between them. */
+main.outlook-page { max-width: none; padding: 0 1.25rem; }
 .outlook-workspace {
   display: grid;
-  grid-template-columns: minmax(9rem, 12.5rem) minmax(0, 1fr);
+  grid-template-columns: var(--outlook-folders, 200px) 6px minmax(0, 1fr);
   padding: 0;
   overflow: hidden;
 }
@@ -11,7 +13,6 @@
   display: flex;
   flex-direction: column;
   gap: .2rem;
-  border-right: 1px solid var(--line, #ded8eb);
   max-height: 75vh;
   overflow: auto;
 }
@@ -69,10 +70,10 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
 .outlook-columns {
   border-top: 1px solid var(--line, #ded8eb);
   display: grid;
-  grid-template-columns: minmax(16rem, 1fr) minmax(0, 2.1fr);
+  grid-template-columns: min(var(--outlook-list, 380px), 55%) 6px minmax(0, 1fr);
   min-height: 30rem;
 }
-.outlook-messages { border-right: 1px solid var(--line, #ded8eb); max-height: 75vh; overflow: auto; }
+.outlook-messages { max-height: 75vh; overflow: auto; }
 
 /* A message in the list: sender and subject; beside them the date, its flag and Move to. */
 .outlook-row { position: relative; display: flex; align-items: stretch; border-bottom: 1px solid var(--line, #ded8eb); border-left: 3px solid transparent; }
@@ -159,21 +160,27 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
 @media (max-width: 830px) {
   .outlook-rule-form { grid-template-columns: 1fr; }
   .outlook-workspace, .outlook-columns { grid-template-columns: 1fr; }
+  .outlook-workspace > .splitter, .outlook-columns > .splitter { display: none; }
   .outlook-folders { flex-direction: row; overflow: auto; border-right: 0; border-bottom: 1px solid var(--line, #ded8eb); }
   .outlook-folders button { flex-shrink: 0; }
   .outlook-messages { max-height: 15rem; border-right: 0; border-bottom: 1px solid var(--line, #ded8eb); }
   .outlook-content input { flex: 1; width: 0; min-width: 8rem; max-width: 100%; }
 }
 
-.outlook-draft-dialog {
-  width: min(42rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 2rem);
-  overflow: auto;
+/* The editors' window: its sides are dragged to make it wider or narrower. */
+.outlook-dialog {
+  max-width: calc(100vw - 2rem);
   margin: auto;
+  padding: 0;
+  overflow: visible;
   box-sizing: border-box;
 }
+.outlook-dialog-body { max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.25rem 1.5rem; box-sizing: border-box; }
+.outlook-dialog-edge { position: absolute; top: 12px; bottom: 12px; width: 10px; }
+.outlook-dialog-edge.start { left: -5px; }
+.outlook-dialog-edge.end { right: -5px; }
+.outlook-dialog-edge::after { left: 4px; background: transparent; border-radius: 2px; }
 .outlook-draft-dialog::backdrop { background: #20172b65; }
-.outlook-ats-compose { width: min(55rem, calc(100vw - 2rem)); }
 .outlook-ats-compose > form { margin: 0; }
 .outlook-ats-compose .outlook-draft-head { position: sticky; top: 0; z-index: 31; background: var(--surface); }
 .outlook-draft-head h3 { margin: 0; }
@@ -233,3 +240,34 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
 .outlook-template-save .row { flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
 .outlook-compose-tools > p { margin: .4rem 0 0; }
 [data-signature] { margin-top: .6rem; }
+
+/* Import CV on an attachment, and the message it came from in the list:
+   orange while importing, green when imported, red when it failed. */
+.outlook-attachment-buttons { align-items: center; gap: .3rem; }
+.outlook-import {
+  display: inline-flex; align-items: center; gap: .4rem; min-height: 36px; padding: .35rem .8rem; border-radius: 9px;
+  font-weight: 600; font-size: .9rem; cursor: pointer; list-style: none; border: 1.5px solid var(--line, #ded8eb); background: var(--surface, #fff);
+}
+.outlook-import::-webkit-details-marker { display: none; }
+.outlook-import svg { width: 19px; height: 19px; }
+.outlook-import.importing { border-color: #f59e0b; background: #fff7e6; color: #b45309; }
+.outlook-import.done { border-color: #22c55e; color: #15803d; }
+.outlook-import.failed { border-color: #ef4444; color: #b91c1c; }
+.outlook-import-wrap { position: relative; }
+.outlook-import-panel {
+  position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; min-width: 16rem; max-width: 22rem; display: grid; gap: .4rem; padding: .55rem .7rem;
+  background: var(--surface, #fff); border: 1px solid var(--line, #ded8eb); border-radius: 10px; box-shadow: 0 8px 24px rgba(29, 21, 48, .14); font-size: .88rem;
+}
+.outlook-import-panel button { justify-self: start; }
+.outlook-import-spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #fcd34d; border-top-color: #d97706; animation: outlook-spin .8s linear infinite; }
+@keyframes outlook-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .outlook-import-spinner { animation: none; } }
+.outlook-row.cv-importing, .outlook-row.cv-done, .outlook-row.cv-failed { border-radius: 10px; margin: 2px 3px; }
+.outlook-row.cv-importing { box-shadow: 0 0 0 2px #f59e0b; }
+.outlook-row.cv-done { box-shadow: 0 0 0 2px #22c55e; }
+.outlook-row.cv-failed { box-shadow: 0 0 0 2px #ef4444; }
+
+/* Candidates' details (salary, notice…) to put in an Outlook message. */
+.outlook-candidate-details { border: 1px solid var(--line, #ded8eb); border-radius: 10px; padding: .45rem .65rem; background: var(--soft, #f7f5fc); min-width: 0; }
+.outlook-candidate-details > summary { cursor: pointer; font-size: .9rem; font-weight: 600; color: var(--accent-dark, #5d3dc2); }
+.outlook-candidate-details .shortlist { margin: .5rem 0 0; border: 0; padding: 0; min-width: 0; }

@@ -132,20 +132,22 @@ async function group(tabId, sourceId) {
   } catch { /* only for looks */ }
 }
 
-// Opens url in a background tab of ours and polls read until it answers.
-async function withTab(op, url, read, prepare) {
+// Opens url in a background tab of ours and polls read until it answers;
+// timedOut names what never finished (read's last answer).
+async function withTab(op, url, read, prepare, timedOut = () => 'LinkedIn did not finish loading. Check again.') {
   await ready;
   const source = op.source;
   const tab = await chrome.tabs.create({url, active: false, ...(source ? {windowId: source.windowId, openerTabId: source.id} : {})});
   owned.set(tab.id, url); await persist();
   if (source) await group(tab.id, source.id);
-  let scrolls = 0, reads = 0;
+  let scrolls = 0, reads = 0, last;
   try {
     for (let attempt = 0; attempt < 100; attempt++) {
       if (op.cancelled) throw safeError('The check was stopped. Nothing more was saved.');
       const now = await ownedTab(tab.id);
       if (now.status === 'complete') {
         const value = await read(tab.id);
+        last = value;
         if (op.cancelled) throw safeError('The check was stopped. Nothing more was saved.');
         if (typeof value?.blocked === 'string') throw safeError(value.blocked.slice(0, 200));
         if (value?.failed) throw safeError('LinkedIn needs you to sign in, or the profile or company could not be confirmed.');
@@ -155,7 +157,7 @@ async function withTab(op, url, read, prepare) {
       }
       await pause(500);
     }
-    throw safeError('LinkedIn did not finish loading. Check again.');
+    throw safeError(timedOut(last));
   } finally {
     await closeOwned(tab.id, url); await persist();
   }
@@ -253,16 +255,28 @@ async function employment(op, args) {
     throw safeError('Choose a contact with a LinkedIn profile, at a company with a LinkedIn page.');
   }
   let moves = [];
+  let absent = 0;
   const value = await withTab(op, args.url + '/details/experience/', async tabId => {
     const read = await inject(tabId, (url, company, id) => {
       try { return globalThis.SourcerReader.readHRJoined(url, company, id); } catch { return {failed: true}; }
     }, [args.url, args.company_url, args.company_id], 'The LinkedIn profile could not be read.');
+    // Every role shown with its dates, none at the company's page: twice in a row, so not a page still drawing.
+    if (read?.absent === true) {
+      if (++absent >= 2) throw safeError("Their LinkedIn Experience shows no role at this company's LinkedIn page. Check the company's LinkedIn page in HiringPlug (it must be the page their role links to), or update the contact by hand.");
+      return {loading: true};
+    }
+    absent = 0;
     // Their time there ended: where they work now, from the same page (best effort).
     if (read && !read.loading && !read.failed && read.current === false) moves = await currentRoles(tabId, args.url, args.company_url);
     return read;
   },
   tabId => inject(tabId, url => (document.visibilityState === 'visible' ? false : globalThis.SourcerReader.prepareHRJoined(url)),
-    [args.url], 'The Experience section could not be loaded.'));
+    [args.url], 'The Experience section could not be loaded.'),
+  last => ({
+    section: 'LinkedIn did not show their Experience section. Open the profile once to check it loads, then check again.',
+    roles: 'LinkedIn did not finish showing their roles. Check again.',
+    dates: "LinkedIn did not show the dates of their role at this company. Check again.",
+  })[last?.wait] || 'LinkedIn did not finish loading. Check again.');
   const {joined, left, current: now} = value;
   if (!dateRe.test(joined) || !dateRe.test(left) || ![true, false, null].includes(now) ||
       (now === true && (!joined || left)) || (now === false && (!joined || !left)) || (now === null && (joined || left)) ||

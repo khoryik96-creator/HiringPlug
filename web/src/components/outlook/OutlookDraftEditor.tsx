@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../../api/client";
 import { uploadOutlookDraftFile } from "../../api/files";
@@ -11,7 +11,10 @@ import { fieldErrors, FormInvalid } from "../forms";
 import { wallTime, zonedInput } from "../calendar/dates";
 import { RichEditor } from "../clientEmail/RichEditor";
 import { editorText, plainToHtml, withoutCaretMarks } from "../clientEmail/richText";
+import { useCandidatePackages } from "../clientEmail/useCandidatePackages";
+import { OutlookCandidateDetails } from "./OutlookCandidateDetails";
 import { type ComposeContext, OutlookComposeTools, useComposeData } from "./OutlookComposeTools";
+import { OutlookDialog } from "./OutlookDialog";
 import { maxDraftFileSize, OutlookDraftFiles } from "./OutlookDraftFiles";
 import { hasSignature, withSignature } from "./outlookSignature";
 import { outlookAddresses } from "./outlookAddresses";
@@ -40,11 +43,8 @@ export function OutlookDraftEditor({ id, onClose, focusMessage = false, fresh = 
     refetchOnReconnect: false,
     gcTime: 0,
   });
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
-  return <dialog className="panel outlook-draft-dialog" ref={dialog} aria-labelledby="outlook-draft-heading"
-    onCancel={(event) => { event.preventDefault(); if (!busy.current) onClose(); }}>
+  return <OutlookDialog className="outlook-draft-dialog" dialogRef={dialog} labelledBy="outlook-draft-heading"
+    onCancel={() => { if (!busy.current) onClose(); }}>
     {id && !query.data ? <>
       <div className="row spread">
         <h3 id="outlook-draft-heading">Outlook draft</h3>
@@ -54,7 +54,7 @@ export function OutlookDraftEditor({ id, onClose, focusMessage = false, fresh = 
       {query.isPending && <p className="muted">Opening draft…</p>}
     </> : <DraftFields key={query.dataUpdatedAt} opened={query.data} focusMessage={focusMessage} setBusy={(pending) => { busy.current = pending; }}
       onClose={onClose} fresh={fresh} permissions={permissions} about={about}/>}
-  </dialog>;
+  </OutlookDialog>;
 }
 
 function inputOf(value: typeof emptyDraft, before?: Draft): DraftInput {
@@ -89,6 +89,8 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   const [candidate, setCandidate] = useState<{ id: string; name: string } | null>(null);
   const [aboutPage, setAboutPage] = useState(about);
   const tools = useComposeData(candidate ? { candidateId: candidate.id } : aboutPage);
+  // The page's candidate is ready to have their details put in (their name shows once read).
+  const packages = useCandidatePackages(about.candidateId ? [{ candidateId: about.candidateId, name: "This candidate" }] : []);
   /** Puts new content in the message (a template, the signature), and shows it. */
   const replaceMessage = (html: string) => { setForm((f) => ({ ...f, html })); setEditorReset((n) => n + 1); };
   // A message just started gets the signature, once (when it has loaded), as Outlook adds it.
@@ -213,16 +215,21 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
         </div>}
         <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={form.subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
         {!draft?.bodyTruncated && <OutlookComposeTools data={tools} html={form.html} subject={form.subject} permissions={permissions}
-          candidate={candidate} onCandidate={(c) => { setCandidate(c); if (!c) setAboutPage({}); }}
+          candidate={candidate} onCandidate={(c) => {
+            setCandidate(c);
+            if (!c) setAboutPage({});
+            else if (!packages.people.some((p) => p.candidateId === c.id) && packages.people.length < 10) packages.change([...packages.people, { candidateId: c.id, name: c.name }]);
+          }}
           onInsert={replaceMessage} onSubject={(s) => { update("subject", s); }}
           onSignature={() => { replaceMessage(withSignature(form.html, tools.signature)); }}
           onAttach={(file) => { action.mutate({ file }); }} disabled={locked || action.isPending} />}
+        {!draft?.bodyTruncated && permissions.includes("candidates:read") && <OutlookCandidateDetails packages={packages} permissions={permissions} />}
         {draft?.bodyTruncated ? <Field label="Message"><textarea readOnly rows={9} value={draft.body} /></Field> :
           <div className="field">
             <span>Message</span>
             <RichEditor compact iconTools plainPaste focusAtStart={focusMessage || fresh} readOnly={locked || action.isPending} html={form.html} resetKey={editorReset}
               invalid={!!(errorFor("bodyHtml") ?? errorFor("body"))} onChange={(html) => { update("html", html); }}
-              fields={tools.fields} values={tools.values} banners={tools.banners} bannerUrls={tools.bannerUrls}
+              fields={tools.fields} values={tools.values} banners={tools.banners} bannerUrls={tools.bannerUrls} inserting={packages.inserting}
               onUploadBanner={permissions.includes("emails.templates:manage") ? (file) => { tools.uploadBanner.mutate(file); } : undefined} />
           </div>}
       </fieldset>

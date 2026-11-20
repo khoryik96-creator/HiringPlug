@@ -118,7 +118,7 @@ export const ROUTES: Route[] = [
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
   { section: "outlook", path: /^#\/outlook$/, permission: "emails:send",
-    render: (c) => <OutlookMail canSaveCv={can(c, "documents:create") && can(c, "candidates:read")} canImportCv={can(c, "intake:create")}
+    render: (c) => <OutlookMail canImportCv={can(c, "intake:create")} userId={c.me.user.id}
       permissions={c.permissions} /> },
   { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: (c) => <Calendar userId={c.me.user.id} /> },
   // Expense claims: for those who claim, and for approvers who do not claim themselves.

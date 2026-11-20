@@ -1,14 +1,19 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import { api, ApiError } from "../../api/client";
+import { api, type Schemas } from "../../api/client";
 import * as files from "../../api/files";
-import { ok, renderWithClient } from "../../test-utils";
+import { ok, renderWithClient, testMe } from "../../test-utils";
+import { CvImportIndicator, titleWithCounts } from "./CvImportIndicator";
 import { OutlookAttachments } from "./OutlookAttachments";
+import { OutlookMessageRow } from "./OutlookMessageList";
+import { resetCvImports } from "./outlookCvImports";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  resetCvImports();
 });
 
 it("shows Outlook-only attachments and downloads a file from the current message", async () => {
@@ -32,66 +37,85 @@ it("shows Outlook-only attachments and downloads a file from the current message
   expect(screen.getByText("Available in Outlook")).toBeTruthy();
   expect(screen.getByText("Open in Outlook to see the remaining attachments.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Download Work samples" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Save Nadia – CV.pdf to candidate" })).toBeNull();
-  expect(screen.queryByRole("link", { name: "Import Nadia – CV.pdf as a candidate" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Save/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Import Nadia – CV.pdf as a candidate" })).toBeNull();
 });
 
-it("links importable attachments to the CV importer", async () => {
-  vi.spyOn(api, "GET").mockResolvedValue(ok({
-    items: [
-      { id: "cvFile", fileName: "Nadia.PDF", sizeBytes: 4000, downloadable: true, savable: true },
-      { id: "cloud", fileName: "Portfolio.docx", sizeBytes: 0, downloadable: false, savable: false },
-      { id: "zip", fileName: "Work samples.zip", sizeBytes: 4000, downloadable: true, savable: true },
-      { id: "oversize", fileName: "Large CV.pdf", sizeBytes: 15 * 1024 ** 2, downloadable: true, savable: false },
-    ],
-    more: false,
-  }));
-  renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv />);
-  const link = await screen.findByRole("link", { name: "Import Nadia.PDF as a candidate" });
-  expect(link.getAttribute("href")).toBe("#/import?outlookMessage=omg_test&outlookAttachment=cvFile");
-  expect(screen.queryByRole("link", { name: /Import (Portfolio|Work samples|Large CV)/ })).toBeNull();
+const me = testMe(["intake:create"]);
+const nadia = { id: "cvFile", fileName: "Nadia.PDF", sizeBytes: 4000, downloadable: true, savable: true };
+const importItem = (status: Schemas["CvImportItemStatus"], error: string | null = null): Schemas["CvImportItem"] => ({
+  id: "cvit_1", fileName: "Nadia.PDF", status, candidateId: status === "failed" ? null : "cand_nadia",
+  candidateName: status === "failed" ? null : "Nadia Aziz", error, updatedAt: "2026-11-20T05:00:00Z",
 });
+const counts = { reading: 0, created: 0, added: 0, unread: 0, failed: 0, duplicate: 0 };
 
-it.each([false, true])("saves to the confirmed candidate and handles exact duplicates (%s)", async (duplicate) => {
+/** The API for an import: the message's files, the import made, then its progress (reading, then outcome). */
+function serveImport(outcome: Schemas["CvImportItem"]) {
+  let polls = 0;
   vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
-    path === "/v1/outlook/messages/{messageId}/attachments" ? ok({
-      items: [{ id: "cvFile", fileName: "Nadia – CV.pdf", sizeBytes: 4400, downloadable: true, savable: true }],
-      more: false,
-    }) : ok({
-      items: [{ id: "cand_nadia", fullName: "Nadia Aziz", email: "nadia@example.test", currentTitle: "QA Engineer" }],
-    }),
+    path === "/v1/me" ? ok(me)
+      : path === "/v1/outlook/messages/{messageId}/attachments" ? ok({
+        items: [nadia, { id: "zip", fileName: "Work samples.zip", sizeBytes: 4000, downloadable: true, savable: true },
+          { id: "oversize", fileName: "Large CV.pdf", sizeBytes: 15 * 1024 ** 2, downloadable: true, savable: false }], more: false,
+      })
+        : path === "/v1/cv-imports" ? ok({ items: [{ id: "cvi_1", source: "direct", createdAt: "2026-11-20T05:00:00Z", counts,
+          items: [polls++ ? outcome : importItem("reading")] }] })
+          : ok({ lists: [] }),
   ));
-  const cv = new Blob(["Synthetic CV"]);
-  const fetchFile = vi.spyOn(files, "fetchFile").mockResolvedValue(cv);
-  const upload = vi.spyOn(files, "uploadCandidateDocument").mockResolvedValue(undefined);
-  if (duplicate) {
-    upload.mockRejectedValueOnce(new ApiError({
-      error: { code: "DOCUMENT_DUPLICATE", message: "Exact duplicate", requestId: "req_test" },
-    }));
-  }
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "cvi_1", source: "direct", createdAt: "2026-11-20T05:00:00Z", counts, items: [] }));
+  vi.spyOn(files, "fetchFile").mockResolvedValue(new Blob(["Synthetic CV"], { type: "application/pdf" }));
+  const upload = vi.fn(() => Promise.resolve(new Response(JSON.stringify(importItem("reading")), { status: 201 })));
+  vi.stubGlobal("fetch", upload);
+  return { post, upload };
+}
 
-  renderWithClient(<OutlookAttachments messageId="omg_test" canSaveCv />);
-  fireEvent.click(await screen.findByRole("button", { name: "Save Nadia – CV.pdf to candidate" }));
-  const submit = screen.getByRole("button", { name: "Save to CV & files" });
-  expect(submit.hasAttribute("disabled")).toBe(true);
-  fireEvent.change(screen.getByLabelText("Candidate"), { target: { value: "Nadia" } });
-  fireEvent.click(await screen.findByRole("button", { name: /Nadia Aziz.*nadia@example.test/ }));
-  expect(fetchFile).not.toHaveBeenCalled();
-  fireEvent.click(submit);
-  expect((await screen.findByRole("status")).textContent).toBe(
-    duplicate ? "This CV is already in Nadia Aziz’s profile." : "CV saved to Nadia Aziz’s profile.",
-  );
-  expect(fetchFile).toHaveBeenCalledWith("/v1/outlook/messages/omg_test/attachments/cvFile/file", "application/octet-stream");
-  expect(upload).toHaveBeenCalledWith("cand_nadia", "original", cv, "Nadia – CV.pdf");
-  expect(screen.getByRole("link", { name: "Open candidate" }).getAttribute("href")).toBe("#/candidates/cand_nadia?tab=cv");
+it("imports a CV in place: importing, then Uploaded, with the candidate to open", async () => {
+  const { post, upload } = serveImport(importItem("created"));
+  renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv userId={me.user.id} />);
+  const start = await screen.findByRole("button", { name: "Import Nadia.PDF as a candidate" });
+  expect(screen.queryByRole("button", { name: /Import (Work samples|Large CV)/ }), "only CV files Outlook can hand over").toBeNull();
+  fireEvent.click(start);
+
+  const importing = await screen.findByLabelText("Importing…: Nadia.PDF");
+  expect(importing.className).toContain("importing");
+  expect(post).toHaveBeenCalledWith("/v1/cv-imports", { body: { source: "direct" } });
+  expect(upload).toHaveBeenCalledWith("/v1/cv-imports/cvi_1/files", expect.objectContaining({ method: "POST" }));
+
+  const done = await screen.findByLabelText("Uploaded: Nadia.PDF", {}, { timeout: 5000 });
+  expect(done.className).toContain("done");
+  fireEvent.click(done);
+  const who = await screen.findByRole("link", { name: "Nadia Aziz" });
+  expect(who.getAttribute("href")).toBe("#/candidates/cand_nadia");
+  expect(screen.getByRole("status").textContent).toBe("New candidate: Nadia Aziz");
 });
 
-it("does not offer Save CV for a file over the upload limit, which can still be downloaded", async () => {
-  vi.spyOn(api, "GET").mockResolvedValue(ok({
-    items: [{ id: "scan", fileName: "Scanned CV.pdf", sizeBytes: 15 * 1024 ** 2, downloadable: true, savable: false }],
-    more: false,
-  }));
-  renderWithClient(<OutlookAttachments messageId="omg_test" canSaveCv />);
-  expect(await screen.findByRole("button", { name: "Download Scanned CV.pdf" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Save Scanned CV.pdf to candidate" })).toBeNull();
+it("shows a failed import in red, with why and Try again", async () => {
+  serveImport(importItem("failed", "This file is not a CV."));
+  renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv userId={me.user.id} />);
+  const start = await screen.findByRole("button", { name: "Import Nadia.PDF as a candidate" });
+  fireEvent.click(start);
+  const failed = await screen.findByLabelText("Failed: Nadia.PDF", {}, { timeout: 5000 });
+  expect(failed.className).toContain("failed");
+  expect(screen.getByRole("status").textContent).toContain("This file is not a CV.");
+  expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+it("outlines the message a CV came from, and counts imports beside Settings", async () => {
+  serveImport(importItem("created"));
+  const message: Schemas["OutlookMessage"] = { id: "omg_test", folderId: "omf_inbox", conversation: "t", subject: "My CV", sender: "nadia@example.test",
+    receivedAt: "2026-11-18T01:00:00Z", isRead: true, isDraft: false, hasAttachments: true, participants: [], webUrl: null, senderName: "Nadia", flagged: false };
+  renderWithClient(<><CvImportIndicator userId={me.user.id} /><OutlookAttachments messageId="omg_test" canImportCv userId={me.user.id} />
+    <OutlookMessageRow item={message} selected={false} folders={[]} cvImport="done" onOpen={vi.fn()} onMove={vi.fn()} onFlag={vi.fn()} /></>);
+  expect(document.querySelector(".outlook-row.cv-done")).not.toBeNull();
+  const start = await screen.findByRole("button", { name: "Import Nadia.PDF as a candidate" });
+  fireEvent.click(start);
+  await screen.findByLabelText("CV imports from Outlook: 1 importing");
+  const indicator = await screen.findByLabelText("CV imports from Outlook: 1 imported", {}, { timeout: 5000 });
+  expect(indicator.className).toContain("done");
+  expect(document.title.startsWith("(1✓) ")).toBe(true);
+});
+
+it("puts the counts in the tab's title, and takes them out", () => {
+  expect(titleWithCounts("HiringPlug", { importing: 1, done: 2, failed: 1 })).toBe("(1… 2✓ 1✗) HiringPlug");
+  expect(titleWithCounts("(1… 2✓ 1✗) HiringPlug", { importing: 0, done: 0, failed: 0 })).toBe("HiringPlug");
 });

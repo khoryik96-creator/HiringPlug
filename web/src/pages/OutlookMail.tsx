@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ClockIcon, FileIcon, IconActions, IconButton, IconLink, PowerIcon, RefreshIcon, StepsIcon } from "../components/ActionIcons";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Splitter, useStoredWidth } from "../components/Splitter";
 import { OutlookATSComposer } from "../components/outlook/OutlookATSComposer";
 import { OutlookCommandBar, useOutlookChange } from "../components/outlook/OutlookCommandBar";
 import { OutlookFolderPane, OutlookMessageRow } from "../components/outlook/OutlookMessageList";
@@ -12,29 +13,32 @@ import { OutlookDraftEditor } from "../components/outlook/OutlookDraftEditor";
 import { OutlookScheduledList } from "../components/outlook/OutlookScheduledList";
 import { OutlookReadingPane } from "../components/outlook/OutlookReadingPane";
 import { OutlookRules } from "../components/outlook/OutlookRules";
+import { messageState, useCvImports } from "../components/outlook/outlookCvImports";
 import "./outlook-workspace.css";
 
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookMail({ canSaveCv = false, canImportCv = false, permissions = [] }: {
-  canSaveCv?: boolean; canImportCv?: boolean; permissions?: Permission[];
+export function OutlookMail({ canImportCv = false, permissions = [], userId }: {
+  canImportCv?: boolean; permissions?: Permission[];
+  /** The signed-in person: the CVs they imported from their mail show on it. */
+  userId?: string;
 }) {
   const params = new URLSearchParams(window.location.hash.split("?")[1]);
   if (params.has("rules")) return <OutlookRules />;
   const candidateId = params.get("candidateId");
   const contactId = params.get("contactId");
   const profile = candidateId ? { candidateId } : contactId ? { contactId } : undefined;
-  return <OutlookWorkspace key={params.toString()} profile={profile} canSaveCv={canSaveCv} canImportCv={canImportCv} permissions={permissions}
+  return <OutlookWorkspace key={params.toString()} profile={profile} canImportCv={canImportCv} permissions={permissions} userId={userId}
     initialSearch={params.get("search") ?? ""} initialThread={params.get("conversation") ?? ""}/>;
 }
 
-function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, initialThread, permissions }: {
+function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, permissions, userId }: {
   profile?: OutlookProfile;
-  canSaveCv: boolean;
   canImportCv: boolean;
   initialSearch: string;
   initialThread: string;
   permissions: Permission[];
+  userId?: string;
 }) {
   const client = useQueryClient();
   const [search, setSearch] = useState(initialSearch);
@@ -97,6 +101,10 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   }
 
   const change = useOutlookChange();
+  // The folder pane and the message list are as wide as last dragged.
+  const [foldersWidth, setFoldersWidth] = useStoredWidth("hiringplug.outlook.foldersWidth", 200, 140, 360);
+  const [listWidth, setListWidth] = useStoredWidth("hiringplug.outlook.listWidth", 380, 260, 760);
+  const imports = useCvImports(userId);
   const items = data?.items ?? [];
   /** Opens a message; Outlook marks it read as it opens. */
   function open(id: string) {
@@ -141,8 +149,9 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
     {!scheduled && data?.enabled && <>
       {data.error && <p className="warning" role="alert">{data.error}</p>}
       {data.syncing && <p className="muted" role="status">Syncing Outlook folders…</p>}
-      <section className="panel outlook-workspace">
+      <section className="panel outlook-workspace" style={{ "--outlook-folders": `${String(foldersWidth)}px`, "--outlook-list": `${String(listWidth)}px` } as CSSProperties}>
         <OutlookFolderPane folders={folders} active={activeFolder} onChoose={chooseFolder} />
+        <Splitter label="Folder pane width" value={foldersWidth} min={140} max={360} onChange={setFoldersWidth} />
         <div className="outlook-content">
           <div className="outlook-topbar">
           <OutlookCommandBar message={active} folders={folders} busy={change.isPending}
@@ -163,6 +172,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
             <div className="outlook-messages" aria-label="Messages">
               {data.items.length === 0 && <p className="muted">No messages to display.</p>}
               {data.items.map((item) => <OutlookMessageRow key={item.id} item={item} selected={item.id === selected} folders={folders}
+                cvImport={messageState(imports, item.id)}
                 onOpen={() => { if (item.isDraft) openDraft(item.id); else open(item.id); }}
                 onMove={(folderId) => { move(item.id, folderId); }}
                 onFlag={() => { change.mutate({ id: item.id, change: { flagged: !item.flagged } }); }} />)}
@@ -171,8 +181,9 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
                 <button type="button" disabled={data.nextOffset == null} onClick={() => { setOffset(data.nextOffset ?? offset); }}>Next</button>
               </div>}
             </div>
+            <Splitter label="Message list width" value={listWidth} min={260} max={760} onChange={setListWidth} />
             {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
-              canSaveCv={canSaveCv} canImportCv={canImportCv} onOpenDraft={openDraft}
+              canImportCv={canImportCv} userId={userId} onOpenDraft={openDraft}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />
               : <p className="outlook-empty muted">Select a message to read it.</p>}
           </div>

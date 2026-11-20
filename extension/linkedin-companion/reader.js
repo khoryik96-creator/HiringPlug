@@ -873,17 +873,17 @@
     const main = document.querySelector('main');
     const heading = [...document.querySelectorAll('main h2, h2')].find(n=>visible(n) && text(n) === 'Experience');
     const details=/\/details\/experience\/?$/.test(location.pathname);
-    if (!main || !details && !heading) return {loading:true};
+    if (!main || !details && !heading) return {loading:true,wait:'section'};
     // Modern company groups have a stable entity key; legacy groups live in
     // the Experience section. Never scan About, activity, education or captions
     // in free-form role descriptions for dates.
     const detailScopes=details?[...main.querySelectorAll('[componentkey$="ExperienceDetailsSection"]')].filter(n=>visible(n) && n.querySelector('[componentkey="profileExperienceDetails_top_anchor"]')):[];
     const scope = details ? detailScopes.length===1?detailScopes[0]:null :
       heading.getAttribute('componentkey') === 'ProfileNullStateCardAnchor_Experience' ? heading.parentElement?.parentElement : document.querySelector('main #experience')?.closest('section');
-    if (!scope) return {loading:true};
+    if (!scope) return {loading:true,wait:'section'};
     const selector = '[componentkey^="entity-collection-item-"], li.artdeco-list__item';
     const cards = [...scope.querySelectorAll(selector)].filter(n=>visible(n) && !n.parentElement?.closest?.(selector));
-    if (!cards.length) return {loading:true};
+    if (!cards.length) return {loading:true,wait:'roles'};
     const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
     const date = value => {
       const match = compact(value).match(/^(?:([A-Za-z]+) )?((?:19|20)\d{2})$/);
@@ -898,10 +898,14 @@
       const start=date(match[1]), current=/^present$/i.test(match[2]), end=current ? null : date(match[2]);
       return start && (current || end && end.year*12+(end.month || 12) >= start.order) ? {start,end,current} : null;
     };
-    const matches = []; let pending=false, ambiguous=false;
+    const matches = []; let pending=false, ambiguous=false, undated=0;
     for (const card of cards) {
       const links = [...card.querySelectorAll('a[href*="/company/"]')].filter(n=>visible(n) && [expectedCompany,'https://www.linkedin.com/company/'+companyId+'/'].includes(companyURL(n.href)));
-      if (!links.length) continue;
+      if (!links.length) {
+        // Another employer: counted as shown once its dates are.
+        if (![...card.querySelectorAll('p, .pvs-entity__caption-wrapper, span[aria-hidden="true"], time')].some(n=>visible(n) && ranges(text(n)))) undated++;
+        continue;
+      }
       // An expandable group may hide the actual first role. A current role's
       // date alone must not be presented as the company joining date.
       if ([...card.querySelectorAll('a, button')].some(n=>visible(n) && /(?:show|see) all|more (?:positions|roles|experiences)/i.test(text(n)))) { ambiguous=true; continue; }
@@ -943,13 +947,14 @@
       if (complete) matches.push({joined:first.value,left:latest.current?'':latest.end.value,current:latest.current});
       else ambiguous=true;
     }
-    if (pending) return {loading:true};
+    if (pending) return {loading:true,wait:'dates'};
     if (ambiguous) return unknown();
     const current=matches.filter(r=>r.current);
     if (current.length) return current.length===1?current[0]:unknown();
     // An Experience skeleton (or other employers hydrating first) does not
-    // establish that the requested company's employment is absent.
-    if (!matches.length) return {loading:true};
+    // establish that the requested company's employment is absent: only every
+    // role shown with its dates, none of them at the company's page, does.
+    if (!matches.length) return undated ? {loading:true,wait:'roles'} : {absent:true};
     const endBound=(value,last)=>Number(value.slice(0,4))*12+(value.length===7?Number(value.slice(5)):last?12:1);
     const latest=matches.filter(r=>matches.every(other=>r===other || endBound(r.left,false)>endBound(other.left,true)));
     return latest.length===1?latest[0]:unknown();

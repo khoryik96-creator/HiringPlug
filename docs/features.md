@@ -625,7 +625,12 @@ for each of their jobs, with **Score fit** / **Score again**.
   by whoever asked, within 15 minutes) and checks the dates make sense. A
   contact whose time there ended, with no current role there, becomes **has
   left** (audited; change it back with Edit); unclear changes nothing. The
-  company's contacts show what LinkedIn showed under each status.
+  company's contacts show what LinkedIn showed under each status. When their
+  Experience has loaded and none of their roles links to the company's page,
+  the check says so (the company's LinkedIn page in HiringPlug is probably not
+  the one their role links to) instead of waiting for it; when LinkedIn never
+  finishes, it names what it did not show (the Experience section, the roles,
+  or the dates at the company) (companion 1.4.1).
 - **Follow leavers** ✅: when LinkedIn shows a contact has left, the companion
   also reads their current roles elsewhere (up to three: company, LinkedIn
   page, title, since when). The contact shows **Now at ...** with **Add at
@@ -1664,10 +1669,18 @@ archive, move, flag, mark read or unread, and reply in the original thread.
 Replies, forwards and new messages use HiringPlug's email tools: templates
 (use, save, save as new, delete), candidate fields including salary, banners,
 the candidate's CV and your own signature (Settings > Your account), and Send
-later. Download file attachments of up to 20 MiB from the reading pane.
-Use **Save CV** to put an attachment in the selected candidate's **CV & files**.
-Use **Import CV** to open it in the candidate importer, with its usual source
-selection, duplicate checks and CV parsing.
+later; **Candidate details** puts candidates in as a block each (or one
+table) with the details chosen, salary included for roles that may see
+salaries, as the client email does. The page uses the width of the screen: drag
+the bars between the folders, the list and the reading pane, or either side of
+the editor, to resize them (kept in this browser). Download attachments of up to
+20 MiB from the reading pane. **Import CV** imports a CV attachment as a candidate
+in place (source Direct, the usual duplicate checks and CV parsing): orange
+while importing, a green outline and **Uploaded** when done (click it for the
+candidate), red and **Failed** with the reason and **Try again**. The message
+in the list gets the same outline, and an icon beside Settings counts what was
+imported and what failed (the browser tab's title too), with the candidate each
+became.
 Save reply drafts in Outlook or open a message there to see linked attachments. **My Outlook conversations** on candidate and contact Email
 tabs links private threads after the recruiter confirms an exact email match.
 **Inbox rules** can move incoming messages to a selected Outlook folder based

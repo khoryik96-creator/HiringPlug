@@ -102,6 +102,44 @@ describe("HiringPlug tools in the Outlook editor", () => {
   });
 });
 
+describe("candidate details in an Outlook message", () => {
+  it("puts the page's candidate in as a block with their salary, notice period and location", async () => {
+    window.localStorage.removeItem("hiringplug.shortlist.details");
+    window.localStorage.removeItem("hiringplug.shortlist.layout");
+    vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+      path === "/v1/email-signature" ? ok({ bodyHtml: signature, version: 1, updatedAt: null })
+        : path === "/v1/email-templates" ? ok({ items: [], fields }) : ok({ items: [] })));
+    vi.spyOn(api, "POST").mockImplementation(() => Promise.resolve(ok({ subject: "", bodyHtml: "", missing: [], salary: true,
+      candidateVersion: 3, compensationVersion: 2,
+      fieldValues: { "[Full name]": "Safwat Ahmad", "[Current salary]": "RM 5,800 / month", "[Expected salary]": "RM 6,700 / month", "[Notice period]": "1 month" } })));
+    renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} about={{ candidateId: "cand_safwat" }}
+      permissions={["candidates:read", "candidates.compensation:read"]} />);
+    const panel = screen.getByRole("group", { name: "Candidates" });
+    await within(panel).findByText("Safwat Ahmad");
+    await waitFor(() => { expect(screen.getByRole("textbox", { name: "Message" }).innerHTML).toContain("Nadia Aziz"); });
+    const insert = within(panel).getByRole("button", { name: "Insert candidates into the message" });
+    expect(insert.textContent).toBe("Insert");
+    expect(within(panel).queryByRole("button", { name: /Refresh candidate details/ }), "no CVs to refresh in Outlook").toBeNull();
+    fireEvent.click(insert);
+    const message = screen.getByRole("textbox", { name: "Message" });
+    await waitFor(() => { expect(message.textContent).toContain("Expected salary: RM 6,700 / month"); });
+    expect(message.textContent).toContain("1. Safwat Ahmad");
+    expect(message.textContent).toContain("Current salary: RM 5,800 / month");
+    expect(message.textContent).toContain("Notice period: 1 month");
+    expect(message.querySelectorAll("p > b")).toHaveLength(1);
+    expect(message.innerHTML.indexOf("Safwat Ahmad"), "above the signature").toBeLessThan(message.innerHTML.indexOf("Nadia Aziz"));
+  });
+
+  it("leaves salary out for a role that may not see salaries", () => {
+    window.localStorage.removeItem("hiringplug.shortlist.details");
+    serve("");
+    renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} about={{ candidateId: "cand_safwat" }} permissions={["candidates:read"]} />);
+    const panel = screen.getByRole("group", { name: "Candidates" });
+    expect(within(panel).queryByRole("checkbox", { name: "Expected salary" })).toBeNull();
+    expect(within(panel).getByRole("checkbox", { name: "Notice period" })).toBeTruthy();
+  });
+});
+
 describe("signature and template placement", () => {
   it("puts the signature once, before the quoted message", () => {
     const reply = "<p><br></p><hr><p>From: Samuel</p><blockquote>Hi</blockquote>";

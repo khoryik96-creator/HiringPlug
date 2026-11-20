@@ -196,18 +196,19 @@ above the quoted message (delete it from any one email; **Insert signature**
 puts it back). **Send later** schedules the message as before. Opening a message marks it read, as Outlook
 does.
 
-For a CV attachment, choose **Save CV**, select the right candidate and confirm
-**Save to CV & files**. **Save CV** is offered for files within the upload limit
-for candidate files (`HP_MAX_UPLOAD_BYTES`); larger ones can still be
-downloaded. Opened from a candidate's page, the candidate is suggested only
-for their linked mail, never for other messages read from there. HiringPlug checks file types and skips exact duplicates
-using the same upload rules as the candidate profile. People who can access the
-candidate's CVs can see the saved copy. The Outlook message stays private.
-
-Choose **Import CV** to open an attachment within the upload limit in **Import profiles**. Choose
-the candidate source and confirm the import to start reading the CV. The
-normal import checks for existing copies and candidates with the same email.
-A file whose upload fails stays selected so you can retry it.
+For a CV attachment within the upload limit (`HP_MAX_UPLOAD_BYTES`; larger ones
+can still be downloaded), choose **Import CV**: the file is imported as a
+candidate where it is, with the source Direct (Other, or the first source, if
+the company has no Direct). The button shows how it goes: orange while
+importing, a green outline and **Uploaded** when done, red and **Failed** when
+it failed. Click it for the candidate it became (new, added to the candidate
+with the same email, or already in HiringPlug), or for the reason and **Try
+again**. The message in the list is outlined the same way, and the icon beside
+Settings counts the CVs imported and failed since you last opened it (the
+browser tab's title shows the counts too). Which message each import came from
+is kept in this browser (ids only); the outcome and the candidate come from the
+import, which **Import profiles** also lists. The Outlook message stays
+private.
 
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook

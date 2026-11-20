@@ -6,6 +6,7 @@ import { useRef } from "react";
 
 import type { Schemas } from "../../api/client";
 import { FlagIcon, MoveFolderIcon, PaperclipIcon } from "../ActionIcons";
+import type { CvImportState } from "./outlookCvImports";
 
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
@@ -74,18 +75,23 @@ export function MoveMenu({ folders, current, disabled = false, onMove }: {
   );
 }
 
-export function OutlookMessageRow({ item, selected, folders, onOpen, onMove, onFlag }: {
+const IMPORT_NOTE = { importing: "Importing a CV from this message", done: "CV imported from this message", failed: "CV import failed for this message" } as const;
+
+export function OutlookMessageRow({ item, selected, folders, cvImport, onOpen, onMove, onFlag }: {
   item: Message; selected: boolean; folders: Folder[];
+  /** How a CV imported from its attachments went: outlined orange, green or red. */
+  cvImport?: CvImportState;
   onOpen: () => void; onMove: (folderId: string) => void; onFlag: () => void;
 }) {
   const subject = item.subject || "(No subject)";
   const who = item.isDraft ? "[Draft]" : (item.senderName || item.sender || "Outlook");
   const unread = !item.isRead && !item.isDraft;
   return (
-    <div className={`outlook-row${unread ? " unread" : ""}${selected ? " selected" : ""}`}>
+    <div className={`outlook-row${unread ? " unread" : ""}${selected ? " selected" : ""}${cvImport ? ` cv-${cvImport}` : ""}`}>
       <button type="button" className="outlook-message" aria-pressed={selected} onClick={onOpen}
         title={item.sender && item.senderName ? `${item.senderName} <${item.sender}>` : undefined}>
-        <span className="outlook-from">{unread && <span className="visually-hidden">Unread: </span>}{who}</span>
+        <span className="outlook-from">{unread && <span className="visually-hidden">Unread: </span>}{who}
+          {cvImport && <span className="visually-hidden"> ({IMPORT_NOTE[cvImport]})</span>}</span>
         <span className="outlook-message-subject">
           <span className="outlook-subject-text">{subject}</span>
           {item.hasAttachments && <span className="outlook-marks" title="Has attachments" aria-label="Has attachments"><PaperclipIcon /></span>}

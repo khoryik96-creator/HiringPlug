@@ -32,13 +32,13 @@ function hue(s: string): number {
   return h;
 }
 
-export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, canImportCv, onThread, onOpenDraft }: {
+export function OutlookReadingPane({ message, folders, profile, linked, canImportCv, userId, onThread, onOpenDraft }: {
   message: Message;
   folders: Folder[];
   profile?: OutlookProfile;
   linked: boolean;
-  canSaveCv: boolean;
   canImportCv: boolean;
+  userId?: string;
   onThread: () => void;
   onOpenDraft: (id: string, focusMessage?: boolean, fresh?: boolean) => void;
 }) {
@@ -144,12 +144,10 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
     <ErrorMessage error={body.error ?? send.error ?? draftReply.error ?? link.error}/>
     {notice && <p role="status">{notice}</p>}
     {draftReply.isPending && <p className="muted" role="status">Opening reply…</p>}
-    {/* The candidate is suggested only for their own linked mail, never for any message read from their page. */}
-    {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id}
-      canSaveCv={canSaveCv} canImportCv={canImportCv} candidateId={linked ? profile?.candidateId : undefined} />}
+    {message.hasAttachments && <OutlookAttachments key={`files-${message.id}`} messageId={message.id} canImportCv={canImportCv} userId={userId} />}
     {body.isPending && <p className="muted">Opening message…</p>}
     {b?.html
-      ? <OutlookMessageFrame key={message.id} html={b.html} blockedImages={b.blockedImages} title={`Message: ${message.subject || "(No subject)"}`}
+      ? <OutlookMessageFrame key={`body-${message.id}`} html={b.html} blockedImages={b.blockedImages} title={`Message: ${message.subject || "(No subject)"}`}
         holdPictures={folders.find((f) => f.id === message.folderId)?.kind === "junkemail"} />
       : b && <div className="outlook-body">{b.text}</div>}
     {b?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}

@@ -237,3 +237,18 @@ test("reads a new contact's name and current roles from their profile", async ()
   assert.deepEqual(opened, [profile + '/', profile + '/details/experience/']);
   assert.equal(b.tabs.size, 1, 'both tabs closed');
 });
+
+test('says when their Experience shows no role at the company, instead of waiting for it', async () => {
+  // Every role shown with its dates, none linked to the company's page: twice, so not a page still drawing.
+  const b = browser({page: (tab, args) => (args.length === 3 ? {absent: true} : true), fast: true});
+  const reply = await b.send(check);
+  assert.match(reply.error, /shows no role at this company's LinkedIn page/);
+  assert.equal(b.tabs.size, 1, 'its tab is closed');
+});
+
+test('names what LinkedIn never finished showing', async () => {
+  for (const [wait, said] of [['dates', /dates of their role at this company/], ['section', /did not show their Experience section/], [undefined, /did not finish loading/]]) {
+    const b = browser({page: (tab, args) => (args.length === 3 ? {loading: true, wait} : true), fast: true});
+    assert.match((await b.send(check)).error, said);
+  }
+});

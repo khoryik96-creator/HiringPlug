@@ -22,6 +22,9 @@ export const TrashIcon = () => (
 export const BuildingIcon = () => (
   <Svg><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 7h2M13 7h2M9 11h2M13 11h2M10 21v-4h4v4" /></Svg>
 );
+export const PersonPlusIcon = () => <Svg><circle cx="10" cy="8" r="4" /><path d="M3 21a7 7 0 0 1 13.5-2.6M19 14v6m-3-3h6" /></Svg>;
+export const CheckIcon = () => <Svg><path d="m5 12 4.5 4.5L19 7" /></Svg>;
+export const AlertIcon = () => <Svg><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5m0 3.2h.01" /></Svg>;
 export const PersonIcon = () => <Svg><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></Svg>;
 export const SparkIcon = () => <Svg><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z" /></Svg>;
 export const ShareIcon = () => (
