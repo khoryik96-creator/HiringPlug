@@ -3582,7 +3582,7 @@ paths:
       operationId: getOutlookMessage
       tags:
         - emails
-      summary: Read an Outlook message as plain text
+      summary: Read an Outlook message, its formatting kept (made safe) and its plain text
       x-permission: emails:send
       responses:
         '200':
@@ -11439,6 +11439,7 @@ components:
         - name
         - kind
         - parentId
+        - unread
       properties:
         id:
           type: string
@@ -11446,9 +11447,13 @@ components:
           type: string
         kind:
           type: string
+          description: "inbox, sentitems, drafts, deleteditems, junkemail, archive, or empty for the person's own folders."
         parentId:
           type: string
           nullable: true
+        unread:
+          type: integer
+          description: Unread messages among those synced (the last 90 days).
     OutlookMessage:
       type: object
       required:
@@ -11457,6 +11462,8 @@ components:
         - conversation
         - subject
         - sender
+        - senderName
+        - flagged
         - participants
         - receivedAt
         - isRead
@@ -11490,6 +11497,11 @@ components:
         webUrl:
           type: string
           nullable: true
+        senderName:
+          type: string
+          description: The sender's display name (empty when Outlook gave none).
+        flagged:
+          type: boolean
     OutlookMailPage:
       type: object
       required:
@@ -11566,11 +11578,47 @@ components:
       required:
         - text
         - truncated
+        - html
+        - blockedImages
+        - from
+        - to
+        - cc
+        - sentAt
+        - importance
       properties:
         text:
           type: string
         truncated:
           type: boolean
+        html:
+          type: string
+          nullable: true
+          description: "The message's formatting, made safe to show (no scripts, forms or frames). Pictures sent with it are included; pictures from the web are held back as data-hp-src until shown. Null for a plain-text message."
+        blockedImages:
+          type: integer
+          description: How many pictures from the web are held back (shown only when the person asks).
+        from:
+          allOf: [{$ref: '#/components/schemas/OutlookPerson'}]
+          nullable: true
+        to:
+          type: array
+          items: {$ref: '#/components/schemas/OutlookPerson'}
+        cc:
+          type: array
+          items: {$ref: '#/components/schemas/OutlookPerson'}
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        importance:
+          type: string
+          enum: [low, normal, high]
+    OutlookPerson:
+      type: object
+      required: [name, address]
+      properties:
+        name: {type: string}
+        address: {type: string}
     OutlookAttachmentList:
       type: object
       required: [items, more]
@@ -11594,8 +11642,11 @@ components:
           description: Downloadable and within the upload limit for a candidate's CV & files.
     OutlookMessageChange:
       type: object
+      description: One change at a time - read status, flag or folder.
       properties:
         isRead:
+          type: boolean
+        flagged:
           type: boolean
         folderId:
           type: string

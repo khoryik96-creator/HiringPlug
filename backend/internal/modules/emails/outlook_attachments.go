@@ -30,10 +30,11 @@ const (
 )
 
 type outlookAttachment struct {
-	ID, Name string
-	Size     int64
-	IsInline bool
-	Type     string `json:"@odata.type"`
+	ID, Name    string
+	ContentType string
+	Size        int64
+	IsInline    bool
+	Type        string `json:"@odata.type"`
 }
 
 func (a outlookAttachment) file() bool { return a.Type == "#microsoft.graph.fileAttachment" }

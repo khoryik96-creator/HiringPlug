@@ -126,6 +126,7 @@ func outlookFolderPath(path string) string {
 
 type outlookRecipient struct {
 	EmailAddress struct {
+		Name    string `json:"name"`
 		Address string `json:"address"`
 	} `json:"emailAddress"`
 }
@@ -139,6 +140,16 @@ type outlookRemoteMessage struct {
 	IsRead, IsDraft, HasAttachments                                 bool
 	Removed                                                         json.RawMessage `json:"@removed"`
 	Body                                                            struct{ ContentType, Content string }
+	Importance                                                      string
+	Flag                                                            struct{ FlagStatus string }
+}
+
+// senderName is who sent it, as their mail app names them.
+func (m outlookRemoteMessage) senderName() string {
+	if m.From.EmailAddress.Address != "" {
+		return m.From.EmailAddress.Name
+	}
+	return m.Sender.EmailAddress.Name
 }
 
 func (m outlookRemoteMessage) sender() string {
@@ -194,11 +205,11 @@ func (s *Service) outlookFolders(ctx context.Context, token string) (map[string]
 		}
 	}
 	kinds := map[string]string{}
-	for _, kind := range []string{"inbox", "sentitems", "drafts", "archive"} {
+	for _, kind := range []string{"inbox", "sentitems", "drafts", "deleteditems", "junkemail", "archive"} {
 		var folder outlookRemoteFolder
 		err := s.outlookRequest(ctx, token, http.MethodGet, root+"/"+kind, nil, &folder)
 		var graph *outlookGraphError
-		if kind == "archive" && errors.As(err, &graph) && graph.status == 404 {
+		if (kind == "archive" || kind == "junkemail" || kind == "deleteditems") && errors.As(err, &graph) && graph.status == 404 {
 			continue
 		}
 		if err != nil {

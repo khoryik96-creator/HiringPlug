@@ -1649,13 +1649,15 @@ again, and connecting uploads what was waiting. See
 
 The Outlook icon beside Calendar opens Outlook Mail. It indexes a recruiter's
 own Outlook folders on request.
-Browse, search, mark read or unread, archive, move and reply in the original
-thread. Download file attachments of up to 20 MiB from the reading pane.
+It looks and works like Outlook: folders with unread counts, a list showing
+each sender, subject and date, and a reading pane showing the message in its
+own formatting (tables, colours, signature logos and banners; in Junk Email,
+pictures from the web load only on **Show pictures**). Browse, search by subject, name or address, delete,
+archive, move, flag, mark read or unread, and reply in the original thread. Download file attachments of up to 20 MiB from the reading pane.
 Use **Save CV** to put an attachment in the selected candidate's **CV & files**.
 Use **Import CV** to open it in the candidate importer, with its usual source
 selection, duplicate checks and CV parsing.
-Save reply drafts in Outlook or open a message there to see original formatting
-and linked attachments. **My Outlook conversations** on candidate and contact Email
+Save reply drafts in Outlook or open a message there to see linked attachments. **My Outlook conversations** on candidate and contact Email
 tabs links private threads after the recruiter confirms an exact email match.
 **Inbox rules** can move incoming messages to a selected Outlook folder based
 on the sender address or words in the subject.

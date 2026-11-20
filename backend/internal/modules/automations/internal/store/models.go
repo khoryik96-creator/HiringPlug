@@ -861,6 +861,8 @@ type EmailOutlookMessage struct {
 	IsDraft        bool
 	HasAttachments bool
 	WebUrl         *string
+	SenderName     string
+	Flagged        bool
 }
 
 type EmailOutlookSend struct {

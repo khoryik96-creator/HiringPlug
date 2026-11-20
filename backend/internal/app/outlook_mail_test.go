@@ -25,6 +25,7 @@ type outlookMailFixture struct {
 	reply    string
 	draft    string
 	failSend bool
+	flag     string // the message's flag status ("" when never flagged)
 }
 
 func (f *outlookMailFixture) serve(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,7 @@ func (f *outlookMailFixture) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	write := func(value any) { _ = json.NewEncoder(w).Encode(value) }
 	folder := func(id string) map[string]any {
-		return map[string]any{"id": id, "displayName": map[string]string{"inbox": "Inbox", "archive": "Archive", "sentitems": "Sent Items", "drafts": "Drafts"}[id], "childFolderCount": 0}
+		return map[string]any{"id": id, "displayName": map[string]string{"inbox": "Inbox", "archive": "Archive", "sentitems": "Sent Items", "drafts": "Drafts", "deleteditems": "Deleted Items", "junkemail": "Junk Email"}[id], "childFolderCount": 0}
 	}
 	switch {
 	case r.URL.Path == "/token":
@@ -41,7 +42,7 @@ func (f *outlookMailFixture) serve(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/profile":
 		write(map[string]string{"mail": "recruiter@example.test"})
 	case strings.HasSuffix(r.URL.Path, "/mailFolders"):
-		write(map[string]any{"value": []any{folder("inbox"), folder("sentitems"), folder("drafts"), folder("archive")}})
+		write(map[string]any{"value": []any{folder("inbox"), folder("sentitems"), folder("drafts"), folder("deleteditems"), folder("junkemail"), folder("archive")}})
 	case strings.HasSuffix(r.URL.Path, "/messages/delta"):
 		parts := strings.Split(r.URL.Path, "/")
 		var id string
@@ -55,7 +56,9 @@ func (f *outlookMailFixture) serve(w http.ResponseWriter, r *http.Request) {
 			now := time.Now().UTC().Truncate(time.Millisecond)
 			items = append(items, map[string]any{
 				"id": "remote-message", "parentFolderId": id, "conversationId": "thread-one",
-				"subject": "Availability for the interview", "from": outlookRecipientJSON("nadia@example.test"),
+				"subject":          "Availability for the interview",
+				"from":             map[string]any{"emailAddress": map[string]string{"name": "Nadia Rahman", "address": "nadia@example.test"}},
+				"flag":             map[string]string{"flagStatus": f.flag},
 				"toRecipients":     []any{outlookRecipientJSON("recruiter@example.test")},
 				"receivedDateTime": now, "lastModifiedDateTime": now, "isRead": f.read,
 				"hasAttachments": true, "webLink": "https://outlook.office.com/mail/item",
@@ -226,6 +229,7 @@ func TestOutlookMailSyncActionsAndProfilePrivacy(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 204, a.request("POST", root, token, nil).Status)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
+	runPostponedCalendarJobs(t, a, tenant.ID) // six folders: the sync's second pass reaches the rest
 	refreshed := listMail(profile, token)
 	require.Len(t, refreshed.Items, 1)
 	require.Equal(t, item.Id, refreshed.Items[0].Id)

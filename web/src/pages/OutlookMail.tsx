@@ -2,18 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
-import { ClockIcon, ComposeIcon, FileIcon, IconActions, IconButton, IconLink, PowerIcon, RefreshIcon, StepsIcon } from "../components/ActionIcons";
+import { ClockIcon, FileIcon, IconActions, IconButton, IconLink, PowerIcon, RefreshIcon, StepsIcon } from "../components/ActionIcons";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { OutlookATSComposer } from "../components/outlook/OutlookATSComposer";
+import { OutlookCommandBar, useOutlookChange } from "../components/outlook/OutlookCommandBar";
+import { OutlookFolderPane, OutlookMessageRow } from "../components/outlook/OutlookMessageList";
 import type { OutlookProfile } from "../components/outlook/OutlookProfileMail";
 import { OutlookDraftEditor } from "../components/outlook/OutlookDraftEditor";
 import { OutlookScheduledList } from "../components/outlook/OutlookScheduledList";
 import { OutlookReadingPane } from "../components/outlook/OutlookReadingPane";
 import { OutlookRules } from "../components/outlook/OutlookRules";
-import { formatWhen } from "../labels";
 import "./outlook-workspace.css";
 
-type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
 export function OutlookMail({ canSaveCv = false, canImportCv = false, permissions = [] }: {
@@ -95,19 +95,27 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
     setSelected(undefined);
   }
 
-  function subject(item: Message) {
-    return item.subject || "(No subject)";
+  const change = useOutlookChange();
+  const items = data?.items ?? [];
+  /** Opens a message; Outlook marks it read as it opens. */
+  function open(id: string) {
+    setSelected(id);
+    const item = items.find((m) => m.id === id);
+    if (item && !item.isRead && !item.isDraft) change.mutate({ id, change: { isRead: true } });
+  }
+  /** Moves a message (Delete is a move to Deleted Items), then shows the next one, as Outlook does. */
+  function move(id: string, folderId: string) {
+    const at = items.findIndex((m) => m.id === id);
+    const next = items[at + 1] ?? items[at - 1];
+    change.mutate({ id, change: { folderId } });
+    if (id === selected) setSelected(next && !next.isDraft ? next.id : undefined);
   }
 
   return <main className="outlook-page">
     <div className="row spread">
       <h2>Outlook Mail</h2>
       <IconActions label="Outlook actions">
-        {data?.enabled && <>
-          <IconButton label="New message" icon={<ComposeIcon />} className="icon-primary"
-            disabled={!folders.some((item) => item.kind === "drafts")} onClick={() => { openDraft(null); }} />
-          <IconButton label="Write with HiringPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />
-        </>}
+        {data?.enabled && <IconButton label="Write with HiringPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />}
         <IconButton label={scheduled ? "Back to mail" : "Scheduled"} icon={<ClockIcon />} pressed={scheduled}
           onClick={() => { setScheduled(!scheduled); }} />
         {data?.enabled && <>
@@ -133,29 +141,30 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
       {data.error && <p className="warning" role="alert">{data.error}</p>}
       {data.syncing && <p className="muted" role="status">Syncing Outlook folders…</p>}
       <section className="panel outlook-workspace">
-        <nav className="outlook-folders" aria-label="Outlook folders">
-          {folders.map((item) => <button type="button" key={item.id} aria-current={activeFolder === item.id ? "page" : undefined} onClick={() => { chooseFolder(item); }}>{item.name}</button>)}
-        </nav>
+        <OutlookFolderPane folders={folders} active={activeFolder} onChoose={chooseFolder} />
         <div className="outlook-content">
-          <form className="row outlook-actions" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setFolder(""); setThread(""); setLinked(false); setOffset(0); setSelected(undefined); }}>
-            <input aria-label="Search Outlook mail" placeholder="Subject or email address" maxLength={254} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); }}/>
+          <div className="outlook-topbar">
+          <OutlookCommandBar message={active} folders={folders} busy={change.isPending}
+            canCompose={folders.some((item) => item.kind === "drafts")} onNew={() => { openDraft(null); }}
+            onMove={(folderId) => { if (active) move(active.id, folderId); }}
+            onRead={(isRead) => { if (active) change.mutate({ id: active.id, change: { isRead } }); }} />
+          <form className="row outlook-search" role="search" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setFolder(""); setThread(""); setLinked(false); setOffset(0); setSelected(undefined); }}>
+            <input type="search" aria-label="Search Outlook mail" placeholder="Search by subject, name or email address" maxLength={254} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); }}/>
             <button type="submit">Search</button>
             {profile && <button type="button" aria-pressed={linked} onClick={() => {
               setLinked(true); setThread(""); setFolder(""); setSearch(""); setSearchInput(""); setOffset(0); setSelected(undefined);
             }}>Linked to profile</button>}
             {thread && <button type="button" onClick={() => { setThread(""); setOffset(0); }}>Back to messages</button>}
           </form>
+          </div>
+          <ErrorMessage error={change.error} />
           <div className="outlook-columns">
             <div className="outlook-messages" aria-label="Messages">
               {data.items.length === 0 && <p className="muted">No messages to display.</p>}
-              {data.items.map((item) => <button type="button" className="outlook-message" aria-pressed={item.id === selected} key={item.id}
-                onClick={() => {
-                  if (item.isDraft) openDraft(item.id);
-                  else setSelected(item.id);
-                }}>
-                <span>{!item.isRead && !item.isDraft && <span className="outlook-unread" aria-label="Unread"/>}{subject(item)}</span>
-                <small>{item.sender || (item.isDraft ? "Draft" : "Outlook")} · {formatWhen(item.receivedAt)}</small>
-              </button>)}
+              {data.items.map((item) => <OutlookMessageRow key={item.id} item={item} selected={item.id === selected} folders={folders}
+                onOpen={() => { if (item.isDraft) openDraft(item.id); else open(item.id); }}
+                onMove={(folderId) => { move(item.id, folderId); }}
+                onFlag={() => { change.mutate({ id: item.id, change: { flagged: !item.flagged } }); }} />)}
               {(offset > 0 || data.nextOffset != null) && <div className="row outlook-actions">
                 <button type="button" disabled={!offset} onClick={() => { setOffset(Math.max(0, offset - 50)); }}>Previous</button>
                 <button type="button" disabled={data.nextOffset == null} onClick={() => { setOffset(data.nextOffset ?? offset); }}>Next</button>

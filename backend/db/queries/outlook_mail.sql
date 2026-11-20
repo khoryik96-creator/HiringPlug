@@ -26,12 +26,18 @@ ON CONFLICT(mailbox_id,remote_id) DO UPDATE SET name=excluded.name,kind=excluded
 DELETE FROM email_outlook_folder WHERE mailbox_id= @mailbox_id AND NOT(remote_id=ANY(@remote_ids::text[]));
 
 -- name: OutlookFolders :many
-SELECT * FROM email_outlook_folder WHERE mailbox_id= @mailbox_id ORDER BY CASE kind WHEN 'inbox' THEN 0 WHEN 'sentitems' THEN 1 WHEN 'drafts' THEN 2 WHEN 'archive' THEN 3 ELSE 4 END,name,id;
+SELECT * FROM email_outlook_folder WHERE mailbox_id= @mailbox_id
+ORDER BY CASE kind WHEN 'inbox' THEN 0 WHEN 'drafts' THEN 1 WHEN 'sentitems' THEN 2 WHEN 'deleteditems' THEN 3 WHEN 'archive' THEN 4 WHEN 'junkemail' THEN 5 ELSE 6 END,name,id;
+
+-- name: OutlookUnreadCounts :many
+SELECT folder_id, count(*)::int AS unread FROM email_outlook_message
+WHERE mailbox_id= @mailbox_id AND NOT is_read AND NOT is_draft GROUP BY folder_id;
 
 -- name: OutlookDueFolders :many
 SELECT * FROM email_outlook_folder WHERE mailbox_id= @mailbox_id
   AND (checked_at IS NULL OR checked_at < now() - CASE WHEN complete THEN interval '2 minutes' ELSE interval '15 seconds' END)
-ORDER BY checked_at NULLS FIRST,id LIMIT 4;
+-- Unchecked folders first; among them Outlook's own, the Inbox first.
+ORDER BY checked_at NULLS FIRST,CASE kind WHEN 'inbox' THEN 0 WHEN 'drafts' THEN 1 WHEN 'sentitems' THEN 2 WHEN 'archive' THEN 3 WHEN 'deleteditems' THEN 4 WHEN 'junkemail' THEN 5 ELSE 6 END,id LIMIT 4;
 
 -- name: OutlookFolder :one
 SELECT * FROM email_outlook_folder WHERE id= @id AND mailbox_id= @mailbox_id;
@@ -44,11 +50,12 @@ WHERE id= @id;
 DELETE FROM email_outlook_message WHERE folder_id= @folder_id;
 
 -- name: SaveOutlookMessage :exec
-INSERT INTO email_outlook_message(mailbox_id,folder_id,remote_id,conversation,subject,sender,participants,received_at,changed_at,is_read,is_draft,has_attachments,web_url)
-VALUES (@mailbox_id,@folder_id,@remote_id,@conversation,@subject,@sender,@participants,@received_at,@changed_at,@is_read,@is_draft,@has_attachments,sqlc.narg(web_url))
+INSERT INTO email_outlook_message(mailbox_id,folder_id,remote_id,conversation,subject,sender,participants,received_at,changed_at,is_read,is_draft,has_attachments,web_url,sender_name,flagged)
+VALUES (@mailbox_id,@folder_id,@remote_id,@conversation,@subject,@sender,@participants,@received_at,@changed_at,@is_read,@is_draft,@has_attachments,sqlc.narg(web_url),@sender_name,@flagged)
 ON CONFLICT(mailbox_id,remote_id) DO UPDATE SET folder_id=excluded.folder_id,conversation=excluded.conversation,subject=excluded.subject,sender=excluded.sender,
 participants=excluded.participants,received_at=excluded.received_at,changed_at=excluded.changed_at,
-is_read=excluded.is_read,is_draft=excluded.is_draft,has_attachments=excluded.has_attachments,web_url=excluded.web_url
+is_read=excluded.is_read,is_draft=excluded.is_draft,has_attachments=excluded.has_attachments,web_url=excluded.web_url,
+sender_name=excluded.sender_name,flagged=excluded.flagged
 WHERE email_outlook_message.changed_at<=excluded.changed_at;
 
 -- name: RemoveOutlookMessage :exec
@@ -65,11 +72,14 @@ WHERE m.mailbox_id= @mailbox_id
  AND (@thread::text='' OR m.conversation= @thread)
  AND (@candidate::text='' OR l.candidate_id= @candidate)
  AND (@contact::text='' OR l.contact_id= @contact)
- AND (@search::text='' OR strpos(lower(m.subject),lower(@search))>0 OR lower(@search)=ANY(m.participants))
+ AND (@search::text='' OR strpos(lower(m.subject),lower(@search))>0 OR strpos(lower(m.sender_name),lower(@search))>0 OR lower(@search)=ANY(m.participants))
 ORDER BY m.received_at DESC,m.id DESC LIMIT 51 OFFSET @skip::integer;
 
 -- name: SetOutlookRead :exec
 UPDATE email_outlook_message SET is_read= @is_read,changed_at=GREATEST(changed_at,@changed_at) WHERE id= @id;
+
+-- name: SetOutlookFlag :exec
+UPDATE email_outlook_message SET flagged= @flagged,changed_at=GREATEST(changed_at,@changed_at) WHERE id= @id;
 
 -- name: MoveOutlookMessage :exec
 UPDATE email_outlook_message SET folder_id= @folder_id,changed_at=GREATEST(changed_at,@changed_at) WHERE id= @id;

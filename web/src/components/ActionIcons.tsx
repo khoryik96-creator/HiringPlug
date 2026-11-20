@@ -60,6 +60,7 @@ export const ArchiveIcon = () => <Svg><path d="M4 5h16v4H4zm2 4v10h12V9m-8 4h4" 
 export const MoveFolderIcon = () => <Svg><path d="M3 8V6h6l2 2h10v11H3zm6 5h7m-3-3 3 3-3 3" /></Svg>;
 export const ConversationIcon = () => <Svg><path d="M4 5h16v12h-7l-4 4v-4H4zm4 4h8m-8 4h5" /></Svg>;
 export const LinkIcon = () => <Svg><path d="m10 14 4-4m-7 2-2 2a3.5 3.5 0 0 0 5 5l3-3m4-4 2-2a3.5 3.5 0 0 0-5-5l-3 3" /></Svg>;
+export const FlagIcon = () => <Svg><path d="M5 21V4m0 0h11l-2 4 2 4H5" /></Svg>;
 export const MoreIcon = () => <Svg><path d="M5 12h.1m7 0h.1m7 0h.1" /></Svg>;
 export const PowerIcon = () => <Svg><path d="M12 3v9m5-6a8 8 0 1 1-10 0" /></Svg>;
 export const CalendarPlusIcon = () => (

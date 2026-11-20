@@ -128,9 +128,17 @@ func (s *Service) listOutlook(ctx context.Context, p authz.Principal, params api
 		for _, folder := range folders {
 			localFolderIds[folder.RemoteID] = folder.ID
 		}
+		counts, err := q.OutlookUnreadCounts(ctx, box.ID)
+		if err != nil {
+			return err
+		}
+		unread := make(map[string]int, len(counts))
+		for _, c := range counts {
+			unread[c.FolderID] = int(c.Unread)
+		}
 		for _, folder := range folders {
 			parent := orNil(localFolderIds[deref(folder.ParentID)])
-			out.Folders = append(out.Folders, api.OutlookMailFolder{Id: folder.ID, Name: folder.Name, Kind: folder.Kind, ParentId: apiconv.OrNull(parent)})
+			out.Folders = append(out.Folders, api.OutlookMailFolder{Id: folder.ID, Name: folder.Name, Kind: folder.Kind, ParentId: apiconv.OrNull(parent), Unread: unread[folder.ID]})
 			out.Syncing = out.Syncing || (!folder.Complete && state.SyncError == nil)
 		}
 		var offset int
@@ -158,7 +166,8 @@ func (s *Service) listOutlook(ctx context.Context, p authz.Principal, params api
 			out.NextOffset = apiconv.OrNull(&next)
 		}
 		for _, row := range rows[:min(50, len(rows))] {
-			out.Items = append(out.Items, api.OutlookMessage{Id: row.ID, FolderId: row.FolderID, Conversation: row.Conversation, Subject: row.Subject, Sender: row.Sender, Participants: row.Participants, ReceivedAt: row.ReceivedAt, IsRead: row.IsRead, IsDraft: row.IsDraft, HasAttachments: row.HasAttachments, WebUrl: apiconv.OrNull(row.WebUrl)})
+			out.Items = append(out.Items, api.OutlookMessage{Id: row.ID, FolderId: row.FolderID, Conversation: row.Conversation, Subject: row.Subject, Sender: row.Sender, Participants: row.Participants, ReceivedAt: row.ReceivedAt, IsRead: row.IsRead, IsDraft: row.IsDraft, HasAttachments: row.HasAttachments, WebUrl: apiconv.OrNull(row.WebUrl),
+				SenderName: row.SenderName, Flagged: row.Flagged})
 		}
 		return nil
 	})

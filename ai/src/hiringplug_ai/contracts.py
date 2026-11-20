@@ -2653,8 +2653,14 @@ class OutlookScheduledJob(BaseModel):
 class OutlookMailFolder(BaseModel):
     id: str
     name: str
-    kind: str
+    kind: Annotated[
+        str,
+        Field(
+            description="inbox, sentitems, drafts, deleteditems, junkemail, archive, or empty for the person's own folders."
+        ),
+    ]
     parentId: Annotated[str | None, Field(...)]
+    unread: Annotated[int, Field(description="Unread messages among those synced (the last 90 days).")]
 
 
 class OutlookMessage(BaseModel):
@@ -2669,6 +2675,8 @@ class OutlookMessage(BaseModel):
     isDraft: bool
     hasAttachments: bool
     webUrl: Annotated[str | None, Field(...)]
+    senderName: Annotated[str, Field(description="The sender's display name (empty when Outlook gave none).")]
+    flagged: bool
 
 
 class OutlookMailPage(BaseModel):
@@ -2706,9 +2714,15 @@ class OutlookRuleFolder(BaseModel):
     name: str
 
 
-class OutlookMessageBody(BaseModel):
-    text: str
-    truncated: bool
+class Importance(StrEnum):
+    low = "low"
+    normal = "normal"
+    high = "high"
+
+
+class OutlookPerson(BaseModel):
+    name: str
+    address: str
 
 
 class OutlookAttachment(BaseModel):
@@ -2723,6 +2737,7 @@ class OutlookAttachment(BaseModel):
 
 class OutlookMessageChange(BaseModel):
     isRead: bool | None = None
+    flagged: bool | None = None
     folderId: Annotated[str | None, Field(max_length=60)] = None
 
 
@@ -6841,6 +6856,26 @@ class OutlookDraft(BaseModel):
 class OutlookRuleList(BaseModel):
     items: list[OutlookRule]
     folders: list[OutlookRuleFolder]
+
+
+class OutlookMessageBody(BaseModel):
+    text: str
+    truncated: bool
+    html: Annotated[
+        str | None,
+        Field(
+            description="The message's formatting, made safe to show (no scripts, forms or frames). Pictures sent with it are included; pictures from the web are held back as data-hp-src until shown. Null for a plain-text message."
+        ),
+    ]
+    blockedImages: Annotated[
+        int,
+        Field(description="How many pictures from the web are held back (shown only when the person asks)."),
+    ]
+    from_: Annotated[OutlookPerson | None, Field(alias="from")]
+    to: list[OutlookPerson]
+    cc: list[OutlookPerson]
+    sentAt: Annotated[AwareDatetime | None, Field(...)]
+    importance: Importance
 
 
 class OutlookAttachmentList(BaseModel):

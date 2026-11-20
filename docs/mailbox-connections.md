@@ -162,12 +162,26 @@ HiringPlug discovers visible folders and reads message delta pages in the Go
 worker. Initial indexing covers up to 90 days of mail, subject to Microsoft's
 5,000-result limit for filtered delta queries per folder. Drafts are indexed
 without the date filter. Large mailboxes fill in over several background runs.
-Open a message to see its attachments and download files up to 20 MiB. Open
-the message in Outlook for linked items, larger files, additional attachments,
-the original formatting or full history. Message details and files are fetched
-when requested. HiringPlug indexes subject,
-participants, dates and folder/read state locally and does not store bodies or
+Open a message to read it in its own formatting (fonts, colours, tables, and
+its pictures: signature logos and banners, whether sent with it or linked from
+the web) and to see its attachments and download files up to 20 MiB. The
+message is made safe before it is shown (nothing in it can run) and is shown in
+a frame of its own. Pictures from the web load as in Outlook, over https and
+without telling their site which page asked; in **Junk Email** they wait for
+**Show pictures**, so a sender of junk cannot tell the message was opened. Open the message in Outlook for linked items, larger files,
+additional attachments or full history. Message details and files are fetched
+when requested. HiringPlug indexes subject, the sender's name, participants,
+dates, flag and folder/read state locally and does not store bodies or
 attachment contents in the inbox index.
+
+The page is laid out like Outlook: folders with their unread counts (Deleted
+Items and Junk Email included, sub-folders under their parent), then the
+message list (sender, subject and attachment mark; beside each date, its
+**Flag** and **Move to**), then the reading pane. The command bar above them
+holds **New mail**, then **Delete** (to Deleted Items), **Archive** and **Mark
+as read/unread** as icons named in tooltips; **Reply**, **Reply all** and
+**Forward** sit as icons beside the sender. Opening a message marks it read, as Outlook
+does.
 
 For a CV attachment, choose **Save CV**, select the right candidate and confirm
 **Save to CV & files**. **Save CV** is offered for files within the upload limit

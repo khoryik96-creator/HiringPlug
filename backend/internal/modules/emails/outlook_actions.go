@@ -40,39 +40,15 @@ func outlookFailure(err error, write bool) error {
 	return apperr.New(api.ErrorCodeOUTLOOKUNAVAILABLE, message)
 }
 
-func (s *Service) outlookBody(ctx context.Context, p authz.Principal, id string) (api.OutlookMessageBody, error) {
-	var out api.OutlookMessageBody
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		q := store.New(tx)
-		if err := q.LockMailboxUser(ctx); err != nil {
-			return err
-		}
-		box, row, err := loadOutlookMessage(ctx, q, p.UserID, id)
-		if err != nil {
-			return err
-		}
-		token, err := s.mailboxAccess(ctx, box)
-		if err != nil {
-			return outlookFailure(err, false)
-		}
-		var remote outlookRemoteMessage
-		if err := s.outlookRequest(ctx, token, http.MethodGet, s.outlookMessagePath(row)+"?$select=body", nil, &remote); err != nil {
-			return outlookFailure(err, false)
-		}
-		body := remote.Body.Content
-		if strings.EqualFold(remote.Body.ContentType, "html") {
-			body = TextFromHTML(SanitizeHTML(body))
-		}
-		out.Text = truncate(body, 40000)
-		out.Truncated = out.Text != body
-		return nil
-	})
-	return out, err
-}
-
 func (s *Service) changeOutlook(ctx context.Context, p authz.Principal, id string, in api.OutlookMessageChange) error {
-	if (in.IsRead == nil) == (in.FolderId == nil) {
-		return apperr.Validation(apperr.FieldErrors{{Field: "message", Message: "choose a read-status change or a destination folder"}})
+	changes := 0
+	for _, set := range []bool{in.IsRead != nil, in.FolderId != nil, in.Flagged != nil} {
+		if set {
+			changes++
+		}
+	}
+	if changes != 1 {
+		return apperr.Validation(apperr.FieldErrors{{Field: "message", Message: "choose one change: read status, flag or destination folder"}})
 	}
 	return database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
@@ -89,7 +65,18 @@ func (s *Service) changeOutlook(ctx context.Context, p authz.Principal, id strin
 		}
 		path := s.outlookMessagePath(row)
 		var remote outlookRemoteMessage
-		if in.FolderId == nil {
+		if in.Flagged != nil {
+			status := "notFlagged"
+			if *in.Flagged {
+				status = "flagged"
+			}
+			if err := s.outlookRequest(ctx, token, http.MethodPatch, path, map[string]any{"flag": map[string]string{"flagStatus": status}}, &remote); err != nil {
+				return outlookFailure(err, true)
+			}
+			if err := q.SetOutlookFlag(ctx, store.SetOutlookFlagParams{ID: id, Flagged: *in.Flagged, ChangedAt: remote.LastModifiedDateTime}); err != nil {
+				return err
+			}
+		} else if in.FolderId == nil {
 			if err := s.outlookRequest(ctx, token, http.MethodPatch, path, map[string]bool{"isRead": *in.IsRead}, &remote); err != nil {
 				return outlookFailure(err, true)
 			}

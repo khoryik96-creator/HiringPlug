@@ -2052,7 +2052,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an Outlook message as plain text */
+        /** Read an Outlook message, its formatting kept (made safe) and its plain text */
         get: operations["getOutlookMessage"];
         put?: never;
         post?: never;
@@ -7220,8 +7220,11 @@ export interface components {
         OutlookMailFolder: {
             id: string;
             name: string;
+            /** @description inbox, sentitems, drafts, deleteditems, junkemail, archive, or empty for the person's own folders. */
             kind: string;
             parentId: string | null;
+            /** @description Unread messages among those synced (the last 90 days). */
+            unread: number;
         };
         OutlookMessage: {
             id: string;
@@ -7236,6 +7239,9 @@ export interface components {
             isDraft: boolean;
             hasAttachments: boolean;
             webUrl: string | null;
+            /** @description The sender's display name (empty when Outlook gave none). */
+            senderName: string;
+            flagged: boolean;
         };
         OutlookMailPage: {
             connected: boolean;
@@ -7274,6 +7280,21 @@ export interface components {
         OutlookMessageBody: {
             text: string;
             truncated: boolean;
+            /** @description The message's formatting, made safe to show (no scripts, forms or frames). Pictures sent with it are included; pictures from the web are held back as data-hp-src until shown. Null for a plain-text message. */
+            html: string | null;
+            /** @description How many pictures from the web are held back (shown only when the person asks). */
+            blockedImages: number;
+            from: components["schemas"]["OutlookPerson"] | null;
+            to: components["schemas"]["OutlookPerson"][];
+            cc: components["schemas"]["OutlookPerson"][];
+            /** Format: date-time */
+            sentAt: string | null;
+            /** @enum {string} */
+            importance: "low" | "normal" | "high";
+        };
+        OutlookPerson: {
+            name: string;
+            address: string;
         };
         OutlookAttachmentList: {
             items: components["schemas"]["OutlookAttachment"][];
@@ -7289,8 +7310,10 @@ export interface components {
             /** @description Downloadable and within the upload limit for a candidate's CV & files. */
             savable: boolean;
         };
+        /** @description One change at a time - read status, flag or folder. */
         OutlookMessageChange: {
             isRead?: boolean;
+            flagged?: boolean;
             folderId?: string;
         };
         OutlookReplyInput: {

@@ -1,16 +1,36 @@
+// The reading pane, as Outlook lays it out: the subject, then who it is from
+// (picture, name and address), to and copied, and when, with Reply, Reply
+// all and Forward as icons beside them; the attachments; then the message itself, in
+// its own formatting.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { formatWhen } from "../../labels";
-import { ArchiveIcon, ConversationIcon, ForwardIcon, IconActions, IconButton, IconLink, MailCheckIcon, MailIcon, MoveFolderIcon, OutlookIcon, ReplyAllIcon, ReplyIcon } from "../ActionIcons";
+import { ConversationIcon, FlagIcon, ForwardIcon, IconButton, MoreIcon, OutlookIcon, ReplyAllIcon, ReplyIcon } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 import { OutlookAttachments } from "./OutlookAttachments";
 import { OutlookForward } from "./OutlookForward";
+import { OutlookMessageFrame } from "./OutlookMessageFrame";
 import type { OutlookProfile } from "./OutlookProfileMail";
 
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
+type Person = Schemas["OutlookPerson"];
+
+/** "NA" for Natasha Leander's "Leander Natasha"; the address's first letters when there is no name. */
+export function initials(name: string, address: string): string {
+  const words = (name || address.split("@")[0] || "?").replace(/[^\p{L}\p{N} ._-]/gu, " ").split(/[\s._-]+/).filter(Boolean);
+  return ((words[0]?.[0] ?? "?") + (words.length > 1 ? words[words.length - 1]?.[0] ?? "" : "")).toUpperCase();
+}
+
+const people = (list: Person[]) => list.map((p) => p.name || p.address).join("; ");
+
+function hue(s: string): number {
+  let h = 0;
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return h;
+}
 
 export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, canImportCv, onThread, onOpenDraft }: {
   message: Message;
@@ -25,22 +45,14 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
   const client = useQueryClient();
   const [reply, setReply] = useState("");
   const [mode, setMode] = useState<"reply" | "replyAll" | "forward" | null>(null);
-  const [destination, setDestination] = useState("");
   const [notice, setNotice] = useState("");
   const draftsReady = folders.some((folder) => folder.kind === "drafts");
-  const path = { messageId: message.id };
-  const params = { path };
+  const params = { path: { messageId: message.id } };
   const body = useQuery({
     queryKey: ["outlook", "body", message.id],
     queryFn: async () => unwrap(await api.GET("/v1/outlook/messages/{messageId}", { params })),
     gcTime: 0,
     retry: false,
-  });
-  const change = useMutation({
-    mutationFn: async (value: Schemas["OutlookMessageChange"]) => {
-      unwrap(await api.PATCH("/v1/outlook/messages/{messageId}", { params, body: value }));
-    },
-    onSuccess: async () => { setDestination(""); await client.invalidateQueries({ queryKey: ["outlook", "list"] }); },
   });
   const send = useMutation({
     mutationFn: async (saveDraft: boolean) => {
@@ -68,6 +80,7 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
     }
     draftReply.mutate(replyAll, { onSuccess: (draft) => { onOpenDraft(draft.messageId, true); } });
   };
+  const forward = () => { setMode("forward"); setNotice(""); };
   const link = useMutation({
     mutationFn: async (remove: boolean) => {
       if (remove) {
@@ -83,50 +96,63 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
       await client.invalidateQueries({ queryKey: ["outlook", "list"] });
     },
   });
-  const archive = folders.find((folder) => folder.kind === "archive");
+
+  const b = body.data;
+  const from: Person = b?.from ?? { name: message.senderName, address: message.sender };
+  const to = b?.to ?? [];
+  const cc = b?.cc ?? [];
+  const responding = mode !== null || draftReply.isPending;
   return <section className="outlook-reading" aria-label="Outlook message">
-    <h3>{message.subject || "(No subject)"}</h3>
-    <p className="outlook-envelope"><strong>{message.sender || "Draft"}</strong> · {formatWhen(message.receivedAt)}</p>
-    <div className="outlook-actions">
-      <IconActions label="Message actions">
-        <IconButton label="Conversation" icon={<ConversationIcon />} onClick={onThread} />
-        {message.webUrl && <IconLink label="Open in Outlook" icon={<OutlookIcon />} href={message.webUrl} external />}
-        <IconButton label={message.isRead ? "Mark unread" : "Mark read"} icon={message.isRead ? <MailIcon /> : <MailCheckIcon />}
-          disabled={change.isPending} onClick={() => { change.mutate({ isRead: !message.isRead }); }} />
-        {archive && archive.id !== message.folderId && <IconButton label="Archive" icon={<ArchiveIcon />} disabled={change.isPending}
-          onClick={() => { change.mutate({ folderId: archive.id }); }} />}
-      </IconActions>
+    <h3 className="outlook-reading-subject">
+      {b?.importance === "high" && <span className="outlook-important" title="High importance" aria-label="High importance">!</span>}
+      {message.subject || "(No subject)"}
+      {message.flagged && <span className="outlook-flag-mark" title="Flagged" aria-label="Flagged"><FlagIcon /></span>}
+    </h3>
+    <div className="outlook-header">
+      <span className="outlook-avatar" aria-hidden="true" style={{ background: `hsl(${String(hue(from.address || from.name))} 45% 42%)` }}>
+        {initials(from.name, from.address)}
+      </span>
+      <div className="outlook-people">
+        <div className="outlook-from-line">
+          <strong>{from.name || from.address || "Draft"}</strong>
+          {from.name && from.address && <span className="muted"> &lt;{from.address}&gt;</span>}
+        </div>
+        {to.length > 0 && <div className="outlook-to-line"><span className="muted">To: </span>{people(to)}</div>}
+        {cc.length > 0 && <div className="outlook-to-line"><span className="muted">Cc: </span>{people(cc)}</div>}
+        <div className="outlook-date muted">{formatWhen(b?.sentAt ?? message.receivedAt)}</div>
+      </div>
+      {!message.isDraft && (
+        <div className="outlook-respond" role="toolbar" aria-label="Respond">
+          <IconButton label="Reply" icon={<ReplyIcon />} disabled={responding} onClick={() => { startReply(false); }} />
+          <IconButton label="Reply all" icon={<ReplyAllIcon />} disabled={responding} onClick={() => { startReply(true); }} />
+          {draftsReady && <IconButton label="Forward" icon={<ForwardIcon />} disabled={responding} onClick={forward} />}
+          <details className="outlook-more">
+            <summary className="icon-action" aria-label="More actions" data-tip="More actions"><MoreIcon /></summary>
+            <div className="outlook-move-menu" role="menu" aria-label="More actions">
+              <button type="button" role="menuitem" onClick={onThread}><ConversationIcon /> Show the conversation</button>
+              {message.webUrl && <a role="menuitem" href={message.webUrl} target="_blank" rel="noreferrer noopener"><OutlookIcon /> Open in Outlook</a>}
+            </div>
+          </details>
+        </div>
+      )}
     </div>
-    <div className="row outlook-actions">
-      <select aria-label="Destination folder" value={destination} onChange={(e) => { setDestination(e.target.value); }}>
-        <option value="">Move to…</option>
-        {folders.filter((folder) => folder.id !== message.folderId).map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-      </select>
-      <IconButton label="Move" icon={<MoveFolderIcon />} disabled={!destination || change.isPending}
-        onClick={() => { change.mutate({ folderId: destination }); }} />
-      {profile && <>
-        {linked
-          ? <button type="button" disabled={link.isPending} onClick={() => { link.mutate(true); }}>Unlink from profile</button>
-          : <button type="button" disabled={link.isPending} onClick={() => { link.mutate(false); }}>Link to {profile.candidateId ? "candidate" : "contact"}</button>}
-      </>}
-    </div>
-    <ErrorMessage error={body.error ?? change.error ?? send.error ?? draftReply.error ?? link.error}/>
+    {profile && <div className="row outlook-profile-link">
+      {linked
+        ? <button type="button" className="link" disabled={link.isPending} onClick={() => { link.mutate(true); }}>Unlink from profile</button>
+        : <button type="button" className="link" disabled={link.isPending} onClick={() => { link.mutate(false); }}>Link to {profile.candidateId ? "candidate" : "contact"}</button>}
+    </div>}
+    <ErrorMessage error={body.error ?? send.error ?? draftReply.error ?? link.error}/>
     {notice && <p role="status">{notice}</p>}
-    {body.isPending && <p className="muted">Opening message…</p>}
     {draftReply.isPending && <p className="muted" role="status">Opening reply…</p>}
-    {body.data && <p className="outlook-body">{body.data.text}</p>}
-    {body.data?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
     {/* The candidate is suggested only for their own linked mail, never for any message read from their page. */}
     {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id}
       canSaveCv={canSaveCv} canImportCv={canImportCv} candidateId={linked ? profile?.candidateId : undefined} />}
-    {!message.isDraft && mode === null && <div className="outlook-response-actions">
-      <IconActions label="Message responses">
-        <IconButton label="Reply" icon={<ReplyIcon />} disabled={draftReply.isPending} onClick={() => { startReply(false); }} />
-        <IconButton label="Reply all" icon={<ReplyAllIcon />} disabled={draftReply.isPending} onClick={() => { startReply(true); }} />
-        {draftsReady && <IconButton label="Forward" icon={<ForwardIcon />} disabled={draftReply.isPending}
-          onClick={() => { setMode("forward"); setNotice(""); }} />}
-      </IconActions>
-    </div>}
+    {body.isPending && <p className="muted">Opening message…</p>}
+    {b?.html
+      ? <OutlookMessageFrame key={message.id} html={b.html} blockedImages={b.blockedImages} title={`Message: ${message.subject || "(No subject)"}`}
+        holdPictures={folders.find((f) => f.id === message.folderId)?.kind === "junkemail"} />
+      : b && <div className="outlook-body">{b.text}</div>}
+    {b?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
     {mode === "forward" && <OutlookForward messageId={message.id} onOpen={onOpenDraft} onClose={() => { setMode(null); }} />}
     {(mode === "reply" || mode === "replyAll") && <form className="outlook-reply" onSubmit={(e) => { e.preventDefault(); send.mutate(false); }}>
       <label className="field">{mode === "replyAll" ? "Reply to all recipients" : "Reply to sender"}

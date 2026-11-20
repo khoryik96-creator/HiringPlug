@@ -155,14 +155,14 @@ func (q *Queries) FinishOutlookSend(ctx context.Context, arg FinishOutlookSendPa
 }
 
 const listOutlookMessages = `-- name: ListOutlookMessages :many
-SELECT m.id, m.mailbox_id, m.tenant_id, m.user_id, m.folder_id, m.remote_id, m.conversation, m.subject, m.sender, m.participants, m.received_at, m.changed_at, m.is_read, m.is_draft, m.has_attachments, m.web_url FROM email_outlook_message m
+SELECT m.id, m.mailbox_id, m.tenant_id, m.user_id, m.folder_id, m.remote_id, m.conversation, m.subject, m.sender, m.participants, m.received_at, m.changed_at, m.is_read, m.is_draft, m.has_attachments, m.web_url, m.sender_name, m.flagged FROM email_outlook_message m
 LEFT JOIN email_outlook_link l ON l.mailbox_id=m.mailbox_id AND l.conversation=m.conversation
 WHERE m.mailbox_id= $1
  AND ($2::text='' OR m.folder_id= $2)
  AND ($3::text='' OR m.conversation= $3)
  AND ($4::text='' OR l.candidate_id= $4)
  AND ($5::text='' OR l.contact_id= $5)
- AND ($6::text='' OR strpos(lower(m.subject),lower($6))>0 OR lower($6)=ANY(m.participants))
+ AND ($6::text='' OR strpos(lower(m.subject),lower($6))>0 OR strpos(lower(m.sender_name),lower($6))>0 OR lower($6)=ANY(m.participants))
 ORDER BY m.received_at DESC,m.id DESC LIMIT 51 OFFSET $7::integer
 `
 
@@ -210,6 +210,8 @@ func (q *Queries) ListOutlookMessages(ctx context.Context, arg ListOutlookMessag
 			&i.IsDraft,
 			&i.HasAttachments,
 			&i.WebUrl,
+			&i.SenderName,
+			&i.Flagged,
 		); err != nil {
 			return nil, err
 		}
@@ -310,7 +312,7 @@ func (q *Queries) OutlookActiveSend(ctx context.Context, arg OutlookActiveSendPa
 }
 
 const outlookByRemoteID = `-- name: OutlookByRemoteID :one
-SELECT id, mailbox_id, tenant_id, user_id, folder_id, remote_id, conversation, subject, sender, participants, received_at, changed_at, is_read, is_draft, has_attachments, web_url FROM email_outlook_message WHERE mailbox_id = $1 AND remote_id = $2
+SELECT id, mailbox_id, tenant_id, user_id, folder_id, remote_id, conversation, subject, sender, participants, received_at, changed_at, is_read, is_draft, has_attachments, web_url, sender_name, flagged FROM email_outlook_message WHERE mailbox_id = $1 AND remote_id = $2
 `
 
 type OutlookByRemoteIDParams struct {
@@ -338,6 +340,8 @@ func (q *Queries) OutlookByRemoteID(ctx context.Context, arg OutlookByRemoteIDPa
 		&i.IsDraft,
 		&i.HasAttachments,
 		&i.WebUrl,
+		&i.SenderName,
+		&i.Flagged,
 	)
 	return i, err
 }
@@ -368,9 +372,10 @@ func (q *Queries) OutlookDraftFolder(ctx context.Context, mailboxID string) (Ema
 const outlookDueFolders = `-- name: OutlookDueFolders :many
 SELECT id, mailbox_id, tenant_id, user_id, remote_id, name, kind, parent_id, cursor_url, complete, checked_at FROM email_outlook_folder WHERE mailbox_id= $1
   AND (checked_at IS NULL OR checked_at < now() - CASE WHEN complete THEN interval '2 minutes' ELSE interval '15 seconds' END)
-ORDER BY checked_at NULLS FIRST,id LIMIT 4
+ORDER BY checked_at NULLS FIRST,CASE kind WHEN 'inbox' THEN 0 WHEN 'drafts' THEN 1 WHEN 'sentitems' THEN 2 WHEN 'archive' THEN 3 WHEN 'deleteditems' THEN 4 WHEN 'junkemail' THEN 5 ELSE 6 END,id LIMIT 4
 `
 
+// Unchecked folders first; among them Outlook's own, the Inbox first.
 func (q *Queries) OutlookDueFolders(ctx context.Context, mailboxID string) ([]EmailOutlookFolder, error) {
 	rows, err := q.db.Query(ctx, outlookDueFolders, mailboxID)
 	if err != nil {
@@ -432,7 +437,8 @@ func (q *Queries) OutlookFolder(ctx context.Context, arg OutlookFolderParams) (E
 }
 
 const outlookFolders = `-- name: OutlookFolders :many
-SELECT id, mailbox_id, tenant_id, user_id, remote_id, name, kind, parent_id, cursor_url, complete, checked_at FROM email_outlook_folder WHERE mailbox_id= $1 ORDER BY CASE kind WHEN 'inbox' THEN 0 WHEN 'sentitems' THEN 1 WHEN 'drafts' THEN 2 WHEN 'archive' THEN 3 ELSE 4 END,name,id
+SELECT id, mailbox_id, tenant_id, user_id, remote_id, name, kind, parent_id, cursor_url, complete, checked_at FROM email_outlook_folder WHERE mailbox_id= $1
+ORDER BY CASE kind WHEN 'inbox' THEN 0 WHEN 'drafts' THEN 1 WHEN 'sentitems' THEN 2 WHEN 'deleteditems' THEN 3 WHEN 'archive' THEN 4 WHEN 'junkemail' THEN 5 ELSE 6 END,name,id
 `
 
 func (q *Queries) OutlookFolders(ctx context.Context, mailboxID string) ([]EmailOutlookFolder, error) {
@@ -491,7 +497,7 @@ func (q *Queries) OutlookLink(ctx context.Context, arg OutlookLinkParams) (Email
 }
 
 const outlookMessage = `-- name: OutlookMessage :one
-SELECT id, mailbox_id, tenant_id, user_id, folder_id, remote_id, conversation, subject, sender, participants, received_at, changed_at, is_read, is_draft, has_attachments, web_url FROM email_outlook_message WHERE id= $1 AND mailbox_id= $2
+SELECT id, mailbox_id, tenant_id, user_id, folder_id, remote_id, conversation, subject, sender, participants, received_at, changed_at, is_read, is_draft, has_attachments, web_url, sender_name, flagged FROM email_outlook_message WHERE id= $1 AND mailbox_id= $2
 `
 
 type OutlookMessageParams struct {
@@ -519,6 +525,8 @@ func (q *Queries) OutlookMessage(ctx context.Context, arg OutlookMessageParams) 
 		&i.IsDraft,
 		&i.HasAttachments,
 		&i.WebUrl,
+		&i.SenderName,
+		&i.Flagged,
 	)
 	return i, err
 }
@@ -660,6 +668,36 @@ func (q *Queries) OutlookThreadHasAddress(ctx context.Context, arg OutlookThread
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const outlookUnreadCounts = `-- name: OutlookUnreadCounts :many
+SELECT folder_id, count(*)::int AS unread FROM email_outlook_message
+WHERE mailbox_id= $1 AND NOT is_read AND NOT is_draft GROUP BY folder_id
+`
+
+type OutlookUnreadCountsRow struct {
+	FolderID string
+	Unread   int32
+}
+
+func (q *Queries) OutlookUnreadCounts(ctx context.Context, mailboxID string) ([]OutlookUnreadCountsRow, error) {
+	rows, err := q.db.Query(ctx, outlookUnreadCounts, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OutlookUnreadCountsRow
+	for rows.Next() {
+		var i OutlookUnreadCountsRow
+		if err := rows.Scan(&i.FolderID, &i.Unread); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const removeMissingOutlookFolders = `-- name: RemoveMissingOutlookFolders :exec
@@ -923,11 +961,12 @@ func (q *Queries) SaveOutlookLink(ctx context.Context, arg SaveOutlookLinkParams
 }
 
 const saveOutlookMessage = `-- name: SaveOutlookMessage :exec
-INSERT INTO email_outlook_message(mailbox_id,folder_id,remote_id,conversation,subject,sender,participants,received_at,changed_at,is_read,is_draft,has_attachments,web_url)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+INSERT INTO email_outlook_message(mailbox_id,folder_id,remote_id,conversation,subject,sender,participants,received_at,changed_at,is_read,is_draft,has_attachments,web_url,sender_name,flagged)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 ON CONFLICT(mailbox_id,remote_id) DO UPDATE SET folder_id=excluded.folder_id,conversation=excluded.conversation,subject=excluded.subject,sender=excluded.sender,
 participants=excluded.participants,received_at=excluded.received_at,changed_at=excluded.changed_at,
-is_read=excluded.is_read,is_draft=excluded.is_draft,has_attachments=excluded.has_attachments,web_url=excluded.web_url
+is_read=excluded.is_read,is_draft=excluded.is_draft,has_attachments=excluded.has_attachments,web_url=excluded.web_url,
+sender_name=excluded.sender_name,flagged=excluded.flagged
 WHERE email_outlook_message.changed_at<=excluded.changed_at
 `
 
@@ -945,6 +984,8 @@ type SaveOutlookMessageParams struct {
 	IsDraft        bool
 	HasAttachments bool
 	WebUrl         *string
+	SenderName     string
+	Flagged        bool
 }
 
 func (q *Queries) SaveOutlookMessage(ctx context.Context, arg SaveOutlookMessageParams) error {
@@ -962,7 +1003,24 @@ func (q *Queries) SaveOutlookMessage(ctx context.Context, arg SaveOutlookMessage
 		arg.IsDraft,
 		arg.HasAttachments,
 		arg.WebUrl,
+		arg.SenderName,
+		arg.Flagged,
 	)
+	return err
+}
+
+const setOutlookFlag = `-- name: SetOutlookFlag :exec
+UPDATE email_outlook_message SET flagged= $1,changed_at=GREATEST(changed_at,$2) WHERE id= $3
+`
+
+type SetOutlookFlagParams struct {
+	Flagged   bool
+	ChangedAt time.Time
+	ID        string
+}
+
+func (q *Queries) SetOutlookFlag(ctx context.Context, arg SetOutlookFlagParams) error {
+	_, err := q.db.Exec(ctx, setOutlookFlag, arg.Flagged, arg.ChangedAt, arg.ID)
 	return err
 }
 

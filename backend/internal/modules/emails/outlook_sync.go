@@ -147,7 +147,7 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 			return &outlookGraphError{status: 502}
 		}
 	} else {
-		fields := "id,parentFolderId,conversationId,subject,from,sender,toRecipients,ccRecipients,replyTo,receivedDateTime,createdDateTime,lastModifiedDateTime,isRead,isDraft,hasAttachments,webLink"
+		fields := "id,parentFolderId,conversationId,subject,from,sender,toRecipients,ccRecipients,replyTo,receivedDateTime,createdDateTime,lastModifiedDateTime,isRead,isDraft,hasAttachments,webLink,flag"
 		query := url.Values{"$select": {fields}}
 		if folder.Kind != "drafts" {
 			query.Set("$filter", "receivedDateTime ge "+time.Now().UTC().AddDate(0, 0, -90).Format(time.RFC3339))
@@ -199,7 +199,8 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 		if len(conversation) > 1024 {
 			return &outlookGraphError{status: 502}
 		}
-		if err := q.SaveOutlookMessage(ctx, store.SaveOutlookMessageParams{MailboxID: folder.MailboxID, FolderID: folder.ID, RemoteID: item.ID, Conversation: conversation, Subject: truncate(item.Subject, 300), Sender: truncate(item.sender(), 254), Participants: outlookParticipants(item), ReceivedAt: item.ReceivedDateTime, ChangedAt: item.LastModifiedDateTime, IsRead: item.IsRead, IsDraft: item.IsDraft, HasAttachments: item.HasAttachments, WebUrl: outlookWebLink(item.WebLink)}); err != nil {
+		if err := q.SaveOutlookMessage(ctx, store.SaveOutlookMessageParams{MailboxID: folder.MailboxID, FolderID: folder.ID, RemoteID: item.ID, Conversation: conversation, Subject: truncate(item.Subject, 300), Sender: truncate(item.sender(), 254), Participants: outlookParticipants(item), ReceivedAt: item.ReceivedDateTime, ChangedAt: item.LastModifiedDateTime, IsRead: item.IsRead, IsDraft: item.IsDraft, HasAttachments: item.HasAttachments, WebUrl: outlookWebLink(item.WebLink),
+			SenderName: truncate(strings.TrimSpace(item.senderName()), 300), Flagged: item.Flag.FlagStatus == "flagged"}); err != nil {
 			return err
 		}
 	}
