@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/simpledoc"
 )
 
 func TestAQuestionIsTidiedAndChecked(t *testing.T) {
@@ -84,4 +85,30 @@ func TestTheMaterialIsKeptShort(t *testing.T) {
 	assert.Equal(t, []string{"Clarify the goal", "Name the constraint", "Pick an option", "Say the trade-off", "Close with the result"}, c.SoftSkills[0].Approach)
 	assert.LessOrEqual(t, len([]rune(c.SoftSkills[0].WhyAsked)), 300)
 	assert.Empty(t, c.Technical)
+}
+
+func TestPrepIsLaidOutToReadInAFile(t *testing.T) {
+	focus := "New to banking"
+	p := Prep{Focus: &focus, Content: &api.InterviewPrepContent{Summary: "Expect depth on streaming.", FocusAreas: []string{"Kafka"},
+		SoftSkills: []api.InterviewPrepItem{{Question: "What if the batch is late?", Kind: "What-if", WhyAsked: "Calm under pressure.",
+			Approach: []string{"Say who is affected"}, Phrasing: []string{`"My first call would be to [lead]."`}, TradeOffs: []string{"Speed vs completeness"},
+			Pitfalls: []string{"Jumping to the fix"}, FromInterviews: true}},
+		Technical: []api.InterviewPrepItem{}, QuestionsToAsk: []string{"Who owns data quality?"}}}
+	doc := PrepDoc("Data Engineer", "Maju Bank Berhad", p, time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC))
+	has := func(kind simpledoc.Kind, text string) bool {
+		for _, b := range doc {
+			if b.Kind == kind && b.Text == text {
+				return true
+			}
+		}
+		return false
+	}
+	assert.True(t, has(simpledoc.Title, "Interview prep: Data Engineer"))
+	assert.True(t, has(simpledoc.Muted, "Maju Bank Berhad · 20 Nov 2026 · Focus: New to banking"))
+	assert.True(t, has(simpledoc.Heading, "1. What if the batch is late?"))
+	assert.True(t, has(simpledoc.Muted, "What-if · Asked at this job's interviews"))
+	assert.True(t, has(simpledoc.Quote, "“My first call would be to [lead].”"), "example lines set apart, quoted once")
+	assert.True(t, has(simpledoc.Label, "Avoid"))
+	assert.False(t, has(simpledoc.Section, "Technical"), "no empty section")
+	assert.True(t, has(simpledoc.Section, "Questions to ask them"))
 }

@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
+import { downloadFrom } from "../../api/files";
 import { formatWhen } from "../../labels";
 import { ArchiveIcon, IconButton, RefreshIcon } from "../ActionIcons";
 import { copyText } from "../CopyButton";
@@ -17,6 +18,7 @@ type Content = Schemas["InterviewPrepContent"];
 type Item = Schemas["InterviewPrepItem"];
 
 const prepsKey = (jobId: string) => ["interview-preps", jobId] as const;
+const FILE_TYPES = { docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdf: "application/pdf" } as const;
 
 /** The material as plain text, to paste in an email or a note. */
 export function prepText(title: string, c: Content): string {
@@ -101,6 +103,12 @@ function PrepCard({ jobId, jobTitle, prep, canManage, open = false }: { jobId: s
     mutationFn: async () => unwrap(await api.PATCH("/v1/interview-preps/{prepId}", { params: { path: { prepId: prep.id } }, body: { archived: !prep.archived } })),
     onSuccess: () => client.invalidateQueries({ queryKey: prepsKey(jobId) }),
   });
+  const [exportError, setExportError] = useState<unknown>(null);
+  const exportAs = (format: keyof typeof FILE_TYPES) => {
+    setExportError(null);
+    downloadFrom(`/v1/interview-preps/${prep.id}/export?format=${format}`, `Interview prep - ${jobTitle}.${format}`, FILE_TYPES[format])
+      .catch((e: unknown) => { setExportError(e); });
+  };
   const c = prep.content;
   const head = (
     <span className="prep-head">
@@ -119,6 +127,11 @@ function PrepCard({ jobId, jobTitle, prep, canManage, open = false }: { jobId: s
       {c && (
         <div className="prep-body">
           <div className="row prep-tools">
+            <span className="prep-export" role="group" aria-label="Export">
+              <span className="muted small">Export</span>
+              <button type="button" onClick={() => { exportAs("docx"); }}>Word</button>
+              <button type="button" onClick={() => { exportAs("pdf"); }}>PDF</button>
+            </span>
             <button type="button" onClick={() => { void copyText(prepText(jobTitle, c)).then((ok) => { if (ok) setCopied(true); }); }}>
               {copied ? "Copied" : "Copy as text"}
             </button>
@@ -139,7 +152,7 @@ function PrepCard({ jobId, jobTitle, prep, canManage, open = false }: { jobId: s
         <IconButton label={prep.archived ? "Bring back this prep" : "Archive this prep"} tip={prep.archived ? "Bring back" : "Archive"}
           icon={prep.archived ? <RefreshIcon /> : <ArchiveIcon />} disabled={archive.isPending} onClick={() => { archive.mutate(); }} />
       )}
-      <ErrorMessage error={archive.error} />
+      <ErrorMessage error={archive.error ?? exportError} />
     </details>
   );
 }

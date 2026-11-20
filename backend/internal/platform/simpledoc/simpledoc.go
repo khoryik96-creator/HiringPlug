@@ -27,6 +27,12 @@ const (
 	// one table, its header row (bold, shaded) first.
 	HeaderRow
 	Row
+	// Section is a part of a long document (a heading above Headings).
+	Section
+	// Label is a small coloured caption over a few lines ("HOW TO APPROACH").
+	Label
+	// Quote is an example line, set apart: indented on a shaded band.
+	Quote
 )
 
 // Block is one part of a document.
@@ -110,6 +116,16 @@ func (d Doc) Docx() ([]byte, error) {
 			body.WriteString(`<w:p><w:pPr><w:spacing w:after="240"/></w:pPr>` + run(b.Text, `<w:rPr><w:color w:val="6B7280"/><w:sz w:val="20"/></w:rPr>`) + `</w:p>`)
 		case Heading:
 			body.WriteString(`<w:p><w:pPr><w:spacing w:before="240" w:after="80"/></w:pPr>` + run(b.Text, `<w:rPr><w:b/><w:sz w:val="26"/></w:rPr>`) + `</w:p>`)
+		case Section:
+			body.WriteString(`<w:p><w:pPr><w:spacing w:before="360" w:after="120"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="4" w:color="D0C7E8"/></w:pBdr></w:pPr>` +
+				run(b.Text, `<w:rPr><w:b/><w:color w:val="5D3DC2"/><w:sz w:val="30"/></w:rPr>`) + `</w:p>`)
+		case Label:
+			body.WriteString(`<w:p><w:pPr><w:keepNext/><w:spacing w:before="120" w:after="40"/></w:pPr>` +
+				run(b.Text, `<w:rPr><w:b/><w:caps/><w:color w:val="5D3DC2"/><w:sz w:val="17"/></w:rPr>`) + `</w:p>`)
+		case Quote:
+			body.WriteString(`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="18" w:space="8" w:color="7352D8"/></w:pBdr>` +
+				`<w:shd w:val="clear" w:color="auto" w:fill="EDE7FC"/><w:ind w:left="300"/><w:spacing w:after="80"/></w:pPr>` +
+				run(b.Text, `<w:rPr><w:i/></w:rPr>`) + `</w:p>`)
 		case Bullet:
 			body.WriteString(`<w:p><w:pPr><w:ind w:left="360" w:hanging="360"/><w:spacing w:after="60"/></w:pPr>` + run("•\t"+b.Text, "") + `</w:p>`)
 		default:
@@ -140,6 +156,16 @@ func (d Doc) Docx() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// keepWithNext starts a new page when less than room (mm) is left, so a
+// heading or label never sits alone at the foot of a page.
+func keepWithNext(pdf *fpdf.Fpdf, room float64) {
+	_, pageHeight := pdf.GetPageSize()
+	_, _, _, bottom := pdf.GetMargins()
+	if pdf.GetY()+room > pageHeight-bottom {
+		pdf.AddPage()
+	}
 }
 
 // tableStart opens a full-width table with borders and n columns, the
@@ -259,10 +285,44 @@ func (d Doc) PDF() ([]byte, error) {
 			pdf.MultiCell(0, 5, tr(b.Text), "", "L", false)
 			pdf.Ln(5)
 		case Heading:
+			keepWithNext(pdf, 22)
 			pdf.SetFont("Helvetica", "B", 12)
 			pdf.SetTextColor(17, 24, 39)
 			pdf.Ln(2)
 			pdf.MultiCell(0, 6, tr(b.Text), "", "L", false)
+		case Section:
+			keepWithNext(pdf, 30)
+			pdf.Ln(4)
+			pdf.SetFont("Helvetica", "B", 14)
+			pdf.SetTextColor(93, 61, 194)
+			dr, dg, db := pdf.GetDrawColor()
+			pdf.SetDrawColor(208, 199, 232)
+			pdf.MultiCell(0, 7, tr(b.Text), "B", "L", false)
+			pdf.SetDrawColor(dr, dg, db)
+			pdf.Ln(3)
+		case Label:
+			keepWithNext(pdf, 18)
+			pdf.Ln(1)
+			pdf.SetFont("Helvetica", "B", 8.5)
+			pdf.SetTextColor(93, 61, 194)
+			pdf.MultiCell(0, 4.5, tr(strings.ToUpper(b.Text)), "", "L", false)
+		case Quote:
+			left, _, _, _ := pdf.GetMargins()
+			pdf.SetFont("Helvetica", "I", 11)
+			pdf.SetTextColor(29, 21, 48)
+			fr, fg, fb := pdf.GetFillColor()
+			dr, dg, db := pdf.GetDrawColor()
+			pdf.SetFillColor(237, 231, 252)
+			pdf.SetDrawColor(115, 82, 216)
+			pdf.SetLineWidth(0.8)
+			y := pdf.GetY()
+			pdf.SetX(left + 3)
+			pdf.MultiCell(0, 5.5, tr(b.Text), "", "L", true)
+			pdf.Line(left+2, y, left+2, pdf.GetY())
+			pdf.SetLineWidth(0.2)
+			pdf.SetFillColor(fr, fg, fb)
+			pdf.SetDrawColor(dr, dg, db)
+			pdf.Ln(1.5)
 		case Bullet:
 			pdf.SetFont("Helvetica", "", 11)
 			pdf.SetTextColor(31, 41, 55)

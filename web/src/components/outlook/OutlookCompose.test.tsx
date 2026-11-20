@@ -130,6 +130,34 @@ describe("candidate details in an Outlook message", () => {
     expect(message.innerHTML.indexOf("Safwat Ahmad"), "above the signature").toBeLessThan(message.innerHTML.indexOf("Nadia Aziz"));
   });
 
+  it("attaches a candidate's CV from their row in the candidate details", async () => {
+    const draft = { messageId: "omg_cv", version: "created", subject: "", body: "", to: [], cc: [], bcc: [], hasAttachments: false,
+      bodyTruncated: false, schedule: null, scheduleNeedsReview: false, webUrl: null };
+    vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+      path === "/v1/email-signature" ? ok({ bodyHtml: "", version: 0, updatedAt: null })
+        : path === "/v1/email-templates" ? ok({ items: [], fields })
+          : path === "/v1/candidates/{candidateId}/documents" ? ok({ items: [{ id: "doc_cv", fileName: "Safwat Ahmad CV.pdf", contentType: "application/pdf" }] })
+            : ok({ items: [], more: false })));
+    vi.spyOn(api, "POST").mockImplementation((path) => Promise.resolve(path === "/v1/outlook/drafts" ? ok(draft)
+      : ok({ subject: "", bodyHtml: "", missing: [], salary: false, fieldValues: { "[Full name]": "Safwat Ahmad" } })));
+    const fetched = vi.fn<(url: string, options?: RequestInit) => Promise<Response>>().mockImplementation((url) => Promise.resolve(
+      url === "/v1/documents/doc_cv/file" ? new Response("%PDF-cv", { status: 200 })
+        : new Response(JSON.stringify({ ...draft, hasAttachments: true, version: "attached" }))));
+    vi.stubGlobal("fetch", fetched);
+    renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} about={{ candidateId: "cand_safwat" }}
+      permissions={["candidates:read", "documents:read"]} />);
+    const panel = screen.getByRole("group", { name: "Candidates" });
+    expect(screen.getByText(/Candidate details & CVs/)).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Attach CV" }), "not in the toolbar any more").toBeNull();
+    const pick = await within(panel).findByRole("combobox", { name: /Attach a CV of/ });
+    fireEvent.change(pick, { target: { value: "doc_cv" } });
+    await waitFor(() => { expect(fetched.mock.calls.map((c) => c[0])).toContain("/v1/outlook/drafts/omg_cv/attachments?version=created"); });
+    const upload = fetched.mock.calls.find((c) => c[0].startsWith("/v1/outlook/drafts/"));
+    expect(upload?.[1]?.body instanceof FormData && (upload[1].body.get("file") as File).name).toBe("Safwat Ahmad CV.pdf");
+    expect(await within(panel).findByText("Attached Safwat Ahmad CV.pdf")).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
   it("leaves salary out for a role that may not see salaries", () => {
     window.localStorage.removeItem("hiringplug.shortlist.details");
     serve("");

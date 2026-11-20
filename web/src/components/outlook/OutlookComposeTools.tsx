@@ -1,13 +1,12 @@
 // HiringPlug's email tools in the Outlook Mail editor (new mail, reply,
 // reply all, forward): templates (use, save, save as new, delete), a
 // candidate whose details fill fields such as [Expected salary], banners,
-// the person's signature, and a candidate's CV to attach.
+// the person's signature (candidates' CVs are attached from their details).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type Permission, unwrap } from "../../api/client";
 import { emailTemplatesKey } from "../../api/keys";
-import { getToken } from "../../auth";
 import { ErrorMessage } from "../ErrorMessage";
 import { plainToHtml, valuesToTokens } from "../clientEmail/richText";
 import { useBanners } from "../clientEmail/useBanners";
@@ -38,10 +37,10 @@ export function useComposeData(about: ComposeContext) {
 
 type Data = ReturnType<typeof useComposeData>;
 
-export function OutlookComposeTools({ data, html, subject, permissions, candidate, onCandidate, onInsert, onSubject, onSignature, onAttach, disabled }: {
+export function OutlookComposeTools({ data, html, subject, permissions, candidate, onCandidate, onInsert, onSubject, onSignature, disabled }: {
   data: Data; html: string; subject: string; permissions: Permission[];
   candidate: { id: string; name: string } | null; onCandidate: (c: { id: string; name: string } | null) => void;
-  onInsert: (html: string) => void; onSubject: (subject: string) => void; onSignature: () => void; onAttach: (file: File) => void;
+  onInsert: (html: string) => void; onSubject: (subject: string) => void; onSignature: () => void;
   disabled: boolean;
 }) {
   const client = useQueryClient();
@@ -81,7 +80,6 @@ export function OutlookComposeTools({ data, html, subject, permissions, candidat
         {permissions.includes("candidates:read") && <CandidatePicker candidate={candidate} onChange={onCandidate} />}
         <button type="button" disabled={!data.signature} title={data.signature ? undefined : "Write your signature in Settings > Your account"}
           onClick={onSignature}>Insert signature</button>
-        {candidate && permissions.includes("documents:read") && <AttachCv candidateId={candidate.id} onAttach={onAttach} />}
       </div>
       {canCreate && (
         <details className="outlook-template-save">
@@ -127,31 +125,6 @@ function CandidatePicker({ candidate, onChange }: { candidate: { id: string; nam
       )}
     </span>
   );
-}
-
-function AttachCv({ candidateId, onAttach }: { candidateId: string; onAttach: (file: File) => void }) {
-  const docs = useQuery({
-    queryKey: ["documents", candidateId],
-    queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
-  });
-  const select = useRef<HTMLSelectElement>(null);
-  const fetchFile = useMutation({
-    mutationFn: async (id: string) => {
-      const doc = docs.data?.find((d) => d.id === id);
-      const res = await fetch(`/v1/documents/${id}/file`, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
-      if (!res.ok || !doc) throw new Error("The CV could not be fetched.");
-      return new File([await res.blob()], doc.fileName, { type: doc.contentType });
-    },
-    onSuccess: (file) => { onAttach(file); if (select.current) select.current.value = ""; },
-  });
-  if (!docs.data?.length) return null;
-  return <>
-    <select ref={select} aria-label="Attach CV" defaultValue="" disabled={fetchFile.isPending} onChange={(e) => { if (e.target.value) fetchFile.mutate(e.target.value); }}>
-      <option value="">{fetchFile.isPending ? "Attaching…" : "Attach CV…"}</option>
-      {docs.data.map((d) => <option key={d.id} value={d.id}>{d.fileName}</option>)}
-    </select>
-    <ErrorMessage error={fetchFile.error} />
-  </>;
 }
 
 /** Fields still in brackets (no value for this candidate, or none chosen): the person fills them in or takes them out. */

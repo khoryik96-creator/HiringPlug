@@ -26,7 +26,8 @@
 .prep-card > p { margin: .6rem .8rem; }
 .prep-card > .icon-action { margin: 0 .8rem .6rem; }
 .prep-body { padding: .6rem .9rem .9rem; }
-.prep-tools { justify-content: flex-end; }
+.prep-tools { justify-content: flex-end; gap: .5rem; }
+.prep-export { display: inline-flex; align-items: center; gap: .35rem; margin-right: auto; }
 .prep-summary { font-size: 1rem; color: var(--ink); margin: .4rem 0; }
 .prep-focus { display: flex; flex-wrap: wrap; gap: .35rem; margin: .4rem 0 .8rem; }
 .prep-chip { font-size: .8rem; padding: .15rem .6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent-dark); }

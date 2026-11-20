@@ -24,6 +24,9 @@ x-module:
     INTERVIEW_PREP_TOO_LITTLE:
       status: 409
       description: The job has no description, ad or recorded questions to prepare from.
+    INTERVIEW_PREP_NOT_WRITTEN:
+      status: 409
+      description: The prep material is still being written, or the AI could not write it, so there is nothing to export.
   jobs:
     interview_prep.write:
       queue: ai
@@ -179,6 +182,35 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/interview-preps/{prepId}/export:
+    parameters:
+      - { name: prepId, in: path, required: true, schema: { $ref: '#/components/schemas/InterviewPrepId' } }
+    get:
+      operationId: exportInterviewPrep
+      tags: [interview_prep]
+      summary: The prep material as a Word or PDF file, to send to a candidate
+      x-permission: interview_prep:read
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [docx, pdf] }
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
 components:
   responses:

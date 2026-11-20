@@ -77,3 +77,27 @@ func TestTables(t *testing.T) {
 	assert.True(t, bytes.HasPrefix(pdf, []byte("%PDF-")))
 	assert.Greater(t, bytes.Count(pdf, []byte("/Type /Page\n")), 1, "more than one page")
 }
+
+func TestSectionsLabelsAndQuotes(t *testing.T) {
+	doc := Doc{{Kind: Section, Text: "Soft skills"}, {Kind: Label, Text: "Say it like"}, {Kind: Quote, Text: "My first call would be to [finance lead]."},
+		{Kind: HeaderRow, Cells: []string{"A", "B"}}, {Kind: Row, Cells: []string{"1", "2"}}}
+	data, err := doc.Docx()
+	require.NoError(t, err)
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	require.NoError(t, err)
+	var body string
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			r, err := f.Open()
+			require.NoError(t, err)
+			b, _ := io.ReadAll(r)
+			body = string(b)
+		}
+	}
+	assert.Contains(t, body, `<w:caps/>`, "a label is small capitals")
+	assert.Contains(t, body, `w:fill="EDE7FC"`, "a quote is on a shaded band")
+	assert.Contains(t, body, "[finance lead]")
+	pdf, err := doc.PDF()
+	require.NoError(t, err)
+	assert.True(t, bytes.HasPrefix(pdf, []byte("%PDF-")))
+}

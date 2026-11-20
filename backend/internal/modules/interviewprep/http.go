@@ -1,7 +1,9 @@
 package interviewprep
 
 import (
+	"bytes"
 	"context"
+	"mime"
 	"time"
 
 	"github.com/oapi-codegen/nullable"
@@ -111,6 +113,22 @@ func (h *HTTP) UpdateInterviewPrep(ctx context.Context, req api.UpdateInterviewP
 		return nil, err
 	}
 	return api.UpdateInterviewPrep200JSONResponse(prepToAPI(p)), nil
+}
+
+// ExportInterviewPrep handles GET /v1/interview-preps/{prepId}/export.
+func (h *HTTP) ExportInterviewPrep(ctx context.Context, req api.ExportInterviewPrepRequestObject) (api.ExportInterviewPrepResponseObject, error) {
+	e, err := h.svc.ExportPrep(ctx, authz.MustFromContext(ctx), req.PrepId, string(req.Params.Format))
+	if err != nil {
+		return nil, err
+	}
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": e.FileName})
+	headers := api.ExportInterviewPrep200ResponseHeaders{ContentDisposition: &disposition}
+	if req.Params.Format == api.ExportInterviewPrepParamsFormatPdf {
+		return api.ExportInterviewPrep200ApplicationpdfResponse{Body: bytes.NewReader(e.Data), ContentLength: int64(len(e.Data)), Headers: headers}, nil
+	}
+	return api.ExportInterviewPrep200ApplicationvndOpenxmlformatsOfficedocumentWordprocessingmlDocumentResponse{
+		Body: bytes.NewReader(e.Data), ContentLength: int64(len(e.Data)), Headers: headers,
+	}, nil
 }
 
 func questionToAPI(q Question) api.InterviewQuestion {

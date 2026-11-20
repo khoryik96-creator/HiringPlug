@@ -148,6 +148,18 @@ func TestTheAIWritesInterviewPrepFromTheJobTheClientAndRecordedQuestions(t *test
 	assert.Equal(t, []string{"\"My first call would be…\""}, got.SoftSkills[0].Phrasing)
 	assert.True(t, got.SoftSkills[0].FromInterviews)
 
+	// Exported to send to a candidate: Word or PDF.
+	res = a.request(http.MethodGet, "/v1/interview-preps/"+done.Id+"/export?format=docx", token, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, "PK", string(res.Body[:2]))
+	assert.Contains(t, res.Header.Get("Content-Disposition"), "Interview prep - Data Engineer.docx")
+	res = a.request(http.MethodGet, "/v1/interview-preps/"+done.Id+"/export?format=pdf", token, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, "%PDF", string(res.Body[:4]))
+	other := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/interview-preps/"+done.Id+"/export?format=pdf",
+		other.Users[api.RoleRecruiter].Token, nil).Status, "another company's prep is not there")
+
 	// Archived: kept apart, and brought back.
 	res = a.request(http.MethodPatch, "/v1/interview-preps/"+done.Id, token, map[string]any{"archived": true})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
@@ -160,6 +172,8 @@ func TestTheAIWritesInterviewPrepFromTheJobTheClientAndRecordedQuestions(t *test
 	res = a.request(http.MethodPost, "/v1/jobs/"+job.Id+"/interview-preps", token, map[string]any{})
 	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
 	res.JSON(&prep)
+	assert.Equal(t, api.ErrorCodeINTERVIEWPREPNOTWRITTEN,
+		a.request(http.MethodGet, "/v1/interview-preps/"+prep.Id+"/export?format=docx", token, nil).Error().Error.Code, "nothing to export while it is written")
 	claimed = claimAIJobWhere(t, aiConn, "prepId", prep.Id)
 	answerAIJob(t, a, aiConn, claimed, api.JobKindInterviewPrepWritten, prepWritten(prep.Id, nil, "the AI provider is down"))
 	a.request(http.MethodGet, "/v1/jobs/"+job.Id+"/interview-preps", token, nil).JSON(&list)

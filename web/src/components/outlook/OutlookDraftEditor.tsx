@@ -222,8 +222,9 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
           }}
           onInsert={replaceMessage} onSubject={(s) => { update("subject", s); }}
           onSignature={() => { replaceMessage(withSignature(form.html, tools.signature)); }}
-          onAttach={(file) => { action.mutate({ file }); }} disabled={locked || action.isPending} />}
-        {!draft?.bodyTruncated && permissions.includes("candidates:read") && <OutlookCandidateDetails packages={packages} permissions={permissions} />}
+          disabled={locked || action.isPending} />}
+        {!draft?.bodyTruncated && permissions.includes("candidates:read") && <OutlookCandidateDetails packages={packages} permissions={permissions}
+          onAttach={(file) => { action.mutate({ file }); }} />}
         {draft?.bodyTruncated ? <Field label="Message"><textarea readOnly rows={9} value={draft.body} /></Field> :
           <div className="field">
             <span>Message</span>

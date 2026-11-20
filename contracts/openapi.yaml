@@ -173,6 +173,10 @@ x-error-codes:
     module: interview_prep
     status: 409
     description: Writing prep material needs the AI (an AI provider set up, and this month's allowance not used up).
+  INTERVIEW_PREP_NOT_WRITTEN:
+    module: interview_prep
+    status: 409
+    description: The prep material is still being written, or the AI could not write it, so there is nothing to export.
   INTERVIEW_PREP_TOO_LITTLE:
     module: interview_prep
     status: 409
@@ -5461,6 +5465,34 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/interview-preps/{prepId}/export:
+    parameters:
+      - {name: prepId, in: path, required: true, schema: {$ref: '#/components/schemas/InterviewPrepId'}}
+    get:
+      operationId: exportInterviewPrep
+      tags: [interview_prep]
+      summary: The prep material as a Word or PDF file, to send to a candidate
+      x-permission: interview_prep:read
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema: {type: string, enum: [docx, pdf]}
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/applications/{applicationId}/interviews:
     parameters:
       - $ref: '#/components/parameters/ApplicationIdPath'
@@ -8087,6 +8119,7 @@ components:
         - INTERVIEW_CLASH
         - INTERVIEW_NOT_ALLOWED
         - INTERVIEW_PREP_AI_OFF
+        - INTERVIEW_PREP_NOT_WRITTEN
         - INTERVIEW_PREP_TOO_LITTLE
         - JOB_AD_BLIND_AI_OFF
         - JOB_AD_BLIND_TOO_SHORT

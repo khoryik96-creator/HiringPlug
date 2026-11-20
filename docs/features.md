@@ -1467,7 +1467,9 @@ to see it, `interview_prep:manage` to change it).
   short steps), *say it like* (1 or 2 example lines with [placeholders] for
   the candidate's own story), *trade-offs* and what to *avoid*. Recorded questions are all
   covered and marked **Asked at interview**. It ends with questions the
-  candidate can ask. **Copy as text** gives it plain, to paste to a candidate.
+  candidate can ask. **Export** gives it as a **Word** or **PDF** file to send to
+  a candidate (the same cards, example lines set apart), and **Copy as text**
+  gives it plain, to paste in a message.
   Each prep is kept with the job; the newest finished one stays open (with any
   newer one being written or failed above it), older ones fold under
   **Earlier prep**, and any can be archived. It uses the company's AI allowance like the other AI
@@ -1707,10 +1709,12 @@ pictures from the web load only on **Show pictures**). Browse, search by subject
 archive, move, flag, mark read or unread, and reply in the original thread.
 Replies, forwards and new messages use HiringPlug's email tools: templates
 (use, save, save as new, delete), candidate fields including salary, banners,
-the candidate's CV and your own signature (Settings > Your account), and Send
-later; **Candidate details** puts candidates in as a block each (or one
-table) with the details chosen, salary included for roles that may see
-salaries, as the client email does. The page uses the width of the screen: drag
+your own signature (Settings > Your account), and Send later; **Candidate
+details & CVs** puts candidates in as a block each (or one table) with the
+details chosen, salary included for roles that may see salaries, as the
+client email does, and each candidate's row has **📎 Attach CV…** to attach
+one of their CVs to the message (the candidate chosen for fields is added to
+the list). The page uses the width of the screen: drag
 the bars between the folders, the list and the reading pane, or either side of
 the editor, to resize them (kept in this browser). Download attachments of up to
 20 MiB from the reading pane. **Import CV** imports a CV attachment as a candidate

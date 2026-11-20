@@ -2,7 +2,7 @@
 // attach, their order, more from the job, and their details put in the
 // message as a block each or as a table.
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { jobApplicationsKey } from "../../api/keys";
@@ -86,7 +86,7 @@ const keep = (key: string, value: unknown) => {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* only a convenience */ }
 };
 
-export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSeeSalary = false, allowEmpty = false, attachProfiles = true, onRefresh, onInsert }: {
+export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSeeSalary = false, allowEmpty = false, attachProfiles = true, rowTool, onRefresh, onInsert }: {
   jobId?: string;
   people: Shortlisted[];
   onPeople: (people: Shortlisted[]) => void;
@@ -96,6 +96,8 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
   allowEmpty?: boolean;
   /** false: details only, no profile to attach (the email has its own attachments), and no Refresh link. */
   attachProfiles?: boolean;
+  /** Without profiles to attach: something else on each candidate's row (Outlook: their CV to attach). */
+  rowTool?: (p: Shortlisted, name: string) => ReactNode;
   onRefresh?: () => void;
   onInsert: (html: string, snapshot: Shortlisted[]) => void;
 }) {
@@ -129,7 +131,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
               <strong>{shown[i]?.name || p.name}</strong>
               <span className="muted small">{[p.title, p.stage ? STAGE[p.stage] : null].filter(Boolean).join(" · ")}</span>
             </span>
-            {!attachProfiles ? null : canSeeCvs ? (
+            {!attachProfiles ? (rowTool?.(p, shown[i]?.name || p.name) ?? null) : canSeeCvs ? (
               <select aria-label={`Profile to attach for ${p.name}`} value={choiceKey(list.profileOf(i))}
                 onChange={(e) => {
                   const picked = list.profiles[i]?.find((x) => choiceKey(x.choice) === e.target.value)?.choice ?? null;

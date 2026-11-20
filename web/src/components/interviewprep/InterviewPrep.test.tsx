@@ -160,6 +160,24 @@ describe("interview prep written by the AI", () => {
     expect(await screen.findByRole("button", { name: "Copy as text" }, { timeout: 3000 }), "back after a moment").toBeTruthy();
   });
 
+  it("exports a prep to Word or PDF, to send to a candidate", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [prep()] }));
+    const fetched = vi.fn<(path: string) => Promise<Response>>().mockImplementation(() => Promise.resolve(new Response("%PDF-1.4", { status: 200 })));
+    vi.stubGlobal("fetch", fetched);
+    Object.defineProperty(URL, "createObjectURL", { value: vi.fn(() => "blob:prep"), configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+    const saved: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { saved.push(this.download); });
+    renderWithClient(<InterviewPrepPanel jobId="jo_1" jobTitle="Data Engineer" canManage={false} />);
+    const exports = await screen.findByRole("group", { name: "Export" });
+    fireEvent.click(within(exports).getByRole("button", { name: "PDF" }));
+    await waitFor(() => { expect(saved).toEqual(["Interview prep - Data Engineer.pdf"]); });
+    expect(fetched.mock.calls[0]?.[0]).toBe("/v1/interview-preps/ivp_1/export?format=pdf");
+    fireEvent.click(within(exports).getByRole("button", { name: "Word" }));
+    await waitFor(() => { expect(saved).toContain("Interview prep - Data Engineer.docx"); });
+    vi.unstubAllGlobals();
+  });
+
   it("archives a prep", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [prep()] }));
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(prep({ archived: true })));
