@@ -10,6 +10,9 @@ export function plainToHtml(text: string): string {
   return text.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
 
+/** The words of a formatted message, to tell whether it says anything. */
+export const editorText = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+
 /** Runs a formatting command on the selection; false when the browser has none. */
 export function exec(command: string, value?: string): boolean {
   // Browsers offer nothing else for formatting editable text (every rich

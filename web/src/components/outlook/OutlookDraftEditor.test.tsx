@@ -27,6 +27,7 @@ const schedule: Schemas["OutlookScheduledSend"] = {
 it("submits the revised draft and new time in the same request", async () => {
   const draft: Schemas["OutlookDraft"] = {
     messageId: "omg_test", version: "opened", subject: "Interview", body: "Tuesday is available.",
+    bodyHtml: "<p><strong>Tuesday</strong><br/> is available.</p>",
     to: ["nadia@example.test"], cc: [], bcc: [], hasAttachments: true, bodyTruncated: false,
     schedule, scheduleNeedsReview: false, webUrl: null,
   };
@@ -36,6 +37,7 @@ it("submits the revised draft and new time in the same request", async () => {
   const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(schedule));
   const onClose = vi.fn();
   renderWithClient(<OutlookDraftEditor id="omg_test" onClose={onClose}/>);
+  fireEvent.blur(await screen.findByRole("textbox", { name: "Message" }));
   fireEvent.change(await screen.findByLabelText("Subject"), { target: { value: "Tuesday interview" } });
   fireEvent.click(screen.getByRole("button", { name: "Change time" }));
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -114,21 +116,22 @@ it("creates a draft on the first attachment and keeps unsaved text when removing
   const send = vi.spyOn(api, "PUT");
   renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} />);
   fireEvent.change(screen.getByLabelText("Subject"), { target: { value: draft.subject } });
-  fireEvent.change(screen.getByLabelText("Message"), { target: { value: draft.body } });
+  const message = screen.getByRole("textbox", { name: "Message" });
+  fireEvent.input(message, { target: { innerHTML: "<p><strong>Tuesday</strong> is available.</p>" } });
   fireEvent.change(screen.getByLabelText("Attachment file"), { target: { files: [file] } });
   expect(await screen.findByText(file.name)).toBeTruthy();
   expect(post).toHaveBeenCalledTimes(1);
-  expect(sentBody(post)).toMatchObject({ subject: draft.subject, body: draft.body });
+  expect(sentBody(post)).toMatchObject({ subject: draft.subject, bodyHtml: "<p><strong>Tuesday</strong> is available.</p>" });
   const [url, options] = upload.mock.calls[0] ?? [];
   expect(url).toBe("/v1/outlook/drafts/omg_test/attachments?version=created");
   expect(options?.method).toBe("POST");
   expect(options?.body instanceof FormData && options.body.get("file")).toEqual(file);
-  fireEvent.change(screen.getByLabelText("Message"), { target: { value: "What about Wednesday?" } });
+  fireEvent.input(message, { target: { innerHTML: "<p>What about <em>Wednesday</em>?</p>" } });
   fireEvent.click(screen.getByRole("button", { name: "Remove Resume.pdf" }));
   await waitFor(() => { expect(screen.queryByText(file.name)).toBeNull(); });
   expect(remove).toHaveBeenCalledWith("/v1/outlook/drafts/{messageId}/attachments/{attachmentId}", {
     params: { path: { messageId: draft.messageId, attachmentId: "test-file" }, query: { version: "attached" } },
   });
-  expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("What about Wednesday?");
+  expect(message.innerHTML).toBe("<p>What about <em>Wednesday</em>?</p>");
   expect(send).not.toHaveBeenCalled();
 });

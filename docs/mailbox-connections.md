@@ -156,6 +156,7 @@ Open the Outlook icon beside Calendar after connecting Microsoft. Choose **Enabl
 to index your personal Outlook mailbox in this agency. Outbound email keeps working
 through the same connection. Outlook Mail uses the existing delegated Microsoft
 permissions. Shared or delegated mailboxes require a separate workflow.
+Hover over an action icon or focus it with Tab to see its label.
 
 HiringPlug discovers visible folders and reads message delta pages in the Go
 worker. Initial indexing covers up to 90 days of mail, subject to Microsoft's
@@ -215,14 +216,21 @@ them, in HiringPlug. Read-only rules and advanced editing are handled in Outlook
 
 Use **New message** to start an Outlook draft, or open one from **Drafts**.
 Save edits to the same draft, discard it to Deleted Items, send it now, or
-choose **Send later**. The editor accepts plain text. It keeps existing body
-formatting when the body has not been edited. Use **Attach file** to add a file
+choose **Send later**. The editor supports bold, italic, underline, lists,
+links, alignment, indentation, fonts, sizes and text colour. Opening a draft
+keeps its original formatting until you edit the message. Use **Attach file** to add a file
 up to 10 MB. Use the trash icon beside a file to remove it from the draft.
 Adding a file to a new message first saves it to Outlook Drafts. If you change
 attachments on a scheduled message, review the files and update the schedule.
-Use Outlook to edit a rich body or manage inline attachments.
-The candidate and client package composer continues to handle CV selection
-and formatted emails.
+Use Outlook to edit inline images or a message that is too long to edit in
+HiringPlug.
+
+**Write with HiringPlug** opens the ATS email composer within Outlook Mail.
+Use it for templates, signatures, banners, candidate details, CV selection,
+previews, and AI writing help when enabled. When opened from a candidate or
+contact's Outlook conversations, the composer uses that profile's context.
+These emails follow HiringPlug's usual delivery and ATS history rules.
+**Send later** is available from native Outlook drafts.
 
 The **Scheduled** list shows the send time in your time zone. Open the draft
 to change its content or time, or choose **Cancel send** to leave it in

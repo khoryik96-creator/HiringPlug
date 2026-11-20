@@ -7136,6 +7136,8 @@ export interface components {
         OutlookDraftInput: {
             subject?: string;
             body?: string;
+            /** @description Formatted message. This takes precedence over plain text when provided. */
+            bodyHtml?: string;
             to?: string[];
             cc?: string[];
             bcc?: string[];
@@ -7143,6 +7145,8 @@ export interface components {
         OutlookDraftUpdate: {
             subject?: string;
             body?: string;
+            /** @description Formatted message. This takes precedence over plain text when provided. */
+            bodyHtml?: string;
             to?: string[];
             cc?: string[];
             bcc?: string[];
@@ -7153,6 +7157,8 @@ export interface components {
             version: string;
             subject: string;
             body: string;
+            /** @description The editable formatting, sanitized for the composer. */
+            bodyHtml?: string;
             bodyTruncated: boolean;
             to: string[];
             cc: string[];

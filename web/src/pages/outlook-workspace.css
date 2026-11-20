@@ -92,6 +92,7 @@
 .outlook-attachments .outlook-save-cv input { width: 100%; min-width: 0; }
 .outlook-reply textarea { width: 100%; }
 .outlook-reply .row { margin-top: .45rem; }
+.outlook-response-actions .icon-action[data-tip]::after { top: auto; bottom: calc(100% + 6px); }
 .outlook-rule-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; min-width: 0; border: 0; margin: 0; padding: 0; }
 .outlook-rule-form > :not(.field) { grid-column: 1 / -1; }
 .outlook-rule-form > p { margin: 0; }
@@ -112,8 +113,12 @@
   box-sizing: border-box;
 }
 .outlook-draft-dialog::backdrop { background: #20172b65; }
+.outlook-ats-compose { width: min(55rem, calc(100vw - 2rem)); }
+.outlook-ats-compose > form { margin: 0; }
+.outlook-ats-compose .outlook-draft-head { position: sticky; top: 0; z-index: 31; background: var(--surface); }
 .outlook-draft-head h3 { margin: 0; }
 .outlook-draft-head { margin-bottom: 1rem; }
+.outlook-draft-head > .icon-action[data-tip]::after { left: auto; right: 0; transform: none; }
 .outlook-draft-fields {
   display: grid;
   grid-template-columns: 1fr;
@@ -128,13 +133,17 @@
 .outlook-draft-dialog .outlook-actions { flex-wrap: wrap; }
 .outlook-draft-dialog .outlook-schedule-time { align-items: end; }
 .outlook-draft-files { min-width: 0; margin: 0; }
-.outlook-draft-files > button { min-height: 34px; padding: .3rem .65rem; }
-.outlook-draft-files .outlook-attachments { margin: .6rem 0 0; }
+.outlook-draft-fields .rich { min-width: 0; }
+.outlook-draft-fields .rich-box { overflow: auto; }
+.outlook-draft-dialog .rich .format-tool { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 34px; min-height: 34px; padding: .3rem .45rem; }
+.outlook-draft-files .outlook-attachments { margin: 0; }
+.outlook-draft-file-head h4 { margin: 0; }
 .outlook-draft-files li { flex-wrap: nowrap; }
 .outlook-draft-files li > span { overflow-wrap: anywhere; min-width: 0; }
 .outlook-draft-files li small { white-space: nowrap; }
 .outlook-draft-files .outlook-attachment-buttons { flex-shrink: 0; }
-.outlook-draft-files .icon-action[data-tip]::after { left: auto; right: 0; transform: none; }
+.outlook-draft-files .outlook-attachment-buttons .icon-action[data-tip]::after { left: auto; right: 0; transform: none; }
+.outlook-draft-file-head > .icon-action[data-tip]::after { left: 0; transform: none; }
 .outlook-send-row {
   display: flex;
   justify-content: space-between;

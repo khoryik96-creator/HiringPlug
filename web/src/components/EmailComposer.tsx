@@ -13,7 +13,7 @@ import { ShortlistPanel, useShortlist } from "./clientEmail/Shortlist";
 import { useCandidatePackages } from "./clientEmail/useCandidatePackages";
 import { RichEditor } from "./clientEmail/RichEditor";
 import { SaveAsTemplate } from "./clientEmail/SaveAsTemplate";
-import { atCursor, fillTokens, plainToHtml, showBanners, withoutCaretMarks } from "./clientEmail/richText";
+import { atCursor, editorText as textOf, fillTokens, plainToHtml, showBanners, withoutCaretMarks } from "./clientEmail/richText";
 import { useBanners } from "./clientEmail/useBanners";
 import { ErrorMessage } from "./ErrorMessage";
 import { emailFieldErrors } from "./clientEmail/emailFieldErrors";
@@ -44,11 +44,9 @@ type Props = {
   canCreateTemplates?: boolean;
   /** The sender may put a booking link in (scheduling:use). */
   canBook?: boolean;
+  iconTools?: boolean;
   onDone: () => void;
 };
-
-/** The words of a formatted message, to tell whether it says anything. */
-const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
 
 /**
  * Write an email: pick a template (filled from the candidate, job and
@@ -57,7 +55,7 @@ const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g
  * send. Placeholders without a value stay in brackets, and sending waits
  * until they are filled in.
  */
-export function EmailComposer({ candidateId, contactId, defaultTo = "", applications = [], applicationId, interviewId, template, canManageTemplates, canCreateTemplates = false, canBook = false, permissions = [], onDone }: Props) {
+export function EmailComposer({ candidateId, contactId, defaultTo = "", applications = [], applicationId, interviewId, template, canManageTemplates, canCreateTemplates = false, canBook = false, iconTools = false, permissions = [], onDone }: Props) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const [about, setAbout] = useState(applicationId ?? "");
@@ -184,7 +182,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       </div>
       <div className="field full">
         <span>Message</span>
-        <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0 || (tried && !textOf(html))} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
+        <RichEditor compact iconTools={iconTools} invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0 || (tried && !textOf(html))} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
           values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f, value) => {

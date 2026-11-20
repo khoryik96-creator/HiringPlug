@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Schemas, unwrap } from "../../api/client";
 import { uploadOutlookDraftFile } from "../../api/files";
 import { formatWhen } from "../../labels";
+import { CloseIcon, IconButton, RefreshIcon, TrashIcon } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 import { Field } from "../Field";
 import { fieldErrors, FormInvalid } from "../forms";
 import { wallTime, zonedInput } from "../calendar/dates";
+import { RichEditor } from "../clientEmail/RichEditor";
+import { editorText, plainToHtml, withoutCaretMarks } from "../clientEmail/richText";
 import { maxDraftFileSize, OutlookDraftFiles } from "./OutlookDraftFiles";
 import { outlookAddresses } from "./outlookAddresses";
 
@@ -36,7 +39,7 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
     {id && !query.data ? <>
       <div className="row spread">
         <h3 id="outlook-draft-heading">Outlook draft</h3>
-        <button type="button" onClick={() => { onClose(); }}>Close</button>
+        <IconButton label="Close" icon={<CloseIcon />} onClick={() => { onClose(); }} />
       </div>
       <ErrorMessage error={query.error}/>
       {query.isPending && <p className="muted">Opening draft…</p>}
@@ -46,19 +49,21 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
 }
 
 function inputOf(value: typeof emptyDraft, before?: Draft): DraftInput {
-  if (!before) return { to: outlookAddresses(value.to), cc: outlookAddresses(value.cc), bcc: outlookAddresses(value.bcc), subject: value.subject, body: value.body };
+  const bodyHtml = withoutCaretMarks(value.html);
+  if (!before) return { to: outlookAddresses(value.to), cc: outlookAddresses(value.cc), bcc: outlookAddresses(value.bcc), subject: value.subject, bodyHtml };
   return {
     ...(value.to !== before.to.join(", ") ? { to: outlookAddresses(value.to) } : {}),
     ...(value.cc !== before.cc.join(", ") ? { cc: outlookAddresses(value.cc) } : {}),
     ...(value.bcc !== before.bcc.join(", ") ? { bcc: outlookAddresses(value.bcc) } : {}),
     ...(value.subject !== before.subject ? { subject: value.subject } : {}),
-    ...(value.body !== before.body && !before.bodyTruncated ? { body: value.body } : {}),
+    ...(value.html !== markupOf(before) && !before.bodyTruncated ? { bodyHtml } : {}),
   };
 }
 
-const emptyDraft = { to: "", cc: "", bcc: "", subject: "", body: "" };
+const emptyDraft = { to: "", cc: "", bcc: "", subject: "", html: "" };
+const markupOf = (draft: Draft) => draft.bodyHtml ?? (draft.body ? plainToHtml(draft.body) : "");
 const formOf = (draft?: Draft) => draft ? {
-  to: draft.to.join(", "), cc: draft.cc.join(", "), bcc: draft.bcc.join(", "), subject: draft.subject, body: draft.body,
+  to: draft.to.join(", "), cc: draft.cc.join(", "), bcc: draft.bcc.join(", "), subject: draft.subject, html: markupOf(draft),
 } : emptyDraft;
 type Operation = "save" | "send" | "schedule" | "discard";
 type DraftAction = Operation | "reload" | { file: File } | { remove: string };
@@ -69,6 +74,7 @@ function DraftFields({ opened, onClose, setBusy }: {
   const client = useQueryClient();
   const [draft, setDraft] = useState(opened);
   const [form, setForm] = useState(() => formOf(opened));
+  const [editorReset, setEditorReset] = useState(0);
   const [copies, setCopies] = useState(!!(form.cc || form.bcc));
   const [later, setLater] = useState(false);
   const [notice, setNotice] = useState("");
@@ -85,6 +91,7 @@ function DraftFields({ opened, onClose, setBusy }: {
           const latest = unwrap(await api.GET("/v1/outlook/drafts/{messageId}", { params: { path: { messageId: draft.messageId } } }));
           setDraft(latest);
           setForm(formOf(latest));
+          setEditorReset((value) => value + 1);
           setCopies(Boolean(latest.cc.length || latest.bcc.length));
           setAt(latest.schedule ? zonedInput(new Date(latest.schedule.sendAt), zone) : "");
           setLater(false);
@@ -140,6 +147,7 @@ function DraftFields({ opened, onClose, setBusy }: {
       } else {
         setDraft(saved);
         setForm(formOf(saved));
+        setEditorReset((value) => value + 1);
       }
       return operation;
     },
@@ -162,11 +170,11 @@ function DraftFields({ opened, onClose, setBusy }: {
   const errors = fieldErrors(action.error);
   const errorFor = (name: string) => errors[name] ?? Object.entries(errors).find(([field]) => field.startsWith(`${name}.`) || field.startsWith(`${name}[`))?.[1];
   const update = (field: keyof typeof form, value: string) => { setForm({ ...form, [field]: value }); setNotice(""); };
-  const readyToSend = !!form.to.trim() && !!form.subject.trim() && !!form.body.trim();
+  const readyToSend = !!form.to.trim() && !!form.subject.trim() && !!editorText(form.html);
   return <>
     <div className="row spread outlook-draft-head">
       <h3 id="outlook-draft-heading">{draft ? "Outlook draft" : "New Outlook message"}</h3>
-      <button type="button" disabled={action.isPending} onClick={() => { onClose(); }}>Close</button>
+      <IconButton label="Close" icon={<CloseIcon />} disabled={action.isPending} onClick={() => { onClose(); }} />
     </div>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); action.mutate("save"); }}>
       <fieldset disabled={locked || action.isPending} className="full outlook-draft-fields">
@@ -177,7 +185,12 @@ function DraftFields({ opened, onClose, setBusy }: {
           <Field label="Bcc" error={errorFor("bcc")}><input value={form.bcc} onChange={(e) => { update("bcc", e.target.value); }}/></Field>
         </div>}
         <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={form.subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
-        <Field label="Message" error={errorFor("body")}><textarea readOnly={draft?.bodyTruncated} maxLength={40000} rows={9} value={form.body} onChange={(e) => { update("body", e.target.value); }}/></Field>
+        {draft?.bodyTruncated ? <Field label="Message"><textarea readOnly rows={9} value={draft.body} /></Field> :
+          <div className="field">
+            <span>Message</span>
+            <RichEditor compact iconTools plainPaste readOnly={locked || action.isPending} html={form.html} resetKey={editorReset}
+              invalid={!!(errorFor("bodyHtml") ?? errorFor("body"))} onChange={(html) => { update("html", html); }} />
+          </div>}
       </fieldset>
       <OutlookDraftFiles draft={draft} disabled={locked || action.isPending}
         onAdd={(file) => { action.mutate({ file }); }} onRemove={(attachment) => { action.mutate({ remove: attachment.id }); }} />
@@ -203,10 +216,10 @@ function DraftFields({ opened, onClose, setBusy }: {
         <button type="button" disabled={locked || action.isPending} aria-expanded={later} onClick={() => { setLater(!later); }}>
           {draft?.scheduleNeedsReview ? "Review schedule" : plan ? "Change time" : "Send later"}
         </button>
-        {draft && <button type="button" disabled={action.isPending} onClick={() => { action.mutate("reload"); }}>Reload draft</button>}
-        {draft && !plan && <button type="button" disabled={action.isPending} onClick={() => {
+        {draft && <IconButton label="Reload draft" icon={<RefreshIcon />} disabled={action.isPending} onClick={() => { action.mutate("reload"); }} />}
+        {draft && !plan && <IconButton label="Discard draft" icon={<TrashIcon />} danger disabled={action.isPending} onClick={() => {
           if (window.confirm("Move this draft to Outlook Deleted Items?")) action.mutate("discard");
-        }}>Discard draft</button>}
+        }} />}
       </div>
     </form>
   </>;

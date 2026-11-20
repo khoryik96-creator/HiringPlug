@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -65,7 +66,9 @@ func draftPatch(in api.OutlookDraftInput) map[string]any {
 	if in.Subject != nil {
 		out["subject"] = strings.TrimSpace(*in.Subject)
 	}
-	if in.Body != nil {
+	if in.BodyHtml != nil {
+		out["body"] = map[string]string{"contentType": "html", "content": WithoutFieldMarks(sanitizeOutlookHTML(*in.BodyHtml))}
+	} else if in.Body != nil {
 		out["body"] = map[string]string{"contentType": "text", "content": *in.Body}
 	}
 	for _, pair := range []struct {
@@ -90,8 +93,16 @@ func draftPatch(in api.OutlookDraftInput) map[string]any {
 
 func draftView(row store.EmailOutlookMessage, remote outlookRemoteMessage, active *store.EmailOutlookSend) api.OutlookDraft {
 	body := remote.Body.Content
+	var rich *string
+	truncated := false
 	if strings.EqualFold(remote.Body.ContentType, "html") {
-		body = TextFromHTML(SanitizeHTML(body))
+		clean := sanitizeOutlookHTML(body)
+		body = TextFromHTML(clean)
+		if utf8.RuneCountInString(clean) <= 100000 {
+			rich = &clean
+		} else {
+			truncated = true
+		}
 	}
 	shown := truncate(body, 40000)
 	var schedule *api.OutlookScheduledSend
@@ -100,7 +111,7 @@ func draftView(row store.EmailOutlookMessage, remote outlookRemoteMessage, activ
 		schedule = &v
 	}
 	return api.OutlookDraft{
-		MessageId: row.ID, Version: draftVersion(remote), Subject: remote.Subject, Body: shown, BodyTruncated: shown != body,
+		MessageId: row.ID, Version: draftVersion(remote), Subject: remote.Subject, Body: shown, BodyHtml: rich, BodyTruncated: truncated || shown != body,
 		To: draftRecipientAddresses(remote.ToRecipients), Cc: draftRecipientAddresses(remote.CcRecipients), Bcc: draftRecipientAddresses(remote.BccRecipients),
 		HasAttachments: remote.HasAttachments, WebUrl: apiconv.OrNull(outlookWebLink(remote.WebLink)), Schedule: apiconv.OrNull(schedule),
 		ScheduleNeedsReview: active != nil && (active.Status == "needs_review" || active.Status == "scheduled" && active.DraftVersion != draftVersion(remote)),

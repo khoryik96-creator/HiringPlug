@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { formatWhen } from "../../labels";
+import { ArchiveIcon, ConversationIcon, ForwardIcon, IconActions, IconButton, IconLink, MailCheckIcon, MailIcon, MoveFolderIcon, OutlookIcon, ReplyAllIcon, ReplyIcon } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 import { OutlookAttachments } from "./OutlookAttachments";
 import { OutlookForward } from "./OutlookForward";
@@ -71,20 +72,23 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
   return <section className="outlook-reading" aria-label="Outlook message">
     <h3>{message.subject || "(No subject)"}</h3>
     <p className="outlook-envelope"><strong>{message.sender || "Draft"}</strong> · {formatWhen(message.receivedAt)}</p>
-    <div className="row outlook-actions">
-      <button type="button" onClick={onThread}>Conversation</button>
-      {message.webUrl && <a href={message.webUrl} target="_blank" rel="noreferrer">Open in Outlook</a>}
-      <button type="button" disabled={change.isPending} onClick={() => { change.mutate({ isRead: !message.isRead }); }}>
-        Mark {message.isRead ? "unread" : "read"}
-      </button>
-      {archive && archive.id !== message.folderId && <button type="button" disabled={change.isPending} onClick={() => { change.mutate({ folderId: archive.id }); }}>Archive</button>}
+    <div className="outlook-actions">
+      <IconActions label="Message actions">
+        <IconButton label="Conversation" icon={<ConversationIcon />} onClick={onThread} />
+        {message.webUrl && <IconLink label="Open in Outlook" icon={<OutlookIcon />} href={message.webUrl} external />}
+        <IconButton label={message.isRead ? "Mark unread" : "Mark read"} icon={message.isRead ? <MailIcon /> : <MailCheckIcon />}
+          disabled={change.isPending} onClick={() => { change.mutate({ isRead: !message.isRead }); }} />
+        {archive && archive.id !== message.folderId && <IconButton label="Archive" icon={<ArchiveIcon />} disabled={change.isPending}
+          onClick={() => { change.mutate({ folderId: archive.id }); }} />}
+      </IconActions>
     </div>
     <div className="row outlook-actions">
       <select aria-label="Destination folder" value={destination} onChange={(e) => { setDestination(e.target.value); }}>
         <option value="">Move to…</option>
         {folders.filter((folder) => folder.id !== message.folderId).map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
       </select>
-      <button type="button" disabled={!destination || change.isPending} onClick={() => { change.mutate({ folderId: destination }); }}>Move</button>
+      <IconButton label="Move" icon={<MoveFolderIcon />} disabled={!destination || change.isPending}
+        onClick={() => { change.mutate({ folderId: destination }); }} />
       {profile && <>
         {linked
           ? <button type="button" disabled={link.isPending} onClick={() => { link.mutate(true); }}>Unlink from profile</button>
@@ -99,11 +103,13 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
     {/* The candidate is suggested only for their own linked mail, never for any message read from their page. */}
     {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id}
       canSaveCv={canSaveCv} canImportCv={canImportCv} candidateId={linked ? profile?.candidateId : undefined} />}
-    {!message.isDraft && mode === null && <div className="row">
-      <button type="button" onClick={() => { setMode("reply"); setNotice(""); }}>Reply</button>
-      <button type="button" onClick={() => { setMode("replyAll"); setNotice(""); }}>Reply all</button>
-      {folders.some((folder) => folder.kind === "drafts") &&
-        <button type="button" onClick={() => { setMode("forward"); setNotice(""); }}>Forward</button>}
+    {!message.isDraft && mode === null && <div className="outlook-response-actions">
+      <IconActions label="Message responses">
+        <IconButton label="Reply" icon={<ReplyIcon />} onClick={() => { setMode("reply"); setNotice(""); }} />
+        <IconButton label="Reply all" icon={<ReplyAllIcon />} onClick={() => { setMode("replyAll"); setNotice(""); }} />
+        {folders.some((folder) => folder.kind === "drafts") &&
+          <IconButton label="Forward" icon={<ForwardIcon />} onClick={() => { setMode("forward"); setNotice(""); }} />}
+      </IconActions>
     </div>}
     {mode === "forward" && <OutlookForward messageId={message.id} onOpen={onOpenDraft} onClose={() => { setMode(null); }} />}
     {(mode === "reply" || mode === "replyAll") && <form className="outlook-reply" onSubmit={(e) => { e.preventDefault(); send.mutate(false); }}>

@@ -113,7 +113,7 @@ it("opens the native forward draft with its original attachment before any send"
   expect(await screen.findByRole("dialog", { name: "Outlook draft" })).toBeTruthy();
   expect(await screen.findByRole("button", { name: "Download Nadia CV.pdf" })).toBeTruthy();
   expect(screen.getByLabelText<HTMLInputElement>("To").value).toBe("james@example.test, lina@example.test");
-  expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toContain("I can make Tuesday.");
+  expect(screen.getByRole("textbox", { name: "Message" }).textContent).toContain("I can make Tuesday.");
   expect(post).toHaveBeenCalledWith("/v1/outlook/messages/{messageId}/forward", {
     params: { path: { messageId: forwardSource.id } },
     body: { to: forwardDraft.to, note: "Please review." },
@@ -136,4 +136,24 @@ it("does not open the previous message's forward after changing messages", async
   await act(async () => { finish(); await Promise.resolve(); });
   await waitFor(() => { expect(screen.getByRole("heading", { name: "Another message" })).toBeTruthy(); });
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("opens the existing ATS composer and its profile context from Outlook", async () => {
+  window.location.hash = "#/outlook?contactId=cont_test";
+  vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+    path === "/v1/outlook/mail" ? ok({ connected: true, enabled: true, folders: [], items: [] })
+      : path === "/v1/mailbox" ? ok({ connected: true, address: "recruiter@example.test", provider: "microsoft" })
+        : ok({ items: [], fields: [] }),
+  ));
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], fieldValues: {} }));
+  renderWithClient(<OutlookMail permissions={["candidates:read", "documents:read", "emails.templates:create"]} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Write with HiringPlug" }));
+  expect(screen.getByRole("dialog", { name: "Write with HiringPlug" })).toBeTruthy();
+  expect(screen.getByLabelText("Template")).toBeTruthy();
+  expect(screen.getByText("Candidates and CVs (0)")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Preview email" })).toBeTruthy();
+  await waitFor(() => {
+    expect(post.mock.calls[0]?.[0]).toBe("/v1/email-previews");
+    expect(sentBody(post)).toMatchObject({ contactId: "cont_test" });
+  });
 });

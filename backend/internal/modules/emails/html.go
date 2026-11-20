@@ -23,7 +23,10 @@ var fieldKeyRe = regexp.MustCompile(`^[a-z]+\.[A-Za-z]+$`)
 // policy keeps text formatting, lists, alignment, links and banner images
 // (by their id: an image's address is never kept, so a message loads nothing
 // from elsewhere).
-var policy = func() *bluemonday.Policy {
+var policy = messageHTMLPolicy(false)
+var outlookHTMLPolicy = messageHTMLPolicy(true)
+
+func messageHTMLPolicy(keepInline bool) *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 	p.AllowElements("p", "br", "div", "span", "b", "strong", "i", "em", "u", "s", "strike", "del",
 		"ul", "ol", "li", "blockquote", "h1", "h2", "h3", "h4", "hr", "font", "sub", "sup",
@@ -37,6 +40,12 @@ var policy = func() *bluemonday.Policy {
 	p.AllowAttrs("data-candidate-summary").Matching(regexp.MustCompile(`^true$`)).OnElements("div")
 	p.AllowAttrs("data-candidate-id").Matching(regexp.MustCompile(`^cand_[0-9a-hjkmnp-tv-z]{26}$`)).OnElements("p", "tr")
 	p.AllowAttrs("alt").OnElements("img")
+	if keepInline {
+		// Outlook resolves these against the draft's existing inline files.
+		// Remote image URLs must never load in the editor.
+		p.AllowURLSchemes("cid")
+		p.AllowAttrs("src").Matching(regexp.MustCompile(`(?i)^cid:[a-z0-9._@+%=-]+$`)).OnElements("img")
+	}
 	p.AllowAttrs("color", "face", "size").OnElements("font")
 	p.AllowAttrs("align").OnElements("p", "div", "td", "th")
 	p.AllowStyles("color", "background-color", "font-family", "font-size", "font-weight", "font-style",
@@ -45,13 +54,17 @@ var policy = func() *bluemonday.Policy {
 	// A table of candidates (the composer's): its lines and spacing.
 	p.AllowStyles("border", "border-collapse", "padding", "vertical-align").OnElements("table", "td", "th")
 	return p
-}()
+}
 
 // SanitizeHTML keeps only what a message may hold; an image without a
 // banner id is dropped.
 func SanitizeHTML(s string) string {
 	clean := policy.Sanitize(s)
 	return strings.TrimSpace(imgWithoutBanner.ReplaceAllString(clean, ""))
+}
+
+func sanitizeOutlookHTML(s string) string {
+	return strings.TrimSpace(imgWithoutBanner.ReplaceAllString(outlookHTMLPolicy.Sanitize(s), ""))
 }
 
 var imgWithoutBanner = regexp.MustCompile(`<img(?:\s+(?:alt|style)="[^"]*")*\s*/?>`)

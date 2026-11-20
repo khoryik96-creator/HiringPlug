@@ -1494,6 +1494,10 @@ components:
         body:
           type: string
           maxLength: 40000
+        bodyHtml:
+          type: string
+          maxLength: 100000
+          description: Formatted message. This takes precedence over plain text when provided.
         to:
           type: array
           items:
@@ -1526,6 +1530,10 @@ components:
         body:
           type: string
           maxLength: 40000
+        bodyHtml:
+          type: string
+          maxLength: 100000
+          description: Formatted message. This takes precedence over plain text when provided.
         to:
           type: array
           items:
@@ -1579,6 +1587,9 @@ components:
           type: string
         body:
           type: string
+        bodyHtml:
+          type: string
+          description: The editable formatting, sanitized for the composer.
         bodyTruncated:
           type: boolean
         to:

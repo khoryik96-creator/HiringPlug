@@ -67,7 +67,9 @@ func draftEnvelope(draft outlookRemoteMessage, changes *api.OutlookDraftInput) O
 	if changes.Subject != nil {
 		out.Subject = *changes.Subject
 	}
-	if changes.Body != nil {
+	if changes.BodyHtml != nil {
+		out.Body = TextFromHTML(SanitizeHTML(*changes.BodyHtml))
+	} else if changes.Body != nil {
 		out.Body = *changes.Body
 	}
 	for _, field := range []struct {

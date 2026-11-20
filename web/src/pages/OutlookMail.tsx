@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Schemas, unwrap } from "../api/client";
+import { api, type Permission, type Schemas, unwrap } from "../api/client";
+import { ClockIcon, ComposeIcon, FileIcon, IconActions, IconButton, IconLink, PowerIcon, RefreshIcon, StepsIcon } from "../components/ActionIcons";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { OutlookATSComposer } from "../components/outlook/OutlookATSComposer";
 import type { OutlookProfile } from "../components/outlook/OutlookProfileMail";
 import { OutlookDraftEditor } from "../components/outlook/OutlookDraftEditor";
 import { OutlookScheduledList } from "../components/outlook/OutlookScheduledList";
@@ -14,22 +16,25 @@ import "./outlook-workspace.css";
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookMail({ canSaveCv = false, canImportCv = false }: { canSaveCv?: boolean; canImportCv?: boolean }) {
+export function OutlookMail({ canSaveCv = false, canImportCv = false, permissions = [] }: {
+  canSaveCv?: boolean; canImportCv?: boolean; permissions?: Permission[];
+}) {
   const params = new URLSearchParams(window.location.hash.split("?")[1]);
   if (params.has("rules")) return <OutlookRules />;
   const candidateId = params.get("candidateId");
   const contactId = params.get("contactId");
   const profile = candidateId ? { candidateId } : contactId ? { contactId } : undefined;
-  return <OutlookWorkspace key={params.toString()} profile={profile} canSaveCv={canSaveCv} canImportCv={canImportCv}
+  return <OutlookWorkspace key={params.toString()} profile={profile} canSaveCv={canSaveCv} canImportCv={canImportCv} permissions={permissions}
     initialSearch={params.get("search") ?? ""} initialThread={params.get("conversation") ?? ""}/>;
 }
 
-function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, initialThread }: {
+function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, initialThread, permissions }: {
   profile?: OutlookProfile;
   canSaveCv: boolean;
   canImportCv: boolean;
   initialSearch: string;
   initialThread: string;
+  permissions: Permission[];
 }) {
   const client = useQueryClient();
   const [search, setSearch] = useState(initialSearch);
@@ -40,6 +45,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<string>();
   const [scheduled, setScheduled] = useState(false);
+  const [atsComposer, setATSComposer] = useState(false);
   // undefined closes the editor. A null message starts a new draft.
   const [draft, setDraft] = useState<string | null>();
 
@@ -95,18 +101,22 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   return <main className="outlook-page">
     <div className="row spread">
       <h2>Outlook Mail</h2>
-      <div className="row outlook-actions">
-        {data?.enabled && <button className="primary" type="button" disabled={!folders.some((item) => item.kind === "drafts")}
-          onClick={() => { setDraft(null); }}>New message</button>}
-        <button type="button" aria-pressed={scheduled} onClick={() => { setScheduled(!scheduled); }}>{scheduled ? "Back to mail" : "Scheduled"}</button>
+      <IconActions label="Outlook actions">
         {data?.enabled && <>
-        <a className="button" href="#/outlook?rules=1">Inbox rules</a>
-        <button type="button" disabled={sync.isPending} onClick={() => { sync.mutate(false); }}>Refresh</button>
-        <button type="button" disabled={sync.isPending} onClick={() => {
-          if (window.confirm("Turn off Outlook sync? Pending sends will be cancelled and HiringPlug’s profile links removed. Mail and drafts stay in Outlook.")) sync.mutate(true);
-        }}>Turn off sync</button>
+          <IconButton label="New message" icon={<ComposeIcon />} className="icon-primary"
+            disabled={!folders.some((item) => item.kind === "drafts")} onClick={() => { setDraft(null); }} />
+          <IconButton label="Write with HiringPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />
         </>}
-      </div>
+        <IconButton label={scheduled ? "Back to mail" : "Scheduled"} icon={<ClockIcon />} pressed={scheduled}
+          onClick={() => { setScheduled(!scheduled); }} />
+        {data?.enabled && <>
+          <IconLink label="Inbox rules" icon={<StepsIcon />} href="#/outlook?rules=1" />
+          <IconButton label="Refresh" icon={<RefreshIcon />} disabled={sync.isPending} onClick={() => { sync.mutate(false); }} />
+          <IconButton label="Turn off sync" icon={<PowerIcon />} danger disabled={sync.isPending} onClick={() => {
+            if (window.confirm("Turn off Outlook sync? Pending sends will be cancelled and HiringPlug’s profile links removed. Mail and drafts stay in Outlook.")) sync.mutate(true);
+          }} />
+        </>}
+      </IconActions>
     </div>
     <ErrorMessage error={result.error ?? sync.error}/>
     {result.isPending && <p className="muted">Loading Outlook Mail…</p>}
@@ -159,6 +169,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
       </section>
     </>}
     {scheduled && <OutlookScheduledList onOpen={setDraft}/>}
+    {atsComposer && <OutlookATSComposer permissions={permissions} profile={profile} onClose={() => { setATSComposer(false); }} />}
     {draft !== undefined && <OutlookDraftEditor key={draft ?? "new"} id={draft} onClose={(operation) => {
       setDraft(undefined);
       if (operation === "send" || operation === "schedule") setScheduled(true);

@@ -69,7 +69,7 @@ func (s *Service) openOutlookResponse(ctx context.Context, token, method, target
 		req.Header.Set("If-Match", etag)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="text", odata.maxpagesize=50`)
+	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="html", odata.maxpagesize=50`)
 	client := *s.connections.HTTPClient
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	response, err := client.Do(req)

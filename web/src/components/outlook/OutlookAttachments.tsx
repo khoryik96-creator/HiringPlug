@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { downloadFrom, outlookAttachmentFilePath } from "../../api/files";
@@ -16,12 +16,13 @@ function attachmentSize(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv = false, candidateId, remove }: {
+export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv = false, candidateId, remove, tools }: {
   messageId: string;
   canSaveCv?: boolean;
   canImportCv?: boolean;
   candidateId?: string;
   remove?: { disabled: boolean; onPick: (file: Attachment) => void };
+  tools?: ReactNode;
 }) {
   const [saveId, setSaveId] = useState<string>();
   const attachments = useQuery({
@@ -39,7 +40,7 @@ export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv =
   });
   const chosen = attachments.data?.items.find((file) => file.id === saveId);
   return <section className="outlook-attachments" aria-label="Attachments">
-    <h4>Attachments</h4>
+    {tools ? <div className="row outlook-draft-file-head"><h4>Attachments</h4>{tools}</div> : <h4>Attachments</h4>}
     {attachments.isPending && <p className="muted" role="status">Loading attachments…</p>}
     <ErrorMessage error={attachments.error}>
       <button type="button" onClick={() => { void attachments.refetch(); }} disabled={attachments.isFetching}>Try again</button>

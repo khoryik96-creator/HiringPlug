@@ -2580,6 +2580,13 @@ class BccItem(RootModel[EmailStr]):
 class OutlookDraftInput(BaseModel):
     subject: Annotated[str | None, Field(max_length=200)] = None
     body: Annotated[str | None, Field(max_length=40000)] = None
+    bodyHtml: Annotated[
+        str | None,
+        Field(
+            description="Formatted message. This takes precedence over plain text when provided.",
+            max_length=100000,
+        ),
+    ] = None
     to: Annotated[list[ToItem] | None, Field(max_length=100)] = None
     cc: Annotated[list[CcItem] | None, Field(max_length=100)] = None
     bcc: Annotated[list[BccItem] | None, Field(max_length=100)] = None
@@ -2588,6 +2595,13 @@ class OutlookDraftInput(BaseModel):
 class OutlookDraftUpdate(BaseModel):
     subject: Annotated[str | None, Field(max_length=200)] = None
     body: Annotated[str | None, Field(max_length=40000)] = None
+    bodyHtml: Annotated[
+        str | None,
+        Field(
+            description="Formatted message. This takes precedence over plain text when provided.",
+            max_length=100000,
+        ),
+    ] = None
     to: Annotated[list[ToItem] | None, Field(max_length=100)] = None
     cc: Annotated[list[CcItem] | None, Field(max_length=100)] = None
     bcc: Annotated[list[BccItem] | None, Field(max_length=100)] = None
@@ -6807,6 +6821,9 @@ class OutlookDraft(BaseModel):
     version: Annotated[str, Field(max_length=64, min_length=64, pattern="^[a-f0-9]+$")]
     subject: str
     body: str
+    bodyHtml: Annotated[
+        str | None, Field(description="The editable formatting, sanitized for the composer.")
+    ] = None
     bodyTruncated: bool
     to: list[str]
     cc: list[str]

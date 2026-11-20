@@ -50,6 +50,18 @@ export const ViewIcon = () => <Svg><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 
 export const RefreshIcon = () => <Svg><path d="M20 5v5h-5m5 0a8 8 0 1 0 .1 4" /></Svg>;
 export const FileIcon = () => <Svg><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6" /></Svg>;
 export const TextIcon = () => <Svg><path d="M4 6h16M4 10h16M4 14h16M4 18h10" /></Svg>;
+export const ComposeIcon = () => <Svg><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M13 7l4 4m-7 3 3-.5 7-7-2.5-2.5-7 7z" /></Svg>;
+export const ClockIcon = () => <Svg><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></Svg>;
+export const PaperclipIcon = () => <Svg><path d="m9 13 6-6a2.2 2.2 0 0 1 3 3l-8 8a4 4 0 0 1-5.7-5.7l8-8" /></Svg>;
+export const ReplyIcon = () => <Svg><path d="m10 5-6 6 6 6v-4c5 0 8 2 10 5 0-7-3-9-10-9z" /></Svg>;
+export const ReplyAllIcon = () => <Svg><path d="m6 7-4 4 4 4m5-10-6 6 6 6v-4c5 0 8 2 10 5 0-7-3-9-10-9z" /></Svg>;
+export const ForwardIcon = () => <Svg><path d="m14 5 6 6-6 6v-4c-5 0-8 2-10 5 0-7 3-9 10-9z" /></Svg>;
+export const ArchiveIcon = () => <Svg><path d="M4 5h16v4H4zm2 4v10h12V9m-8 4h4" /></Svg>;
+export const MoveFolderIcon = () => <Svg><path d="M3 8V6h6l2 2h10v11H3zm6 5h7m-3-3 3 3-3 3" /></Svg>;
+export const ConversationIcon = () => <Svg><path d="M4 5h16v12h-7l-4 4v-4H4zm4 4h8m-8 4h5" /></Svg>;
+export const LinkIcon = () => <Svg><path d="m10 14 4-4m-7 2-2 2a3.5 3.5 0 0 0 5 5l3-3m4-4 2-2a3.5 3.5 0 0 0-5-5l-3 3" /></Svg>;
+export const MoreIcon = () => <Svg><path d="M5 12h.1m7 0h.1m7 0h.1" /></Svg>;
+export const PowerIcon = () => <Svg><path d="M12 3v9m5-6a8 8 0 1 1-10 0" /></Svg>;
 export const CalendarPlusIcon = () => (
   <Svg><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4m8-4v4M3 10h18m-9 3v5m-2.5-2.5h5" /></Svg>
 );
@@ -79,8 +91,9 @@ export function IconButton({ label, icon, onClick, disabled = false, tip = label
   );
 }
 
-export function IconLink({ label, icon, href }: { label: string; icon: ReactNode; href: string }) {
-  return <a className="icon-action" href={href} aria-label={label} data-tip={label}>{icon}</a>;
+export function IconLink({ label, icon, href, external = false }: { label: string; icon: ReactNode; href: string; external?: boolean }) {
+  return <a className="icon-action" href={href} aria-label={label} data-tip={label}
+    target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>{icon}</a>;
 }
 
 /** A thin line before the delete icon, which stands apart. */

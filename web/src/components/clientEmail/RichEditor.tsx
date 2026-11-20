@@ -1,25 +1,30 @@
 // The message box with its toolbar: bold, italic, underline, strike, lists,
 // indent, alignment, link, clear format, font, size, colour, insert a field
 // ([Expected salary]) or a banner. CV Studio's email client, with indent.
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { Schemas } from "../../api/client";
-import { exec, fillTypedFields, insertHtml, insertValue, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
+import { LinkIcon, MoreIcon, StepsIcon } from "../ActionIcons";
+import { exec, fillTypedFields, insertHtml, insertValue, plainToHtml, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
 
 const NONE: Record<string, string> = {};
+const NO_FIELDS: Schemas["EmailField"][] = [];
 const FONTS = ["Calibri", "Arial", "Georgia", "Times New Roman", "Verdana", "Tahoma"];
 const SIZES = ["10", "11", "12", "14", "16", "18", "24"];
 
 type Props = {
   compact?: boolean;
+  iconTools?: boolean;
   invalid?: boolean;
+  readOnly?: boolean;
+  plainPaste?: boolean;
   /** What the box starts with; changing `resetKey` puts it back in. */
   html: string;
   resetKey: number;
   onChange: (html: string) => void;
-  fields: Schemas["EmailField"][];
-  banners: Schemas["EmailBanner"][];
-  bannerUrls: Record<string, string>;
+  fields?: Schemas["EmailField"][];
+  banners?: Schemas["EmailBanner"][];
+  bannerUrls?: Record<string, string>;
   onUploadBanner?: (file: File) => void;
   /**
    * The candidate's value for each field, by token. A field is put in as its
@@ -38,21 +43,28 @@ type Props = {
   onFocus?: () => void;
 };
 
-export function RichEditor({ compact = false, invalid = false, html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
+export function RichEditor({ compact = false, iconTools = false, invalid = false, readOnly = false, plainPaste = false, html, resetKey, onChange, fields: fieldOptions, banners, bannerUrls = NONE, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const extras = !compact || expanded;
   const vals = values ?? NONE;
+  const fields = fieldOptions ?? NO_FIELDS;
   const box = useRef<HTMLDivElement>(null);
+  const reported = useRef("");
   const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
 
   useEffect(() => {
     if (!box.current) return;
     box.current.innerHTML = html;
     showBanners(box.current, bannerUrls);
+    reported.current = box.current.innerHTML;
     // Only when the message is replaced (a template), not on every change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
-  useEffect(() => { showBanners(box.current, bannerUrls); }, [bannerUrls]);
+  useEffect(() => {
+    if (!box.current) return;
+    showBanners(box.current, bannerUrls);
+    reported.current = box.current.innerHTML;
+  }, [bannerUrls]);
   // Wherever the cursor goes in the message (a click, the keyboard, a field
   // just put in), it is remembered, so the next field goes exactly there.
   useEffect(() => {
@@ -62,12 +74,20 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
   }, []);
   // A template's fields (and any typed before the values came) show their values.
   useEffect(() => {
-    if (box.current && fillTypedFields(box.current, fields, vals)) onChange(box.current.innerHTML);
+    if (box.current && fillTypedFields(box.current, fields, vals)) {
+      reported.current = box.current.innerHTML;
+      onChange(reported.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey, vals, fields]);
 
   const remember = () => { if (box.current) cursor.current = saveRange(box.current) ?? cursor.current; };
-  const changed = () => { remember(); if (box.current) onChange(box.current.innerHTML); };
+  const changed = () => {
+    remember();
+    if (!box.current || box.current.innerHTML === reported.current) return;
+    reported.current = box.current.innerHTML;
+    onChange(reported.current);
+  };
   const typed = () => {
     box.current?.querySelectorAll<HTMLElement>("[data-missing-detail]").forEach((node)=>{
       const text=node.textContent.trim();
@@ -123,18 +143,20 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
   }, [inserting?.id]);
   // Toolbar buttons keep the cursor where it is in the message.
   const keep = (e: React.MouseEvent) => { e.preventDefault(); };
-  const button = (label: string, command: string, text = label) => (
-    <button type="button" className="tool" aria-label={label} onMouseDown={keep} onClick={() => { run(command); }}>{text}</button>
+  const toolClass = iconTools ? "tool icon-action format-tool" : "tool";
+  const button = (label: string, command: string, text: ReactNode = label) => (
+    <button type="button" className={toolClass} aria-label={label} data-tip={iconTools ? label : undefined}
+      onMouseDown={keep} onClick={() => { run(command); }}>{text}</button>
   );
 
   return (
     <div className="rich">
       <div className={compact ? "toolbar compact" : "toolbar"} role="toolbar" aria-label="Formatting">
-        {button("Bold", "bold", "B")}
-        {button("Italic", "italic", "I")}
-        {button("Underline", "underline", "U")}
+        {button("Bold", "bold", iconTools ? <b>B</b> : "B")}
+        {button("Italic", "italic", iconTools ? <i>I</i> : "I")}
+        {button("Underline", "underline", iconTools ? <u>U</u> : "U")}
         <span className="extra-formatting" hidden={!extras}>{button("Strike", "strikeThrough", "Strike")}
-        </span>{button("Bullets", "insertUnorderedList")}
+        </span>{button("Bullets", "insertUnorderedList", iconTools ? <StepsIcon /> : "Bullets")}
         <span className="extra-formatting" hidden={!extras}>
         {button("Numbered list", "insertOrderedList")}
         {button("Indent", "indent", "Indent →")}
@@ -142,10 +164,10 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
         {button("Left", "justifyLeft")}
         {button("Center", "justifyCenter")}
         {button("Right", "justifyRight")}
-        </span><button type="button" className="tool" onMouseDown={keep} onClick={() => {
+        </span><button type="button" className={toolClass} aria-label="Link" data-tip={iconTools ? "Link" : undefined} onMouseDown={keep} onClick={() => {
           const url = window.prompt("Link to (https://…)");
           if (url && /^(https?:\/\/|mailto:)/i.test(url)) run("createLink", url);
-        }}>Link</button>
+        }}>{iconTools ? <LinkIcon /> : "Link"}</button>
         <span className="extra-formatting" hidden={!extras}>{button("Clear format", "removeFormat")}
         <select aria-label="Font" defaultValue="Calibri" onChange={(e) => { run("fontName", e.target.value); }}>
           {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
@@ -154,7 +176,7 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
           {SIZES.map((s) => <option key={s} value={s}>{s} pt</option>)}
         </select>
         <input type="color" aria-label="Text colour" defaultValue="#0b57a4" onChange={(e) => { run("foreColor", e.target.value); }} />
-        </span><select aria-label="Insert field" value="" onChange={(e) => {
+        </span>{fieldOptions && <select aria-label="Insert field" value="" onChange={(e) => {
           const field = fields.find((f) => f.token === e.target.value);
           const value = field && vals[field.token];
           if (!field || !box.current) return;
@@ -166,8 +188,8 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
         }}>
           <option value="">Insert field…</option>
           {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}{values && !values[f.token] ? " — no value" : ""}</option>)}
-        </select>
-        <span className="extra-formatting" hidden={!extras}><select aria-label="Insert banner" value="" onChange={(e) => {
+        </select>}
+        {banners && <span className="extra-formatting" hidden={!extras}><select aria-label="Insert banner" value="" onChange={(e) => {
           if (e.target.value) insert(`<img data-banner-id="${e.target.value}" alt="banner"><br>`);
         }}>
           <option value="">Insert banner…</option>
@@ -183,11 +205,20 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
             }} />
           </label>
         )}
-        </span>{compact && <button type="button" className="tool" aria-expanded={expanded} onMouseDown={keep}
-          onClick={() => { setExpanded(!expanded); }}>{expanded ? "Less formatting" : "More formatting"}</button>}
+        </span>}{compact && <button type="button" className={toolClass} aria-expanded={expanded}
+          aria-label={expanded ? "Less formatting" : "More formatting"} data-tip={iconTools ? (expanded ? "Less formatting" : "More formatting") : undefined}
+          onMouseDown={keep} onClick={() => { setExpanded(!expanded); }}>
+          {iconTools ? <MoreIcon /> : expanded ? "Less formatting" : "More formatting"}
+        </button>}
       </div>
-      <div ref={box} className="rich-box" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
-        aria-label="Message" aria-invalid={invalid || undefined} tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus} />
+      <div ref={box} className="rich-box" contentEditable={!readOnly} suppressContentEditableWarning role="textbox" aria-multiline="true"
+        aria-label="Message" aria-invalid={invalid || undefined} aria-readonly={readOnly || undefined} tabIndex={0}
+        onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus}
+        onDrop={plainPaste ? (event) => { event.preventDefault(); } : undefined}
+        onPaste={plainPaste ? (event) => {
+          event.preventDefault();
+          if (!readOnly && box.current) { insertHtml(box.current, plainToHtml(event.clipboardData.getData("text/plain"))); changed(); }
+        } : undefined} />
     </div>
   );
 }

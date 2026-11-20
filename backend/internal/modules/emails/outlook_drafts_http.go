@@ -28,7 +28,7 @@ func (h *HTTP) UpdateOutlookDraft(ctx context.Context, r api.UpdateOutlookDraftR
 		return nil, err
 	}
 	in := r.Body
-	out, err := h.svc.writeOutlookDraft(ctx, p, r.MessageId, in.Version, api.OutlookDraftInput{Subject: in.Subject, Body: in.Body, To: in.To, Cc: in.Cc, Bcc: in.Bcc}, false)
+	out, err := h.svc.writeOutlookDraft(ctx, p, r.MessageId, in.Version, api.OutlookDraftInput{Subject: in.Subject, Body: in.Body, BodyHtml: in.BodyHtml, To: in.To, Cc: in.Cc, Bcc: in.Bcc}, false)
 	return api.UpdateOutlookDraft200JSONResponse(out), err
 }
 func (h *HTTP) DeleteOutlookDraft(ctx context.Context, r api.DeleteOutlookDraftRequestObject) (api.DeleteOutlookDraftResponseObject, error) {
