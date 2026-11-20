@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { fieldSettingsKey, policiesKey } from "../api/keys";
 import { SalaryCalculationSettings } from "../components/SalaryCalculationSettings";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { chipStyle } from "../components/companyCategory";
+import { useSettingsAnchor } from "../components/useSettingsAnchor";
 import { fieldErrors } from "../components/forms";
 import { NOTICE_UNIT, keysOf } from "../labels";
 
@@ -42,50 +43,41 @@ export function SalarySettings() {
 export function ListSettings() {
   const settings = useFieldSettingsQuery();
   const lists = settings.data?.lists ?? [];
-  // "#/settings/lists#contact-roles" opens the page at that part (links from a contact's card).
-  const part = window.location.hash.split("#")[2];
-  useEffect(() => {
-    if (!part || !settings.data) return;
-    const el = document.getElementById(part);
-    if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
-  }, [part, settings.data]);
   return (
     <main>
       <h2>Dropdowns &amp; categories</h2>
       <ErrorMessage error={settings.error} />
       {settings.data && (
-        <>
-          <p className="muted">Industries and subindustries have <a href="#/industries">their own page</a>.</p>
-          <h3>Dropdowns</h3>
-          {lists.filter((l) => !l.hints && !l.colors && l.name !== "industry" && !CLAIM_LISTS.includes(l.name)).map((l) => <ListEditor key={l.name} list={l} />)}
-          <h3 id="company-categories">Company categories</h3>
-          <p className="muted">
-            The categories a company can be in (signed client, prospect, VIP…), each with its colour: the colour of its card on the
-            company&apos;s page and its chip in the list. Rename them, add your own, choose the colours.
-          </p>
-          {lists.filter((l) => l.name === "company_category").map((l) => <ListEditor key={l.name} list={l} />)}
-          <h3 id="contact-roles">Contact roles</h3>
-          <p className="muted">
-            What a contact does in hiring (hiring manager, HR…), each with its colour: the colour of their card and their chip in
-            the contact list, where you can filter by it. Rename them, add your own, choose the colours.
-          </p>
-          {lists.filter((l) => l.name === "contact_role").map((l) => <ListEditor key={l.name} list={l} />)}
-          <h3 id="benefits-template">Company benefits template</h3>
-          <p className="muted">
-            What to record for each client on its page: its benefits, and the steps it takes before an offer. Rename, reorder,
-            hide or add items; the hint under each says what to write.
-          </p>
-          {lists.filter((l) => l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
-          <h3 id="claims">Expense claims</h3>
-          <p className="muted">
-            Receipt types are what a receipt is for (Grab fare, food, drinks…), each with its colour: a receipt is matched to one
-            when it is read, by the words of its name. Claim types are what people choose a claim is. Rename them, add your own;
-            one used by a claim is hidden rather than removed.
-          </p>
-          {lists.filter((l) => CLAIM_LISTS.includes(l.name)).map((l) => <ListEditor key={l.name} list={l} />)}
-        </>
+        <div className="panel settings-list-panel">
+          <SettingsPart id="dropdowns" label="Dropdowns">
+            {lists.filter((l) => !l.hints && !l.colors && l.name !== "industry" && !CLAIM_LISTS.includes(l.name)).map((l) => <ListEditor key={l.name} list={l} />)}
+          </SettingsPart>
+          <SettingsPart id="company-categories" label="Company categories">
+            {lists.filter((l) => l.name === "company_category").map((l) => <ListEditor key={l.name} list={l} />)}
+          </SettingsPart>
+          <SettingsPart id="contact-roles" label="Contact roles">
+            {lists.filter((l) => l.name === "contact_role").map((l) => <ListEditor key={l.name} list={l} />)}
+          </SettingsPart>
+          <SettingsPart id="benefits-template" label="Company benefits template">
+            {lists.filter((l) => l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
+          </SettingsPart>
+          <SettingsPart id="claims" label="Expense claims">
+            {lists.filter((l) => CLAIM_LISTS.includes(l.name)).map((l) => <ListEditor key={l.name} list={l} />)}
+          </SettingsPart>
+        </div>
       )}
     </main>
+  );
+}
+
+/** Keep editors mounted so folding a section preserves unsaved work. */
+function SettingsPart({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+  const target = useSettingsAnchor(id);
+  return (
+    <details className="settings-part" id={id} ref={target} tabIndex={-1}>
+      <summary>{label}</summary>
+      {children}
+    </details>
   );
 }
 
@@ -133,6 +125,7 @@ function AgencyName() {
 
 /** Who sees a sent email that shows salary. */
 function Policies() {
+  const target = useSettingsAnchor("salary-in-emails");
   const queryClient = useQueryClient();
   const policies = useQuery({ queryKey: policiesKey, queryFn: async () => unwrap(await api.GET("/v1/settings/policies")) });
   const save = useMutation({
@@ -140,7 +133,7 @@ function Policies() {
     onSuccess: (p) => { queryClient.setQueryData(policiesKey, p); },
   });
   return (
-    <section className="panel" aria-label="Salary in emails">
+    <section className="panel" aria-label="Salary in emails" id="salary-in-emails" ref={target} tabIndex={-1}>
       <h3>Salary in emails</h3>
       <p className="muted">Who sees sent emails that show salary?</p>
       <ErrorMessage error={policies.error ?? save.error} />
@@ -156,6 +149,7 @@ function Policies() {
 }
 
 function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
+  const target = useSettingsAnchor("mandatory-fields");
   const queryClient = useQueryClient();
   const [chosen, setChosen] = useState(() => Object.fromEntries(fields.map((f) => [`${f.form}/${f.field}`, f.mandatory])));
   const save = useMutation({
@@ -180,7 +174,7 @@ function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
     </fieldset>
   );
   return (
-    <section className="panel" aria-label="Mandatory fields">
+    <section className="panel" aria-label="Mandatory fields" id="mandatory-fields" ref={target} tabIndex={-1}>
       <h3>Mandatory fields</h3>
       <div className="row">{group("candidate", "Candidates")}{group("job", "Jobs")}</div>
       <div className="row">
@@ -216,6 +210,8 @@ function ListEditor({ list }: { list: List }) {
     setRows(next);
   };
   const notice = list.name === "notice_period";
+  const noticeId = notice ? "notice-period" : undefined;
+  const target = useSettingsAnchor(noticeId);
   const add = () => {
     if (notice) {
       const n = Number(adding.value);
@@ -227,7 +223,7 @@ function ListEditor({ list }: { list: List }) {
     setAdding({ ...adding, label: "", hint: "" });
   };
   return (
-    <section className="panel" aria-label={list.label}>
+    <section className="panel" aria-label={list.label} id={noticeId} ref={target} tabIndex={notice ? -1 : undefined}>
       <h4>{list.label}</h4>
       <div className="table-scroll">
         <table>

@@ -62,7 +62,10 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
 
   const permissions = me.data.permissions;
   const { route, id } = resolve(hash, permissions);
-  const inSettings = route.menu?.in === "settings" || menu("settings", permissions).some((r) => r.section === route.section);
+  const settingsPages = menu("settings", permissions);
+  const inSettings = route.menu?.in === "settings";
+  // Links to editors within a settings page should keep its forms mounted.
+  const pageKey = inSettings ? hash.split("#", 2).join("#") : hash;
   const canUseCalendar = permissions.includes("calendars:use");
   const onCalendar = route.section === "calendar";
   const showCalendarDock = canUseCalendar && calendarDocked && !onCalendar;
@@ -113,11 +116,10 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       <div className="shell-content">
         <div className="shell-page" inert={calendarModal}>
           <AiNotice permissions={permissions} />
-          {/* key: a new location starts with a fresh boundary */}
-          <PageErrorBoundary key={hash}>
+          <PageErrorBoundary key={pageKey}>
             <Suspense fallback={<p className="muted page-loading">Loading…</p>}>
               {route.menu?.in === "settings" ? (
-                <SettingsLayout section={route.section} pages={menu("settings", permissions)}>
+                <SettingsLayout section={route.section} pages={settingsPages} permissions={permissions}>
                   {route.render({ permissions, me: me.data, id })}
                 </SettingsLayout>
               ) : route.render({ permissions, me: me.data, id })}

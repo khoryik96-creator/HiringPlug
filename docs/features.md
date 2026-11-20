@@ -1486,15 +1486,20 @@ on hover and keyboard focus. The forms and their save actions keep visible label
 
 ## Main settings ✅
 
-One **Settings** button in the top bar leads to everything that is set up
-rather than worked on, with a menu of its parts on the left; each person sees
-the parts they may change: **General** (the agency's name and mandatory
-fields), **Salary** (salary in emails and how a package is worked out),
-**Dropdowns & categories** (the dropdowns' options, company categories,
-contact roles and the benefits template), **Industries**, **AI provider**, **Team**,
-**Roles and access**, **Data protection**, **Integrations**, **CV templates**,
-**Email templates**, **System** and **Your account** (booking hours,
-password), which everyone has.
+**Settings** groups the pages on the left by personal preferences, recruiting
+setup, email and scheduling, team and agency, finance, and system and
+integrations. The current group opens automatically. The menu and search
+show pages available to the signed-in user.
+
+**Search settings and features** accepts page names or phrases such as
+“connect Outlook”, “who can see salary”, and “upload CVs”. Select a result or
+press Enter to open the top match. Results can link straight to a setting
+or an available feature such as Outlook Mail, Calendar, or CV import.
+Search uses page names and keywords in the browser.
+
+**Dropdowns & categories** groups editors into collapsible sections.
+Folding a section keeps edits until you leave the page. A link to a section
+opens its editor.
 
 **System** (owners and admins) shows the company's background work in plain
 words (sending emails, reading CVs, making PDF copies, ...): how much is

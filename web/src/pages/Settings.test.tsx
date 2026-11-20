@@ -42,8 +42,8 @@ describe("settings", () => {
     answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ name: "company_benefits", label: "Company benefits", kind: "open", hints: true, options: [] }));
     renderWithClient(<ListSettings />);
+    fireEvent.click(await screen.findByText("Company benefits template", { selector: "summary" }));
     const benefits = await screen.findByRole("region", { name: "Company benefits" });
-    expect(screen.getByRole("heading", { name: "Company benefits template" })).toBeTruthy();
     expect(within(benefits).getByLabelText<HTMLInputElement>("Hint for Annual leave").value).toBe("If it grows with service or grade, give the detail");
     expect(within(screen.getByRole("region", { name: "Candidate source" })).queryByLabelText(/Hint/)).toBeNull();
 

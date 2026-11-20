@@ -57,22 +57,53 @@ for (const role of ["owner", "recruiter", "viewer"] as const) {
     await page.getByRole("link", { name: "Settings" }).click();
     const menu = page.getByRole("navigation", { name: "Settings" });
     await expect(menu).toBeVisible();
-    const parts = await menu.getByRole("link").allTextContents();
-    expect(parts).toContain("Your account");
-    if (role === "owner") expect(parts).toEqual(expect.arrayContaining(["General", "AI provider", "Team", "System"]));
-    else expect(parts).not.toContain("General");
-    for (const part of parts) {
-      await menu.getByRole("link", { name: part, exact: true }).click();
+    const paths = await menu.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
+    expect(paths).toContain("#/account");
+    if (role === "owner") expect(paths).toEqual(expect.arrayContaining(["#/settings", "#/ai-provider", "#/team", "#/system"]));
+    else expect(paths).not.toContain("#/settings");
+    for (const path of paths) {
+      const link = menu.locator(`a[href="${path}"]`);
+      const group = link.locator("xpath=ancestor::details");
+      if (await group.getAttribute("open") === null) await group.locator("summary").click();
+      await link.click();
       await expect(page.getByText("This page could not be shown")).toHaveCount(0);
-      await expect(menu.getByRole("link", { name: part, exact: true })).toHaveAttribute("aria-current", "page");
+      await expect(link).toHaveAttribute("aria-current", "page");
+      await expect(link).toBeVisible();
     }
-    if (role !== "owner") { // where the AI is set up, and who may do it
-      await menu.getByRole("link", { name: "AI provider", exact: true }).click();
+    if (role !== "owner") {
+      await opens(page, "#/ai-provider", "AI provider");
       await expect(page.getByText("Only owners and admins choose the AI provider")).toBeVisible();
     }
     expect(errors).toEqual([]);
   });
 }
+
+test("settings search opens an exact editor and folding preserves unsaved list edits", async ({ page }) => {
+  await signIn(page, "owner");
+  await opens(page, "#/settings", "General");
+  const search = page.getByRole("searchbox", { name: "Search settings and features" });
+  await search.fill("who can see salary");
+  await expect(page.getByRole("link", { name: "Salary in emails" })).toBeVisible();
+  await search.press("Enter");
+  await expect(page).toHaveURL(/#\/settings\/salary#salary-in-emails$/);
+  await expect(page.getByRole("region", { name: "Salary in emails" })).toBeFocused();
+  await search.fill("hiring manager");
+  await page.getByRole("link", { name: "Contact roles" }).click();
+  await expect(page).toHaveURL(/#\/settings\/lists#contact-roles$/);
+  const editor = page.locator("details#contact-roles");
+  const option = editor.getByRole("textbox", { name: "Contact roles option 1" });
+  await expect(option).toBeVisible();
+  await option.fill("Unsaved contact role");
+  await editor.locator("summary").click();
+  await expect(option).toBeHidden();
+  await search.fill("Contact roles");
+  await search.press("Enter");
+  await expect(option).toHaveValue("Unsaved contact role");
+  await search.fill("Company categories");
+  await search.press("Enter");
+  await expect(page.locator("details#company-categories")).toHaveAttribute("open", "");
+  await expect(option).toHaveValue("Unsaved contact role");
+});
 
 test("a candidate's page opens, with their CV", async ({ page, request }) => {
   const errors = await signIn(page, "recruiter");

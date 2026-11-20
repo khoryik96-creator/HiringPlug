@@ -97,7 +97,7 @@ describe("top bar", () => {
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
     // The profile is fetched again on each page load (an earlier test may have left another one cached).
     await waitFor(() => {
-      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "Salary", "Dropdowns & categories", "Industries", "AI provider", "Team", "System", "Your account", "My dropdowns", "LinkedIn companion"]);
+      expect(within(menu()).getAllByRole("link", { hidden: true }).map((a) => a.textContent)).toEqual(["Your account", "My dropdowns", "Dropdowns & categories", "Industries", "Salary", "General", "Team", "AI provider", "LinkedIn companion", "System"]);
     });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
     expect(screen.queryByText("Admin")).toBeNull();
@@ -106,7 +106,7 @@ describe("top bar", () => {
   it("opens the first part a recruiter may change, and leaves out the company's settings", async () => {
     signedIn(RECRUITER, "#/settings");
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
-    await waitFor(() => { expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["AI provider", "Your account", "My dropdowns", "LinkedIn companion"]); });
+    await waitFor(() => { expect(within(menu()).getAllByRole("link", { hidden: true }).map((a) => a.textContent)).toEqual(["Your account", "My dropdowns", "AI provider", "LinkedIn companion"]); });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
   });
 

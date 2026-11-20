@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
+import { useSettingsAnchor } from "./useSettingsAnchor";
 
 type Rules = Schemas["SalaryCalculationRules"];
 
@@ -18,10 +19,11 @@ export const useSalaryRules = () =>
   });
 
 export function SalaryCalculationSettings() {
+  const target = useSettingsAnchor("salary-calculation");
   const query = useSalaryRules();
   const [saved, setSaved] = useState(false);
   return (
-    <section className="panel" aria-label="Salary calculation">
+    <section className="panel" aria-label="Salary calculation" id="salary-calculation" ref={target} tabIndex={-1}>
       <h3>Salary calculation</h3>
       <ErrorMessage error={query.error} />
       {query.data && (
