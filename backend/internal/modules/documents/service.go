@@ -31,6 +31,7 @@ type Service struct {
 	whenRead       []TextReadHook
 	whenDone       []ReadDoneHook
 	enrichIndustry func(context.Context, pgx.Tx, *api.ParsedProfile) error
+	industryLabels func(context.Context, pgx.Tx) ([]string, error)
 	ai             AIAllowance // nil: the AI never fills in CV readings
 }
 

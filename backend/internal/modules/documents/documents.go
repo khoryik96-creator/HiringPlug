@@ -134,6 +134,12 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 	}
 }
 
+// UseIndustryLabels gives the AI the company's industry list, to name the
+// newest employer's industry as one of them.
+func (m *Module) UseIndustryLabels(f func(context.Context, pgx.Tx) ([]string, error)) {
+	m.service.industryLabels = f
+}
+
 // UseIndustryRecognition enriches grounded employer evidence using the shared Go rules.
 func (m *Module) UseIndustryRecognition(f func(context.Context, pgx.Tx, *api.ParsedProfile) error) {
 	m.service.enrichIndustry = f

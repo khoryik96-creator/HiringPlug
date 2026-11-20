@@ -86,6 +86,15 @@ export function fillFromJd(form: JobFormState, d: Schemas["JdDetails"]): JobForm
     workType: form.workType || (d.workType ?? ""),
     workArrangement: form.workArrangement || (d.workArrangement ?? ""),
     description: pick(form.description, d.description),
+    // A new job's 1 is the default, not something typed.
+    openings: d.openings && ["", "1"].includes(form.openings.trim()) ? String(d.openings) : form.openings,
   };
+}
+
+/** A company's name without its legal ending and punctuation, to match a JD's to one on record. */
+export function companyKey(name: string): string {
+  return name.toLowerCase()
+    .replace(/\b(sdn\.?\s*bhd\.?|berhad|bhd\.?|pte\.?\s*ltd\.?|ltd\.?|limited|inc\.?|plc|llc|corporation|corp\.?)\s*$/u, "")
+    .replace(/\([^)]*\)/gu, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 

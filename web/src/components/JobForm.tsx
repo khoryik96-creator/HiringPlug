@@ -10,7 +10,7 @@ import { Field } from "./Field";
 import { CountryOptions, useFavourites } from "./favourites";
 import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { JdDrop } from "./JdDrop";
-import { fillFromJd, formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
+import { companyKey, fillFromJd, formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
 import { SaveError } from "./SaveError";
 
 /**
@@ -27,6 +27,16 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
   const [opened] = useState(() => ({ id: job?.id, version: job?.version ?? 0, form: formFromJob(job, company) }));
   const [form, setForm] = useState(opened.form);
   const [jdFileId, setJdFileId] = useState<string | null>(null); // the JD the form was filled in from: kept with the new job
+  const [jdCompany, setJdCompany] = useState(""); // the company a JD names, when none on record matched it
+  /** The company a JD names, chosen when one on record has that name (Sdn Bhd and the like aside). */
+  const pickJdCompany = async (name: string) => {
+    const key = companyKey(name);
+    if (!key) return;
+    const found = unwrap(await api.GET("/v1/companies", { params: { query: { q: key, limit: 8 } } })).items;
+    const match = found.find((c) => companyKey(c.name) === key);
+    if (match) setForm((f) => (f.company ? f : { ...f, company: { id: match.id, name: match.name }, contactId: "" }));
+    else setJdCompany(name);
+  };
   const companyId = form.company?.id;
   const contacts = useQuery({
     queryKey: [...contactsKey, "company", companyId],
@@ -78,13 +88,20 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
     >
       {!opened.id && (
         <div className="full">
-          <JdDrop readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => { setForm((f) => fillFromJd(f, d)); setJdFileId(id); }} />
+          <JdDrop readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => {
+            setForm((f) => fillFromJd(f, d));
+            setJdFileId(id);
+            if (d.companyName && !form.company) void pickJdCompany(d.companyName).catch(() => { setJdCompany(d.companyName ?? ""); });
+          }} />
         </div>
       )}
       {text("title", req("Job title", "title"))}
-      <Field label={req("Company", "companyId")} error={errors[JOB_PATHS.company]}>
-        <CompanyPicker value={form.company} onChange={(c) => { setForm((f) => ({ ...f, company: c, contactId: "" })); }} />
-      </Field>
+      <div>
+        <Field label={req("Company", "companyId")} error={errors[JOB_PATHS.company]}>
+          <CompanyPicker value={form.company} onChange={(c) => { setForm((f) => ({ ...f, company: c, contactId: "" })); }} />
+        </Field>
+        {jdCompany && !form.company && <p className="small muted" role="status">The JD names “{jdCompany}”: choose it above, or add it as a company.</p>}
+      </div>
       <Field label={req("Hiring contact", "contactId")} error={errors[JOB_PATHS.contactId]}>
         <select value={form.contactId} disabled={!companyId} onChange={(e) => { set("contactId", e.target.value); }}>
           <option value="">—</option>

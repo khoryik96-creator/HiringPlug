@@ -77,3 +77,47 @@ func TestTheAIFillsCVReadingsOnlyWhenOnAndCounts(t *testing.T) {
 		assert.False(t, *payload.UseAi)
 	})
 }
+
+func TestTheAIsPickOfTheNewestEmployersIndustryIsTaggedWhenTheNameRulesCannotTell(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	a := newTestApp(t, assistantOn)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	text := "SITI AISYAH\nSenior Analyst | Kenanga Contoh Holdings | Jan 2021 - Present\nAnalyst | Syarikat Lama | 2018 - 2020"
+	job := func(title, company, dates, start, end string, current bool) api.ParsedJob {
+		j := api.ParsedJob{Title: sourced(title, title), Company: sourced(company, company), Dates: sourced(dates, dates),
+			StartDate: nullable.NewNullableWithValue(start), EndDate: nullable.NewNullNullable[string](), Current: current}
+		if end != "" {
+			j.EndDate = nullable.NewNullableWithValue(end)
+		}
+		return j
+	}
+	answer := func(industry nullable.Nullable[api.SourcedText]) api.ParsedProfile {
+		return api.ParsedProfile{Parser: "rules@1+ai-history", FullName: sourced("Siti Aisyah", "SITI AISYAH"), Industry: industry,
+			Skills: []api.SourcedText{}, Education: []api.ParsedEducation{}, Experience: []api.ParsedJob{
+				job("Senior Analyst", "Kenanga Contoh Holdings", "Jan 2021 - Present", "2021-01", "", true),
+				job("Analyst", "Syarikat Lama", "2018 - 2020", "2018", "2020", false),
+			}}
+	}
+	parse := func(profile api.ParsedProfile) api.ParsedProfile {
+		doc, claimed, payload := readCV(t, a, conn, token, text)
+		require.NotNil(t, payload.Industries, "the company's industry list goes with the AI read")
+		assert.Contains(t, *payload.Industries, "FSI – Banking")
+		answerAIJob(t, a, conn, claimed, api.JobKindDocumentCvParsed, api.DocumentCvParsedJob{
+			DocumentId: doc.Id, ErrorMessage: nullable.NewNullNullable[string](), Profile: nullable.NewNullableWithValue(profile)})
+		return a.getDocument(token, doc.Id).ParsedProfile.MustGet()
+	}
+
+	got := parse(answer(sourced("FSI – Banking", "Kenanga Contoh Holdings")))
+	require.True(t, got.Industry.IsSpecified() && !got.Industry.IsNull(), "tagged from the AI's pick")
+	assert.Equal(t, "Financial Services", got.Industry.MustGet().Value, "the industry the pick belongs to")
+	assert.Equal(t, 0, *got.SelectedEmployerIndex)
+
+	got = parse(answer(sourced("FSI – Banking", "Syarikat Lama")))
+	assert.True(t, got.Industry.IsNull(), "a pick for another employer than the newest is not used")
+	got = parse(answer(sourced("Space Mining", "Kenanga Contoh Holdings")))
+	assert.True(t, got.Industry.IsNull(), "a pick that is not on the list is not used")
+}

@@ -7268,6 +7268,8 @@ export interface components {
             fileName?: string;
             /** @description The AI may fill what the rules leave empty (Kano's way: when the rules find name, email, phone, current title and company, only the industry is asked for). Set when the AI is on and the company has allowance left. */
             useAi?: boolean;
+            /** @description The company's industry list (labels), sent with useAi: the AI names the newest employer's industry as one of them, and Go tags it when its own rules cannot tell from the employer's name. */
+            industries?: string[];
             /** @description What the AI may read: the text with salary figures taken out (salary never goes to the AI). Sent with useAi; quotes still come from text. */
             aiText?: string;
             /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
@@ -8633,6 +8635,10 @@ export interface components {
             salaryText: string | null;
             /** Format: date */
             closesOn: string | null;
+            /** @description The hiring company the description names, to choose it on the job. */
+            companyName?: string | null;
+            /** @description How many people it says are wanted. */
+            openings?: number | null;
             /** @description The ad text: the description's text, tidied, with its bullet points as lines starting with "- ". */
             description: string;
         };
@@ -8644,6 +8650,20 @@ export interface components {
             fileName: string;
             /** Format: int64 */
             sizeBytes: number;
+            /** @description The AI reads the details too (the title, the hiring company, where, the kind of job, how many are wanted). Set when the AI is on and the company has allowance left. Pay never goes to the AI: the worker takes it out first, and salary and closing date come from Go's rules only. */
+            useAi?: boolean;
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
+        };
+        /** @description The details the AI read from a description; every text is copied from it (Go checks). */
+        JdAiDetails: {
+            title: string | null;
+            companyName: string | null;
+            location: string | null;
+            country: components["schemas"]["CountryCode"] | null;
+            workType: components["schemas"]["WorkType"] | null;
+            workArrangement: components["schemas"]["WorkArrangement"] | null;
+            openings: number | null;
         };
         JdRenderPdfJob: {
             jdFileId: components["schemas"]["JdFileId"];
@@ -8662,6 +8682,10 @@ export interface components {
             /** @description The description's plain text, with NUL characters removed. */
             text: string | null;
             errorMessage: string | null;
+            /** @description What the AI read (with useAi), or null. */
+            aiDetails?: components["schemas"]["JdAiDetails"] | null;
+            /** @description The AI tokens used reading it. */
+            aiTokens?: number;
         };
         /** @example ad_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         JobAdId: string;

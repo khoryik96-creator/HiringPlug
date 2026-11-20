@@ -718,9 +718,18 @@ lead's company (with the built-in email check).
   text) come in Phase 3.
 - **A job from the client's JD** ✅: drop the client's job description (PDF,
   Word or text) on the Add job form, or on a job's ads to write an ad; the
-  title, location, country, work type and arrangement and the description are
-  read from it into the form (fields already typed are kept), to check and
-  save.
+  title, the hiring company, location, country, work type and arrangement, how
+  many are wanted and the description are read from it into the form (fields
+  already typed are kept), to check and save. The company is chosen when one
+  on record has its name ("Maju Foods Bhd" for "MAJU FOODS BERHAD"); otherwise
+  the form names it, to choose or add. The rules read labelled lines
+  ("Location:", "No. of vacancies:"), a letterhead as the company (never the
+  title), "About <company>", "hiring 2 …" as the openings, and take as the
+  title the first short line with a job-title word, past a slogan or a heading. With an AI provider (and allowance left), the
+  AI reads a PDF or Word JD's details too and tells the title from a slogan or
+  heading; what it gives must be text from the JD, and lines about pay are
+  taken out before it sees the JD (the salary and closing date come from the
+  rules only). Reading JDs counts in the monthly AI allowance.
 - **Job descriptions kept with the job** ✅: every JD dropped on a job (on its
   details, on an ad, or on the Add job form it was added from) stays with the
   job under Job details: a PDF, picture or text file opens in the app, any
@@ -1350,7 +1359,18 @@ the file, owned by whoever imported it, and is read like any CV; when the
 reading is done the candidate is filled in from it: name, email, phone,
 location, nationality, country of residence, LinkedIn link, current title and
 company (the latest job), industry, notice period, skills, work history and
-education. A value the rules refuse (e.g. a phone in no known format) is left
+education. **The latest employer and its industry:** with an AI provider (and
+allowance left), the AI reads the whole work history, telling the employer
+from the job title, a client the candidate was placed at, a department, a
+team or a career break, and names the latest employer's industry from the
+company's own industry list; every employer and title must be text from the
+CV. The industry is tagged from the employer's name by the rules first, and
+from the AI's pick when they cannot tell. Without the AI the rules read the
+work history, and no longer take a client ("Client: ..."), a team size
+("Team: [4]"), a career break or an aside in brackets for the employer, or
+"Promoted to" as part of the title; a name in capitals with no role word
+("CONTOH GDC MALAYSIA | 2018 - 2021") is the employer. The same reading
+fills the CV review on a candidate's page. A value the rules refuse (e.g. a phone in no known format) is left
 out and the rest kept. **One candidate per email:** when the CV's email
 belongs to a candidate already, the file is added to that candidate and the
 new one merged into them (their empty fields filled, nothing they have

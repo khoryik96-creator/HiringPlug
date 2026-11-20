@@ -11,7 +11,7 @@ from ..contracts import DocumentCvParsedJob, DocumentParseCvJob, JobKind, Parsed
 from ..parsing import parse_cv
 from ..providers import ProviderError
 from ..queue import FollowUp
-from . import cv_ai
+from . import cv_ai, cv_history
 
 if TYPE_CHECKING:
     from . import Deps
@@ -33,8 +33,12 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
                 log.warning("ai key could not be opened", extra={"document_id": payload.documentId.root})
         if ai is not None and payload.aiText:
             try:
-                filled = cv_ai.fill(profile, payload.aiText, ai)  # never the salary figures
-                profile, tokens = filled.profile, filled.tokens
+                # The AI reads the work history whenever it is on (the rules confuse a
+                # client or a team with the employer), then fills what is still missing.
+                labels = [i.root for i in payload.industries or []]
+                history = cv_history.read(profile, payload.aiText, ai, labels)  # never the salary figures
+                filled = cv_ai.fill(history.profile, payload.aiText, ai)
+                profile, tokens = filled.profile, history.tokens + filled.tokens
             except Exception:  # an AI-step bug must not lose the rules' reading
                 log.warning("ai fill failed", exc_info=True, extra={"document_id": payload.documentId.root})
     except Exception as exc:  # a rule bug must not leave the CV "being read" forever

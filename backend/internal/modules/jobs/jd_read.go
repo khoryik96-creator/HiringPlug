@@ -17,11 +17,13 @@ type JDDetails struct {
 	Title, Location, Country, WorkType, WorkArrangement, SalaryText string
 	ClosesOn                                                        *time.Time
 	Description                                                     string
+	CompanyName                                                     string // the hiring company it names
+	Openings                                                        *int   // how many are wanted
 }
 
 var (
 	bulletRe   = regexp.MustCompile(`^\s*(?:[•●▪◦○■□➢➤►▶✓✔·*–—-]|\(?[0-9]{1,2}[.)]|\(?[a-hA-H][.)])\s+`)
-	labelRe    = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z /&]{1,30}?)\s*[:：]\s*(.*)$`)
+	labelRe    = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z /&.]{1,30}?)\s*[:：]\s*(.*)$`)
 	spaceRe    = regexp.MustCompile(`[ \t\x{00a0}]+`)
 	headingRe  = regexp.MustCompile(`(?i)^(job description|jd|position description|about (us|the (company|role|job))|overview|summary|(key |job |main )?(responsibilities|requirements|qualifications|duties)|what you will do|who you are|what we offer|benefits|the role|role)\s*:?$`)
 	salaryRe   = regexp.MustCompile(`(?i)(?:RM|MYR|SGD|S\$|USD|US\$)\s?\d[\d,]*(?:\.\d+)?\s?[kK]?(?:\s?(?:-|–|to)\s?(?:RM|MYR|SGD|S\$|USD|US\$)?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?(?:\s?(?:per|/|a|an)\s?(?:month|mth|annum|year|yr|hour|hr))?`)
@@ -41,7 +43,19 @@ var jdLabels = map[string][]string{
 	"type":     {"employment type", "job type", "type", "work type", "employment", "contract type"},
 	"arrange":  {"work arrangement", "arrangement", "work mode", "working arrangement", "work model"},
 	"closes":   {"closing date", "apply by", "application deadline", "deadline", "closes", "closing"},
+	"company":  {"company", "company name", "employer", "hiring company", "organisation", "organization", "client", "syarikat"},
+	"openings": {"no. of vacancies", "no of vacancies", "vacancies", "openings", "headcount", "head count", "no. of positions", "number of positions", "no. of headcount", "positions available"},
 }
+
+var (
+	// legalNameRe is a company's registered name: "Maju Foods Berhad", "Contoh (M) Sdn. Bhd.".
+	legalNameRe = regexp.MustCompile(`(?i)^[\p{L}\p{N}&.,'()\- ]{2,80}?\b(?:sdn\.?\s*bhd\.?|berhad|bhd\.?|pte\.?\s*ltd\.?|ltd\.?|limited|inc\.?|plc|llc|corporation|corp\.?|group)\s*$`)
+	aboutRe     = regexp.MustCompile(`(?i)^about\s+(.{2,80}?)\s*:?$`)
+	countRe     = regexp.MustCompile(`\b([1-9]\d{0,2})\b`)
+	openingsRe  = regexp.MustCompile(`(?i)\b([1-9]\d?)\s+(?:positions|vacancies|openings|headcount|pax)\b|\(\s*x\s*([1-9]\d?)\s*\)|\b(?:hiring|recruiting)\s+([1-9]\d?)\s+[a-z]`)
+	// roleRe is a word job titles have: a line with one is the title before a slogan or a heading.
+	roleRe = regexp.MustCompile(`(?i)\b(?:engineers?|managers?|analysts?|executives?|officers?|specialists?|consultants?|directors?|lead|head|heads|assistants?|accountants?|developers?|designers?|planners?|architects?|administrators?|coordinators?|supervisors?|technicians?|associates?|advisors?|auditors?|controllers?|scientists?|representatives?|clerks?|interns?|trainees?|vp|chief|president|partner|programmer|tester|operator|buyer|merchandiser|nurse|pharmacist|doctor|lecturer|teacher|chef|driver|cashier|receptionist|secretary)\b`)
+)
 
 // Places a description may name, with their country.
 var jdPlaces = []struct{ name, country string }{
@@ -104,6 +118,15 @@ func ReadJD(text string, today time.Time) JDDetails {
 			if a := arrangementIn(value); a != "" && d.WorkArrangement == "" {
 				d.WorkArrangement, used[i] = a, true
 			}
+		case "company":
+			if d.CompanyName == "" && !strings.ContainsAny(value, ".;") {
+				d.CompanyName, used[i] = clipRunes(value, 200), true
+			}
+		case "openings":
+			if m := countRe.FindStringSubmatch(value); m != nil && d.Openings == nil {
+				n := atoi(m[1])
+				d.Openings, used[i] = &n, true
+			}
 		case "closes":
 			if day := dateIn(value); day != nil && d.ClosesOn == nil {
 				used[i] = true
@@ -114,15 +137,37 @@ func ReadJD(text string, today time.Time) JDDetails {
 		}
 	}
 
+	if d.CompanyName == "" {
+		d.CompanyName = companyIn(lines)
+	}
 	if d.Title == "" {
 		for i, line := range lines {
 			if line == "" || strings.HasPrefix(line, "- ") || headingRe.MatchString(line) {
+				continue
+			}
+			if legalNameRe.MatchString(line) { // the client's letterhead, not the title
 				continue
 			}
 			if words := len(strings.Fields(line)); words <= 10 && len([]rune(line)) <= 90 && !strings.ContainsAny(line, ":.;") {
 				d.Title, used[i] = strings.TrimSpace(strings.TrimPrefix(line, "Job Description - ")), true
 			}
 			break
+		}
+		// A slogan or a heading came first ("Banking Made Simple"): the title is the
+		// first short line with a job-title word, when there is one.
+		if !roleRe.MatchString(d.Title) {
+			for i, line := range lines {
+				short := len(strings.Fields(line)) <= 8 && len([]rune(line)) <= 80 && !strings.ContainsAny(line, ":.;")
+				if line != "" && short && !strings.HasPrefix(line, "- ") && !legalNameRe.MatchString(line) && roleRe.MatchString(line) {
+					for j := range used {
+						if lines[j] == d.Title {
+							delete(used, j)
+						}
+					}
+					d.Title, used[i] = strings.TrimSpace(strings.TrimPrefix(line, "Job Description - ")), true
+					break
+				}
+			}
 		}
 	}
 	whole := strings.Join(lines, "\n")
@@ -138,6 +183,12 @@ func ReadJD(text string, today time.Time) JDDetails {
 	if d.Location == "" {
 		d.Location = placeIn(whole)
 	}
+	if d.Openings == nil {
+		if m := openingsRe.FindStringSubmatch(whole); m != nil {
+			n := atoi(m[1] + m[2] + m[3])
+			d.Openings = &n
+		}
+	}
 	d.Country = countryOf(d.Location)
 	if d.Country == "" {
 		d.Country = countryOf(placeIn(whole))
@@ -152,6 +203,25 @@ func ReadJD(text string, today time.Time) JDDetails {
 	}
 	d.Description = clipRunes(strings.TrimSpace(strings.Join(unwrap(body), "\n")), 20000)
 	return d
+}
+
+// companyIn is the hiring company a description names: its registered name
+// on a line of its own near the top (a letterhead), or after "About".
+func companyIn(lines []string) string {
+	seen := 0
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		if m := aboutRe.FindStringSubmatch(line); m != nil && !headingRe.MatchString(line) && isHeading(line) {
+			return clipRunes(strings.TrimSpace(m[1]), 200)
+		}
+		if seen < 6 && legalNameRe.MatchString(line) {
+			return clipRunes(strings.TrimSpace(line), 200)
+		}
+		seen++
+	}
+	return ""
 }
 
 // unwrap undoes a PDF's line wrapping (a line going on in lower case joins

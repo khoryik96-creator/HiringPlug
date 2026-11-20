@@ -116,8 +116,9 @@ def test_the_job_uses_the_ai_only_when_go_allows_it() -> None:
 
     [on] = parse_cv.run(DocumentParseCvJob.model_validate(with_ai | {"aiText": ai_text}), deps)
     result = DocumentCvParsedJob.model_validate(on.payload.model_dump(mode="json"))
-    assert result.aiTokens == 460
-    [(_, prompt)] = ai.calls
-    assert "8,500" not in prompt, "salary never goes to the AI"
+    assert result.aiTokens == 920, "the work-history read, then the fill"
+    history, fill = ai.calls
+    for _, prompt in (history, fill):
+        assert "8,500" not in prompt, "salary never goes to the AI"
     assert result.profile is not None
     assert result.profile.industry is None, "Go owns employer-sector rules"

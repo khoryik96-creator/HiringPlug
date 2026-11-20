@@ -682,6 +682,17 @@ func (q *Queries) InsertJobSalary(ctx context.Context, arg InsertJobSalaryParams
 	return i, err
 }
 
+const jdReadTokensSince = `-- name: JdReadTokensSince :one
+SELECT coalesce(sum(ai_tokens), 0)::bigint FROM job_description_file WHERE created_at >= $1 AND ai_tokens > 0
+`
+
+func (q *Queries) JdReadTokensSince(ctx context.Context, since time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, jdReadTokensSince, since)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const jobOrderExists = `-- name: JobOrderExists :one
 SELECT EXISTS (SELECT 1 FROM job_order WHERE id = $1)
 `
@@ -1202,16 +1213,17 @@ func (q *Queries) SaveJdPdf(ctx context.Context, arg SaveJdPdfParams) (string, e
 
 const saveJdRead = `-- name: SaveJdRead :execrows
 UPDATE job_description_file
-SET status = $1, error = $2, text = $3, details = $4
-WHERE id = $5
+SET status = $1, error = $2, text = $3, details = $4, ai_tokens = $5
+WHERE id = $6
 `
 
 type SaveJdReadParams struct {
-	Status  string
-	Error   *string
-	Text    *string
-	Details []byte
-	ID      string
+	Status   string
+	Error    *string
+	Text     *string
+	Details  []byte
+	AiTokens int32
+	ID       string
 }
 
 func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (int64, error) {
@@ -1220,6 +1232,7 @@ func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (int64, 
 		arg.Error,
 		arg.Text,
 		arg.Details,
+		arg.AiTokens,
 		arg.ID,
 	)
 	if err != nil {

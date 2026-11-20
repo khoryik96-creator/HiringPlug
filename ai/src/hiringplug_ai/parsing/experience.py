@@ -50,6 +50,17 @@ _OTHER_LABEL = re.compile(
     re.I,
 )
 _NUMBERING = re.compile(r"^\(?\d{1,2}[.)]\s+")
+# Neither an employer nor a title: a client or customer served, a team or its
+# size, vendors, a career break, or a bracketed aside ("(Solutioned from KL Hub)").
+_NOT_A_JOB_PART = re.compile(
+    r"^(?:\(|(?:clients?|customers?|vendors?|sabbatical|career\s+break)\b(?!\s+(?:manager|lead|service|success|"
+    r"relations|experience|support|executive|officer|engineer|analyst|specialist|director|head))|"
+    r"team\s*(?:[:\[(]|size|of\b)|project\s*(?:[:\[(]|name\b)|(?:management|department|division|unit)\s*,)",
+    re.IGNORECASE,
+)
+_TEAM_SIZE = re.compile(r"\s*[·|•,-]?\s*\bteam\s*(?:size)?\s*:?\s*[\[(]?\s*\d+\s*[\])]?\s*$", re.IGNORECASE)
+_SHOUTED = re.compile(r"^(?=.*[A-Z]{2})[A-Z0-9&.,()'/ -]+$")  # "IBM GDC MALAYSIA": an employer's name
+_PROMOTED = re.compile(r"^(?:promoted|appointed|transferred|elevated)\s+(?:to|as)\s+", re.IGNORECASE)
 _CLIENT = re.compile(
     r"\s*[-–(]?\s*\bclients?\s*[:：][^|]*", re.I
 )  # "Coforge client :UOB | DBA" -> employer Coforge
@@ -357,6 +368,15 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
             title = name
         elif company is None and name != title:
             company = name
+    if title and _NOT_A_JOB_PART.match(title):
+        title = None
+    if company and _NOT_A_JOB_PART.match(company):
+        company = None
+    if title:
+        # "Promoted to X · Team:[4]" -> X
+        title = _TEAM_SIZE.sub("", _PROMOTED.sub("", title)).strip() or None
+    if title and company is None and not ROLE_RE.search(title) and _SHOUTED.match(title):
+        title, company = None, title  # "IBM GDC MALAYSIA | Mar 2018 - May 2021": a name, not a role
     if not (title or company) or _is_school(title, company):
         return None
     return Job(title=title, company=company, dates=dates)

@@ -1174,6 +1174,7 @@ type JobDescriptionFile struct {
 	PdfStatus   *string
 	PdfKey      *string
 	PdfError    *string
+	AiTokens    int32
 }
 
 type JobLead struct {

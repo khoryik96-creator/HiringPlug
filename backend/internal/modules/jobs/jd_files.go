@@ -113,9 +113,17 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 			row.PdfStatus = &queued
 		}
 		if !filekind.ReadHere(ctype) {
-			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJobReadJd, api.JobReadJdJob{
+			read := api.JobReadJdJob{
 				JdFileId: id, DownloadUrl: s.files.SignedURL(key, jdLinkTTL), ContentType: ctype, FileName: name, SizeBytes: int64(len(data)),
-			}); err != nil {
+			}
+			if s.ai != nil { // the AI reads the details too, in the monthly allowance
+				access, on, err := s.ai.Allowed(ctx, tx)
+				if err != nil {
+					return err
+				}
+				read.UseAi, read.Ai = &on, access
+			}
+			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJobReadJd, read); err != nil {
 				return err
 			}
 		}
@@ -161,11 +169,18 @@ func (s *Service) saveJDRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		return err
 	}
 	params := store.SaveJdReadParams{ID: result.JdFileId, Status: string(api.JdFileStatusFailed)}
+	if result.AiTokens != nil && *result.AiTokens > 0 {
+		params.AiTokens = int32(min(*result.AiTokens, 1_000_000)) //nolint:gosec // capped
+	}
 	text, _ := result.Text.Get()
 	text = strings.TrimSpace(text)
 	switch {
 	case result.Status == api.ExtractionStatusExtracted && text != "":
-		details, err := json.Marshal(ReadJD(text, time.Now()))
+		read := ReadJD(text, time.Now())
+		if ai, err := result.AiDetails.Get(); err == nil {
+			read = WithAI(text, read, ai)
+		}
+		details, err := json.Marshal(read)
 		if err != nil {
 			return err
 		}
@@ -275,6 +290,7 @@ func jdToAPI(f JDFile) api.JdFile {
 			SalaryText: c.OrNull(nonEmpty(d.SalaryText)), Country: c.OrNull(nonEmpty(d.Country)),
 			WorkType:        c.OrNull(c.Convert[api.WorkType](nonEmpty(d.WorkType))),
 			WorkArrangement: c.OrNull(c.Convert[api.WorkArrangement](nonEmpty(d.WorkArrangement))),
+			CompanyName:     c.OrNull(nonEmpty(d.CompanyName)), Openings: c.OrNull(d.Openings),
 		}
 		v.ClosesOn.SetNull()
 		if d.ClosesOn != nil {

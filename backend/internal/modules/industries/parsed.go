@@ -25,6 +25,7 @@ func (m *Module) EnrichParsed(ctx context.Context, tx pgx.Tx, p *api.ParsedProfi
 		jobs = append(jobs, Employment{Name: sourced(j.Company), Title: sourced(j.Title), Start: partial(j.StartDate), End: partial(j.EndDate), Current: j.Current})
 	}
 	selected, _ := SelectEmployer(jobs, time.Now())
+	picked, _ := p.Industry.Get() // the AI's pick for the newest employer, if it named one
 	p.SelectedEmployerIndex = nil
 	p.Industry = nullable.NewNullNullable[api.SourcedText]()
 	if selected < 0 {
@@ -37,13 +38,37 @@ func (m *Module) EnrichParsed(ctx context.Context, tx pgx.Tx, p *api.ParsedProfi
 		return err
 	}
 	category, _ := Recognize(c.Items, j, verified)
+	employer, _ := p.Experience[selected].Company.Get()
+	if category == nil && picked.Value != "" && employer.Quote != "" && picked.Quote == employer.Quote {
+		category = MatchLabel(c.Items, picked.Value) // the AI's pick, for this employer, when it is on the list
+	}
 	if category != nil {
 		label := root(*category, catalogueMap(c.Items)).Label
-		quote := p.Experience[selected].Company.MustGet().Quote
-		p.Industry = nullable.NewNullableWithValue(api.SourcedText{Value: label, Quote: quote})
+		p.Industry = nullable.NewNullableWithValue(api.SourcedText{Value: label, Quote: employer.Quote})
 	}
 	return nil
 }
+
+// Labels are the company's active industries, for the AI to name an
+// employer's industry as one of them.
+func (m *Module) Labels(ctx context.Context, tx pgx.Tx) ([]string, error) {
+	if err := m.service.ensureIn(ctx, tx); err != nil {
+		return nil, err
+	}
+	c, err := catalogueIn(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	all := catalogueMap(c.Items)
+	out := []string{}
+	for _, i := range c.Items {
+		if active(i, all) && len(out) < 400 {
+			out = append(out, i.Label)
+		}
+	}
+	return out, nil
+}
+
 func sourced(v nullable.Nullable[api.SourcedText]) string {
 	if x, e := v.Get(); e == nil {
 		return x.Value

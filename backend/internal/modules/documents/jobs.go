@@ -116,6 +116,13 @@ func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, ro
 		job.Ai = ai
 		forAI := redact.WithoutSalary(*row.ExtractedText) // salary never goes to the AI
 		job.AiText = &forAI
+		if s.industryLabels != nil {
+			labels, err := s.industryLabels(ctx, tx)
+			if err != nil {
+				return err
+			}
+			job.Industries = &labels
+		}
 	}
 	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentParseCv, job); err != nil {
 		return err

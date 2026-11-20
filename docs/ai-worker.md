@@ -108,6 +108,26 @@ fills what they miss (messy work history), and both are checked. Values are
 **suggestions**: the recruiter reviews them next to the profile and ticks
 what to use; nothing a person entered is replaced unless they tick it.
 
+**The AI's work history** (`jobs/cv_history.py`, with `useAi`): the rules'
+layout guesses confuse a client, a department, a team or a career break with
+the employer, so when the company has the AI on, the AI reads the whole work
+history (from the salary-free text) and returns each job's employer, title
+and dates, copied from the CV, and the newest employer's industry, chosen
+from the company's industry list (`industries` in the job, from Go's
+catalogue). A job whose employer is not CV text is dropped; when none is
+left, the rules' reading stands. Go grounds every quote again, picks the
+current employer from the dates, and tags the AI's industry only when its
+own employer-name rules cannot tell and the pick names that employer and is
+on the list. Then the older fill (`cv_ai.py`) asks for name, email, phone or
+location when they are still missing.
+
+**The JD's details** (`jobs/jd_ai.py`, `job.read_jd` with `useAi`): the AI
+reads the title, hiring company, location, country, work type and
+arrangement and how many are wanted from the JD's text with every line
+about pay taken out; Go (`jobs/jd_ai.go`) keeps a text only when the JD has
+it, and the salary and closing date stay its rules'. Tokens are counted on
+the JD file, in the monthly allowance.
+
 **The rules** (`parsing/`) come from Kano's CV scanner and CV Studio's
 normaliser, rebuilt as small tested modules and tuned on 25 real CVs
 (JobStreet and LinkedIn exports, Word and PDF, designer two-column layouts,

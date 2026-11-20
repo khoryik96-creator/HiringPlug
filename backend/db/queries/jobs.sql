@@ -189,7 +189,7 @@ UPDATE job_description_file SET job_id = @job_id WHERE id = @id AND job_id IS NU
 
 -- name: SaveJdRead :execrows
 UPDATE job_description_file
-SET status = @status, error = sqlc.narg(error), text = sqlc.narg(text), details = sqlc.narg(details)
+SET status = @status, error = sqlc.narg(error), text = sqlc.narg(text), details = sqlc.narg(details), ai_tokens = @ai_tokens
 WHERE id = @id;
 
 -- AI rewrites of an ad's blind version (CV Studio's way).
@@ -213,6 +213,9 @@ RETURNING *;
 
 -- name: BlindRewriteTokensSince :one
 SELECT coalesce(sum(tokens), 0)::bigint FROM job_ad_blind_rewrite WHERE created_at >= @since;
+
+-- name: JdReadTokensSince :one
+SELECT coalesce(sum(ai_tokens), 0)::bigint FROM job_description_file WHERE created_at >= @since AND ai_tokens > 0;
 
 -- The AI's rewrite becomes the ad's blind version, as a person's edit would
 -- (the ad's version moves on, so an open edit form sees the change).

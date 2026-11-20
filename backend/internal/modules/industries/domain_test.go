@@ -107,3 +107,19 @@ func TestRecognitionReadsEWalletsAndPlatformsInAName(t *testing.T) {
 	got, _ := Recognize(items, Employment{Name: "Grabowski Engineering GmbH", Title: "Engineer"}, "")
 	assert.Nil(t, got)
 }
+
+func TestTheAIsPickIsMatchedToTheList(t *testing.T) {
+	items := testCatalogue(t)
+	label := func(words string) string {
+		if i := MatchLabel(items, words); i != nil {
+			return i.Label
+		}
+		return ""
+	}
+	assert.Equal(t, "FSI – Banking", label("FSI – Banking"), "as listed")
+	assert.Equal(t, "FSI – Banking", label("fsi - banking"), "case and dashes aside")
+	assert.Equal(t, "FSI – Banking", label("Banking"), "the part after the group")
+	assert.Equal(t, "Information Technology & Services", label("Information Technology & Services"))
+	assert.Equal(t, "", label("Space Mining"), "not on the list")
+	assert.Equal(t, "", label("  "))
+}

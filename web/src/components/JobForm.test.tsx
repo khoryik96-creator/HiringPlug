@@ -60,6 +60,37 @@ describe("job form", () => {
     expect(sentBody(post)).toMatchObject({ title: "Finance Manager", jdFileId: "jdf_1" });
   });
 
+  it("chooses the company the JD names when it is on record, and takes how many are wanted", async () => {
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
+      path === "/v1/settings/fields" ? ok(testFieldSettings())
+        : path === "/v1/companies" ? ok({ items: [{ id: "comp_maju", name: "Maju Foods Bhd", city: "Shah Alam" }], nextCursor: null })
+          : ok({ items: [], nextCursor: null }))) as never);
+    const details = { title: "Senior Production Planner", location: "Shah Alam", country: "MY", workType: "full_time", workArrangement: "onsite",
+      salaryText: null, closesOn: null, description: "Plan production.", companyName: "MAJU FOODS BERHAD", openings: 2 };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      id: "jdf_2", jobId: null, fileName: "JD.pdf", status: "read", error: null, details, createdAt: "2026-11-07T00:00:00Z",
+    }), { status: 201 }));
+    renderWithClient(<JobForm job={null} onDone={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Drop the client's JD/), { target: { files: [new File(["x"], "JD.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Openings").value).toBe("2"); });
+    await waitFor(() => { expect(screen.getByText("Maju Foods Bhd")).toBeTruthy(); });
+    expect(get).toHaveBeenCalledWith("/v1/companies", { params: { query: { q: "maju foods", limit: 8 } } });
+  });
+
+  it("names the JD's company when none on record has that name", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
+      path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      id: "jdf_3", jobId: null, fileName: "JD.pdf", status: "read", error: null, createdAt: "2026-11-07T00:00:00Z",
+      details: { title: "Planner", location: null, country: null, workType: null, workArrangement: null, salaryText: null, closesOn: null,
+        description: "", companyName: "Contoh Holdings Sdn Bhd", openings: null },
+    }), { status: 201 }));
+    renderWithClient(<JobForm job={null} onDone={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Drop the client's JD/), { target: { files: [new File(["x"], "JD.txt", { type: "text/plain" })] } });
+    expect(await screen.findByText(/The JD names “Contoh Holdings Sdn Bhd”/)).toBeTruthy();
+    expect(screen.getByLabelText<HTMLInputElement>("Openings").value, "the default stays when the JD does not say").toBe("1");
+  });
+
   it("refuses a bad number of openings before sending", async () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(job));
     renderWithClient(<JobForm job={null} company={{ id: job.companyId, name: "Maybank" }} onDone={vi.fn()} />);

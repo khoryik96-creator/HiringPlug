@@ -720,6 +720,8 @@ components:
           nullable: true
         salaryText: { type: string, nullable: true, description: "As the description gives it, e.g. \"RM 8,000 - 10,000 per month\"." }
         closesOn: { type: string, format: date, nullable: true }
+        companyName: { type: string, nullable: true, description: "The hiring company the description names, to choose it on the job." }
+        openings: { type: integer, nullable: true, minimum: 1, maximum: 999, description: "How many people it says are wanted." }
         description:
           type: string
           description: "The ad text: the description's text, tidied, with its bullet points as lines starting with \"- \"."
@@ -735,6 +737,36 @@ components:
         contentType: { type: string }
         fileName: { type: string }
         sizeBytes: { type: integer, format: int64 }
+        useAi:
+          type: boolean
+          description: >
+            The AI reads the details too (the title, the hiring company, where,
+            the kind of job, how many are wanted). Set when the AI is on and
+            the company has allowance left. Pay never goes to the AI: the
+            worker takes it out first, and salary and closing date come from
+            Go's rules only.
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    JdAiDetails:
+      type: object
+      additionalProperties: false
+      description: The details the AI read from a description; every text is copied from it (Go checks).
+      required: [title, companyName, location, country, workType, workArrangement, openings]
+      properties:
+        title: { type: string, nullable: true, maxLength: 200 }
+        companyName: { type: string, nullable: true, maxLength: 200 }
+        location: { type: string, nullable: true, maxLength: 200 }
+        country:
+          allOf: [{ $ref: '#/components/schemas/CountryCode' }]
+          nullable: true
+        workType:
+          allOf: [{ $ref: '#/components/schemas/WorkType' }]
+          nullable: true
+        workArrangement:
+          allOf: [{ $ref: '#/components/schemas/WorkArrangement' }]
+          nullable: true
+        openings: { type: integer, nullable: true, minimum: 1, maximum: 999 }
     JdRenderPdfJob:
       type: object
       additionalProperties: false
@@ -763,6 +795,11 @@ components:
           pattern: '^[^\x00]*$'
           description: The description's plain text, with NUL characters removed.
         errorMessage: { type: string, nullable: true }
+        aiDetails:
+          allOf: [{ $ref: '#/components/schemas/JdAiDetails' }]
+          nullable: true
+          description: What the AI read (with useAi), or null.
+        aiTokens: { type: integer, minimum: 0, description: The AI tokens used reading it. }
     JobAdId:
       type: string
       pattern: '^ad_[0-9a-hjkmnp-tv-z]{26}$'

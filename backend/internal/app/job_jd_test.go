@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -135,4 +136,50 @@ func TestAJobDescriptionFillsInANewJob(t *testing.T) {
 		"only those who may add jobs")
 	other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/jd-files/"+f.Id, other, nil).Status, "only your company's")
+}
+
+func TestTheAIReadsAJobDescriptionsDetailsAndCountsItsTokens(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, assistantOn)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	ctx := context.Background()
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+
+	res := a.upload("/v1/jd-files", token, "", "JD.pdf", minimalPDF)
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var f api.JdFile
+	res.JSON(&f)
+	claimed := claimAIJobWhere(t, aiConn, "jdFileId", f.Id)
+	var asked api.JobReadJdJob
+	require.NoError(t, json.Unmarshal(claimed.Payload, &asked))
+	require.NotNil(t, asked.UseAi)
+	assert.True(t, *asked.UseAi, "the AI reads the details too when it is on")
+
+	letterhead := "MAJU FOODS BERHAD\nDriving Growth Across Asia\nWe are hiring 2 planners for our Shah Alam plant.\n" +
+		"Senior Production Planner\nPay: RM 7,000 - 8,500 a month"
+	tokens := 900
+	answerAIJob(t, a, aiConn, claimed, api.JobKindJobJdRead, api.JobJdReadJob{
+		JdFileId: f.Id, Status: api.ExtractionStatusExtracted, Text: nullable.NewNullableWithValue(letterhead),
+		ErrorMessage: nullable.NewNullNullable[string](), AiTokens: &tokens,
+		AiDetails: nullable.NewNullableWithValue(api.JdAiDetails{
+			Title: nullable.NewNullableWithValue("Senior Production Planner"), CompanyName: nullable.NewNullableWithValue("Maju Foods Berhad"),
+			Location: nullable.NewNullableWithValue("Shah Alam"), Country: nullable.NewNullableWithValue("MY"),
+			WorkType:        nullable.NewNullableWithValue(api.WorkTypeFullTime),
+			WorkArrangement: nullable.NewNullableWithValue(api.WorkArrangementOnsite), Openings: nullable.NewNullableWithValue(2),
+		}),
+	})
+	var read api.JdFile
+	a.request(http.MethodGet, "/v1/jd-files/"+f.Id, token, nil).JSON(&read)
+	d := read.Details.MustGet()
+	assert.Equal(t, "Senior Production Planner", d.Title.MustGet(), "the AI's title, not the letterhead or the slogan")
+	assert.Equal(t, "Maju Foods Berhad", d.CompanyName.MustGet())
+	assert.Equal(t, 2, d.Openings.MustGet())
+	assert.Equal(t, api.WorkTypeFullTime, d.WorkType.MustGet())
+	assert.Equal(t, "RM 7,000 - 8,500 a month", d.SalaryText.MustGet(), "pay from the rules")
+
+	var status api.AssistantStatus
+	a.request(http.MethodGet, "/v1/assistant", token, nil).JSON(&status)
+	assert.EqualValues(t, 900, status.UsedTokens, "reading job descriptions is in the monthly allowance")
 }

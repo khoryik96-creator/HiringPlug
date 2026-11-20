@@ -195,6 +195,7 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.UseIndustries(m.Industries)
 	m.Companies.UseIndustries(companyIndustries{m.Industries})
 	m.Documents.UseIndustryRecognition(m.Industries.EnrichParsed)
+	m.Documents.UseIndustryLabels(m.Industries.Labels)
 	m.Settings.UseIndustries(m.Industries)
 	m.Automations = automations.New(d.Pool, automations.Deps{
 		Applications: automationApplications{m.Pipeline, m.Jobs}, Interviews: automationInterviews{m.Interviews},

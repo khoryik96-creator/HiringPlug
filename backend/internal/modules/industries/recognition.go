@@ -192,6 +192,45 @@ func Recognize(items []api.Industry, j Employment, verifiedID string) (*api.Indu
 	}
 	return nil, "Employer industry is unclear. Choose it manually; saving remains available."
 }
+
+// MatchLabel is the active industry named by words (an AI's pick): its
+// label or an alias, case, dashes and spacing aside, or else the part of a
+// label after its group ("Banking" for "FSI – Banking"). nil when none.
+func MatchLabel(items []api.Industry, words string) *api.Industry {
+	all := catalogueMap(items)
+	want := labelKey(words)
+	if want == "" {
+		return nil
+	}
+	var byPart *api.Industry
+	for _, i := range items {
+		if !active(i, all) {
+			continue
+		}
+		if labelKey(i.Label) == want {
+			return &i
+		}
+		for _, a := range i.Aliases {
+			if labelKey(a) == want {
+				return &i
+			}
+		}
+		if parts := labelGroup.Split(i.Label, 2); byPart == nil && len(parts) == 2 && labelKey(parts[1]) == want {
+			byPart = &i
+		}
+	}
+	return byPart
+}
+
+var (
+	labelGroup = regexp.MustCompile(`\s+[-–—]\s+`)
+	labelSpace = regexp.MustCompile(`[^\p{L}\p{N}&/]+`)
+)
+
+func labelKey(s string) string {
+	return strings.TrimSpace(labelSpace.ReplaceAllString(strings.ToLower(s), " "))
+}
+
 func originalLabel(i api.Industry) string {
 	if i.SourceKey == nil {
 		return ""

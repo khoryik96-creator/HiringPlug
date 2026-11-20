@@ -2545,6 +2545,10 @@ class DocumentTextExtractedJob(BaseModel):
     ]
 
 
+class Industry(RootModel[str]):
+    root: Annotated[str, Field(max_length=120)]
+
+
 class DocumentParseCvJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2565,6 +2569,13 @@ class DocumentParseCvJob(BaseModel):
         bool | None,
         Field(
             description="The AI may fill what the rules leave empty (Kano's way: when the rules find name, email, phone, current title and company, only the industry is asked for). Set when the AI is on and the company has allowance left.\n"
+        ),
+    ] = None
+    industries: Annotated[
+        list[Industry] | None,
+        Field(
+            description="The company's industry list (labels), sent with useAi: the AI names the newest employer's industry as one of them, and Go tags it when its own rules cannot tell from the employer's name.\n",
+            max_length=400,
         ),
     ] = None
     aiText: Annotated[
@@ -3487,7 +3498,7 @@ class IndustryId(RootModel[str]):
     root: Annotated[str, Field(pattern="^industry_[0-9a-hjkmnp-tv-z]{26}$")]
 
 
-class Industry(BaseModel):
+class Industry1(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -3506,7 +3517,7 @@ class IndustryCatalogue(BaseModel):
         extra="forbid",
     )
     version: int
-    items: list[Industry]
+    items: list[Industry1]
 
 
 class Alias(RootModel[str]):
@@ -4296,6 +4307,16 @@ class JobReadJdJob(BaseModel):
     contentType: str
     fileName: str
     sizeBytes: int
+    useAi: Annotated[
+        bool | None,
+        Field(
+            description="The AI reads the details too (the title, the hiring company, where, the kind of job, how many are wanted). Set when the AI is on and the company has allowance left. Pay never goes to the AI: the worker takes it out first, and salary and closing date come from Go's rules only.\n"
+        ),
+    ] = None
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
 
 
 class JdRenderPdfJob(BaseModel):
@@ -4315,21 +4336,6 @@ class JdPdfRenderedJob(BaseModel):
         str | None, Field(description="The PDF (base64); null when it failed.", max_length=28000000)
     ]
     error: Annotated[str | None, Field(max_length=1000)]
-
-
-class JobJdReadJob(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    jdFileId: JdFileId
-    status: ExtractionStatus
-    text: Annotated[
-        str | None,
-        Field(
-            description="The description's plain text, with NUL characters removed.", pattern="^[^\\x00]*$"
-        ),
-    ]
-    errorMessage: Annotated[str | None, Field(...)]
 
 
 class JobAdId(RootModel[str]):
@@ -7475,12 +7481,50 @@ class JdDetails(BaseModel):
         str | None, Field(description='As the description gives it, e.g. "RM 8,000 - 10,000 per month".')
     ]
     closesOn: Annotated[date | None, Field(...)]
+    companyName: Annotated[
+        str | None, Field(description="The hiring company the description names, to choose it on the job.")
+    ] = None
+    openings: Annotated[
+        int | None, Field(description="How many people it says are wanted.", ge=1, le=999)
+    ] = None
     description: Annotated[
         str,
         Field(
             description='The ad text: the description\'s text, tidied, with its bullet points as lines starting with "- ".'
         ),
     ]
+
+
+class JdAiDetails(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str | None, Field(max_length=200)]
+    companyName: Annotated[str | None, Field(max_length=200)]
+    location: Annotated[str | None, Field(max_length=200)]
+    country: Annotated[CountryCode | None, Field(...)]
+    workType: Annotated[WorkType | None, Field(...)]
+    workArrangement: Annotated[WorkArrangement | None, Field(...)]
+    openings: Annotated[int | None, Field(ge=1, le=999)]
+
+
+class JobJdReadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jdFileId: JdFileId
+    status: ExtractionStatus
+    text: Annotated[
+        str | None,
+        Field(
+            description="The description's plain text, with NUL characters removed.", pattern="^[^\\x00]*$"
+        ),
+    ]
+    errorMessage: Annotated[str | None, Field(...)]
+    aiDetails: Annotated[JdAiDetails | None, Field(description="What the AI read (with useAi), or null.")] = (
+        None
+    )
+    aiTokens: Annotated[int | None, Field(description="The AI tokens used reading it.", ge=0)] = None
 
 
 class JobAd(BaseModel):

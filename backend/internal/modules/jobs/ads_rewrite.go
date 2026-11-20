@@ -214,7 +214,13 @@ func (s *Service) saveBlindRewrite(ctx context.Context, tx pgx.Tx, job jobqueue.
 // TokensSince is the AI tokens blind ad rewrites used since a time (the
 // company's monthly allowance), in the caller's transaction.
 func (s *Service) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).BlindRewriteTokensSince(ctx, since)
+	q := store.New(tx)
+	rewrites, err := q.BlindRewriteTokensSince(ctx, since)
+	if err != nil {
+		return 0, err
+	}
+	reads, err := q.JdReadTokensSince(ctx, since) // job descriptions the AI read
+	return rewrites + reads, err
 }
 
 func orNull(s *string) nullable.Nullable[string] {
