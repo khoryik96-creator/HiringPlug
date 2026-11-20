@@ -99,6 +99,7 @@ candidate belonging to the same company.
 | `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | possible candidates by meaning (embeddings) | later |
+| `interviewprep` | questions asked at a job's interviews (`interview_question`), the AI's interview prep (`interview_prep`) | ✅ |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |
 | `leads` | licensed job-data providers; contacts found for a lead's company | later |
 | `integrations` | API key, webhook subscription and delivery | M6 |

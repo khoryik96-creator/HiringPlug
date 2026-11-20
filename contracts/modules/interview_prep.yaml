@@ -1,0 +1,399 @@
+# Module contract: interview_prep (a job's interview insights and AI prep material).
+# See contracts/README.md for the format.
+x-module:
+  name: interview_prep
+  description: >
+    Interview insights for a job: the questions asked at its interviews (as
+    candidates and the client tell them), kept with the job and archived once
+    no longer asked; and interview prep material the AI writes from the job,
+    the client and those questions: soft skills (situational and what-if) and
+    technical questions, each with why it is asked, how to approach it, the
+    trade-offs to weigh and what to avoid: guidance, never model answers.
+    Salary never goes to the AI.
+  permissions:
+    interview_prep:read:
+      description: See a job's interview questions and prep material.
+      roles: [owner, admin, recruiter, sourcer]
+    interview_prep:manage:
+      description: Record, edit and archive a job's interview questions, and have the AI write prep material.
+      roles: [owner, admin, recruiter, sourcer]
+  errorCodes:
+    INTERVIEW_PREP_AI_OFF:
+      status: 409
+      description: Writing prep material needs the AI (an AI provider set up, and this month's allowance not used up).
+    INTERVIEW_PREP_TOO_LITTLE:
+      status: 409
+      description: The job has no description, ad or recorded questions to prepare from.
+  jobs:
+    interview_prep.write:
+      queue: ai
+      payload: InterviewPrepWriteJob
+      priority: high
+      description: Write a job's interview prep material with the AI (Python AI worker).
+    interview_prep.written:
+      queue: core
+      payload: InterviewPrepWrittenJob
+      priority: high
+      description: Save the prep material and the tokens used (Go worker).
+
+paths:
+  /v1/jobs/{jobId}/interview-questions:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: listInterviewQuestions
+      tags: [interview_prep]
+      summary: The questions asked at a job's interviews, newest first
+      x-permission: interview_prep:read
+      parameters:
+        - { name: archived, in: query, required: false, schema: { type: boolean, default: false }, description: "true: the archived ones instead." }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewQuestionList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: createInterviewQuestion
+      tags: [interview_prep]
+      summary: Record a question asked at the job's interviews
+      x-permission: interview_prep:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewQuestionInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewQuestion' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/interview-questions/{questionId}:
+    parameters:
+      - { name: questionId, in: path, required: true, schema: { $ref: '#/components/schemas/InterviewQuestionId' } }
+    patch:
+      operationId: updateInterviewQuestion
+      tags: [interview_prep]
+      summary: Change a recorded question, or archive it (or bring it back)
+      x-permission: interview_prep:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewQuestionPatch' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewQuestion' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      operationId: deleteInterviewQuestion
+      tags: [interview_prep]
+      summary: Delete a question recorded by mistake
+      x-permission: interview_prep:manage
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/jobs/{jobId}/interview-preps:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: listInterviewPreps
+      tags: [interview_prep]
+      summary: The job's interview prep material, newest first
+      x-permission: interview_prep:read
+      parameters:
+        - { name: archived, in: query, required: false, schema: { type: boolean, default: false }, description: "true: the archived ones instead." }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewPrepList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: createInterviewPrep
+      tags: [interview_prep]
+      summary: Have the AI write interview prep material for the job (in the background)
+      description: >
+        From the job (its description and ad, never its salary), the client
+        (name, industry, what it does) and the questions recorded at its
+        interviews that are not archived.
+      x-permission: interview_prep:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewPrepRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewPrep' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InterviewPrepConflict' }
+
+  /v1/interview-preps/{prepId}:
+    parameters:
+      - { name: prepId, in: path, required: true, schema: { $ref: '#/components/schemas/InterviewPrepId' } }
+    patch:
+      operationId: updateInterviewPrep
+      tags: [interview_prep]
+      summary: Archive prep material (or bring it back)
+      x-permission: interview_prep:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewPrepPatch' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewPrep' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  responses:
+    InterviewPrepConflict:
+      description: The AI is off (INTERVIEW_PREP_AI_OFF), or there is too little to prepare from (INTERVIEW_PREP_TOO_LITTLE).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    InterviewQuestionId:
+      type: string
+      pattern: '^ivq_[0-9a-hjkmnp-tv-z]{26}$'
+      example: ivq_01jbz6w0m0k8q9x2r3s4t5v6w7
+    InterviewPrepId:
+      type: string
+      pattern: '^ivp_[0-9a-hjkmnp-tv-z]{26}$'
+      example: ivp_01jbz6w0m0k8q9x2r3s4t5v6w7
+    InterviewRound:
+      type: string
+      description: Which interview it was asked at.
+      enum: [screening, hr, technical, hiring_manager, panel, case_study, final, other]
+    InterviewQuestionKind:
+      type: string
+      description: technical = skills and knowledge; situational = what would you do / what if; behavioural = tell me about a time; culture = motivation and fit.
+      enum: [technical, situational, behavioural, culture, other]
+    InterviewQuestion:
+      type: object
+      required: [id, jobId, question, round, kind, askedOn, source, notes, archived, version, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/InterviewQuestionId' }
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        question: { type: string }
+        round:
+          allOf: [{ $ref: '#/components/schemas/InterviewRound' }]
+          nullable: true
+        kind: { $ref: '#/components/schemas/InterviewQuestionKind' }
+        askedOn: { type: string, format: date, nullable: true }
+        source: { type: string, nullable: true, description: "Who told it, e.g. a candidate after their second round." }
+        notes: { type: string, nullable: true, description: "What the interviewer was after, how it went." }
+        archived: { type: boolean }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    InterviewQuestionInput:
+      type: object
+      additionalProperties: false
+      required: [question, kind]
+      properties:
+        question: { type: string, minLength: 1, maxLength: 2000 }
+        round:
+          allOf: [{ $ref: '#/components/schemas/InterviewRound' }]
+          nullable: true
+        kind: { $ref: '#/components/schemas/InterviewQuestionKind' }
+        askedOn: { type: string, format: date, nullable: true }
+        source: { type: string, maxLength: 200, nullable: true }
+        notes: { type: string, maxLength: 2000, nullable: true }
+    InterviewQuestionPatch:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: integer }
+        question: { type: string, minLength: 1, maxLength: 2000 }
+        round:
+          allOf: [{ $ref: '#/components/schemas/InterviewRound' }]
+          nullable: true
+        kind: { $ref: '#/components/schemas/InterviewQuestionKind' }
+        askedOn: { type: string, format: date, nullable: true }
+        source: { type: string, maxLength: 200, nullable: true }
+        notes: { type: string, maxLength: 2000, nullable: true }
+        archived: { type: boolean }
+    InterviewQuestionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/InterviewQuestion' }
+    InterviewPrepStatus:
+      type: string
+      description: queued = the AI is writing it; done = written; failed = it could not be (see error).
+      enum: [queued, done, failed]
+    InterviewPrepRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        focus: { type: string, maxLength: 1000, description: "Anything to focus on, e.g. the candidate is strong technically but new to banking." }
+    InterviewPrepItem:
+      type: object
+      additionalProperties: false
+      description: One question, in short points that are easy to scan (never an essay or a full model answer).
+      required: [question, kind, whyAsked, approach, phrasing, tradeOffs, pitfalls, fromInterviews]
+      properties:
+        question: { type: string, maxLength: 400, description: "The question, or the kind of question to expect." }
+        kind: { type: string, maxLength: 60, description: "E.g. Situational, What-if, Behavioural, Technical, System design." }
+        whyAsked: { type: string, maxLength: 300, description: "The rationale, in a sentence or two: what the interviewer is testing." }
+        approach:
+          type: array
+          maxItems: 5
+          description: How to approach it, as short steps (guidance, not a model answer).
+          items: { type: string, maxLength: 200 }
+        phrasing:
+          type: array
+          maxItems: 3
+          description: Examples of how to phrase a key line (an opening, a framing, a trade-off), to adapt in their own words.
+          items: { type: string, maxLength: 300 }
+        tradeOffs:
+          type: array
+          maxItems: 4
+          description: The trade-offs worth naming in the answer, briefly.
+          items: { type: string, maxLength: 200 }
+        pitfalls:
+          type: array
+          maxItems: 4
+          description: What weakens an answer, briefly.
+          items: { type: string, maxLength: 200 }
+        fromInterviews: { type: boolean, description: "Built on a question recorded at this job's interviews." }
+    InterviewPrepContent:
+      type: object
+      additionalProperties: false
+      required: [summary, focusAreas, softSkills, technical, questionsToAsk]
+      properties:
+        summary: { type: string, maxLength: 600, description: "What the interviews will probe, in two or three sentences." }
+        focusAreas:
+          type: array
+          maxItems: 8
+          items: { type: string, maxLength: 160 }
+        softSkills:
+          type: array
+          maxItems: 10
+          description: Situational, what-if and behavioural questions.
+          items: { $ref: '#/components/schemas/InterviewPrepItem' }
+        technical:
+          type: array
+          maxItems: 12
+          items: { $ref: '#/components/schemas/InterviewPrepItem' }
+        questionsToAsk:
+          type: array
+          maxItems: 6
+          description: Good questions for the candidate to ask the interviewer.
+          items: { type: string, maxLength: 250 }
+    InterviewPrep:
+      type: object
+      required: [id, jobId, status, focus, content, error, model, questionCount, archived, createdAt, finishedAt]
+      properties:
+        id: { $ref: '#/components/schemas/InterviewPrepId' }
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        status: { $ref: '#/components/schemas/InterviewPrepStatus' }
+        focus: { type: string, nullable: true }
+        content:
+          allOf: [{ $ref: '#/components/schemas/InterviewPrepContent' }]
+          nullable: true
+        error: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        questionCount: { type: integer, description: "How many recorded questions it was written from." }
+        archived: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    InterviewPrepList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/InterviewPrep' }
+    InterviewPrepPatch:
+      type: object
+      additionalProperties: false
+      required: [archived]
+      properties:
+        archived: { type: boolean }
+
+    # --- Job payloads (messages on the job queue, not HTTP bodies) ---
+    InterviewPrepQuestion:
+      type: object
+      additionalProperties: false
+      required: [question, kind]
+      properties:
+        question: { type: string }
+        kind: { $ref: '#/components/schemas/InterviewQuestionKind' }
+        round:
+          allOf: [{ $ref: '#/components/schemas/InterviewRound' }]
+          nullable: true
+        notes: { type: string, nullable: true }
+    InterviewPrepWriteJob:
+      type: object
+      additionalProperties: false
+      required: [prepId, jobTitle, companyName, jobDescription, questions]
+      properties:
+        prepId: { $ref: '#/components/schemas/InterviewPrepId' }
+        jobTitle: { type: string }
+        companyName: { type: string }
+        companyIndustry: { type: string, nullable: true }
+        companyAbout: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        workArrangement: { type: string, nullable: true }
+        jobDescription: { type: string, description: "The job's description and its ad's text, without salary." }
+        questions:
+          type: array
+          description: The questions recorded at the job's interviews (not archived).
+          items: { $ref: '#/components/schemas/InterviewPrepQuestion' }
+        focus: { type: string, nullable: true }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    InterviewPrepWrittenJob:
+      type: object
+      additionalProperties: false
+      required: [prepId, content, error, model, inputTokens, outputTokens]
+      properties:
+        prepId: { $ref: '#/components/schemas/InterviewPrepId' }
+        content:
+          allOf: [{ $ref: '#/components/schemas/InterviewPrepContent' }]
+          nullable: true
+        error: { type: string, nullable: true, description: "Why there is no material (provider down, unreadable answer, ...)." }
+        model: { type: string, nullable: true }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }

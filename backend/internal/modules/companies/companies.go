@@ -95,6 +95,21 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 		api.JobKindCompanyIndustryAsk: m.service.industryAsk}
 }
 
+// Profile is what a company does, for other modules (e.g. interview prep).
+type Profile struct {
+	Name            string
+	Industry, About *string
+}
+
+// ProfileOf returns a company's name, industry and description.
+func (m *Module) ProfileOf(ctx context.Context, tx pgx.Tx, companyID string) (Profile, error) {
+	row, err := store.New(tx).GetCompany(ctx, companyID)
+	if err != nil {
+		return Profile{}, err
+	}
+	return Profile{Name: row.Name, Industry: row.Industry, About: row.About}, nil
+}
+
 // Terms returns a client's terms of business (nothing set when none were
 // saved), for other modules: a new placement's fee, payment terms and
 // guarantee come from them.

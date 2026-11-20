@@ -97,6 +97,17 @@ func (m *Module) ViewIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id st
 	return m.service.view(ctx, tx, p, fromRow(row))
 }
 
+// AdText is the text of the job's newest ad (title and description, as
+// written for the original ad; "" when it has none), for other modules
+// (e.g. interview prep).
+func (m *Module) AdText(ctx context.Context, tx pgx.Tx, jobID string) (string, error) {
+	ads, err := store.New(tx).ListJobAds(ctx, jobID)
+	if err != nil || len(ads) == 0 {
+		return "", err
+	}
+	return RewriteSource(adFromRow(ads[0]).Details), nil
+}
+
 // Brief is what other modules need to show a job.
 type Brief struct {
 	Title     string

@@ -61,6 +61,8 @@ class Permission(StrEnum):
     identity_team_manage = "identity.team:manage"
     intake_create = "intake:create"
     integrations_manage = "integrations:manage"
+    interview_prep_manage = "interview_prep:manage"
+    interview_prep_read = "interview_prep:read"
     interviews_feedback = "interviews:feedback"
     interviews_read = "interviews:read"
     interviews_schedule = "interviews:schedule"
@@ -138,6 +140,8 @@ class ErrorCode(StrEnum):
     INTERNAL = "INTERNAL"
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
     INTERVIEW_NOT_ALLOWED = "INTERVIEW_NOT_ALLOWED"
+    INTERVIEW_PREP_AI_OFF = "INTERVIEW_PREP_AI_OFF"
+    INTERVIEW_PREP_TOO_LITTLE = "INTERVIEW_PREP_TOO_LITTLE"
     JOB_AD_BLIND_AI_OFF = "JOB_AD_BLIND_AI_OFF"
     JOB_AD_BLIND_TOO_SHORT = "JOB_AD_BLIND_TOO_SHORT"
     JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
@@ -214,6 +218,8 @@ class JobKind(StrEnum):
     email_outlook_sync = "email.outlook_sync"
     email_send = "email.send"
     interview_remind = "interview.remind"
+    interview_prep_write = "interview_prep.write"
+    interview_prep_written = "interview_prep.written"
     jd_blind = "jd.blind"
     jd_blinded = "jd.blinded"
     jd_pdf_rendered = "jd.pdf_rendered"
@@ -3771,6 +3777,219 @@ class WebhookDeliverJob(BaseModel):
     deliveryId: WebhookDeliveryId
 
 
+class InterviewQuestionId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["ivq_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^ivq_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class InterviewPrepId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["ivp_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^ivp_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class InterviewRound(StrEnum):
+    screening = "screening"
+    hr = "hr"
+    technical = "technical"
+    hiring_manager = "hiring_manager"
+    panel = "panel"
+    case_study = "case_study"
+    final = "final"
+    other = "other"
+
+
+class InterviewQuestionKind(StrEnum):
+    technical = "technical"
+    situational = "situational"
+    behavioural = "behavioural"
+    culture = "culture"
+    other = "other"
+
+
+class InterviewQuestionInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    question: Annotated[str, Field(max_length=2000, min_length=1)]
+    round: InterviewRound | None = None
+    kind: InterviewQuestionKind
+    askedOn: date | None = None
+    source: Annotated[str | None, Field(max_length=200)] = None
+    notes: Annotated[str | None, Field(max_length=2000)] = None
+
+
+class InterviewQuestionPatch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: int
+    question: Annotated[str | None, Field(max_length=2000, min_length=1)] = None
+    round: InterviewRound | None = None
+    kind: InterviewQuestionKind | None = None
+    askedOn: date | None = None
+    source: Annotated[str | None, Field(max_length=200)] = None
+    notes: Annotated[str | None, Field(max_length=2000)] = None
+    archived: bool | None = None
+
+
+class InterviewPrepStatus(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class InterviewPrepRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    focus: Annotated[
+        str | None,
+        Field(
+            description="Anything to focus on, e.g. the candidate is strong technically but new to banking.",
+            max_length=1000,
+        ),
+    ] = None
+
+
+class ApproachItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=200)]
+
+
+class PhrasingItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=300)]
+
+
+class TradeOff(RootModel[str]):
+    root: Annotated[str, Field(max_length=200)]
+
+
+class Pitfall(RootModel[str]):
+    root: Annotated[str, Field(max_length=200)]
+
+
+class InterviewPrepItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    question: Annotated[
+        str, Field(description="The question, or the kind of question to expect.", max_length=400)
+    ]
+    kind: Annotated[
+        str,
+        Field(description="E.g. Situational, What-if, Behavioural, Technical, System design.", max_length=60),
+    ]
+    whyAsked: Annotated[
+        str,
+        Field(
+            description="The rationale, in a sentence or two: what the interviewer is testing.",
+            max_length=300,
+        ),
+    ]
+    approach: Annotated[
+        list[ApproachItem],
+        Field(description="How to approach it, as short steps (guidance, not a model answer).", max_length=5),
+    ]
+    phrasing: Annotated[
+        list[PhrasingItem],
+        Field(
+            description="Examples of how to phrase a key line (an opening, a framing, a trade-off), to adapt in their own words.",
+            max_length=3,
+        ),
+    ]
+    tradeOffs: Annotated[
+        list[TradeOff], Field(description="The trade-offs worth naming in the answer, briefly.", max_length=4)
+    ]
+    pitfalls: Annotated[list[Pitfall], Field(description="What weakens an answer, briefly.", max_length=4)]
+    fromInterviews: Annotated[
+        bool, Field(description="Built on a question recorded at this job's interviews.")
+    ]
+
+
+class FocusArea(RootModel[str]):
+    root: Annotated[str, Field(max_length=160)]
+
+
+class QuestionsToAskItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=250)]
+
+
+class InterviewPrepContent(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    summary: Annotated[
+        str, Field(description="What the interviews will probe, in two or three sentences.", max_length=600)
+    ]
+    focusAreas: Annotated[list[FocusArea], Field(max_length=8)]
+    softSkills: Annotated[
+        list[InterviewPrepItem],
+        Field(description="Situational, what-if and behavioural questions.", max_length=10),
+    ]
+    technical: Annotated[list[InterviewPrepItem], Field(max_length=12)]
+    questionsToAsk: Annotated[
+        list[QuestionsToAskItem],
+        Field(description="Good questions for the candidate to ask the interviewer.", max_length=6),
+    ]
+
+
+class InterviewPrepPatch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    archived: bool
+
+
+class InterviewPrepQuestion(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    question: str
+    kind: InterviewQuestionKind
+    round: InterviewRound | None = None
+    notes: str | None = None
+
+
+class InterviewPrepWriteJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    prepId: InterviewPrepId
+    jobTitle: str
+    companyName: str
+    companyIndustry: str | None = None
+    companyAbout: str | None = None
+    location: str | None = None
+    workArrangement: str | None = None
+    jobDescription: Annotated[
+        str, Field(description="The job's description and its ad's text, without salary.")
+    ]
+    questions: Annotated[
+        list[InterviewPrepQuestion],
+        Field(description="The questions recorded at the job's interviews (not archived)."),
+    ]
+    focus: str | None = None
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
+
+
+class InterviewPrepWrittenJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    prepId: InterviewPrepId
+    content: Annotated[InterviewPrepContent | None, Field(...)]
+    error: Annotated[
+        str | None, Field(description="Why there is no material (provider down, unreadable answer, ...).")
+    ]
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
+
+
 class InterviewInvitationInput(BaseModel):
     version: Annotated[int, Field(ge=1, le=2147483647)]
     teams: bool
@@ -7146,6 +7365,45 @@ class Me(BaseModel):
     tenant: Tenant
     role: Role
     permissions: list[Permission]
+
+
+class InterviewQuestion(BaseModel):
+    id: InterviewQuestionId
+    jobId: JobOrderId
+    question: str
+    round: Annotated[InterviewRound | None, Field(...)]
+    kind: InterviewQuestionKind
+    askedOn: Annotated[date | None, Field(...)]
+    source: Annotated[
+        str | None, Field(description="Who told it, e.g. a candidate after their second round.")
+    ]
+    notes: Annotated[str | None, Field(description="What the interviewer was after, how it went.")]
+    archived: bool
+    version: int
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class InterviewQuestionList(BaseModel):
+    items: list[InterviewQuestion]
+
+
+class InterviewPrep(BaseModel):
+    id: InterviewPrepId
+    jobId: JobOrderId
+    status: InterviewPrepStatus
+    focus: Annotated[str | None, Field(...)]
+    content: Annotated[InterviewPrepContent | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+    model: Annotated[str | None, Field(...)]
+    questionCount: Annotated[int, Field(description="How many recorded questions it was written from.")]
+    archived: bool
+    createdAt: AwareDatetime
+    finishedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class InterviewPrepList(BaseModel):
+    items: list[InterviewPrep]
 
 
 class Interview(BaseModel):

@@ -1041,6 +1041,40 @@ type InterviewFeedback struct {
 	SubmittedAt    time.Time
 }
 
+type InterviewPrep struct {
+	ID            string
+	TenantID      string
+	JobID         string
+	Status        string
+	Focus         *string
+	Content       []byte
+	Error         *string
+	Model         *string
+	Tokens        int32
+	QuestionCount int32
+	ArchivedAt    *time.Time
+	CreatedBy     string
+	CreatedAt     time.Time
+	FinishedAt    *time.Time
+}
+
+type InterviewQuestion struct {
+	ID         string
+	TenantID   string
+	JobID      string
+	Question   string
+	Round      *string
+	Kind       string
+	AskedOn    *time.Time
+	Source     *string
+	Notes      *string
+	ArchivedAt *time.Time
+	Version    int32
+	CreatedBy  string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 type InvoiceSetting struct {
 	TenantID     string
 	Issuer       string

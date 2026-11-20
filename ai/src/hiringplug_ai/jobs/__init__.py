@@ -31,6 +31,7 @@ from ..contracts import (
     DocumentExtractTextJob,
     DocumentParseCvJob,
     DocumentRenderPdfJob,
+    InterviewPrepWriteJob,
     JdBlindJob,
     JdRenderPdfJob,
     JobKind,
@@ -49,6 +50,7 @@ from . import (
     company_industry,
     extract_text,
     format_studio,
+    interview_prep,
     match_score,
     parse_cv,
     read_jd,
@@ -206,4 +208,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.cv_format_studio: Handler(CvFormatStudioJob, format_studio.run),
     JobKind.company_industry: Handler(CompanyIndustryJob, company_industry.run),
     JobKind.claim_read_receipt: Handler(ClaimReadReceiptJob, read_receipt.run),
+    JobKind.interview_prep_write: Handler(InterviewPrepWriteJob, interview_prep.run),
 }

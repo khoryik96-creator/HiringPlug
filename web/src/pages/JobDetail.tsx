@@ -7,6 +7,8 @@ import { BuildingIcon, EditIcon, IconActions, IconButton, PersonIcon } from "../
 import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
+import { InterviewPrepPanel } from "../components/interviewprep/InterviewPrepPanel";
+import { InterviewQuestions } from "../components/interviewprep/InterviewQuestions";
 import { JobAds } from "../components/JobAds";
 import { MarketMap } from "../components/MarketMap";
 import { JdFiles } from "../components/JdFiles";
@@ -22,7 +24,7 @@ import { type Section, SectionTabs } from "../components/SectionTabs";
 import { countryName, formatDay } from "../labels";
 import { useFieldSettings } from "../components/useFieldSettings";
 
-type JobTab = "activity" | "details" | "ads" | "market" | "money" | "assistant";
+type JobTab = "activity" | "details" | "ads" | "market" | "money" | "interview" | "assistant";
 
 /** One job: the pipeline on top, the rest in tabs. Render it with key={id} so edit state never carries over. */
 export function JobDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
@@ -59,6 +61,10 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
       <JobRetainer jobId={j.id} permissions={permissions} />
     </> },
+    ...(permissions.includes("interview_prep:read") ? [{ id: "interview" as const, label: "Interview insights", content: <>
+      <InterviewQuestions jobId={j.id} canManage={permissions.includes("interview_prep:manage")} />
+      <InterviewPrepPanel jobId={j.id} jobTitle={j.title} canManage={permissions.includes("interview_prep:manage")} />
+    </> }] : []),
     // Kept mounted: it may be docked on the right whatever tab is open.
     ...(permissions.includes("assistant:use") ? [{ id: "assistant" as const, label: "AI assistant", keep: true,
       content: <Assistant subjectType="job" subjectId={j.id} permissions={permissions} /> }] : []),

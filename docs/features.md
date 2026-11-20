@@ -745,7 +745,8 @@ lead's company (with the built-in email check).
 - **The job page** ✅: the pipeline comes first, across the width of the
   screen, with the possible candidates folded under it; the rest is in tabs
   under it, like a candidate's: **Notes & activity**, **Job details** (and its
-  JDs), **Job ads**, **Market map** and **Budget & retainer**, with the AI
+  JDs), **Job ads**, **Market map**, **Budget & retainer** and **Interview
+  insights**, with the AI
   assistant folded at the bottom. The ads panel folds away, and each ad is a card (title, status, facts and
   its buttons) that opens to its versions, side by side or one at a time; the
   newest is open, older ones folded.
@@ -1441,6 +1442,33 @@ target companies, other titles to search, skills, typical pay, difficulty and
 where to find people, from what the AI knows of the market as well as the job
 and the counts above (never pay or names), marked as estimates. The map, with
 the insights, downloads as Word or PDF.
+
+## Interview insights ✅
+
+A tab on each job (owners, admins, recruiters and sourcers; `interview_prep:read`
+to see it, `interview_prep:manage` to change it).
+
+- **Questions asked**: record what candidates and the client say was asked at
+  the job's interviews: the question, its kind (technical, situational /
+  what-if, behavioural, motivation & fit), the round, the day, who told you and
+  a note. Questions no longer asked are **archived** (kept, out of the list and
+  out of the AI's prep, brought back any time); one recorded by mistake is
+  deleted.
+- **Interview prep with AI**: **Write prep with AI** (optionally with a focus,
+  e.g. "strong technically, new to banking") prepares material from the job
+  description and newest ad (salary lines taken out), the client's industry and
+  what it does, and the questions recorded (not archived). It is guidance on
+  how to approach each question, never a model answer to memorise, and short:
+  a two-line summary and areas to brush up on, then **soft skills**
+  (situational, what-if, behavioural) and **technical** questions, each a card
+  with *why they ask* (one line), *how to approach* (3 to 5 short steps),
+  *say it like* (1 to 3 example lines with [placeholders] for the candidate's
+  own story), *trade-offs* and what to *avoid*. Recorded questions are all
+  covered and marked **Asked at interview**. It ends with questions the
+  candidate can ask. **Copy as text** gives it plain, to paste to a candidate.
+  Each prep is kept with the job; older ones fold under **Earlier prep**, and
+  any can be archived. It uses the company's AI allowance like the other AI
+  features, and says why when the AI could not write it.
 
 ## Data protection (PDPA) ✅
 

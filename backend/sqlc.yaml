@@ -219,3 +219,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/claims/internal/store
+  - <<: *module
+    queries: db/queries/interview_prep.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/interviewprep/internal/store

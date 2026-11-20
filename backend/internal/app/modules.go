@@ -37,6 +37,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/industries"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/intake"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviewprep"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads"
@@ -56,37 +57,38 @@ import (
 
 // Modules holds every module, wired together.
 type Modules struct {
-	Identity     *identity.Module
-	Candidates   *candidates.Module
-	Documents    *documents.Module
-	Companies    *companies.Module
-	Contacts     *contacts.Module
-	Jobs         *jobs.Module
-	Pipeline     *pipeline.Module
-	Notes        *notes.Module
-	Careers      *careers.Module
-	Interviews   *interviews.Module
-	Emails       *emails.Module
-	Placements   *placements.Module
-	Reports      *reports.Module
-	Offers       *offers.Module
-	Integrations *integrations.Module
-	Leads        *leads.Module
-	Cvformats    *cvformats.Module
-	Assistant    *assistant.Module
-	Matching     *matching.Module
-	Privacy      *privacy.Module
-	Settings     *settings.Module
-	Intake       *intake.Module
-	Market       *market.Module
-	AIProviders  *aiproviders.Module
-	Scheduling   *scheduling.Module
-	Industries   *industries.Module
-	Automations  *automations.Module
-	Folders      *folders.Module
-	Bin          *bin.Module
-	Calendars    *calendars.Module
-	Claims       *claims.Module
+	Identity      *identity.Module
+	Candidates    *candidates.Module
+	Documents     *documents.Module
+	Companies     *companies.Module
+	Contacts      *contacts.Module
+	Jobs          *jobs.Module
+	Pipeline      *pipeline.Module
+	Notes         *notes.Module
+	Careers       *careers.Module
+	Interviews    *interviews.Module
+	Emails        *emails.Module
+	Placements    *placements.Module
+	Reports       *reports.Module
+	Offers        *offers.Module
+	Integrations  *integrations.Module
+	Leads         *leads.Module
+	Cvformats     *cvformats.Module
+	Assistant     *assistant.Module
+	Matching      *matching.Module
+	Privacy       *privacy.Module
+	Settings      *settings.Module
+	Intake        *intake.Module
+	Market        *market.Module
+	AIProviders   *aiproviders.Module
+	Scheduling    *scheduling.Module
+	Industries    *industries.Module
+	Automations   *automations.Module
+	Folders       *folders.Module
+	Bin           *bin.Module
+	Calendars     *calendars.Module
+	Claims        *claims.Module
+	InterviewPrep *interviewprep.Module
 	// scaffold:fields
 }
 
@@ -152,7 +154,7 @@ func NewModules(d Deps) *Modules {
 		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents},
 		AI: cvReadingAI{
 			all: aiUse{func() []tokensSince {
-				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 			}},
 			ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 		},
@@ -163,12 +165,16 @@ func NewModules(d Deps) *Modules {
 		Market:       assistantMarket{m},
 		AI:           m.AIProviders,
 		Agency:       m.Identity,
-		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies} }},
+		OtherAIUse: aiUse{func() []tokensSince {
+			return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
+		}},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
-		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs, m.Companies} }},
+		OtherAIUse: aiUse{func() []tokensSince {
+			return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
+		}},
 	}, matching.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Intake = intake.New(d.Pool, intake.Deps{
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
@@ -217,6 +223,15 @@ func NewModules(d Deps) *Modules {
 		Dropbox: claims.App{ClientID: d.Config.Dropbox.AppKey, ClientSecret: d.Config.Dropbox.AppSecret},
 	})
 	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies, m.Claims}) // records holding an option keep it
+	m.InterviewPrep = interviewprep.New(d.Pool, interviewprep.Deps{
+		Jobs: interviewPrepJobs{m.Jobs}, Companies: interviewPrepCompanies{m.Companies},
+		AI: cvReadingAI{ // prep material, in the same monthly allowance
+			all: aiUse{func() []tokensSince {
+				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
+			}},
+			ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+		},
+	})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims)
@@ -225,19 +240,19 @@ func NewModules(d Deps) *Modules {
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
 		all: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
 		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	m.Jobs.UseAI(cvReadingAI{ // blind ad rewrites, in the same monthly allowance
 		all: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
 		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	m.Companies.UseAI(cvReadingAI{ // a new company's industry, in the same monthly allowance
 		all: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
 		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
@@ -247,37 +262,38 @@ func NewModules(d Deps) *Modules {
 // Each module's handler type is called HTTP; these aliases give the embedded
 // fields distinct names.
 type (
-	identityHTTP     = identity.HTTP
-	candidatesHTTP   = candidates.HTTP
-	documentsHTTP    = documents.HTTP
-	companiesHTTP    = companies.HTTP
-	contactsHTTP     = contacts.HTTP
-	jobsHTTP         = jobs.HTTP
-	pipelineHTTP     = pipeline.HTTP
-	notesHTTP        = notes.HTTP
-	careersHTTP      = careers.HTTP
-	interviewsHTTP   = interviews.HTTP
-	emailsHTTP       = emails.HTTP
-	placementsHTTP   = placements.HTTP
-	reportsHTTP      = reports.HTTP
-	offersHTTP       = offers.HTTP
-	integrationsHTTP = integrations.HTTP
-	leadsHTTP        = leads.HTTP
-	cvformatsHTTP    = cvformats.HTTP
-	assistantHTTP    = assistant.HTTP
-	matchingHTTP     = matching.HTTP
-	privacyHTTP      = privacy.HTTP
-	settingsHTTP     = settings.HTTP
-	intakeHTTP       = intake.HTTP
-	marketHTTP       = market.HTTP
-	aiprovidersHTTP  = aiproviders.HTTP
-	schedulingHTTP   = scheduling.HTTP
-	industriesHTTP   = industries.HTTP
-	automationsHTTP  = automations.HTTP
-	foldersHTTP      = folders.HTTP
-	binHTTP          = bin.HTTP
-	calendarsHTTP    = calendars.HTTP
-	claimsHTTP       = claims.HTTP
+	identityHTTP      = identity.HTTP
+	candidatesHTTP    = candidates.HTTP
+	documentsHTTP     = documents.HTTP
+	companiesHTTP     = companies.HTTP
+	contactsHTTP      = contacts.HTTP
+	jobsHTTP          = jobs.HTTP
+	pipelineHTTP      = pipeline.HTTP
+	notesHTTP         = notes.HTTP
+	careersHTTP       = careers.HTTP
+	interviewsHTTP    = interviews.HTTP
+	emailsHTTP        = emails.HTTP
+	placementsHTTP    = placements.HTTP
+	reportsHTTP       = reports.HTTP
+	offersHTTP        = offers.HTTP
+	integrationsHTTP  = integrations.HTTP
+	leadsHTTP         = leads.HTTP
+	cvformatsHTTP     = cvformats.HTTP
+	assistantHTTP     = assistant.HTTP
+	matchingHTTP      = matching.HTTP
+	privacyHTTP       = privacy.HTTP
+	settingsHTTP      = settings.HTTP
+	intakeHTTP        = intake.HTTP
+	marketHTTP        = market.HTTP
+	aiprovidersHTTP   = aiproviders.HTTP
+	schedulingHTTP    = scheduling.HTTP
+	industriesHTTP    = industries.HTTP
+	automationsHTTP   = automations.HTTP
+	foldersHTTP       = folders.HTTP
+	binHTTP           = bin.HTTP
+	calendarsHTTP     = calendars.HTTP
+	claimsHTTP        = claims.HTTP
+	interviewprepHTTP = interviewprep.HTTP
 	// scaffold:aliases
 )
 
@@ -316,6 +332,7 @@ type Server struct {
 	*binHTTP
 	*calendarsHTTP
 	*claimsHTTP
+	*interviewprepHTTP
 	// scaffold:embeds
 }
 
@@ -324,37 +341,38 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // Server returns the composed HTTP handlers.
 func (m *Modules) Server() *Server {
 	return &Server{
-		identityHTTP:     m.Identity.HTTP,
-		candidatesHTTP:   m.Candidates.HTTP,
-		documentsHTTP:    m.Documents.HTTP,
-		companiesHTTP:    m.Companies.HTTP,
-		contactsHTTP:     m.Contacts.HTTP,
-		jobsHTTP:         m.Jobs.HTTP,
-		pipelineHTTP:     m.Pipeline.HTTP,
-		notesHTTP:        m.Notes.HTTP,
-		careersHTTP:      m.Careers.HTTP,
-		interviewsHTTP:   m.Interviews.HTTP,
-		emailsHTTP:       m.Emails.HTTP,
-		placementsHTTP:   m.Placements.HTTP,
-		reportsHTTP:      m.Reports.HTTP,
-		offersHTTP:       m.Offers.HTTP,
-		integrationsHTTP: m.Integrations.HTTP,
-		leadsHTTP:        m.Leads.HTTP,
-		cvformatsHTTP:    m.Cvformats.HTTP,
-		assistantHTTP:    m.Assistant.HTTP,
-		matchingHTTP:     m.Matching.HTTP,
-		privacyHTTP:      m.Privacy.HTTP,
-		settingsHTTP:     m.Settings.HTTP,
-		intakeHTTP:       m.Intake.HTTP,
-		marketHTTP:       m.Market.HTTP,
-		aiprovidersHTTP:  m.AIProviders.HTTP,
-		schedulingHTTP:   m.Scheduling.HTTP,
-		industriesHTTP:   m.Industries.HTTP,
-		automationsHTTP:  m.Automations.HTTP,
-		foldersHTTP:      m.Folders.HTTP,
-		binHTTP:          m.Bin.HTTP,
-		calendarsHTTP:    m.Calendars.HTTP,
-		claimsHTTP:       m.Claims.HTTP,
+		identityHTTP:      m.Identity.HTTP,
+		candidatesHTTP:    m.Candidates.HTTP,
+		documentsHTTP:     m.Documents.HTTP,
+		companiesHTTP:     m.Companies.HTTP,
+		contactsHTTP:      m.Contacts.HTTP,
+		jobsHTTP:          m.Jobs.HTTP,
+		pipelineHTTP:      m.Pipeline.HTTP,
+		notesHTTP:         m.Notes.HTTP,
+		careersHTTP:       m.Careers.HTTP,
+		interviewsHTTP:    m.Interviews.HTTP,
+		emailsHTTP:        m.Emails.HTTP,
+		placementsHTTP:    m.Placements.HTTP,
+		reportsHTTP:       m.Reports.HTTP,
+		offersHTTP:        m.Offers.HTTP,
+		integrationsHTTP:  m.Integrations.HTTP,
+		leadsHTTP:         m.Leads.HTTP,
+		cvformatsHTTP:     m.Cvformats.HTTP,
+		assistantHTTP:     m.Assistant.HTTP,
+		matchingHTTP:      m.Matching.HTTP,
+		privacyHTTP:       m.Privacy.HTTP,
+		settingsHTTP:      m.Settings.HTTP,
+		intakeHTTP:        m.Intake.HTTP,
+		marketHTTP:        m.Market.HTTP,
+		aiprovidersHTTP:   m.AIProviders.HTTP,
+		schedulingHTTP:    m.Scheduling.HTTP,
+		industriesHTTP:    m.Industries.HTTP,
+		automationsHTTP:   m.Automations.HTTP,
+		foldersHTTP:       m.Folders.HTTP,
+		binHTTP:           m.Bin.HTTP,
+		calendarsHTTP:     m.Calendars.HTTP,
+		claimsHTTP:        m.Claims.HTTP,
+		interviewprepHTTP: m.InterviewPrep.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -400,6 +418,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Calendars.JobHandlers(),
 		m.Bin.JobHandlers(),
 		m.Claims.JobHandlers(),
+		m.InterviewPrep.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

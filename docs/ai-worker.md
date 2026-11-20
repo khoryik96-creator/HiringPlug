@@ -382,6 +382,21 @@ part of a key) are replaced by fixed messages. See
 4. Test the logic with plain unit tests, and the handler with the fakes in
    `tests/test_jobs.py`.
 
+## Interview prep (built: `interview_prep.write`)
+
+`jobs/interview_prep.py` writes a job's interview prep in one call. Go sends the
+job's title, location, description and newest ad (`interviewprep.JobText`:
+lines repeated in both kept once, salary taken out by `redact.WithoutSalary`
+and any line with a currency amount dropped), the client's name, industry and
+what it does, the questions recorded at its interviews (not archived) and an
+optional focus. The model is told to give guidance, not answers, in short
+points: per question why it is asked, 3 to 5 steps, 1 to 3 example lines with
+[placeholders], trade-offs and pitfalls, covering every recorded question.
+`read()` clips every text and list to the contract's limits and drops items
+without a question; an answer with no questions, unreadable JSON or a provider
+error comes back as the reason, with the tokens used, on
+`interview_prep.written`, where Go marks the prep done or failed.
+
 ## Receipts (expense claims)
 
 `claim.read_receipt` reads a claim's receipt with the same extraction (a PDF's

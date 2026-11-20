@@ -3157,6 +3157,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/interview-questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The questions asked at a job's interviews, newest first */
+        get: operations["listInterviewQuestions"];
+        put?: never;
+        /** Record a question asked at the job's interviews */
+        post: operations["createInterviewQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/interview-questions/{questionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["schemas"]["InterviewQuestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a question recorded by mistake */
+        delete: operations["deleteInterviewQuestion"];
+        options?: never;
+        head?: never;
+        /** Change a recorded question, or archive it (or bring it back) */
+        patch: operations["updateInterviewQuestion"];
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/interview-preps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The job's interview prep material, newest first */
+        get: operations["listInterviewPreps"];
+        put?: never;
+        /**
+         * Have the AI write interview prep material for the job (in the background)
+         * @description From the job (its description and ad, never its salary), the client (name, industry, what it does) and the questions recorded at its interviews that are not archived.
+         */
+        post: operations["createInterviewPrep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/interview-preps/{prepId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prepId: components["schemas"]["InterviewPrepId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Archive prep material (or bring it back) */
+        patch: operations["updateInterviewPrep"];
+        trace?: never;
+    };
     "/v1/applications/{applicationId}/interviews": {
         parameters: {
             query?: never;
@@ -4847,11 +4929,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -8132,6 +8214,153 @@ export interface components {
         WebhookDeliverJob: {
             deliveryId: components["schemas"]["WebhookDeliveryId"];
         };
+        /** @example ivq_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        InterviewQuestionId: string;
+        /** @example ivp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        InterviewPrepId: string;
+        /**
+         * @description Which interview it was asked at.
+         * @enum {string}
+         */
+        InterviewRound: "screening" | "hr" | "technical" | "hiring_manager" | "panel" | "case_study" | "final" | "other";
+        /**
+         * @description technical = skills and knowledge; situational = what would you do / what if; behavioural = tell me about a time; culture = motivation and fit.
+         * @enum {string}
+         */
+        InterviewQuestionKind: "technical" | "situational" | "behavioural" | "culture" | "other";
+        InterviewQuestion: {
+            id: components["schemas"]["InterviewQuestionId"];
+            jobId: components["schemas"]["JobOrderId"];
+            question: string;
+            round: components["schemas"]["InterviewRound"] | null;
+            kind: components["schemas"]["InterviewQuestionKind"];
+            /** Format: date */
+            askedOn: string | null;
+            /** @description Who told it, e.g. a candidate after their second round. */
+            source: string | null;
+            /** @description What the interviewer was after, how it went. */
+            notes: string | null;
+            archived: boolean;
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        InterviewQuestionInput: {
+            question: string;
+            round?: components["schemas"]["InterviewRound"] | null;
+            kind: components["schemas"]["InterviewQuestionKind"];
+            /** Format: date */
+            askedOn?: string | null;
+            source?: string | null;
+            notes?: string | null;
+        };
+        InterviewQuestionPatch: {
+            version: number;
+            question?: string;
+            round?: components["schemas"]["InterviewRound"] | null;
+            kind?: components["schemas"]["InterviewQuestionKind"];
+            /** Format: date */
+            askedOn?: string | null;
+            source?: string | null;
+            notes?: string | null;
+            archived?: boolean;
+        };
+        InterviewQuestionList: {
+            items: components["schemas"]["InterviewQuestion"][];
+        };
+        /**
+         * @description queued = the AI is writing it; done = written; failed = it could not be (see error).
+         * @enum {string}
+         */
+        InterviewPrepStatus: "queued" | "done" | "failed";
+        InterviewPrepRequest: {
+            /** @description Anything to focus on, e.g. the candidate is strong technically but new to banking. */
+            focus?: string;
+        };
+        /** @description One question, in short points that are easy to scan (never an essay or a full model answer). */
+        InterviewPrepItem: {
+            /** @description The question, or the kind of question to expect. */
+            question: string;
+            /** @description E.g. Situational, What-if, Behavioural, Technical, System design. */
+            kind: string;
+            /** @description The rationale, in a sentence or two: what the interviewer is testing. */
+            whyAsked: string;
+            /** @description How to approach it, as short steps (guidance, not a model answer). */
+            approach: string[];
+            /** @description Examples of how to phrase a key line (an opening, a framing, a trade-off), to adapt in their own words. */
+            phrasing: string[];
+            /** @description The trade-offs worth naming in the answer, briefly. */
+            tradeOffs: string[];
+            /** @description What weakens an answer, briefly. */
+            pitfalls: string[];
+            /** @description Built on a question recorded at this job's interviews. */
+            fromInterviews: boolean;
+        };
+        InterviewPrepContent: {
+            /** @description What the interviews will probe, in two or three sentences. */
+            summary: string;
+            focusAreas: string[];
+            /** @description Situational, what-if and behavioural questions. */
+            softSkills: components["schemas"]["InterviewPrepItem"][];
+            technical: components["schemas"]["InterviewPrepItem"][];
+            /** @description Good questions for the candidate to ask the interviewer. */
+            questionsToAsk: string[];
+        };
+        InterviewPrep: {
+            id: components["schemas"]["InterviewPrepId"];
+            jobId: components["schemas"]["JobOrderId"];
+            status: components["schemas"]["InterviewPrepStatus"];
+            focus: string | null;
+            content: components["schemas"]["InterviewPrepContent"] | null;
+            error: string | null;
+            model: string | null;
+            /** @description How many recorded questions it was written from. */
+            questionCount: number;
+            archived: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+        };
+        InterviewPrepList: {
+            items: components["schemas"]["InterviewPrep"][];
+        };
+        InterviewPrepPatch: {
+            archived: boolean;
+        };
+        InterviewPrepQuestion: {
+            question: string;
+            kind: components["schemas"]["InterviewQuestionKind"];
+            round?: components["schemas"]["InterviewRound"] | null;
+            notes?: string | null;
+        };
+        InterviewPrepWriteJob: {
+            prepId: components["schemas"]["InterviewPrepId"];
+            jobTitle: string;
+            companyName: string;
+            companyIndustry?: string | null;
+            companyAbout?: string | null;
+            location?: string | null;
+            workArrangement?: string | null;
+            /** @description The job's description and its ad's text, without salary. */
+            jobDescription: string;
+            /** @description The questions recorded at the job's interviews (not archived). */
+            questions: components["schemas"]["InterviewPrepQuestion"][];
+            focus?: string | null;
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
+        };
+        InterviewPrepWrittenJob: {
+            prepId: components["schemas"]["InterviewPrepId"];
+            content: components["schemas"]["InterviewPrepContent"] | null;
+            /** @description Why there is no material (provider down, unreadable answer, ...). */
+            error: string | null;
+            model: string | null;
+            inputTokens: number;
+            outputTokens: number;
+        };
         InterviewInvitationInput: {
             version: number;
             teams: boolean;
@@ -10404,6 +10633,15 @@ export interface components {
         };
         /** @description Not allowed (TEAM_CHANGE_NOT_ALLOWED). */
         TeamChangeNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The AI is off (INTERVIEW_PREP_AI_OFF), or there is too little to prepare from (INTERVIEW_PREP_TOO_LITTLE). */
+        InterviewPrepConflict: {
             headers: {
                 [name: string]: unknown;
             };
@@ -16882,6 +17120,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookDelivery"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listInterviewQuestions: {
+        parameters: {
+            query?: {
+                /** @description true: the archived ones instead. */
+                archived?: boolean;
+            };
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewQuestionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createInterviewQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewQuestionInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewQuestion"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteInterviewQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["schemas"]["InterviewQuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateInterviewQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["schemas"]["InterviewQuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewQuestionPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewQuestion"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listInterviewPreps: {
+        parameters: {
+            query?: {
+                /** @description true: the archived ones instead. */
+                archived?: boolean;
+            };
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewPrepList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createInterviewPrep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewPrepRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewPrep"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["InterviewPrepConflict"];
+        };
+    };
+    updateInterviewPrep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prepId: components["schemas"]["InterviewPrepId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewPrepPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewPrep"];
                 };
             };
             401: components["responses"]["Unauthenticated"];
