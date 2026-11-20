@@ -49,6 +49,18 @@ export function outlookAttachmentFilePath(messageId: string, attachmentId: strin
   return `/v1/outlook/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/file`;
 }
 
+export async function uploadOutlookDraftFile(messageId: string, version: string, file: File): Promise<Schemas["OutlookDraft"]> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(`/v1/outlook/drafts/${encodeURIComponent(messageId)}/attachments?version=${encodeURIComponent(version)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+    body,
+  });
+  if (!res.ok) await throwFor(res);
+  return await res.json() as Schemas["OutlookDraft"];
+}
+
 /** Saves a file the API serves (e.g. an interview's calendar entry) under the given name. */
 export async function downloadFrom(path: string, fileName: string, type: string): Promise<void> {
   const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });

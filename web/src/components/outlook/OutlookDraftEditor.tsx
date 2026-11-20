@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
+import { uploadOutlookDraftFile } from "../../api/files";
 import { formatWhen } from "../../labels";
 import { ErrorMessage } from "../ErrorMessage";
 import { Field } from "../Field";
 import { fieldErrors, FormInvalid } from "../forms";
 import { wallTime, zonedInput } from "../calendar/dates";
-import { OutlookAttachments } from "./OutlookAttachments";
+import { maxDraftFileSize, OutlookDraftFiles } from "./OutlookDraftFiles";
 import { outlookAddresses } from "./outlookAddresses";
 
 type Draft = Schemas["OutlookDraft"];
@@ -40,7 +41,7 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
       <ErrorMessage error={query.error}/>
       {query.isPending && <p className="muted">Opening draft…</p>}
     </> : <DraftFields key={query.dataUpdatedAt} opened={query.data} setBusy={(pending) => { busy.current = pending; }}
-      onClose={onClose} onReload={() => { void query.refetch(); }}/>}
+      onClose={onClose}/>}
   </dialog>;
 }
 
@@ -56,16 +57,18 @@ function inputOf(value: typeof emptyDraft, before?: Draft): DraftInput {
 }
 
 const emptyDraft = { to: "", cc: "", bcc: "", subject: "", body: "" };
+const formOf = (draft?: Draft) => draft ? {
+  to: draft.to.join(", "), cc: draft.cc.join(", "), bcc: draft.bcc.join(", "), subject: draft.subject, body: draft.body,
+} : emptyDraft;
 type Operation = "save" | "send" | "schedule" | "discard";
+type DraftAction = Operation | "reload" | { file: File } | { remove: string };
 
-function DraftFields({ opened, onClose, onReload, setBusy }: {
-  opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; onReload: () => void; setBusy: (pending: boolean) => void;
+function DraftFields({ opened, onClose, setBusy }: {
+  opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; setBusy: (pending: boolean) => void;
 }) {
   const client = useQueryClient();
   const [draft, setDraft] = useState(opened);
-  const [form, setForm] = useState(() => opened ? {
-    to: opened.to.join(", "), cc: opened.cc.join(", "), bcc: opened.bcc.join(", "), subject: opened.subject, body: opened.body,
-  } : emptyDraft);
+  const [form, setForm] = useState(() => formOf(opened));
   const [copies, setCopies] = useState(!!(form.cc || form.bcc));
   const [later, setLater] = useState(false);
   const [notice, setNotice] = useState("");
@@ -76,7 +79,36 @@ function DraftFields({ opened, onClose, onReload, setBusy }: {
   const action = useMutation({
     onMutate: () => { setBusy(true); },
     onSettled: () => { setBusy(false); },
-    mutationFn: async (operation: Operation) => {
+    mutationFn: async (operation: DraftAction) => {
+      if (operation === "reload") {
+        if (draft) {
+          const latest = unwrap(await api.GET("/v1/outlook/drafts/{messageId}", { params: { path: { messageId: draft.messageId } } }));
+          setDraft(latest);
+          setForm(formOf(latest));
+          setCopies(Boolean(latest.cc.length || latest.bcc.length));
+          setAt(latest.schedule ? zonedInput(new Date(latest.schedule.sendAt), zone) : "");
+          setLater(false);
+        }
+        return "files";
+      }
+      if (typeof operation !== "string") {
+        let opened = draft;
+        if ("file" in operation) {
+          if (operation.file.size === 0 || operation.file.size > maxDraftFileSize) {
+            throw new Error("Choose a non-empty file up to 10 MB.");
+          }
+          if (!opened) {
+            opened = unwrap(await api.POST("/v1/outlook/drafts", { body: inputOf(form) }));
+            setDraft(opened);
+          }
+          setDraft(await uploadOutlookDraftFile(opened.messageId, opened.version, operation.file));
+        } else if (opened) {
+          setDraft(unwrap(await api.DELETE("/v1/outlook/drafts/{messageId}/attachments/{attachmentId}", {
+            params: { path: { messageId: opened.messageId, attachmentId: operation.remove }, query: { version: opened.version } },
+          })));
+        }
+        return "files";
+      }
       if (operation === "discard" && draft) {
         unwrap(await api.DELETE("/v1/outlook/drafts/{messageId}", { params: { path: { messageId: draft.messageId }, query: { version: draft.version } } }));
         return operation;
@@ -107,7 +139,7 @@ function DraftFields({ opened, onClose, onReload, setBusy }: {
         }));
       } else {
         setDraft(saved);
-        setForm({ to: saved.to.join(", "), cc: saved.cc.join(", "), bcc: saved.bcc.join(", "), subject: saved.subject, body: saved.body });
+        setForm(formOf(saved));
       }
       return operation;
     },
@@ -116,9 +148,15 @@ function DraftFields({ opened, onClose, onReload, setBusy }: {
       void client.invalidateQueries({ queryKey: outlookScheduledKey });
       if (operation === "save") {
         setNotice("Saved in Outlook Drafts.");
+      } else if (operation === "files") {
+        void client.invalidateQueries({ queryKey: ["outlook", "attachments"] });
+        setNotice("");
       } else {
         onClose(operation);
       }
+    },
+    onError: (_error, operation) => {
+      if (typeof operation !== "string") void client.invalidateQueries({ queryKey: outlookScheduledKey });
     },
   });
   const errors = fieldErrors(action.error);
@@ -141,7 +179,8 @@ function DraftFields({ opened, onClose, onReload, setBusy }: {
         <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={form.subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
         <Field label="Message" error={errorFor("body")}><textarea readOnly={draft?.bodyTruncated} maxLength={40000} rows={9} value={form.body} onChange={(e) => { update("body", e.target.value); }}/></Field>
       </fieldset>
-      {draft?.hasAttachments && <div className="full outlook-draft-attachments"><OutlookAttachments messageId={draft.messageId} /></div>}
+      <OutlookDraftFiles draft={draft} disabled={locked || action.isPending}
+        onAdd={(file) => { action.mutate({ file }); }} onRemove={(attachment) => { action.mutate({ remove: attachment.id }); }} />
       {(draft?.bodyTruncated || draft?.webUrl) && <div className="full row outlook-actions small">
         {draft.bodyTruncated && <span className="muted">Edit the full message in Outlook.</span>}
         {draft.webUrl && <a href={draft.webUrl} target="_blank" rel="noreferrer">Open in Outlook</a>}
@@ -164,7 +203,7 @@ function DraftFields({ opened, onClose, onReload, setBusy }: {
         <button type="button" disabled={locked || action.isPending} aria-expanded={later} onClick={() => { setLater(!later); }}>
           {draft?.scheduleNeedsReview ? "Review schedule" : plan ? "Change time" : "Send later"}
         </button>
-        {opened && <button type="button" disabled={action.isPending} onClick={onReload}>Reload draft</button>}
+        {draft && <button type="button" disabled={action.isPending} onClick={() => { action.mutate("reload"); }}>Reload draft</button>}
         {draft && !plan && <button type="button" disabled={action.isPending} onClick={() => {
           if (window.confirm("Move this draft to Outlook Deleted Items?")) action.mutate("discard");
         }}>Discard draft</button>}

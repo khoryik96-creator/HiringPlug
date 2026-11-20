@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -16,21 +17,19 @@ import (
 )
 
 type forwardMailFixture struct {
-	*draftProvider
+	*draftFilesProvider
 	forwards int
 }
 
 func newForwardMailFixture() *forwardMailFixture {
-	return &forwardMailFixture{draftProvider: newDraftProvider()}
+	return &forwardMailFixture{draftFilesProvider: newDraftFilesProvider()}
 }
 
 func (f *forwardMailFixture) serve(w http.ResponseWriter, r *http.Request) {
 	const original = "/me/messages/remote-message/"
 	const draft = "/me/messages/forward-draft/"
-	if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, draft+"attachments") {
-		copy := r.Clone(r.Context())
-		copy.URL.Path = original + strings.TrimPrefix(r.URL.Path, draft)
-		serveOutlookAttachmentFixture(w, copy)
+	if strings.HasPrefix(r.URL.Path, draft+"attachments") {
+		f.draftFilesProvider.serve(w, r)
 		return
 	}
 	if r.Method != http.MethodPost || r.URL.Path != original+"createForward" {
@@ -67,6 +66,9 @@ func (f *forwardMailFixture) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	f.updateVersion(payload)
 	f.drafts["forward-draft"] = payload
+	f.files["forward-draft"] = []map[string]any{{
+		"id": "copied-file", "name": "Nadia – CV.pdf", "size": len(outlookFixtureCV), "@odata.type": "#microsoft.graph.fileAttachment",
+	}}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(payload)
@@ -121,6 +123,24 @@ func TestOutlookForwardCreatesAPrivateDraftWithTheOriginalFiles(t *testing.T) {
 		"draftVersion": reopened.Version, "expectedVersion": 0, "sendAt": time.Now().Add(time.Hour),
 	})
 	require.Equal(t, http.StatusAccepted, r.Status, "%s", r.Body)
+	r = addDraftFileForTest(t, a, user, draft.MessageId, reopened.Version)
+	require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
+	var attached api.OutlookDraft
+	r.JSON(&attached)
+	assert.True(t, attached.ScheduleNeedsReview)
+	remove := draftPath + "/attachments/" + files.Items[0].Id + "?version=" + url.QueryEscape(attached.Version)
+	r = a.request("DELETE", remove, user, nil)
+	require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
+	var updated api.OutlookDraft
+	r.JSON(&updated)
+	assert.Equal(t, draft.Body, updated.Body)
+	assert.True(t, updated.ScheduleNeedsReview)
+	a.request("GET", "/v1/outlook/messages/"+draft.MessageId+"/attachments", user, nil).JSON(&files)
+	require.Len(t, files.Items, 1)
+	assert.Equal(t, "Resume.pdf", files.Items[0].FileName)
+	a.request("GET", "/v1/outlook/messages/"+inbox.Items[0].Id+"/attachments", user, nil).JSON(&files)
+	require.NotEmpty(t, files.Items)
+	assert.Equal(t, "Nadia – CV.pdf", files.Items[0].FileName, "editing the forward leaves the original message alone")
 	f.mu.Lock()
 	forwards, sends := f.forwards, f.attempts
 	f.mu.Unlock()

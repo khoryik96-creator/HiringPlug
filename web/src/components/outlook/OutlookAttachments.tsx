@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { downloadFrom, outlookAttachmentFilePath } from "../../api/files";
+import { IconButton, TrashIcon } from "../ActionIcons";
 import { isCvFileName } from "../DropZone";
 import { ErrorMessage } from "../ErrorMessage";
 import { OutlookSaveCv } from "./OutlookSaveCv";
@@ -15,11 +16,12 @@ function attachmentSize(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv = false, candidateId }: {
+export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv = false, candidateId, remove }: {
   messageId: string;
   canSaveCv?: boolean;
   canImportCv?: boolean;
   candidateId?: string;
+  remove?: { disabled: boolean; onPick: (file: Attachment) => void };
 }) {
   const [saveId, setSaveId] = useState<string>();
   const attachments = useQuery({
@@ -47,18 +49,22 @@ export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv =
     {!!attachments.data?.items.length && <ul>
       {attachments.data.items.map((file) => <li key={file.id}>
         <span><strong>{file.fileName}</strong> <small className="muted">{attachmentSize(file.sizeBytes)}</small></span>
-        {file.downloadable ? <div className="row outlook-attachment-buttons">
-          <button type="button" aria-label={`Download ${file.fileName}`} disabled={download.isPending}
-            onClick={() => { download.mutate(file); }}>
-            {download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
-          </button>
-          {canSaveCv && file.savable && isCvFileName(file.fileName) &&
-            <button type="button" aria-label={`Save ${file.fileName} to candidate`} disabled={chosen !== undefined}
-              onClick={() => { setSaveId(file.id); }}>Save CV</button>}
-          {canImportCv && file.savable && isCvFileName(file.fileName) && <a className="button"
-            aria-label={`Import ${file.fileName} as a candidate`}
-            href={`#/import?${new URLSearchParams({ outlookMessage: messageId, outlookAttachment: file.id }).toString()}`}>Import CV</a>}
-        </div> : <small className="muted">Available in Outlook</small>}
+        <div className="row outlook-attachment-buttons">
+          {file.downloadable ? <>
+            <button type="button" aria-label={`Download ${file.fileName}`} disabled={download.isPending}
+              onClick={() => { download.mutate(file); }}>
+              {download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
+            </button>
+            {canSaveCv && file.savable && isCvFileName(file.fileName) &&
+              <button type="button" aria-label={`Save ${file.fileName} to candidate`} disabled={chosen !== undefined}
+                onClick={() => { setSaveId(file.id); }}>Save CV</button>}
+            {canImportCv && file.savable && isCvFileName(file.fileName) && <a className="button"
+              aria-label={`Import ${file.fileName} as a candidate`}
+              href={`#/import?${new URLSearchParams({ outlookMessage: messageId, outlookAttachment: file.id }).toString()}`}>Import CV</a>}
+          </> : <small className="muted">Available in Outlook</small>}
+          {remove && <IconButton label={`Remove ${file.fileName}`} tip="Remove attachment" icon={<TrashIcon />} danger
+            disabled={remove.disabled} onClick={() => { remove.onPick(file); }} />}
+        </div>
         {canSaveCv && chosen?.id === file.id && <OutlookSaveCv fileName={file.fileName}
           filePath={outlookAttachmentFilePath(messageId, file.id)} candidateId={candidateId}
           onClose={() => { setSaveId(undefined); }} />}
