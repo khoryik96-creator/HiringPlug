@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -119,4 +120,35 @@ func TestPipelineListsForJobAndCandidate(t *testing.T) {
 	res = a.request(http.MethodPost, "/v1/jobs/"+otherJob.Id+"/applications", other.Users[api.RoleOwner].Token, map[string]any{"candidateId": wei.Id})
 	require.Equal(t, http.StatusBadRequest, res.Status, "%s", res.Body)
 	assert.Equal(t, []string{"candidateId"}, fieldNames(t, res.Error()), "another company's candidate does not exist for you")
+}
+
+func TestPipelineReturnsAllApplicationsAcrossTheOldLimit(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	recruiter := tenant.Users[api.RoleRecruiter]
+	company := a.createCompany(recruiter.Token, map[string]any{"name": "Pipeline Page Client"})
+	job := a.createJob(recruiter.Token, map[string]any{"companyId": company.Id, "title": "High volume role"})
+	_, err := testutil.Current.Admin.Exec(context.Background(), `
+		WITH candidates AS (
+		  INSERT INTO candidate(tenant_id, first_name, created_by, owner_id)
+		  SELECT $1, 'Test applicant '||n, $2, $2 FROM generate_series(1,1001) n RETURNING id
+		)
+		INSERT INTO application(tenant_id, job_order_id, candidate_id, created_by)
+		SELECT $1,$3,id,$2 FROM candidates`, tenant.ID, recruiter.ID, job.Id)
+	require.NoError(t, err)
+	path := "/v1/jobs/" + job.Id + "/applications"
+	var first, last api.ApplicationList
+	res := a.request(http.MethodGet, path, recruiter.Token, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res.JSON(&first)
+	require.Len(t, first.Items, 1000)
+	require.NotNil(t, first.NextCursor)
+	assert.Equal(t, first.Items[999].Id, *first.NextCursor)
+	res = a.request(http.MethodGet, path+"?cursor="+*first.NextCursor, recruiter.Token, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res.JSON(&last)
+	require.Len(t, last.Items, 1)
+	assert.Greater(t, last.Items[0].Id, first.Items[999].Id)
+	assert.Nil(t, last.NextCursor)
 }

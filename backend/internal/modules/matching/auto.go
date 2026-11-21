@@ -56,11 +56,9 @@ func (s *Service) autoScore(ctx context.Context, tx pgx.Tx, tenantID string, app
 	if err != nil || !on {
 		return err
 	}
-	if err := s.withinAllowance(ctx, tx, tenantID); err != nil {
-		return skipIfExpected(err)
-	}
 	p := authz.System(tenantID)
 	q := store.New(tx)
+	var slots int64
 	for _, a := range apps {
 		latest, err := q.LatestForApplication(ctx, a.ID)
 		if err != nil {
@@ -92,8 +90,18 @@ func (s *Service) autoScore(ctx context.Context, tx pgx.Tx, tenantID string, app
 		if cv == "" {
 			continue // scored once a CV has been read
 		}
+		if slots == 0 {
+			slots, err = s.allowanceSlots(ctx, tx, tenantID)
+			if err != nil {
+				return skipIfExpected(err)
+			}
+		}
 		if _, err := s.queue(ctx, tx, p, ai, a, job, cv); err != nil {
 			return err
+		}
+		slots--
+		if slots == 0 {
+			break
 		}
 	}
 	return nil

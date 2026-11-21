@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
+import { loadApplications } from "../api/applications";
 import { candidateApplicationsKey, candidateEmailsKey } from "../api/keys";
 import { EMAIL_STATUS, formatWhen } from "../labels";
 import { IconButton, MailIcon } from "./ActionIcons";
@@ -24,7 +25,7 @@ export function CandidateEmails({ candidateId, email, permissions, writing: cont
   });
   const apps = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
-    queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
+    queryFn: ({ signal }) => loadApplications("candidate", candidateId, signal),
     enabled: writing && permissions.includes("pipeline:read"),
   });
   return (

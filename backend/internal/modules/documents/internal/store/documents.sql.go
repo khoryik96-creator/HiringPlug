@@ -89,12 +89,12 @@ func (q *Queries) CVTextOf(ctx context.Context, id string) (CVTextOfRow, error) 
 const candidatesWithMatchingCV = `-- name: CandidatesWithMatchingCV :many
 SELECT candidate_id::text FROM cv_search
 WHERE terms @@ to_tsquery('english', $1::text)
-LIMIT $2
+LIMIT $2::int
 `
 
 type CandidatesWithMatchingCVParams struct {
 	Ts       string
-	RowLimit int32
+	RowLimit *int32
 }
 
 // Advanced search: the candidates with a CV (read, not formatted) matching

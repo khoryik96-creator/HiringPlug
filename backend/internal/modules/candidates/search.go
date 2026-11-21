@@ -78,15 +78,26 @@ func (m *Module) SearchIn(ctx context.Context, tx pgx.Tx, p authz.Principal, f S
 
 func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f SearchFilter, cursor *string, limit int) (SearchPage, error) {
 	var page SearchPage
-	var ts *string
-	excluded := ""
+	var ts, prefilter *string
+	var plan []byte
 	if f.Boolean != nil {
 		q, err := boolsearch.ParseField("boolean", *f.Boolean)
 		if err != nil {
 			return page, err
 		}
 		t := q.TSQuery()
-		ts, excluded = &t, q.Excluded()
+		ts = &t
+		if s.cvs != nil {
+			plan, err = q.CandidatePlan()
+			if err != nil {
+				return page, err
+			}
+			if plan != nil {
+				if needed := q.CandidatePrefilter(); needed != "" {
+					prefilter = &needed
+				}
+			}
+		}
 		for _, term := range q.Terms {
 			page.Terms = append(page.Terms, term.Text())
 		}
@@ -94,20 +105,19 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	if f.SalaryMax != nil && !canSeeSalary(p) {
 		return page, apperr.Validation(apperr.FieldErrors{{Field: "expectedSalaryMax", Message: "needs a role that may see salaries"}})
 	}
-	inCV := map[string]bool{}
-	var cvIDs, excludedIDs []string
-	if ts != nil && s.cvs != nil {
+	var cvIDs []string
+	var cvQuery *string
+	cvLimit := MaxCVMatches
+	if plan == nil {
+		cvQuery = ts
+	} else {
+		cvQuery = prefilter
+		cvLimit = 0 // a necessary prefilter must include every match
+	}
+	if cvQuery != nil && s.cvs != nil {
 		var err error
-		if cvIDs, err = s.cvs.CandidatesWithMatchingCV(ctx, tx, *ts, MaxCVMatches); err != nil {
+		if cvIDs, err = s.cvs.CandidatesWithMatchingCV(ctx, tx, *cvQuery, cvLimit); err != nil {
 			return page, err
-		}
-		if excluded != "" { // a word left out with NOT, in their CV, leaves them out
-			if excludedIDs, err = s.cvs.CandidatesWithMatchingCV(ctx, tx, excluded, MaxCVMatches); err != nil {
-				return page, err
-			}
-		}
-		for _, id := range cvIDs {
-			inCV[id] = true
 		}
 	}
 	industryIDs := []string{}
@@ -125,7 +135,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	sort, cur, offset := f.Order.paging(p, cursor)
 	in := store.SearchCandidatesParams{
-		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
+		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), BooleanPlan: plan, Prefilter: prefilter,
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
@@ -152,7 +162,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 			WorkAuthorizationBasis: r.WorkAuthorizationBasis, Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry,
 			Source: r.Source, Industry: r.Industry,
 		}, !canSeeSalary(p))
-		if inCV[r.ID] {
+		if r.CvHit {
 			matched = append(matched, r.ID)
 		}
 	}
@@ -167,7 +177,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	}
 	page.Items = make([]SearchHit, len(rows))
 	for i, r := range rows {
-		page.Items[i] = SearchHit{Summary: summaries[i], InCV: inCV[r.ID], InProfile: r.ProfileHit}
+		page.Items[i] = SearchHit{Summary: summaries[i], InCV: r.CvHit, InProfile: r.ProfileHit}
 		if sn, ok := snippets[r.ID]; ok && strings.TrimSpace(sn) != "" {
 			page.Items[i].CVSnippet = &sn
 		}
@@ -198,7 +208,7 @@ func searchRows(ctx context.Context, q *store.Queries, in store.SearchCandidates
 	}
 	sorted, err := q.SearchCandidatesSorted(ctx, store.SearchCandidatesSortedParams{
 		Sort: sort, RowOffset: offset, IndustryCandidateIds: in.IndustryCandidateIds, Ts: in.Ts, Query: in.Query, Phones: in.Phones,
-		CvIds: in.CvIds, ExcludedIds: in.ExcludedIds, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
+		CvIds: in.CvIds, BooleanPlan: in.BooleanPlan, Prefilter: in.Prefilter, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
 		Residence: in.Residence, Sources: in.Sources, Industries: in.Industries, Skills: in.Skills, AllSkills: in.AllSkills,
 		Tags: in.Tags, Specializations: in.Specializations, Certifications: in.Certifications, Location: in.Location, NoticeMaxDays: in.NoticeMaxDays, SalaryMax: in.SalaryMax, SalaryCurrency: in.SalaryCurrency,
 		Owner: in.Owner, InIds: in.InIds, UpdatedWithinDays: in.UpdatedWithinDays, RowLimit: in.RowLimit,

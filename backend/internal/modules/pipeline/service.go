@@ -167,25 +167,28 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 }
 
 // ForJob returns a job's pipeline, in the order candidates were added.
-func (s *Service) ForJob(ctx context.Context, p authz.Principal, jobID string) ([]View, error) {
+func (s *Service) ForJob(ctx context.Context, p authz.Principal, jobID string, cursor *string, limit int32) ([]View, *string, error) {
 	var out []View
+	var next *string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if err := s.requireJob(ctx, tx, jobID); err != nil {
 			return err
 		}
-		rows, err := store.New(tx).ListJobApplications(ctx, jobID)
+		rows, err := store.New(tx).PageJobApplications(ctx, store.PageJobApplicationsParams{JobOrderID: jobID, Cursor: cursor, RowLimit: limit + 1})
 		if err != nil {
 			return err
 		}
+		rows, next = applicationPage(rows, limit)
 		out, err = s.views(ctx, tx, rows)
 		return err
 	})
-	return out, err
+	return out, next, err
 }
 
 // ForCandidate returns the jobs a candidate is on, newest first.
-func (s *Service) ForCandidate(ctx context.Context, p authz.Principal, candidateID string) ([]View, error) {
+func (s *Service) ForCandidate(ctx context.Context, p authz.Principal, candidateID string, cursor *string, limit int32) ([]View, *string, error) {
 	var out []View
+	var next *string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		ok, err := s.candidates.Exists(ctx, tx, candidateID)
 		if err != nil {
@@ -194,14 +197,22 @@ func (s *Service) ForCandidate(ctx context.Context, p authz.Principal, candidate
 		if !ok {
 			return apperr.NotFound("candidate")
 		}
-		rows, err := store.New(tx).ListCandidateApplications(ctx, candidateID)
+		rows, err := store.New(tx).PageCandidateApplications(ctx, store.PageCandidateApplicationsParams{CandidateID: candidateID, Cursor: cursor, RowLimit: limit + 1})
 		if err != nil {
 			return err
 		}
+		rows, next = applicationPage(rows, limit)
 		out, err = s.views(ctx, tx, rows)
 		return err
 	})
-	return out, err
+	return out, next, err
+}
+
+func applicationPage(rows []store.Application, limit int32) ([]store.Application, *string) {
+	if len(rows) <= int(limit) {
+		return rows, nil
+	}
+	return rows[:limit], &rows[limit-1].ID
 }
 
 func (s *Service) requireJob(ctx context.Context, tx pgx.Tx, jobID string) error {

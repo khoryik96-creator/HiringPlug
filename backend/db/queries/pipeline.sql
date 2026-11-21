@@ -28,10 +28,20 @@ RETURNING *;
 
 -- A job's pipeline, oldest first (the order cards were added).
 -- name: ListJobApplications :many
-SELECT * FROM application WHERE job_order_id = @job_order_id ORDER BY id LIMIT 1000;
+SELECT * FROM application WHERE job_order_id = @job_order_id ORDER BY id;
 
 -- name: ListCandidateApplications :many
-SELECT * FROM application WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
+SELECT * FROM application WHERE candidate_id = @candidate_id ORDER BY id DESC;
+
+-- name: PageJobApplications :many
+SELECT * FROM application WHERE job_order_id = @job_order_id
+  AND (sqlc.narg(cursor)::text IS NULL OR id > sqlc.narg(cursor)::text)
+ORDER BY id LIMIT @row_limit;
+
+-- name: PageCandidateApplications :many
+SELECT * FROM application WHERE candidate_id = @candidate_id
+  AND (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
+ORDER BY id DESC LIMIT @row_limit;
 
 -- The dashboard. Counts per job and stage for the given (open) jobs.
 -- name: StageCounts :many

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Document, type Permission, type Schemas, unwrap } from "../api/client";
+import { loadApplications } from "../api/applications";
 import { candidateApplicationsKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
 import { fieldErrors } from "./forms";
@@ -163,7 +164,7 @@ function TemplateForm({ candidateId, permissions, onDone }: { candidateId: strin
   const templates = useQuery({ queryKey: cvTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/cv-templates")).items });
   const apps = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
-    queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
+    queryFn: ({ signal }) => loadApplications("candidate", candidateId, signal),
     enabled: permissions.includes("pipeline:read"),
   });
   const [form, setForm] = useState({ templateId: "standard", applicationId: "", blind: false, showContact: false, includeSalary: false, summary: "" });

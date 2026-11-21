@@ -14,11 +14,11 @@ type HTTP struct{ svc *Service }
 
 // ListJobApplications handles GET /v1/jobs/{jobId}/applications.
 func (h *HTTP) ListJobApplications(ctx context.Context, req api.ListJobApplicationsRequestObject) (api.ListJobApplicationsResponseObject, error) {
-	views, err := h.svc.ForJob(ctx, authz.MustFromContext(ctx), req.JobId)
+	views, next, err := h.svc.ForJob(ctx, authz.MustFromContext(ctx), req.JobId, req.Params.Cursor, applicationPageSize(req.Params.Limit, 1000))
 	if err != nil {
 		return nil, err
 	}
-	return api.ListJobApplications200JSONResponse{Items: toAPIList(views)}, nil
+	return api.ListJobApplications200JSONResponse{Items: toAPIList(views), NextCursor: next}, nil
 }
 
 // AddApplication handles POST /v1/jobs/{jobId}/applications.
@@ -36,11 +36,11 @@ func (h *HTTP) AddApplication(ctx context.Context, req api.AddApplicationRequest
 
 // ListCandidateApplications handles GET /v1/candidates/{candidateId}/applications.
 func (h *HTTP) ListCandidateApplications(ctx context.Context, req api.ListCandidateApplicationsRequestObject) (api.ListCandidateApplicationsResponseObject, error) {
-	views, err := h.svc.ForCandidate(ctx, authz.MustFromContext(ctx), req.CandidateId)
+	views, next, err := h.svc.ForCandidate(ctx, authz.MustFromContext(ctx), req.CandidateId, req.Params.Cursor, applicationPageSize(req.Params.Limit, 200))
 	if err != nil {
 		return nil, err
 	}
-	return api.ListCandidateApplications200JSONResponse{Items: toAPIList(views)}, nil
+	return api.ListCandidateApplications200JSONResponse{Items: toAPIList(views), NextCursor: next}, nil
 }
 
 // MoveApplication handles POST /v1/applications/{applicationId}/move.
@@ -53,6 +53,13 @@ func (h *HTTP) MoveApplication(ctx context.Context, req api.MoveApplicationReque
 		return nil, err
 	}
 	return api.MoveApplication200JSONResponse(toAPI(view)), nil
+}
+
+func applicationPageSize(limit *int, fallback int32) int32 {
+	if limit == nil || *limit < 1 || *limit > int(fallback) {
+		return fallback
+	}
+	return int32(*limit) //nolint:gosec // bounded above
 }
 
 func toAPIList(views []View) []api.Application {

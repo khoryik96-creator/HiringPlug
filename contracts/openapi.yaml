@@ -6710,6 +6710,13 @@ paths:
       tags: [pipeline]
       summary: The candidates on a job (its pipeline), oldest first
       x-permission: pipeline:read
+      parameters:
+        - name: cursor
+          in: query
+          schema: {$ref: '#/components/schemas/ApplicationId'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}
       responses:
         '200':
           description: OK
@@ -6748,6 +6755,13 @@ paths:
       tags: [pipeline]
       summary: The jobs a candidate is on, newest first
       x-permission: pipeline:read
+      parameters:
+        - name: cursor
+          in: query
+          schema: {$ref: '#/components/schemas/ApplicationId'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 200}
       responses:
         '200':
           description: OK
@@ -14794,6 +14808,9 @@ components:
       type: object
       required: [items]
       properties:
+        nextCursor:
+          $ref: '#/components/schemas/ApplicationId'
+          description: Continue after this application ID when more results are available.
         items:
           type: array
           items: {$ref: '#/components/schemas/Application'}

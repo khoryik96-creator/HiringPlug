@@ -429,7 +429,7 @@ func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivi
 }
 
 const listCandidateApplications = `-- name: ListCandidateApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE candidate_id = $1 ORDER BY id DESC
 `
 
 func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID string) ([]Application, error) {
@@ -469,7 +469,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 }
 
 const listJobApplications = `-- name: ListJobApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1 ORDER BY id
 `
 
 // A job's pipeline, oldest first (the order cards were added).
@@ -660,6 +660,102 @@ func (q *Queries) OverlappingApplications(ctx context.Context, arg OverlappingAp
 	for rows.Next() {
 		var i OverlappingApplicationsRow
 		if err := rows.Scan(&i.FromID, &i.ToID, &i.JobOrderID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pageCandidateApplications = `-- name: PageCandidateApplications :many
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE candidate_id = $1
+  AND ($2::text IS NULL OR id < $2::text)
+ORDER BY id DESC LIMIT $3
+`
+
+type PageCandidateApplicationsParams struct {
+	CandidateID string
+	Cursor      *string
+	RowLimit    int32
+}
+
+func (q *Queries) PageCandidateApplications(ctx context.Context, arg PageCandidateApplicationsParams) ([]Application, error) {
+	rows, err := q.db.Query(ctx, pageCandidateApplications, arg.CandidateID, arg.Cursor, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.JobOrderID,
+			&i.CandidateID,
+			&i.Stage,
+			&i.Reason,
+			&i.ReasonNote,
+			&i.StageChangedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Channel,
+			&i.Binned,
+			&i.Step,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pageJobApplications = `-- name: PageJobApplications :many
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1
+  AND ($2::text IS NULL OR id > $2::text)
+ORDER BY id LIMIT $3
+`
+
+type PageJobApplicationsParams struct {
+	JobOrderID string
+	Cursor     *string
+	RowLimit   int32
+}
+
+func (q *Queries) PageJobApplications(ctx context.Context, arg PageJobApplicationsParams) ([]Application, error) {
+	rows, err := q.db.Query(ctx, pageJobApplications, arg.JobOrderID, arg.Cursor, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.JobOrderID,
+			&i.CandidateID,
+			&i.Stage,
+			&i.Reason,
+			&i.ReasonNote,
+			&i.StageChangedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Channel,
+			&i.Binned,
+			&i.Step,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

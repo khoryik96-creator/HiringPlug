@@ -126,12 +126,16 @@ func (s *Service) ready(ctx context.Context, tx pgx.Tx, tenant string) (*api.AiA
 	if !on {
 		return nil, apperr.New(api.ErrorCodeASSISTANTOFF, "The AI assistant is switched off: no AI provider is set up yet.")
 	}
+	pending, err := jobqueue.PendingAI(ctx, tx, tenant)
+	if err != nil {
+		return nil, err
+	}
 	used, err := s.used(ctx, tx, tenant)
 	if err != nil {
 		return nil, err
 	}
-	if used >= s.settings.MonthlyTokens {
-		return nil, apperr.New(api.ErrorCodeASSISTANTLIMITREACHED, "Your company has used this month's AI allowance; it starts again on the 1st.")
+	if used+pending >= s.settings.MonthlyTokens {
+		return nil, apperr.New(api.ErrorCodeASSISTANTLIMITREACHED, "This month's AI allowance is used or reserved by work in progress. Try again after it completes or next month.")
 	}
 	return ai, nil
 }

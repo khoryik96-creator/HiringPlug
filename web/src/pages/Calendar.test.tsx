@@ -28,6 +28,8 @@ it("makes attendee invitations explicit and highlights rejected fields", async (
   fireEvent.change(people, { target: { value: "invalid, hr@maju.test hr@maju.test" } }); fireEvent.keyDown(people, { key: "Enter" });
   expect(screen.getByRole("alert").textContent).toBe("Not an email address: invalid"); // stays typed, named
   expect(screen.getAllByText("hr@maju.test")).toHaveLength(1); // a chip, once, as in Outlook
+  fireEvent.submit(screen.getByRole("form", { name: "New appointment" }));
+  expect(post).not.toHaveBeenCalled();
   fireEvent.change(people, { target: { value: "" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(await screen.findByText("Enter valid email addresses.")).toBeTruthy(); expect(screen.getByLabelText("Attendees").getAttribute("aria-invalid")).toBe("true");

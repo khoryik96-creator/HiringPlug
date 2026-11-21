@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
+import { loadApplications } from "../api/applications";
 import { assistantAnswersKey, assistantKey, candidateApplicationsKey } from "../api/keys";
 import { ASSISTANT_KIND, formatWhen } from "../labels";
 import { AdText } from "./AdText";
@@ -24,7 +25,7 @@ export function Assistant({ subjectType, subjectId, permissions }: { subjectType
   const status = useQuery({ queryKey: assistantKey, queryFn: async () => unwrap(await api.GET("/v1/assistant")), enabled: allowed });
   const applications = useQuery({
     queryKey: candidateApplicationsKey(subjectId),
-    queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId: subjectId } } })),
+    queryFn: ({ signal }) => loadApplications("candidate", subjectId, signal),
     enabled: allowed && subjectType === "candidate" && permissions.includes("pipeline:read"),
   });
   const own: Subject = { type: subjectType, id: subjectId, label: subjectType === "candidate" ? "This candidate" : "This job" };

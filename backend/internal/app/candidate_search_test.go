@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"bytes"
 	"net/http"
 	"net/url"
 	"strings"
@@ -161,4 +162,40 @@ func TestAdvancedSearchBySpecializationAndCertifications(t *testing.T) {
 	res.JSON(&got)
 	assert.Empty(t, got.Certifications)
 	assert.Equal(t, []string{"Aina"}, found(map[string]any{"certifications": []string{"CISSP"}}))
+}
+
+func TestBooleanNegationAcrossDocumentsStaysWithinItsBranch(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	aiConn := aiConnFor(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	c := a.createCandidate(token, map[string]any{"firstName": "Example", "currentTitle": "SAP Engineer"})
+	withCV(t, a, aiConn, token, c.Id, "SAP consultant")
+	second := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "older.pdf", append(bytes.Clone(minimalPDF), '\n'))
+	require.Equal(t, http.StatusCreated, second.Status, "%s", second.Body)
+	var doc api.Document
+	second.JSON(&doc)
+	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, "SAP intern"))
+	for _, sort := range []string{"newest", "name"} {
+		for _, item := range []struct {
+			query string
+			want  bool
+		}{
+			{"SAP AND NOT intern", false},
+			{"SAP OR (Java AND NOT intern)", true},
+			{"SAP AND NOT (Java AND intern)", true},
+			{"SAP AND NOT NOT intern", true},
+		} {
+			res := a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"boolean": item.query, "sort": sort})
+			require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+			var page api.CandidateSearchPage
+			res.JSON(&page)
+			if item.want {
+				require.Len(t, page.Items, 1, item.query)
+				assert.Equal(t, c.Id, page.Items[0].Candidate.Id)
+			} else {
+				assert.Empty(t, page.Items, item.query)
+			}
+		}
+	}
 }

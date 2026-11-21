@@ -5323,6 +5323,10 @@ class Application(BaseModel):
 
 
 class ApplicationList(BaseModel):
+    nextCursor: Annotated[
+        ApplicationId | None,
+        Field(description="Continue after this application ID when more results are available."),
+    ] = None
     items: list[Application]
 
 

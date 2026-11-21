@@ -171,7 +171,8 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 		if !p.Can(api.PermissionPipelineRead) {
 			return apperr.NotFound("job")
 		}
-		if err := s.withinAllowance(ctx, tx, p.TenantID); err != nil {
+		slots, err := s.allowanceSlots(ctx, tx, p.TenantID)
+		if err != nil {
 			return err
 		}
 		apps, err := s.deps.Applications.OpenOnJob(ctx, tx, jobID)
@@ -197,7 +198,7 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 				res.AlreadyScored++
 				continue
 			}
-			if res.Queued == maxBatch {
+			if int64(res.Queued) == min(maxBatch, slots) {
 				break
 			}
 			if no, err := s.consentWithdrawn(ctx, tx, a.CandidateID); err != nil {
@@ -236,27 +237,40 @@ func (s *Service) on(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
 // withinAllowance refuses once the company used this month's AI allowance
 // (matching and the assistant together).
 func (s *Service) withinAllowance(ctx context.Context, tx pgx.Tx, tenant string) error {
-	return database.AsSystem(ctx, tx, tenant, func() error { return s.checkTenantAllowance(ctx, tx) })
+	_, err := s.allowanceSlots(ctx, tx, tenant)
+	return err
 }
 
-func (s *Service) checkTenantAllowance(ctx context.Context, tx pgx.Tx) error {
+func (s *Service) allowanceSlots(ctx context.Context, tx pgx.Tx, tenant string) (int64, error) {
+	pending, err := jobqueue.PendingAI(ctx, tx, tenant)
+	if err != nil {
+		return 0, err
+	}
+	var used int64
+	err = database.AsSystem(ctx, tx, tenant, func() error {
+		var err error
+		used, err = s.tenantUsage(ctx, tx)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	remaining := s.settings.MonthlyTokens - used - pending
+	if remaining <= 0 {
+		return 0, apperr.New(api.ErrorCodeMATCHINGLIMITREACHED,
+			"This month's AI allowance is used or reserved by work in progress. Try again after it completes or next month.")
+	}
+	return 1 + (remaining-1)/jobqueue.EstimatedAITokens, nil
+}
+
+func (s *Service) tenantUsage(ctx context.Context, tx pgx.Tx) (int64, error) {
 	since := monthStart(s.now(), s.settings.TimeZone)
 	used, err := store.New(tx).TokensSince(ctx, since)
-	if err != nil {
-		return err
+	if err != nil || s.deps.OtherAIUse == nil {
+		return used, err
 	}
-	if s.deps.OtherAIUse != nil {
-		other, err := s.deps.OtherAIUse.TokensSince(ctx, tx, since)
-		if err != nil {
-			return err
-		}
-		used += other
-	}
-	if used >= s.settings.MonthlyTokens {
-		return apperr.New(api.ErrorCodeMATCHINGLIMITREACHED,
-			"Your company has used this month's AI allowance; it starts again on the 1st.")
-	}
-	return nil
+	other, err := s.deps.OtherAIUse.TokensSince(ctx, tx, since)
+	return used + other, err
 }
 
 // application, jobText and cvText gather what the AI reads, as the user may

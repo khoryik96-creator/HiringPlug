@@ -84,3 +84,25 @@ func TestAssistantAllowanceIncludesAllAgencyRecords(t *testing.T) {
 	require.Equal(t, api.ErrorCodeINTERVIEWPREPAIOFF, res.Error().Error.Code)
 
 }
+
+func TestAssistantReservesAllowanceWhileWorkIsQueued(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, map[string]string{"HP_AI_PROVIDER": "openai_compatible", "HP_AI_MONTHLY_TOKENS": "100"})
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	person := a.createCandidate(token, map[string]any{"firstName": "Synthetic Person"})
+	ask := map[string]any{"subjectType": "candidate", "subjectId": person.Id, "kind": "summary"}
+	res := a.ask(token, ask)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	var queued api.AssistantAnswer
+	res.JSON(&queued)
+	res = a.ask(token, ask)
+	require.Equal(t, http.StatusTooManyRequests, res.Status, "%s", res.Body)
+	require.Equal(t, api.ErrorCodeASSISTANTLIMITREACHED, res.Error().Error.Code)
+	aiAnswers(t, a, aiConnFor(t), queued.Id, api.AssistantAnsweredJob{
+		Answer: nullable.NewNullableWithValue("Synthetic answer."), Error: nullable.NewNullNullable[string](),
+		Model: nullable.NewNullableWithValue("fixture"), InputTokens: 80, OutputTokens: 10,
+	})
+	res = a.ask(token, ask)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+}

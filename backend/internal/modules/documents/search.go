@@ -18,11 +18,16 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
-// CandidatesWithMatchingCV returns up to limit candidates with a CV (read,
+// CandidatesWithMatchingCV returns candidates with a CV (read,
 // not formatted) matching ts, a text search query, in the caller's
 // transaction (row-level security: only candidates the user may see).
 func (m *Module) CandidatesWithMatchingCV(ctx context.Context, tx pgx.Tx, ts string, limit int) ([]string, error) {
-	ids, err := store.New(tx).CandidatesWithMatchingCV(ctx, store.CandidatesWithMatchingCVParams{Ts: ts, RowLimit: int32(limit)}) //nolint:gosec // a small constant
+	var capRows *int32
+	if limit > 0 {
+		n := int32(limit) //nolint:gosec // the search's small upper limit
+		capRows = &n
+	}
+	ids, err := store.New(tx).CandidatesWithMatchingCV(ctx, store.CandidatesWithMatchingCVParams{Ts: ts, RowLimit: capRows})
 	if err != nil {
 		return nil, err
 	}

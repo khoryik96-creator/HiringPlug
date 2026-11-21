@@ -114,3 +114,17 @@ func TestAMistypedNearSaysWhatIsWrong(t *testing.T) {
 		assert.Contains(t, err.Error(), want, in)
 	}
 }
+
+func TestCandidatePrefilterKeepsOnlyNecessaryPositiveTerms(t *testing.T) {
+	for input, want := range map[string]string{
+		"SAP AND NOT intern":               "'sap'",
+		"SAP OR (Java AND NOT intern)":     "('sap' | 'java')",
+		"SAP OR NOT intern":                "",
+		"(SAP OR NOT intern) AND engineer": "'engineer'",
+		"NOT (SAP AND intern)":             "",
+	} {
+		q, err := Parse(input)
+		require.NoError(t, err)
+		assert.Equal(t, want, q.CandidatePrefilter(), input)
+	}
+}

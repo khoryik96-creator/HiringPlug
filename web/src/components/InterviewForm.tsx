@@ -244,7 +244,7 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
               {calendarBusy.map((name) => <li key={`busy-${name}`}>{name}: an appointment in their calendar</li>)}
               {calendarStale.map((name) => <li key={`stale-${name}`}>{name}: their Outlook has not synced lately, so they may be busy</li>)}
             </ul>
-            <button type="button" onClick={() => { save.mutate(true); }}>{sending ? "Send anyway" : "Schedule anyway"}</button>
+            <button type="button" onClick={(e) => { if (e.currentTarget.form?.reportValidity()) save.mutate(true); }}>{sending ? "Send anyway" : "Schedule anyway"}</button>
           </div>
         ) : (
           <SaveError error={save.error} shown={["interviewerIds", "location", "startsAt", "message"]} onReload={onDone} />

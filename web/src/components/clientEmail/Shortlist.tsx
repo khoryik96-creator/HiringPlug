@@ -5,6 +5,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
+import { loadApplications } from "../../api/applications";
 import { jobApplicationsKey } from "../../api/keys";
 import { EmailCandidateSearch } from "./EmailCandidateSearch";
 import { STAGE } from "../../labels";
@@ -106,7 +107,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
   const onJob = useQuery({
     queryKey: jobApplicationsKey(jobId ?? ""),
     enabled: jobId !== undefined,
-    queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/applications", { params: { path: { jobId: jobId ?? "" } } })),
+    queryFn: ({ signal }) => loadApplications("job", jobId ?? "", signal),
   });
   const more = (onJob.data?.items ?? []).filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn" && !people.some((p) => p.candidateId === a.candidateId));
   const available = DETAILS.filter((d) => !d.salary || canSeeSalary);

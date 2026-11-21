@@ -106,7 +106,7 @@ SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >=
 -- name: CandidatesWithMatchingCV :many
 SELECT candidate_id::text FROM cv_search
 WHERE terms @@ to_tsquery('english', @ts::text)
-LIMIT @row_limit;
+LIMIT sqlc.narg(row_limit)::int;
 
 -- Where each candidate's best matching CV matches: the words found between
 -- [[ and ]].

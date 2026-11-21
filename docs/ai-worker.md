@@ -392,6 +392,14 @@ requests are sent again only on 429/529; provider error texts (which can echo
 part of a key) are replaced by fixed messages. See
 [features.md](features.md#35-ai-assistant-sidebar--off-until-an-ai-provider-is-set-up).
 
+## Shared AI allowance
+
+Admissions count a provisional 1,000-token hold for each queued or running
+AI operation. The hold covers the Python request and its Go result until actual
+usage replaces it. One final request can use a balance under 1,000 tokens.
+Actual token use is known after the model responds, so the allowance is an
+admission limit with estimates.
+
 ## Adding a job to the AI worker
 
 1. Declare it in the module contract: `x-jobs: { thing.do: { queue: ai, payload: ThingDoJob } }`

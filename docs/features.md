@@ -142,8 +142,9 @@ says what is wrong with it.
 their CVs and profiles, as on job boards: `SAP AND (BW OR BPC) NOT
 internship`, `"project manager"`, `manag*` (any ending), `SAP NEAR/3
 planning` (within 3 words, either way round; NEAR alone is 5; it binds
-before NOT); words side by side must all appear; NOT or -word leaves out (a word left out found in any of
-their CVs leaves them out, even when their profile matches). The box shows
+before NOT); terms that must match together are searched within one CV or the
+profile. NOT checks its operand across the profile and all readable CVs.
+An exclusion inside one OR branch applies to that branch. The box shows
 how it is read (operators, phrases and words left out in their colours).
 Dropdowns narrow it: status, work authorization (local, PR, spousal / RP-T
 / other pass, needs pass, not known), nationality, where they live, source,

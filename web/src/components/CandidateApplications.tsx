@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Permission, unwrap } from "../api/client";
+import type { Permission } from "../api/client";
+import { loadApplications } from "../api/applications";
 import { candidateApplicationsKey, jobsKey } from "../api/keys";
 import { CLOSE_REASON, STAGE } from "../labels";
 import { IconButton, MailIcon, PlusIcon } from "./ActionIcons";
@@ -21,7 +22,7 @@ import { type MoveRequest, useMoveApplication } from "./useMoveApplication";
 export function CandidateApplications({ candidateId, candidateName, canUpdate, permissions }: { candidateId: string; candidateName?: string; canUpdate: boolean; permissions: Permission[] }) {
   const list = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
-    queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
+    queryFn: ({ signal }) => loadApplications("candidate", candidateId, signal),
   });
   const move = useMoveApplication();
   // Offer and Placed ask for the offer or the placement report first.

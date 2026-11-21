@@ -34,7 +34,7 @@ export function Composer({ label, toolbar, onClose, closing, side, children, onS
   label: string; toolbar: ReactNode; onClose: () => void; closing?: boolean; side?: ReactNode; children: ReactNode; onSubmit: () => void;
 }) {
   return (
-    <form className="composer" aria-label={label} onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+    <form className="composer" aria-label={label} onSubmit={(e) => { e.preventDefault(); if (e.currentTarget.reportValidity()) onSubmit(); }}
       onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
       <div className="composer-bar" role="toolbar" aria-label="Actions">
         {toolbar}
@@ -154,7 +154,7 @@ export function EmailChips({ emails, onChange, disabled, invalid, label = "Atten
   const [draft, setDraft] = useState("");
   const [bad, setBad] = useState<string[]>([]);
   // Addresses become chips, once each; anything else stays typed, and is named.
-  const add = () => {
+  const add = (input: HTMLInputElement) => {
     const typed = draft.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const known = new Set(emails.map((e) => e.toLowerCase()));
     const good: string[] = [];
@@ -164,6 +164,7 @@ export function EmailChips({ emails, onChange, disabled, invalid, label = "Atten
       else if (!known.has(e.toLowerCase())) { known.add(e.toLowerCase()); good.push(e); }
     }
     if (good.length) onChange([...emails, ...good]);
+    input.setCustomValidity(wrong.length ? "Correct or remove the invalid addresses." : "");
     setBad(wrong);
     setDraft(wrong.join(" "));
   };
@@ -176,9 +177,15 @@ export function EmailChips({ emails, onChange, disabled, invalid, label = "Atten
       ))}
       <input aria-label={label} placeholder={emails.length ? "" : placeholder} value={draft} disabled={disabled} type="text"
         aria-invalid={invalid || bad.length > 0 ? true : undefined}
-        onChange={(e) => { setDraft(e.target.value); }} onBlur={add}
+        onChange={(e) => {
+          const value = e.currentTarget.value;
+          setDraft(value);
+          setBad([]);
+          // Native form validation also guards submits while the field still has focus.
+          e.currentTarget.setCustomValidity(value.trim() ? "Add the addresses or clear this field before sending." : "");
+        }} onBlur={(e) => { add(e.currentTarget); }}
         onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === "," || e.key === ";" || e.key === "Tab") && draft.trim()) { if (e.key !== "Tab") e.preventDefault(); add(); }
+          if ((e.key === "Enter" || e.key === "," || e.key === ";" || e.key === "Tab") && draft.trim()) { if (e.key !== "Tab") e.preventDefault(); add(e.currentTarget); }
           if (e.key === "Backspace" && !draft && emails.length) onChange(emails.slice(0, -1));
         }} />
       {bad.length > 0 && <small className="error chips-error" role="alert">Not an email address: {bad.join(", ")}</small>}

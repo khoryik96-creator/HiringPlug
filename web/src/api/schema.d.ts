@@ -9557,6 +9557,8 @@ export interface components {
             updatedAt: string;
         };
         ApplicationList: {
+            /** @description Continue after this application ID when more results are available. */
+            nextCursor?: components["schemas"]["ApplicationId"];
             items: components["schemas"]["Application"][];
         };
         ApplicationCreate: {
@@ -19020,7 +19022,10 @@ export interface operations {
     };
     listJobApplications: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: components["schemas"]["ApplicationId"];
+                limit?: number;
+            };
             header?: never;
             path: {
                 jobId: components["parameters"]["JobOrderIdPath"];
@@ -19076,7 +19081,10 @@ export interface operations {
     };
     listCandidateApplications: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: components["schemas"]["ApplicationId"];
+                limit?: number;
+            };
             header?: never;
             path: {
                 candidateId: components["parameters"]["CandidateIdPath"];

@@ -15,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 type tokensSince interface {
@@ -52,11 +53,15 @@ func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*
 	if err != nil || !on {
 		return nil, false, err
 	}
+	pending, err := jobqueue.PendingAI(ctx, tx, tenantID)
+	if err != nil {
+		return nil, false, err
+	}
 	var used int64
 	err = database.AsSystem(ctx, tx, tenantID, func() error {
 		var err error
 		used, err = a.all.TokensSince(ctx, tx, assistant.MonthStart(a.now(), a.tz))
 		return err
 	})
-	return access, used < a.cfg.MonthlyTokens, err
+	return access, used+pending < a.cfg.MonthlyTokens, err
 }

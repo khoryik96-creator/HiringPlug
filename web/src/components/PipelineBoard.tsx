@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
+import { loadApplications } from "../api/applications";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
 import { BoardIcon, CloseIcon, IconButton, PlusIcon, StepsIcon } from "./ActionIcons";
@@ -32,7 +33,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const queryClient = useQueryClient();
   const list = useQuery({
     queryKey: jobApplicationsKey(jobId),
-    queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/applications", { params: { path: { jobId } } })),
+    queryFn: ({ signal }) => loadApplications("job", jobId, signal),
   });
   const move = useMoveApplication();
   const stages = useJobStages(jobId);

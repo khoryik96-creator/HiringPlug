@@ -88,23 +88,28 @@ LIMIT @row_limit;
 -- Advanced search: every filter given must hold. With @ts (a boolean
 -- search as a text search query), a candidate is found when their profile
 -- matches or they are one of @cv_ids (whose CVs match, found by the
--- documents module); a profile match does not count for @excluded_ids
--- (whose CVs have a word left out with NOT). Newest first, keyset
--- pagination on id.
+-- documents module). Searches with NOT evaluate the full expression over
+-- each source, checking exclusions across the candidate. Newest first.
 -- name: SearchCandidates :many
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
        c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
        c.nationality, c.residence_country, c.source, c.industry,
-       (sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text))::boolean AS profile_hit
+       (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 1) <> 0
+             ELSE sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) END)::boolean AS profile_hit,
+       (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 2) <> 0
+             ELSE c.id = ANY (@cv_ids::text[]) END)::boolean AS cv_hit
 FROM candidate c
+CROSS JOIN LATERAL (SELECT app_candidate_boolean_matches(c.id, c.profile_terms, sqlc.narg(boolean_plan)::jsonb) AS hits OFFSET 0) matches
 WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR c.phone = ANY (@phones::text[]))
-  AND (sqlc.narg(ts)::text IS NULL
-       OR (c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) AND NOT c.id = ANY (@excluded_ids::text[]))
+  AND (sqlc.narg(prefilter)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(prefilter)::text)
        OR c.id = ANY (@cv_ids::text[]))
+  AND (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN matches.hits <> 0
+            ELSE sqlc.narg(ts)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text)
+                 OR c.id = ANY (@cv_ids::text[]) END)
   AND (cardinality(@availability::text[]) = 0 OR c.availability = ANY (@availability::text[]))
   AND (cardinality(@wa_kinds::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
@@ -406,16 +411,22 @@ SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.cur
        c.location, c.work_authorization, c.tags, c.updated_at,
        c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
        c.nationality, c.residence_country, c.source, c.industry,
-       (sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text))::boolean AS profile_hit
+       (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 1) <> 0
+             ELSE sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) END)::boolean AS profile_hit,
+       (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 2) <> 0
+             ELSE c.id = ANY (@cv_ids::text[]) END)::boolean AS cv_hit
 FROM candidate c
+CROSS JOIN LATERAL (SELECT app_candidate_boolean_matches(c.id, c.profile_terms, sqlc.narg(boolean_plan)::jsonb) AS hits OFFSET 0) matches
 -- Salaries only for roles that may see them (row-level security); for others the sort is newest first.
 LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
 WHERE (sqlc.narg(query)::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR c.phone = ANY (@phones::text[]))
-  AND (sqlc.narg(ts)::text IS NULL
-       OR (c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) AND NOT c.id = ANY (@excluded_ids::text[]))
+  AND (sqlc.narg(prefilter)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(prefilter)::text)
        OR c.id = ANY (@cv_ids::text[]))
+  AND (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN matches.hits <> 0
+            ELSE sqlc.narg(ts)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text)
+                 OR c.id = ANY (@cv_ids::text[]) END)
   AND (cardinality(@availability::text[]) = 0 OR c.availability = ANY (@availability::text[]))
   AND (cardinality(@wa_kinds::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
