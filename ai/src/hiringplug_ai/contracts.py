@@ -847,7 +847,7 @@ class CalendarEventInput(BaseModel):
     notesHtml: Annotated[
         str | None,
         Field(
-            description="The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text.",
+            description="The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text unless given.",
             max_length=30000,
         ),
     ] = None
@@ -866,7 +866,13 @@ class CalendarEventUpdate(BaseModel):
     endsAt: AwareDatetime
     timeZone: Annotated[str, Field(max_length=64, min_length=1)]
     notes: Annotated[str | None, Field(max_length=4000)] = None
-    notesHtml: Annotated[str | None, Field(max_length=30000)] = None
+    notesHtml: Annotated[
+        str | None,
+        Field(
+            description="Left out, the formatted notes stay as they are (and are not sent to Outlook again); empty, the notes are plain.",
+            max_length=30000,
+        ),
+    ] = None
     location: Annotated[str | None, Field(max_length=500)] = None
     attendees: Annotated[list[CalendarAttendee], Field(max_length=50)]
     allDay: bool
@@ -4037,14 +4043,14 @@ class InterviewInvitationInput(BaseModel):
     bodyHtml: Annotated[
         str | None,
         Field(
-            description="The invitation's message, formatted, as the candidate sees it in Outlook (else the interview's instructions). Dropped for the instructions when the interview moves, so no old time stays in it.",
+            description="The invitation's message, formatted, as the candidate sees it in Outlook (else the interview's instructions). Interview fields a template filled in (<span data-field=\"interview.when\">, .length, .how, .where) are filled again when the interview changes; other text stays as written. Outlook keeps a Teams meeting's message as it was first sent (its join details are in it). Only for a first invitation.\n",
             max_length=30000,
         ),
     ] = None
     optional: Annotated[
         list[EmailStr] | None,
         Field(
-            description="Optional attendees (Outlook's Optional, the meeting's Cc), e.g. the hiring manager. Meeting invitations have no Bcc.",
+            description="Optional attendees (Outlook's Optional, the meeting's Cc), e.g. the hiring manager. Meeting invitations have no Bcc. Only for a first invitation.",
             max_length=20,
         ),
     ] = None

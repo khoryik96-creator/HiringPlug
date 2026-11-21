@@ -23,10 +23,18 @@ var notesPolicy = func() *bluemonday.Policy {
 	p.AddTargetBlankToFullyQualifiedLinks(true)
 	p.AllowAttrs("color", "face", "size").OnElements("font")
 	p.AllowAttrs("align").OnElements("p", "div")
+	// The person's signature (the composer finds it again), and interview fields a template filled in.
+	p.AllowAttrs("data-signature").Matching(regexp.MustCompile(`^true$`)).OnElements("div")
+	p.AllowAttrs("data-field").Matching(interviewFieldRe).OnElements("span")
 	p.AllowStyles("color", "background-color", "font-family", "font-size", "font-weight", "font-style",
 		"text-decoration", "text-align", "margin-left", "padding-left", "line-height").Globally()
 	return p
 }()
+
+// maxNotesHTML is the most formatted notes may hold once made safe (the database's limit).
+const maxNotesHTML = 30000
+
+var interviewFieldRe = regexp.MustCompile(`^interview\.(when|length|how|where)$`)
 
 var (
 	breakRe  = regexp.MustCompile(`(?i)<br\s*/?>|</(p|div|li|h[1-4]|blockquote|tr)>`)
@@ -51,10 +59,10 @@ func cleanNotes(raw string) (safe, text string) {
 	return safe, text
 }
 
-// orNil is nil for "": no formatted notes.
-func orNil(s string) *string {
-	if s == "" {
+// htmlOrNil is the formatted notes to store: nil for none.
+func htmlOrNil(s *string) *string {
+	if s == nil || *s == "" {
 		return nil
 	}
-	return &s
+	return s
 }

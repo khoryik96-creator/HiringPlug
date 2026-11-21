@@ -2,7 +2,9 @@ package calendars
 
 import (
 	"context"
+	htmlpkg "html"
 	"math"
+	"regexp"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -10,6 +12,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/humantime"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -28,13 +31,14 @@ func (s *Service) syncInvitationProjection(ctx context.Context, tx pgx.Tx, row s
 		title, notes, location, start, end = row.Title, row.Notes, row.Location, row.StartsAt, row.EndsAt
 	}
 	location = bounded(location, 500)
-	if title == row.Title && notes == row.Notes && location == row.Location && start.Equal(row.StartsAt) && end.Equal(row.EndsAt) && status == row.Status {
+	formatted := s.refillInterview(row.NotesHtml, meeting)
+	if title == row.Title && notes == row.Notes && location == row.Location && start.Equal(row.StartsAt) && end.Equal(row.EndsAt) && status == row.Status && text(formatted) == text(row.NotesHtml) {
 		return store.New(tx).AdvanceInterviewInvitationSource(ctx, store.AdvanceInterviewInvitationSourceParams{
 			ID: row.ID, SourceVersion: int32(meeting.Version), //nolint:gosec // source versions are int32
 		})
 	}
 	return store.New(tx).SyncInterviewInvitation(ctx, store.SyncInterviewInvitationParams{
-		ID: row.ID, Title: title, Notes: notes, Location: location, StartsAt: start, EndsAt: end,
+		ID: row.ID, Title: title, Notes: notes, NotesHtml: formatted, Location: location, StartsAt: start, EndsAt: end,
 		Status: status, SourceVersion: int32(meeting.Version), //nolint:gosec // source versions are int32
 	})
 }
@@ -176,4 +180,34 @@ func sourceOf(kind, id string) sourceKey {
 		kind = "interview"
 	}
 	return sourceKey{kind, id}
+}
+
+// filledFieldRe is a field a template filled in, even made bold or italic inside.
+var filledFieldRe = regexp.MustCompile(`<span data-field="interview\.(when|length|how|where)">(?:[^<]|</?(?:b|strong|i|em|u|s|strike|del|font|sub|sup)(?:\s[^>]*)?>)*</span>`)
+
+var modeWords = map[string]string{"video": "Video", "in_person": "In person", "phone": "Phone"}
+
+// refillInterview fills an invitation message's interview fields (those a
+// template filled in) with the interview as it is now, so a moved interview's
+// message never names its old time or place. Text typed by hand stays.
+func (s *Service) refillInterview(html *string, meeting Meeting) *string {
+	if html == nil || meeting.Version == math.MaxInt32 {
+		return html
+	}
+	zone := s.config.TimeZone
+	if zone == nil {
+		zone = time.UTC
+	}
+	value := map[string]string{
+		"when": humantime.When(meeting.Start, zone), "length": humantime.Length(int(meeting.End.Sub(meeting.Start).Minutes())),
+		"how": modeWords[meeting.Mode], "where": meeting.Location,
+	}
+	out := filledFieldRe.ReplaceAllStringFunc(*html, func(span string) string {
+		key := filledFieldRe.FindStringSubmatch(span)[1]
+		return `<span data-field="interview.` + key + `">` + htmlpkg.EscapeString(value[key]) + `</span>`
+	})
+	if len(out) > maxNotesHTML { // longer values would not fit: the message stays as it was
+		return html
+	}
+	return &out
 }

@@ -58,7 +58,12 @@ shared/delegated calendars are not included.
 - The body is formatted as in an email (bold, italic, underline, lists, links,
   fonts and colours, from the email editor's toolbar) and goes to Outlook as
   the event's HTML body, kept to text formatting and links (no images or
-  scripts); HiringPlug keeps its plain text beside it. A new appointment or
+  scripts); HiringPlug keeps its plain text beside it. The body is sent to
+  Outlook only when it was written in HiringPlug, so changing an
+  appointment's time never replaces a body edited in Outlook, and a reply or
+  other change in Outlook leaves the formatted notes; a body rewritten in
+  Outlook replaces them (as plain text). Attendee addresses are checked as
+  they are typed. A new appointment or
   interview starts with the person's email signature (Settings > Your
   account), and the signature icon takes it out or puts it back. **Optional**
   adds optional attendees: Outlook's Optional, the meeting's Cc. Outlook
@@ -66,10 +71,23 @@ shared/delegated calendars are not included.
 - An interview's **Template** icon fills the title and message from an email
   template (Settings > Email templates), with the candidate's and job's
   details and the interview's time, length and place as composed. Templates
-  that would show a salary are not offered. The message's text becomes the
-  interview's instructions; the formatted message is the Outlook invitation's
-  body. When the interview moves, the invitation goes back to the plain
-  instructions, so no old time or place stays in it.
+  that would show a salary are not offered. The template is filled from the
+  composer as it is (not the saved interview); its instructions placeholder
+  is dropped (the message is the instructions), the title leaves out the
+  interview's time and place (Outlook shows them, and the title would go
+  stale), and Send waits while a field it could not fill (e.g. [Client
+  contact]) is still in the message. The formatted message is the Outlook
+  invitation's body; when it goes with an invitation it is not also stored as
+  the interview's instructions, and without one it is. The interview fields a template filled in (time,
+  length, how, where) are marked, and HiringPlug fills them again when the
+  interview moves (even made bold), so the invitation never names its old
+  time or place; text typed by hand stays as written, and a message that
+  would grow past the size limit stays as it was. A Teams invitation's message stays as it
+  was first sent (Outlook keeps the join details in it, so HiringPlug never
+  replaces it): Outlook still moves the meeting and tells the candidate, and
+  the composer says so when such an interview is moved. A sent invitation's
+  message and optional attendees are changed in Outlook, not on a retry (the
+  same first request again is simply answered).
 - Scheduling an interview with Outlook connected sends the candidate's Outlook
   invitation in the same step (the **Outlook invitation** toggle, its reminder
   and **Email candidate a day before** sit in the toolbar as icons), with any

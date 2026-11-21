@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/oapi-codegen/nullable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,9 +21,6 @@ func TestCompaniesCanUseQwenWithTheirOwnKey(t *testing.T) {
 	ctx := context.Background()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
-	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
-	require.NoError(t, err)
-	defer func() { _ = aiConn.Close(ctx) }()
 
 	assert.Equal(t, api.AiProviderName("qwen"), a.aiProviders(owner).Providers[3].Provider, "listed last")
 	const key = "sk-qwen-0123456789abcdef"
@@ -39,15 +34,15 @@ func TestCompaniesCanUseQwenWithTheirOwnKey(t *testing.T) {
 	assert.True(t, a.assistantOn(recruiter))
 
 	sealed := savedSealed(t, tenant.ID, "qwen")
-	job := claimCheck(t, aiConn, sealed)
+	// The check queued for the AI worker names Qwen (read, not claimed: other tests share the queue).
+	var payload []byte
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx,
+		`SELECT payload FROM job WHERE queue = 'ai' AND kind = $1 AND payload->'access'->>'sealedKey' = $2`, string(api.JobKindAiproviderCheck), sealed).Scan(&payload))
 	var check api.AiProviderCheckJob
-	require.NoError(t, json.Unmarshal(job.Payload, &check))
+	require.NoError(t, json.Unmarshal(payload, &check))
 	assert.Equal(t, api.AiProviderName("qwen"), check.Access.Provider, "the worker is told to call Qwen")
 	assert.Equal(t, "qwen-plus", check.Access.Model)
-	answerAIJob(t, a, aiConn, job, api.JobKindAiproviderChecked, api.AiProviderCheckedJob{
-		Provider: "qwen", SealedKey: sealed, Ok: true, Message: nullable.NewNullNullable[string](),
-	})
-	assert.Equal(t, api.AiProviderCheckStatusOk, entryOf(a.aiProviders(owner), "qwen").Check.MustGet().Status)
+	assert.Equal(t, api.AiProviderCheckStatusQueued, entryOf(a.aiProviders(owner), "qwen").Check.MustGet().Status)
 
 	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/ai-providers", owner, map[string]any{"provider": "off"}).Status)
 	res = a.request(http.MethodPut, "/v1/ai-providers", owner, map[string]any{"provider": "qwen"})

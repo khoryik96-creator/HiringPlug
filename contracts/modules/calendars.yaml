@@ -421,7 +421,7 @@ components:
         notesHtml:
           type: string
           maxLength: 30000
-          description: The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text.
+          description: The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text unless given.
         location:
           type: string
           maxLength: 500
@@ -467,6 +467,7 @@ components:
         notesHtml:
           type: string
           maxLength: 30000
+          description: Left out, the formatted notes stay as they are (and are not sent to Outlook again); empty, the notes are plain.
         location:
           type: string
           maxLength: 500

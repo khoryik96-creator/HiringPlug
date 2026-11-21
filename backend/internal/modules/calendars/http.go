@@ -87,7 +87,7 @@ func (h *HTTP) UpdateCalendarEvent(ctx context.Context, r api.UpdateCalendarEven
 		return nil, err
 	}
 	b := r.Body
-	in := Input{Title: b.Title, Notes: text(b.Notes), NotesHTML: text(b.NotesHtml), Location: text(b.Location), Start: b.StartsAt, End: b.EndsAt, TimeZone: b.TimeZone, Attendees: inputAttendees(b.Attendees), AllDay: b.AllDay, Teams: b.Teams}
+	in := Input{Title: b.Title, Notes: text(b.Notes), NotesHTML: b.NotesHtml, Location: text(b.Location), Start: b.StartsAt, End: b.EndsAt, TimeZone: b.TimeZone, Attendees: inputAttendees(b.Attendees), AllDay: b.AllDay, Teams: b.Teams}
 	v, err := h.svc.save(ctx, p, r.EventId, b.Version, in)
 	return api.UpdateCalendarEvent200JSONResponse(v), err
 }
@@ -108,7 +108,7 @@ func (h *HTTP) RetryCalendarEvent(ctx context.Context, r api.RetryCalendarEventR
 	return api.RetryCalendarEvent200JSONResponse(v), err
 }
 func inputOf(b api.CalendarEventInput) Input {
-	return Input{Title: b.Title, Notes: text(b.Notes), NotesHTML: text(b.NotesHtml), Location: text(b.Location), Start: b.StartsAt, End: b.EndsAt, TimeZone: b.TimeZone, Attendees: inputAttendees(b.Attendees), AllDay: b.AllDay, Teams: b.Teams}
+	return Input{Title: b.Title, Notes: text(b.Notes), NotesHTML: b.NotesHtml, Location: text(b.Location), Start: b.StartsAt, End: b.EndsAt, TimeZone: b.TimeZone, Attendees: inputAttendees(b.Attendees), AllDay: b.AllDay, Teams: b.Teams}
 }
 func text(p *string) string {
 	if p == nil {

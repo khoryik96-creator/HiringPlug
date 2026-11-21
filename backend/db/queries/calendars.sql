@@ -38,7 +38,11 @@ SELECT * FROM calendar_event WHERE id= @id;
 INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,time_zone,all_day,teams,attendees,source,sync_status)
 VALUES(app_current_tenant(),app_current_user(),@title,@notes,sqlc.narg(notes_html),@location,@starts_at,@ends_at,@time_zone,@all_day,@teams,@attendees,'local',@sync_status) RETURNING *;
 -- name: UpdateCalendarEvent :one
-UPDATE calendar_event SET title= @title,notes= @notes,notes_html=sqlc.narg(notes_html),location= @location,starts_at= @starts_at,ends_at= @ends_at,time_zone= @time_zone,all_day= @all_day,teams= @teams,attendees= @attendees,version=version+1,sync_status= @sync_status,sync_error=NULL,updated_at=now()
+UPDATE calendar_event SET title= @title,notes= @notes,
+ -- No formatted notes given: they stay as they are (and are not sent again).
+ notes_html=CASE WHEN @keep_notes_html::boolean THEN notes_html ELSE sqlc.narg(notes_html) END,
+ body_dirty=body_dirty OR notes <> @notes OR (NOT @keep_notes_html::boolean AND notes_html IS DISTINCT FROM sqlc.narg(notes_html)),
+ location= @location,starts_at= @starts_at,ends_at= @ends_at,time_zone= @time_zone,all_day= @all_day,teams= @teams,attendees= @attendees,version=version+1,sync_status= @sync_status,sync_error=NULL,updated_at=now()
 WHERE id= @id AND version= @expected_version AND source='local' AND status='active' RETURNING *;
 -- name: CancelCalendarEvent :one
 UPDATE calendar_event SET status='cancelled',version=version+1,sync_status= @sync_status,sync_error=NULL,updated_at=now() WHERE id= @id AND version= @expected_version AND source='local' RETURNING *;
@@ -89,8 +93,9 @@ UPDATE calendar_event SET candidate_reminder_sent_for= @starts_at
 WHERE id= @id AND candidate_reminder_version= @reminder_version AND starts_at= @starts_at;
 -- name: SyncInterviewInvitation :one
 UPDATE calendar_event SET source_version= @source_version,title= @title,notes= @notes,
- -- A moved interview's invitation shows its instructions again, so no old time or place stays in a formatted message.
- notes_html=CASE WHEN starts_at <> @starts_at OR ends_at <> @ends_at OR location <> @location THEN NULL ELSE notes_html END,
+ -- The formatted message with its interview fields filled again (see invitation_sync.go).
+ body_dirty=body_dirty OR notes <> @notes OR notes_html IS DISTINCT FROM sqlc.narg(notes_html),
+ notes_html=sqlc.narg(notes_html),
  location= @location,
  starts_at= @starts_at,ends_at= @ends_at,status= @status,version=version+1,updated_at=now(),
  sync_status=CASE WHEN sync_status IN ('failed','conflict') THEN sync_status ELSE 'pending' END
@@ -105,7 +110,8 @@ DELETE FROM calendar_event WHERE id= @id AND source='interview_invitation';
 UPDATE calendar_event SET join_url= @join_url
 WHERE id= @id AND source='interview_invitation' AND version= @expected_version AND status='active';
 -- name: SaveCalendarReceipt :execrows
-UPDATE calendar_event SET remote_id=sqlc.narg(remote_id),remote_key=sqlc.narg(remote_key),remote_connection= @connection_id,sent_version= @sent_version,web_url=sqlc.narg(web_url),join_url=sqlc.narg(join_url),remote_snapshot= @remote_snapshot,
+UPDATE calendar_event SET remote_id=sqlc.narg(remote_id),remote_key=sqlc.narg(remote_key),remote_connection= @connection_id,sent_version= @sent_version,
+ body_dirty=CASE WHEN version= @sent_version THEN false ELSE body_dirty END,web_url=sqlc.narg(web_url),join_url=sqlc.narg(join_url),remote_snapshot= @remote_snapshot,
  sync_status=CASE WHEN version= @sent_version THEN 'synced' ELSE 'pending' END,sync_error=NULL
 WHERE calendar_event.id= @id AND EXISTS(SELECT 1 FROM calendar_connection WHERE calendar_connection.id= @connection_id AND user_id=calendar_event.user_id AND calendar_connection.status<>'disconnected');
 -- name: CalendarPushFailed :exec

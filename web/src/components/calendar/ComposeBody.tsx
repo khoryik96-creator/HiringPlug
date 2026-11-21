@@ -41,19 +41,22 @@ export function useMessage(initialHtml: string, isNew: boolean, enabled: boolean
   const signature = useSignature(enabled);
   const [message, setMessage] = useState({ html: initialHtml, reset: 0 });
   const [signed, setSigned] = useState(!isNew);
+  const [edited, setEdited] = useState(false); // written in here: only then is the body sent again
   if (!signed && signature) { // the signature has arrived: added once, as the composer opens
     setSigned(true);
     setMessage((m) => ({ html: withSignature(m.html, signature), reset: m.reset + 1 }));
   }
   const toggleSignature = () => {
+    setEdited(true);
     setMessage((m) => ({ html: hasSignature(m.html) ? withoutSignature(m.html) : withSignature(m.html, signature), reset: m.reset + 1 }));
   };
   /** Put in a whole new message (a template), keeping the signature where there was one. */
   const replace = (html: string) => {
+    setEdited(true);
     setMessage((m) => ({ html: signature && hasSignature(m.html) ? withSignature(html, signature) : html, reset: m.reset + 1 }));
   };
-  const write = (html: string) => { setMessage((m) => ({ ...m, html })); };
-  return { message, signature, toggleSignature, replace, write };
+  const write = (html: string) => { setEdited(true); setMessage((m) => ({ ...m, html })); };
+  return { message, signature, toggleSignature, replace, write, edited };
 }
 
 /** The formatted body, with the email editor's toolbar as icons. */
@@ -67,30 +70,47 @@ const SALARY = /\{\{\s*candidate\.(currentSalary|expectedSalary|salaryNotes|curr
 /** What a template's interview placeholders say, from the composer (the interview may not exist yet). */
 export type InterviewWords = { when: string; length: string; how: string; where: string };
 
+// The interview's own instructions are this message: a template's placeholder for them is dropped.
+const INSTRUCTIONS = /\{\{\s*interview\.instructions\s*\}\}/gi;
+/** Placeholders and fields left unfilled, e.g. {{client.name}} or [Client contact]. */
+export const UNFILLED = /\{\{\s*[\w.]+\s*\}\}/g;
+
+/** A subject without the interview's time, place or length (Outlook shows those, and they would go stale in the title). */
+function subjectOf(subject: string): string {
+  return subject
+    .replace(/\s*(?:\b(?:on|at|in)\b|[-–—,:])?\s*(?:\{\{\s*interview\.(?:when|length|how|where)\s*\}\}|\[(?:Interview time|Interview place)\])/gi, "")
+    .replace(/\s{2,}/g, " ").trim();
+}
+
 function fillInterview(text: string, words: InterviewWords, html: boolean): string {
   const value: Record<string, string> = { when: words.when, length: words.length, how: words.how, where: words.where };
-  return text.replace(/\{\{\s*interview\.(when|length|how|where)\s*\}\}|\[(Interview time|Interview place)\]/gi, (_m, key: string | undefined, label: string | undefined) => {
+  return text.replace(INSTRUCTIONS, "").replace(/\{\{\s*interview\.(when|length|how|where)\s*\}\}|\[(Interview time|Interview place)\]/gi, (_m, key: string | undefined, label: string | undefined) => {
     const k = key ?? (label?.toLowerCase().endsWith("time") ? "when" : "where");
     const v = value[k] ?? "";
-    return html ? escapeHtml(v) : v;
+    // Marked in the message, so the server fills it again when the interview moves.
+    return html ? `<span data-field="interview.${k}">${escapeHtml(v)}</span>` : v;
   });
 }
 
 /** Picking an email template: its subject and message, filled from the candidate, their job and the interview. */
-export function TemplatePicker({ candidateId, applicationId, interviewId, words, onPick }: {
-  candidateId: string; applicationId: string; interviewId?: string; words: InterviewWords;
-  onPick: (draft: { subject: string; html: string }) => void;
+export function TemplatePicker({ candidateId, applicationId, words, onPick }: {
+  candidateId: string; applicationId: string; words: InterviewWords;
+  onPick: (draft: { subject: string; html: string; missing: string[] }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")), enabled: open });
   const offered = (templates.data?.items ?? []).filter((t) => !SALARY.test(`${t.subject} ${t.body} ${t.bodyHtml ?? ""}`));
   const draft = useMutation({
     mutationFn: async (templateId: string) => unwrap(await api.POST("/v1/email-drafts", {
-      body: { templateId, candidateId, applicationId, interviewId, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      // Without the interview: its time and place come from the composer, as they are now, and are marked.
+      body: { templateId, candidateId, applicationId, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
     })),
     onSuccess: (d) => {
-      const html = d.bodyHtml ?? d.body.split("\n").map((l) => `<p>${escapeHtml(l) || "<br>"}</p>`).join("");
-      onPick({ subject: fillInterview(d.subject, words, false), html: fillInterview(html, words, true) });
+      const raw = d.bodyHtml ?? d.body.split("\n").map((l) => `<p>${escapeHtml(l) || "<br>"}</p>`).join("");
+      const html = fillInterview(raw, words, true);
+      // What is still to fill in before sending (fields the server had no value for).
+      const missing = [...new Set([...d.missing.filter((m) => !/^\[Interview (time|place)\]$/.test(m) && html.includes(escapeHtml(m))), ...(html.match(UNFILLED) ?? [])])];
+      onPick({ subject: fillInterview(subjectOf(d.subject), words, false), html, missing });
       setOpen(false);
     },
   });

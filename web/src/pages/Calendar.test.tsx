@@ -25,11 +25,13 @@ it("makes attendee invitations explicit and highlights rejected fields", async (
   renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
   fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Interview" } });
   const people = screen.getByLabelText("Attendees");
-  fireEvent.change(people, { target: { value: "invalid" } }); fireEvent.keyDown(people, { key: "Enter" });
-  expect(screen.getByText("invalid")).toBeTruthy(); // a chip, as in Outlook
+  fireEvent.change(people, { target: { value: "invalid, hr@maju.test hr@maju.test" } }); fireEvent.keyDown(people, { key: "Enter" });
+  expect(screen.getByRole("alert").textContent).toBe("Not an email address: invalid"); // stays typed, named
+  expect(screen.getAllByText("hr@maju.test")).toHaveLength(1); // a chip, once, as in Outlook
+  fireEvent.change(people, { target: { value: "" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(await screen.findByText("Enter valid email addresses.")).toBeTruthy(); expect(screen.getByLabelText("Attendees").getAttribute("aria-invalid")).toBe("true");
-  expect(sentBody(post)).toMatchObject({ title: "Interview", attendees: [{ email: "invalid" }] });
+  expect(sentBody(post)).toMatchObject({ title: "Interview", attendees: [{ email: "hr@maju.test" }] });
 });
 it("requires valid intervals before sending and uses local midnight for all-day appointments", async () => {
   const post = vi.spyOn(api, "POST").mockResolvedValue(ok({})); const onSaved = vi.fn();
@@ -194,4 +196,21 @@ it("invites optional attendees and sends the notes formatted, with the signature
   expect(body.attendees).toEqual([{ email: "hr@maju.test" }, { email: "boss@maju.test", optional: true }]);
   expect(body.notesHtml).toContain('<div data-signature="true"><p>Best, Demo</p></div>');
   expect(body.notes).toBe(""); // the signature is not the appointment's notes
+});
+it("leaves an opened appointment's notes alone unless they are written in", async () => {
+  const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({})); const onSaved = vi.fn();
+  const event = { id: "cev_1", version: 2, title: "Sync", notes: "Agenda", notesHtml: "<p><b>Agenda</b></p>", location: "", startsAt: "2026-11-18T01:00:00Z", endsAt: "2026-11-18T02:00:00Z", timeZone: "Asia/Kuala_Lumpur", allDay: false, attendees: [], teams: false } as unknown as Schemas["CalendarEvent"];
+  renderWithClient(<EventForm event={event} date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={onSaved}/>);
+  fireEvent.change(screen.getByLabelText("End time"), { target: { value: "30" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+  const body = sentBody(put) as Record<string, unknown>;
+  expect(body.notes).toBe("Agenda");
+  expect(body).not.toHaveProperty("notesHtml"); // left out: kept, and Outlook's body is not replaced
+});
+it("shows why formatted notes were refused", async () => {
+  vi.spyOn(api, "POST").mockResolvedValue(invalidField("notesHtml", "is too long: shorten the notes"));
+  renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={disconnected} onClose={vi.fn()} onSaved={vi.fn()}/>);
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Long" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("is too long: shorten the notes")).toBeTruthy();
 });

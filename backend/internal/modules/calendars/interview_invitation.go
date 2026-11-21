@@ -120,7 +120,11 @@ func (m *Module) SendInterviewInvitation(ctx context.Context, tx pgx.Tx, p authz
 			return out, invitationDenied("Reconnect the original Outlook calendar to manage this invitation.")
 		}
 		if row.SyncStatus != "failed" && row.SyncStatus != "conflict" {
-			return out, nil
+			return out, nil // already made: the same request again is answered, not refused
+		}
+		if in.BodyHtml != nil || in.Optional != nil {
+			// A retry sends the invitation as it was made: its message and attendees are changed in Outlook.
+			return out, apperr.Validation(apperr.FieldErrors{{Field: "bodyHtml", Message: "an invitation already made keeps its message and attendees: change them in Outlook"}})
 		}
 	}
 	if !s.canManageInvitation(meeting, row) {
@@ -149,6 +153,9 @@ func (m *Module) SendInterviewInvitation(ctx context.Context, tx pgx.Tx, p authz
 		var bodyHTML *string
 		if in.BodyHtml != nil {
 			if safe, _ := cleanNotes(*in.BodyHtml); safe != "" {
+				if len(safe) > maxNotesHTML { // making it safe can lengthen it
+					return out, apperr.Validation(apperr.FieldErrors{{Field: "bodyHtml", Message: "is too long: shorten the message"}})
+				}
 				bodyHTML = &safe
 			}
 		}

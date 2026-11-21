@@ -22,7 +22,7 @@ type Attendee struct {
 // Input is deliberately independent of Graph's representation.
 type Input struct {
 	Title, Notes, Location, TimeZone string
-	NotesHTML                        string // formatted notes, cleaned in normalize; Notes is then their text
+	NotesHTML                        *string // formatted notes, cleaned in normalize (nil: unchanged on a change; ""/empty: none)
 	Start, End                       time.Time
 	AllDay, Teams                    bool
 	Attendees                        []Attendee
@@ -32,10 +32,13 @@ func normalize(in Input) (Input, error) {
 	var errs apperr.FieldErrors
 	in.Title = strings.TrimSpace(in.Title)
 	in.Notes = strings.TrimSpace(in.Notes)
-	if in.NotesHTML != "" {
-		var text string
-		in.NotesHTML, text = cleanNotes(in.NotesHTML)
-		if in.Notes == "" && in.NotesHTML != "" { // the notes as text, unless the composer gave them (without its signature)
+	if in.NotesHTML != nil {
+		safe, text := cleanNotes(*in.NotesHTML)
+		in.NotesHTML = &safe
+		if len(safe) > maxNotesHTML { // making it safe can lengthen it (links get rel, quotes are escaped)
+			errs.Add("notesHtml", "is too long: shorten the notes")
+		}
+		if in.Notes == "" && safe != "" { // the notes as text, unless the composer gave them (without its signature)
 			in.Notes = bounded(text, 4000)
 		}
 	}

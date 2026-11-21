@@ -211,9 +211,11 @@ func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
 	delete(patch, "transactionId")
 	var sent graphEvent
 	_ = json.Unmarshal(row.RemoteSnapshot, &sent)
-	// Formatted notes are always sent (Outlook rewrites HTML, so it cannot be compared).
+	// Formatted notes are sent only when HiringPlug changed them (Outlook rewrites
+	// HTML, so they cannot be compared with what it holds).
 	formatted := row.NotesHtml != nil && *row.NotesHtml != ""
-	if row.Teams || sent.OnlineMeeting != nil || (!formatted && sent.Body.ContentType == "text" && strings.TrimSpace(sent.Body.Content) == strings.TrimSpace(row.Notes)) {
+	if row.Teams || sent.OnlineMeeting != nil || (formatted && !row.BodyDirty) ||
+		(!formatted && sent.Body.ContentType == "text" && strings.TrimSpace(sent.Body.Content) == strings.TrimSpace(row.Notes)) {
 		delete(patch, "body")
 	}
 	return json.Marshal(patch)

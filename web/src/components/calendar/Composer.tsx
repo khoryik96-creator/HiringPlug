@@ -145,15 +145,27 @@ export function MeetingPicker({ online, link, onChange, teamsAuto, extra }: {
   );
 }
 
+const EMAIL = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]+$/;
+
 /** People as chips; typing an address and Enter, comma or Tab adds it. */
 export function EmailChips({ emails, onChange, disabled, invalid, label = "Attendees", placeholder = "Invite attendees", optional = false }: {
   emails: string[]; onChange: (e: string[]) => void; disabled?: boolean; invalid?: boolean; label?: string; placeholder?: string; optional?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [bad, setBad] = useState<string[]>([]);
+  // Addresses become chips, once each; anything else stays typed, and is named.
   const add = () => {
-    const next = draft.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
-    if (next.length) onChange([...emails, ...next.filter((e) => !emails.some((x) => x.toLowerCase() === e.toLowerCase()))]);
-    setDraft("");
+    const typed = draft.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
+    const known = new Set(emails.map((e) => e.toLowerCase()));
+    const good: string[] = [];
+    const wrong: string[] = [];
+    for (const e of typed) {
+      if (!EMAIL.test(e)) wrong.push(e);
+      else if (!known.has(e.toLowerCase())) { known.add(e.toLowerCase()); good.push(e); }
+    }
+    if (good.length) onChange([...emails, ...good]);
+    setBad(wrong);
+    setDraft(wrong.join(" "));
   };
   return (
     <div className="chips-input">
@@ -163,12 +175,13 @@ export function EmailChips({ emails, onChange, disabled, invalid, label = "Atten
         </span>
       ))}
       <input aria-label={label} placeholder={emails.length ? "" : placeholder} value={draft} disabled={disabled} type="text"
-        aria-invalid={invalid ? true : undefined}
+        aria-invalid={invalid || bad.length > 0 ? true : undefined}
         onChange={(e) => { setDraft(e.target.value); }} onBlur={add}
         onKeyDown={(e) => {
           if ((e.key === "Enter" || e.key === "," || e.key === ";" || e.key === "Tab") && draft.trim()) { if (e.key !== "Tab") e.preventDefault(); add(); }
           if (e.key === "Backspace" && !draft && emails.length) onChange(emails.slice(0, -1));
         }} />
+      {bad.length > 0 && <small className="error chips-error" role="alert">Not an email address: {bad.join(", ")}</small>}
     </div>
   );
 }

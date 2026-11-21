@@ -17,6 +17,8 @@ import { joinLocation, linkProblem, type Service, splitLocation } from "./meetin
 
 type Event = Schemas["CalendarEvent"];
 const DAY = 24 * 60;
+/** The fields whose errors show at their own row. */
+const SHOWN = ["title", "attendees", "startsAt", "endsAt", "location", "notes", "notesHtml"];
 /** Ends Outlook offers: 15, 30 and 45 minutes, then every half hour to a day. */
 const ENDS = [15, 30, 45, ...Array.from({ length: 47 }, (_, i) => 60 + i * 30)];
 
@@ -42,7 +44,7 @@ export function EventForm({ event, date, startAtSlot = false, connection, onClos
   const set = (change: Partial<typeof form>) => { setForm((f) => ({ ...f, ...change })); };
   // The notes, formatted; a new appointment starts with the person's signature, as in Outlook.
   const [showOptional, setShowOptional] = useState(form.optional.length > 0);
-  const { message, signature, toggleSignature, write } = useMessage(event ? event.notesHtml ?? plainToHtml(event.notes) : "", !event, connection.connected);
+  const { message, signature, toggleSignature, write, edited } = useMessage(event ? event.notesHtml ?? plainToHtml(event.notes) : "", !event, connection.connected);
   const teamsAuto = connection.teamsAvailable && !event?.teams;
   const service = (["teams", "google_meet", "zoom"] as string[]).includes(form.online) ? form.online as Service : null;
   // Only a meeting the user picks here changes: an appointment opened and saved keeps its own.
@@ -66,7 +68,9 @@ export function EventForm({ event, date, startAtSlot = false, connection, onClos
       if (problem) throw new FormInvalid({ location: problem });
       if (picked && service === "teams" && !teams && !form.link.trim()) throw new FormInvalid({ location: "Paste the Teams meeting link." });
       const body: Schemas["CalendarEventInput"] = {
-        title: form.title, notes: bodyText(message.html).slice(0, 4000), ...(saysSomething(message.html) ? { notesHtml: message.html } : {}), startsAt: from.toISOString(), endsAt: to.toISOString(), timeZone: zone, allDay: form.allDay,
+        // The notes as they were, unless written here: Outlook's body is then left as it is.
+        ...(event && !edited ? { notes: event.notes } : { notes: bodyText(message.html).slice(0, 4000), notesHtml: saysSomething(message.html) ? message.html : "" }),
+        title: form.title, startsAt: from.toISOString(), endsAt: to.toISOString(), timeZone: zone, allDay: form.allDay,
         // A Teams meeting Outlook makes gets its own location from Outlook.
         location: autoTeams ? form.place.trim() : joinLocation(form.place, service ?? "none", form.link), teams,
         attendees: [...form.attendees.map((email) => ({ email })), ...form.optional.map((email) => ({ email, optional: true }))],
@@ -94,7 +98,7 @@ export function EventForm({ event, date, startAtSlot = false, connection, onClos
             icon={<SignatureIcon />} pressed={hasSignature(message.html)} disabled={!signature} onClick={toggleSignature} />
           <span className="composer-bar-note muted small">{zone}</span>
         </>}
-        side={<DayPeek day={new Date(`${form.day}T00:00`)} start={form.allDay ? null : preview?.from ?? null} end={form.allDay ? null : preview?.to ?? null} title={form.title} skip={event?.id} />}>
+        side={<DayPeek day={preview?.from ?? new Date(`${form.day}T00:00`)} start={form.allDay ? null : preview?.from ?? null} end={form.allDay ? null : preview?.to ?? null} title={form.title} skip={event?.id} />}>
         <input className="composer-title" aria-label="Title" placeholder="Add a title" autoFocus required maxLength={200} value={form.title}
           aria-invalid={errors.title ? true : undefined} onChange={(e) => { set({ title: e.target.value }); }} />
         {errors.title && <small className="error">{errors.title}</small>}
@@ -139,7 +143,9 @@ export function EventForm({ event, date, startAtSlot = false, connection, onClos
           {event?.teams && <small className="composer-hint">Changed notes stay in HiringPlug: Outlook keeps this Teams meeting&apos;s own notes, which hold its join details.</small>}
           {errors.notes && <small className="error">{errors.notes}</small>}
         </Row>
-        <ErrorMessage error={Object.keys(errors).length ? null : save.error} />
+        {errors.notesHtml && <small className="error" role="alert">{errors.notesHtml}</small>}
+        {/* Field errors are shown at their field; anything else (or a field shown nowhere) here. */}
+        <ErrorMessage error={Object.keys(errors).every((k) => SHOWN.some((f) => k === f || k.startsWith(`${f}.`)) ) && Object.keys(errors).length ? null : save.error} />
       </Composer>
     </section>
   );

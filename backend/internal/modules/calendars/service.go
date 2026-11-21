@@ -156,7 +156,7 @@ func (s *Service) save(ctx context.Context, p authz.Principal, id string, versio
 		}
 		var row store.CalendarEvent
 		if id == "" {
-			row, err = q.InsertCalendarEvent(ctx, store.InsertCalendarEventParams{Title: in.Title, Notes: in.Notes, NotesHtml: orNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync})
+			row, err = q.InsertCalendarEvent(ctx, store.InsertCalendarEventParams{Title: in.Title, Notes: in.Notes, NotesHtml: htmlOrNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync})
 		} else {
 			before, e := q.CalendarEvent(ctx, id)
 			if database.IsNoRows(e) {
@@ -171,7 +171,7 @@ func (s *Service) save(ctx context.Context, p authz.Principal, id string, versio
 			if before.Source != "local" {
 				return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this interview or booking in its original HiringPlug screen, or open an external event in Outlook.")
 			}
-			row, err = q.UpdateCalendarEvent(ctx, store.UpdateCalendarEventParams{ID: id, ExpectedVersion: int32(version), Title: in.Title, Notes: in.Notes, NotesHtml: orNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync}) //nolint:gosec // range checked above
+			row, err = q.UpdateCalendarEvent(ctx, store.UpdateCalendarEventParams{ID: id, ExpectedVersion: int32(version), Title: in.Title, Notes: in.Notes, KeepNotesHtml: in.NotesHTML == nil, NotesHtml: htmlOrNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync}) //nolint:gosec // range checked above
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("calendar event")
 			}

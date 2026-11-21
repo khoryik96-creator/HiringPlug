@@ -45,6 +45,10 @@ it("starts with Teams ticked for an interview scheduled as a Teams meeting", asy
   fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
   expect((await screen.findByLabelText<HTMLInputElement>("Microsoft Teams meeting")).checked).toBe(true);
   cleanup();
+  renderWithClient(<InterviewInvitation interview={{ ...interview, location: "Room 4B; Microsoft Teams Meeting" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
+  expect((await screen.findByLabelText<HTMLInputElement>("Microsoft Teams meeting")).checked).toBe(true); // a room beside it
+  cleanup();
   renderWithClient(<InterviewInvitation interview={{ ...interview, location: "https://zoom.us/j/1" }} />);
   fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
   expect((await screen.findByLabelText<HTMLInputElement>("Microsoft Teams meeting")).checked).toBe(false);

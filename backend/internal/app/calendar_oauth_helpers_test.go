@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 
 	"strings"
 	"sync"
@@ -65,7 +66,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		items := []map[string]any{}
 		for _, e := range f.events {
 			if accountOf(e) == f.signedIn() { // each account sees its own calendar
-				items = append(items, e)
+				items = append(items, answered(r, e))
 			}
 		}
 		body := map[string]any{"value": items}
@@ -86,7 +87,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&e)
 		for _, old := range f.events { // a mailbox keeps one event per transactionId
 			if tx, _ := e["transactionId"].(string); tx != "" && old["transactionId"] == tx && accountOf(old) == f.signedIn() {
-				_ = json.NewEncoder(w).Encode(old)
+				_ = json.NewEncoder(w).Encode(answered(r, old))
 				return
 			}
 		}
@@ -105,7 +106,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(503) // stored, but the answer never arrives
 			return
 		}
-		_ = json.NewEncoder(w).Encode(e)
+		_ = json.NewEncoder(w).Encode(answered(r, e))
 	case strings.Contains(r.URL.Path, "/events/"):
 		id := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 		e, ok := f.events[id]
@@ -139,7 +140,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			}
 			e["changeKey"] = "v2"
 		}
-		_ = json.NewEncoder(w).Encode(e)
+		_ = json.NewEncoder(w).Encode(answered(r, e))
 	default:
 		w.WriteHeader(404)
 	}
@@ -216,4 +217,24 @@ func runPostponedCalendarJobs(t *testing.T, a *testApp, tenant string) {
 	_, err := testutil.Current.Admin.Exec(t.Context(), `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND status = 'pending'`, tenant)
 	require.NoError(t, err)
 	runCoreJobsUntilIdle(t, a, tenant)
+}
+
+var tagRe = regexp.MustCompile(`<[^>]*>`)
+
+// answered is an event as Outlook answers it: with Prefer
+// outlook.body-content-type="text", an HTML body comes back as its text (the
+// event keeps what was sent, for the tests to read).
+func answered(r *http.Request, e map[string]any) map[string]any {
+	body, _ := e["body"].(map[string]any)
+	if body == nil || body["contentType"] != "html" || !strings.Contains(r.Header.Get("Prefer"), `body-content-type="text"`) {
+		return e
+	}
+	out := make(map[string]any, len(e))
+	for k, v := range e {
+		out[k] = v
+	}
+	content, _ := body["content"].(string)
+	text := tagRe.ReplaceAllString(strings.NewReplacer("</p>", "\n", "<br>", "\n", "</li>", "\n").Replace(content), "")
+	out["body"] = map[string]any{"contentType": "text", "content": strings.TrimSpace(text)}
+	return out
 }

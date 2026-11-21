@@ -3,6 +3,7 @@ package calendars
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -185,8 +186,16 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 		}
 		return nil
 	}
+	// Outlook answers with the body as text. Only a body changed in Outlook since
+	// the last receipt replaces the notes (and their formatting): a reply or
+	// another change leaves HiringPlug's formatted notes as they are.
+	var known graphEvent
+	bodyChanged := strings.TrimSpace(e.Body.Content) != strings.TrimSpace(row.Notes)
+	if json.Unmarshal(row.RemoteSnapshot, &known) == nil && len(row.RemoteSnapshot) > 0 {
+		bodyChanged = strings.TrimSpace(e.Body.Content) != strings.TrimSpace(known.Body.Content)
+	}
 	notes := row.Notes
-	if e.Body.ContentType == "text" {
+	if e.Body.ContentType == "text" && bodyChanged {
 		notes = bounded(e.Body.Content, 4000)
 	}
 	attendees, _ := json.Marshal(e.attendees())
@@ -198,7 +207,7 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 	if e.IsCancelled {
 		status = "cancelled"
 	}
-	if err := q.UpdateManagedFromOutlook(ctx, store.UpdateManagedFromOutlookParams{ID: row.ID, Title: title, Notes: notes, PlainBody: e.Body.ContentType == "text", Location: bounded(e.Location.DisplayName, 500), StartsAt: start, EndsAt: end, AllDay: e.IsAllDay, Attendees: attendees, Status: status, RemoteKey: e.key(), WebUrl: safeWebURL(e.WebLink), JoinUrl: e.join(), RemoteSnapshot: snapshot}); err != nil {
+	if err := q.UpdateManagedFromOutlook(ctx, store.UpdateManagedFromOutlookParams{ID: row.ID, Title: title, Notes: notes, PlainBody: e.Body.ContentType == "text" && bodyChanged, Location: bounded(e.Location.DisplayName, 500), StartsAt: start, EndsAt: end, AllDay: e.IsAllDay, Attendees: attendees, Status: status, RemoteKey: e.key(), WebUrl: safeWebURL(e.WebLink), JoinUrl: e.join(), RemoteSnapshot: snapshot}); err != nil {
 		return err
 	}
 	updated, err := q.CalendarEvent(ctx, row.ID)

@@ -10,12 +10,12 @@ import { api, ApiError, type Permission, type Schemas, unwrap } from "../api/cli
 import { applicationInterviewsKey, interviewsKey, usersKey } from "../api/keys";
 import { formatWhen, INTERVIEW_MODE } from "../labels";
 import { IconButton, MailIcon, OutlookIcon, PhoneIcon, TrashIcon } from "./ActionIcons";
-import { plainToHtml } from "./clientEmail/richText";
+import { escapeHtml, plainToHtml } from "./clientEmail/richText";
 import { bodyText, ComposeBody, hasSignature, saysSomething, SignatureIcon, TemplatePicker, useMessage } from "./calendar/ComposeBody";
 import { BellIcon, Composer, EmailChips, EndTime, lasting, MeetingPicker, NotesIcon, PeopleIcon, PinIcon, Row, SendIcon, StartTime, TimeIcon, VideoIcon } from "./calendar/Composer";
 import { localInput } from "./calendar/dates";
 import { DayPeek } from "./calendar/DayPeek";
-import { linkProblem, type Service, splitLocation, TEAMS_LOCATION } from "./calendar/meeting";
+import { joinLocation, linkProblem, type Service, splitLocation, TEAMS_LOCATION } from "./calendar/meeting";
 import { FormInvalid, fieldErrors } from "./forms";
 import { SaveError } from "./SaveError";
 
@@ -31,7 +31,7 @@ function whereOf(iv: Interview | undefined): { where: Where | null; link: string
   if (!iv) return { where: null, link: "", place: "" };
   if (iv.mode !== "video") return { where: iv.mode, link: "", place: iv.location ?? "" };
   const { online, link, place } = splitLocation(iv.location);
-  if (online !== "none") return { where: online, link, place: "" };
+  if (online !== "none") return { where: online, link, place }; // a room beside the link is kept
   return { where: place ? "other" : null, link: place, place: "" };
 }
 
@@ -54,6 +54,13 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
   const usesCalendar = permissions.includes("calendars:use");
   const outlook = useQuery({ queryKey: connectionKey, queryFn: async () => unwrap(await api.GET("/v1/calendar/connection")), enabled: usesCalendar, staleTime: 60_000 });
   const conn = outlook.data;
+  // A sent Teams invitation: Outlook moves the meeting but keeps its message (its join details are in it).
+  const sentInvite = useQuery({
+    queryKey: ["interview-outlook-invitation", interview?.id ?? "", interview?.version ?? 0],
+    queryFn: async () => unwrap(await api.GET("/v1/interviews/{interviewId}/outlook-invitation", { params: { path: { interviewId: interview?.id ?? "" } } })),
+    enabled: Boolean(interview) && usesCalendar,
+  });
+  const teamsInviteSent = Boolean(sentInvite.data?.teams) && ["sent", "pending"].includes(sentInvite.data?.status ?? "");
   const canInvite = !interview && usesCalendar && permissions.includes("interviews:schedule") && Boolean(conn?.connected) && conn?.status !== "reconnect";
   const [opened] = useState(() => ({ version: interview?.version ?? 0 }));
   const [begin] = useState(() => localInput(interview ? new Date(interview.startsAt) : nextWorkingDay()));
@@ -65,6 +72,8 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
   });
   const [invite, setInvite] = useState({ send: true, reminderMinutes: 15, candidateReminder: false, optional: [] as string[] });
   // The message to the candidate, formatted: the invitation's body, and (as text) the interview's instructions.
+  const [templated, setTemplated] = useState(false); // a template wrote the message: sent as the invitation, not kept as the instructions
+  const [unfilled, setUnfilled] = useState<string[]>([]); // the template's fields still to fill in
   const { message, signature, toggleSignature, replace, write } = useMessage(interview?.instructions ? plainToHtml(interview.instructions) : "", !interview, usesCalendar);
   const who = candidateId ?? interview?.candidateId;
   const [notSent, setNotSent] = useState<string | null>(null);
@@ -81,16 +90,25 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
     mutationFn: async (ignoreClashes: boolean) => {
       if (!start || Number.isNaN(start.getTime())) throw new FormInvalid({ startsAt: "Choose the date." });
       if (form.interviewerIds.length === 0) throw new FormInvalid({ interviewerIds: "Add at least one interviewer." });
+      const left = unfilled.filter((t) => message.html.includes(escapeHtml(t)));
+      if (left.length) throw new FormInvalid({ message: `Fill in ${left.join(", ")} first: the candidate would see it as written.` });
       const problem = service ? linkProblem(service, form.link) : "";
       if (problem) throw new FormInvalid({ location: problem });
+      // A Teams meeting with no link needs Outlook to make it (this invitation), or already had one made.
+      const outlookMakesTeams = sending && teamsAuto;
+      if ((form.where !== null || !interview) && where === "teams" && !form.link.trim() && !outlookMakesTeams && interview?.location !== TEAMS_LOCATION) {
+        throw new FormInvalid({ location: "Paste the Teams meeting link, or send the Outlook invitation to make one." });
+      }
+      const room = form.place.trim();
       const location = form.where === null && interview ? interview.location ?? "" // not chosen here: kept as it was
-        : where === "teams" ? form.link.trim() || TEAMS_LOCATION
-        : where === "in_person" || where === "phone" ? form.place.trim() : form.link.trim();
+        : where === "in_person" || where === "phone" ? room
+        : where === "other" ? [room, form.link.trim()].filter(Boolean).join("; ")
+        : joinLocation(room, where, form.link);
       const mode: Schemas["InterviewMode"] = where === "in_person" || where === "phone" ? where : "video";
       const body = {
         title: form.title, startsAt: start.toISOString(), durationMinutes: form.durationMinutes,
         mode,
-        location: location || null, instructions: bodyText(message.html).slice(0, 2000) || null, interviewerIds: form.interviewerIds, ignoreClashes,
+        location: location || null, instructions: templated && sending ? null : bodyText(message.html).slice(0, 2000) || null, interviewerIds: form.interviewerIds, ignoreClashes,
       };
       const saved = interview
         ? unwrap(await api.PATCH("/v1/interviews/{interviewId}", { params: { path: { interviewId: interview.id } }, body: { version: opened.version, ...body } }))
@@ -161,11 +179,11 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
               onClick={() => { setInvite({ ...invite, candidateReminder: !invite.candidateReminder }); }} />}
           </>}
           <span className="composer-sep" aria-hidden="true" />
-          {who && permissions.includes("emails:send") && <TemplatePicker candidateId={who} applicationId={applicationId} interviewId={interview?.id}
+          {who && permissions.includes("emails:send") && <TemplatePicker candidateId={who} applicationId={applicationId}
             words={{ when: start && !Number.isNaN(start.getTime()) ? start.toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "",
               length: lasting(form.durationMinutes), how: INTERVIEW_MODE[where === "in_person" || where === "phone" ? where : "video"],
               where: where === "in_person" || where === "phone" ? form.place : form.link || (where === "teams" ? "Microsoft Teams" : "") }}
-            onPick={(d) => { set({ title: d.subject.slice(0, 100) || form.title }); replace(d.html); }} />}
+            onPick={(d) => { set({ title: d.subject.slice(0, 100) || form.title }); setTemplated(true); setUnfilled(d.missing); replace(d.html); }} />}
           <IconButton label="Signature" tip={signature ? (hasSignature(message.html) ? "Remove signature" : "Add signature") : "Write your signature in Settings > Your account"}
             icon={<SignatureIcon />} pressed={hasSignature(message.html)} disabled={!signature} onClick={toggleSignature} />
         </>}
@@ -199,6 +217,9 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
             <EndTime start={form.time} minutes={form.durationMinutes} choices={LENGTHS} onChange={(m) => { set({ durationMinutes: m }); }} />
           </div>
           {errors.startsAt && <small className="error">{errors.startsAt}</small>}
+          {teamsInviteSent && interview && start && (start.getTime() !== Date.parse(interview.startsAt) || form.durationMinutes !== interview.durationMinutes) && (
+            <small className="composer-hint" role="note">Outlook moves the Teams meeting and tells the candidate; the invitation&apos;s message stays as it was first sent.</small>
+          )}
         </Row>
         <Row icon={<VideoIcon />} label="Where">
           <MeetingPicker online={where} link={form.link} teamsAuto={teamsAuto && (Boolean(interview) || sending)}
@@ -213,6 +234,7 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
         </Row>
         <Row icon={<NotesIcon />} label="Details" className="composer-notes">
           <ComposeBody html={message.html} resetKey={message.reset} onChange={write} />
+          {errors.message && <small className="error" role="alert">{errors.message}</small>}
         </Row>
         {clashes ? (
           <div className="warning" role="alert">
@@ -225,7 +247,7 @@ export function InterviewForm({ applicationId, interview, onDone, permissions = 
             <button type="button" onClick={() => { save.mutate(true); }}>{sending ? "Send anyway" : "Schedule anyway"}</button>
           </div>
         ) : (
-          <SaveError error={save.error} shown={["interviewerIds", "location", "startsAt"]} onReload={onDone} />
+          <SaveError error={save.error} shown={["interviewerIds", "location", "startsAt", "message"]} onReload={onDone} />
         )}
       </Composer>
     </section>

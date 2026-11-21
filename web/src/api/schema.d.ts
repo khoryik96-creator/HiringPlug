@@ -5446,7 +5446,7 @@ export interface components {
             endsAt: string;
             timeZone: string;
             notes?: string;
-            /** @description The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text. */
+            /** @description The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text unless given. */
             notesHtml?: string;
             location?: string;
             attendees: components["schemas"]["CalendarAttendee"][];
@@ -5461,6 +5461,7 @@ export interface components {
             endsAt: string;
             timeZone: string;
             notes?: string;
+            /** @description Left out, the formatted notes stay as they are (and are not sent to Outlook again); empty, the notes are plain. */
             notesHtml?: string;
             location?: string;
             attendees: components["schemas"]["CalendarAttendee"][];
@@ -8395,9 +8396,9 @@ export interface components {
             reminderMinutes: number;
             /** @description Email the candidate the day before. Defaults to off. */
             candidateReminder?: boolean;
-            /** @description The invitation's message, formatted, as the candidate sees it in Outlook (else the interview's instructions). Dropped for the instructions when the interview moves, so no old time stays in it. */
+            /** @description The invitation's message, formatted, as the candidate sees it in Outlook (else the interview's instructions). Interview fields a template filled in (<span data-field="interview.when">, .length, .how, .where) are filled again when the interview changes; other text stays as written. Outlook keeps a Teams meeting's message as it was first sent (its join details are in it). Only for a first invitation. */
             bodyHtml?: string;
-            /** @description Optional attendees (Outlook's Optional, the meeting's Cc), e.g. the hiring manager. Meeting invitations have no Bcc. */
+            /** @description Optional attendees (Outlook's Optional, the meeting's Cc), e.g. the hiring manager. Meeting invitations have no Bcc. Only for a first invitation. */
             optional?: string[];
         };
         InterviewOutlookReminderInput: {
