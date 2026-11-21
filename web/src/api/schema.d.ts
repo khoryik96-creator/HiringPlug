@@ -3751,6 +3751,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/job-leads/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find direct ads from the agency's configured feeds using a candidate's CV
+         * @description Results use the observed title and location, in newest-first order. The selected CV stays in HiringPlug.
+         */
+        post: operations["discoverJobLeads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/job-leads/{jobLeadId}": {
         parameters: {
             query?: never;
@@ -3760,7 +3780,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /** Open a lead in the workspace */
+        get: operations["getJobLead"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3768,6 +3789,25 @@ export interface paths {
         head?: never;
         /** Change a lead's status, notes or company */
         patch: operations["updateJobLead"];
+        trace?: never;
+    };
+    "/v1/job-leads/{jobLeadId}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobLeadId: components["parameters"]["JobLeadIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Add or remove this lead from my favorites */
+        put: operations["setJobLeadFavorite"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/jobs/{jobId}/market-map": {
@@ -8992,9 +9032,38 @@ export interface components {
             closedAt: string | null;
             status: components["schemas"]["LeadStatus"];
             notes: string | null;
+            /** @description Whether this lead is in the caller's favorites. */
+            favorite?: boolean;
+            /** @description Ad text observed in the source. Returned on the detail endpoint when the source provided it. */
+            description?: string;
+            /** Format: date-time */
+            descriptionObservedAt?: string;
+        };
+        JobLeadFavoriteInput: {
+            favorite: boolean;
         };
         JobLeadList: {
             items: components["schemas"]["JobLead"][];
+            nextCursor?: components["schemas"]["JobLeadId"];
+        };
+        /** @enum {string} */
+        LeadDiscoveryCountry: "MY" | "SG" | "AU" | "NZ" | "GB" | "US" | "HK" | "ID" | "TH" | "VN" | "PH" | "IN";
+        /** @enum {string} */
+        LeadDiscoverySource: "greenhouse" | "lever" | "ashby" | "smartrecruiters";
+        LeadDiscoveryInput: {
+            candidateId: components["schemas"]["CandidateId"];
+            documentId: components["schemas"]["DocumentId"];
+            countries: components["schemas"]["LeadDiscoveryCountry"][];
+            /** @description Default to configured structured job feeds. */
+            sources?: components["schemas"]["LeadDiscoverySource"][];
+            targetRole?: string;
+            cursor?: components["schemas"]["JobLeadId"];
+        };
+        LeadDiscoveryPage: {
+            items: components["schemas"]["JobLead"][];
+            /** @description Role used to match observed job titles. */
+            role: string;
+            nextCursor?: components["schemas"]["JobLeadId"];
         };
         JobLeadInput: {
             companyName: string;
@@ -18456,6 +18525,10 @@ export interface operations {
                 open?: boolean;
                 /** @description Words in the company or title. */
                 q?: string;
+                cursor?: components["schemas"]["JobLeadId"];
+                limit?: number;
+                /** @description Show only this user's favorites when true. */
+                favorites?: boolean;
             };
             header?: never;
             path?: never;
@@ -18504,6 +18577,59 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    discoverJobLeads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadDiscoveryInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDiscoveryPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getJobLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobLeadId: components["parameters"]["JobLeadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLead"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     updateJobLead: {
         parameters: {
             query?: never;
@@ -18533,6 +18659,34 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    setJobLeadFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobLeadId: components["parameters"]["JobLeadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobLeadFavoriteInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getMarketMap: {

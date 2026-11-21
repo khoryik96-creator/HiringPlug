@@ -35,6 +35,11 @@ type Companies interface {
 	Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error)
 }
 
+// CVs reads the exact source CV in the caller's scoped transaction.
+type CVs interface {
+	CVTextOf(ctx context.Context, tx pgx.Tx, documentID string) (candidateID, source, text string, err error)
+}
+
 // Module is the leads module.
 type Module struct {
 	service *Service
@@ -43,8 +48,8 @@ type Module struct {
 
 // New wires the module. allowPrivate lets careers pages be on private
 // networks (local testing only).
-func New(pool *pgxpool.Pool, companies Companies, allowPrivate bool) *Module {
-	svc := &Service{pool: pool, companies: companies, allowPrivate: allowPrivate}
+func New(pool *pgxpool.Pool, companies Companies, cvs CVs, allowPrivate bool) *Module {
+	svc := &Service{pool: pool, companies: companies, cvs: cvs, allowPrivate: allowPrivate}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 

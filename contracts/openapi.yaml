@@ -6264,6 +6264,9 @@ paths:
         - {name: sourceId, in: query, required: false, schema: {$ref: '#/components/schemas/LeadSourceId'}}
         - {name: open, in: query, required: false, description: Only openings still listed (true) or closed (false)., schema: {type: boolean}}
         - {name: q, in: query, required: false, description: Words in the company or title., schema: {type: string, maxLength: 100}}
+        - {name: cursor, in: query, schema: {$ref: '#/components/schemas/JobLeadId'}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 500}}
+        - {name: favorites, in: query, schema: {type: boolean}, description: Show only this user's favorites when true.}
       responses:
         '200':
           description: OK
@@ -6292,9 +6295,45 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/job-leads/discover:
+    post:
+      operationId: discoverJobLeads
+      tags: [leads]
+      summary: Find direct ads from the agency's configured feeds using a candidate's CV
+      description: Results use the observed title and location, in newest-first order. The selected CV stays in HiringPlug.
+      x-permission: leads:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LeadDiscoveryInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeadDiscoveryPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/job-leads/{jobLeadId}:
     parameters:
       - $ref: '#/components/parameters/JobLeadIdPath'
+    get:
+      operationId: getJobLead
+      tags: [leads]
+      summary: Open a lead in the workspace
+      x-permission: leads:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobLead'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
     patch:
       operationId: updateJobLead
       tags: [leads]
@@ -6316,6 +6355,25 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/job-leads/{jobLeadId}/favorite:
+    parameters:
+      - $ref: '#/components/parameters/JobLeadIdPath'
+    put:
+      operationId: setJobLeadFavorite
+      tags: [leads]
+      summary: Add or remove this lead from my favorites
+      x-permission: leads:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobLeadFavoriteInput'}
+      responses:
+        '204': {description: Saved}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/jobs/{jobId}/market-map:
     parameters:
       - $ref: '#/components/parameters/JobOrderIdPath'
@@ -14113,6 +14171,15 @@ components:
         closedAt: {type: string, format: date-time, nullable: true, description: When the opening stopped being listed.}
         status: {$ref: '#/components/schemas/LeadStatus'}
         notes: {type: string, nullable: true}
+        favorite: {type: boolean, description: Whether this lead is in the caller's favorites.}
+        description: {type: string, description: Ad text observed in the source. Returned on the detail endpoint when the source provided it.}
+        descriptionObservedAt: {type: string, format: date-time}
+    JobLeadFavoriteInput:
+      type: object
+      additionalProperties: false
+      required: [favorite]
+      properties:
+        favorite: {type: boolean}
     JobLeadList:
       type: object
       required: [items]
@@ -14120,6 +14187,44 @@ components:
         items:
           type: array
           items: {$ref: '#/components/schemas/JobLead'}
+        nextCursor: {$ref: '#/components/schemas/JobLeadId'}
+    LeadDiscoveryCountry:
+      type: string
+      enum: [MY, SG, AU, NZ, GB, US, HK, ID, TH, VN, PH, IN]
+    LeadDiscoverySource:
+      type: string
+      enum: [greenhouse, lever, ashby, smartrecruiters]
+    LeadDiscoveryInput:
+      type: object
+      additionalProperties: false
+      required: [candidateId, documentId, countries]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        countries:
+          type: array
+          minItems: 1
+          maxItems: 12
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/LeadDiscoveryCountry'}
+        sources:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/LeadDiscoverySource'}
+          description: Default to configured structured job feeds.
+        targetRole: {type: string, maxLength: 120}
+        cursor: {$ref: '#/components/schemas/JobLeadId'}
+    LeadDiscoveryPage:
+      type: object
+      required: [items, role]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/JobLead'}
+        role: {type: string, description: Role used to match observed job titles.}
+        nextCursor: {$ref: '#/components/schemas/JobLeadId'}
     JobLeadInput:
       type: object
       additionalProperties: false

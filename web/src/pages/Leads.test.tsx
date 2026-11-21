@@ -89,3 +89,27 @@ describe("leads", () => {
     expect(screen.queryByRole("button", { name: "+ Save a lead" })).toBeNull();
   });
 });
+
+it("finds jobs from the exact original CV and clears matches when the selected CV changes", async () => {
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok({ items:
+    path === "/v1/candidates" ? [{ id: "cand_1", fullName: "Aina Rahman", currentTitle: "QA Engineer" }]
+      : path === "/v1/candidates/{candidateId}/documents" ? [
+        { id: "doc_1", fileName: "Original CV.pdf", source: "original", status: "extracted" },
+        { id: "doc_2", fileName: "Earlier CV.pdf", source: "original", status: "extracted" },
+        { id: "doc_3", fileName: "Formatted CV.docx", source: "formatted", status: "extracted" },
+      ] : [lead],
+  }))) as never);
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ role: "QA Engineer", items: [{ ...lead, title: "QA Automation Engineer" }] }));
+  renderWithClient(<Leads permissions={[...manage, "candidates:read", "documents:read"]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find jobs from a CV" }));
+  const lookup = screen.getByRole("form", { name: "CV job search" });
+  fireEvent.change(within(lookup).getByLabelText("Candidate"), { target: { value: "Aina" } });
+  fireEvent.click(await within(lookup).findByRole("button", { name: /Aina Rahman/ }));
+  await within(lookup).findByRole("option", { name: "Original CV.pdf" });
+  expect(within(lookup).queryByRole("option", { name: "Formatted CV.docx" })).toBeNull();
+  fireEvent.click(within(lookup).getByRole("button", { name: "Find jobs" }));
+  expect(await screen.findByRole("link", { name: "QA Automation Engineer" })).toBeTruthy();
+  expect(sentBody(post)).toMatchObject({ candidateId: "cand_1", documentId: "doc_1", countries: ["MY"] });
+  fireEvent.change(within(lookup).getByLabelText("CV"), { target: { value: "doc_2" } });
+  expect(screen.queryByRole("link", { name: "QA Automation Engineer" })).toBeNull();
+});

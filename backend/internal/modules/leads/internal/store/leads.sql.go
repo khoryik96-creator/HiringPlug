@@ -10,6 +10,20 @@ import (
 	"time"
 )
 
+const addLeadFavorite = `-- name: AddLeadFavorite :execrows
+INSERT INTO job_lead_favorite (tenant_id, user_id, lead_id)
+SELECT tenant_id, app_current_user(), id FROM job_lead WHERE id = $1
+ON CONFLICT DO NOTHING
+`
+
+func (q *Queries) AddLeadFavorite(ctx context.Context, leadID string) (int64, error) {
+	result, err := q.db.Exec(ctx, addLeadFavorite, leadID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const closeLead = `-- name: CloseLead :exec
 UPDATE job_lead SET closed_at = now() WHERE id = $1 AND closed_at IS NULL
 `
@@ -58,6 +72,22 @@ func (q *Queries) GetLead(ctx context.Context, id string) (JobLead, error) {
 		&i.Notes,
 		&i.CreatedBy,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getLeadEvidence = `-- name: GetLeadEvidence :one
+SELECT tenant_id, lead_id, description, observed_at FROM job_lead_evidence WHERE lead_id = $1
+`
+
+func (q *Queries) GetLeadEvidence(ctx context.Context, leadID string) (JobLeadEvidence, error) {
+	row := q.db.QueryRow(ctx, getLeadEvidence, leadID)
+	var i JobLeadEvidence
+	err := row.Scan(
+		&i.TenantID,
+		&i.LeadID,
+		&i.Description,
+		&i.ObservedAt,
 	)
 	return i, err
 }
@@ -190,57 +220,161 @@ func (q *Queries) InsertSource(ctx context.Context, arg InsertSourceParams) (Lea
 	return i, err
 }
 
-const listLeads = `-- name: ListLeads :many
-SELECT id, tenant_id, version, source_id, source_kind, external_id, company_name, company_id, title, location, url, posted_at, first_seen_at, last_seen_at, closed_at, status, notes, created_by, updated_at FROM job_lead
-WHERE ($1::text IS NULL OR status = $1)
-  AND ($2::text IS NULL OR source_id = $2)
-  AND ($3::boolean IS NULL OR (closed_at IS NULL) = $3)
-  AND ($4::text IS NULL OR company_name ILIKE '%' || $4 || '%' OR title ILIKE '%' || $4 || '%')
-ORDER BY id DESC
-LIMIT 500
+const leadDiscoveryPage = `-- name: LeadDiscoveryPage :many
+SELECT l.id, l.tenant_id, l.version, l.source_id, l.source_kind, l.external_id, l.company_name, l.company_id, l.title, l.location, l.url, l.posted_at, l.first_seen_at, l.last_seen_at, l.closed_at, l.status, l.notes, l.created_by, l.updated_at, (f.lead_id IS NOT NULL)::boolean AS favorite
+FROM job_lead l
+JOIN lead_source s ON s.id = l.source_id AND s.tenant_id = l.tenant_id AND s.active
+LEFT JOIN job_lead_favorite f ON f.tenant_id = l.tenant_id AND f.lead_id = l.id AND f.user_id = app_current_user()
+WHERE l.closed_at IS NULL AND l.source_id IS NOT NULL AND l.url IS NOT NULL
+  AND l.status <> 'ignored'
+  AND l.source_kind = ANY($1::text[])
+  AND l.location ~* $2::text
+  AND to_tsvector('simple', l.title) @@ to_tsquery('simple', $3::text)
+  AND ($4::text IS NULL OR l.id < $4)
+ORDER BY l.id DESC
+LIMIT $5
 `
 
-type ListLeadsParams struct {
-	Status   *string
-	SourceID *string
-	Open     *bool
-	Q        *string
+type LeadDiscoveryPageParams struct {
+	SourceKinds []string
+	LocationRe  string
+	TitleQuery  string
+	Cursor      *string
+	RowLimit    int32
 }
 
-func (q *Queries) ListLeads(ctx context.Context, arg ListLeadsParams) ([]JobLead, error) {
-	rows, err := q.db.Query(ctx, listLeads,
-		arg.Status,
-		arg.SourceID,
-		arg.Open,
-		arg.Q,
+type LeadDiscoveryPageRow struct {
+	JobLead  JobLead
+	Favorite bool
+}
+
+// Discovery uses official feed rows and their observed locations, without
+// letting ambiguous remote postings stand in for a country.
+func (q *Queries) LeadDiscoveryPage(ctx context.Context, arg LeadDiscoveryPageParams) ([]LeadDiscoveryPageRow, error) {
+	rows, err := q.db.Query(ctx, leadDiscoveryPage,
+		arg.SourceKinds,
+		arg.LocationRe,
+		arg.TitleQuery,
+		arg.Cursor,
+		arg.RowLimit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []JobLead
+	var items []LeadDiscoveryPageRow
 	for rows.Next() {
-		var i JobLead
+		var i LeadDiscoveryPageRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.TenantID,
-			&i.Version,
-			&i.SourceID,
-			&i.SourceKind,
-			&i.ExternalID,
-			&i.CompanyName,
-			&i.CompanyID,
-			&i.Title,
-			&i.Location,
-			&i.Url,
-			&i.PostedAt,
-			&i.FirstSeenAt,
-			&i.LastSeenAt,
-			&i.ClosedAt,
-			&i.Status,
-			&i.Notes,
-			&i.CreatedBy,
-			&i.UpdatedAt,
+			&i.JobLead.ID,
+			&i.JobLead.TenantID,
+			&i.JobLead.Version,
+			&i.JobLead.SourceID,
+			&i.JobLead.SourceKind,
+			&i.JobLead.ExternalID,
+			&i.JobLead.CompanyName,
+			&i.JobLead.CompanyID,
+			&i.JobLead.Title,
+			&i.JobLead.Location,
+			&i.JobLead.Url,
+			&i.JobLead.PostedAt,
+			&i.JobLead.FirstSeenAt,
+			&i.JobLead.LastSeenAt,
+			&i.JobLead.ClosedAt,
+			&i.JobLead.Status,
+			&i.JobLead.Notes,
+			&i.JobLead.CreatedBy,
+			&i.JobLead.UpdatedAt,
+			&i.Favorite,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const leadFavorite = `-- name: LeadFavorite :one
+SELECT EXISTS (SELECT 1 FROM job_lead_favorite WHERE lead_id = $1 AND user_id = app_current_user())::boolean AS favorite
+`
+
+func (q *Queries) LeadFavorite(ctx context.Context, leadID string) (bool, error) {
+	row := q.db.QueryRow(ctx, leadFavorite, leadID)
+	var favorite bool
+	err := row.Scan(&favorite)
+	return favorite, err
+}
+
+const listLeads = `-- name: ListLeads :many
+SELECT l.id, l.tenant_id, l.version, l.source_id, l.source_kind, l.external_id, l.company_name, l.company_id, l.title, l.location, l.url, l.posted_at, l.first_seen_at, l.last_seen_at, l.closed_at, l.status, l.notes, l.created_by, l.updated_at, (f.lead_id IS NOT NULL)::boolean AS favorite
+FROM job_lead l
+LEFT JOIN job_lead_favorite f ON f.tenant_id = l.tenant_id AND f.lead_id = l.id AND f.user_id = app_current_user()
+WHERE ($1::text IS NULL OR l.status = $1)
+  AND ($2::text IS NULL OR l.source_id = $2)
+  AND ($3::boolean IS NULL OR (l.closed_at IS NULL) = $3)
+  AND ($4::text IS NULL OR l.company_name ILIKE '%' || $4 || '%' OR l.title ILIKE '%' || $4 || '%')
+  AND (NOT $5::boolean OR f.lead_id IS NOT NULL)
+  AND ($6::text IS NULL OR l.id < $6)
+ORDER BY l.id DESC
+LIMIT $7
+`
+
+type ListLeadsParams struct {
+	Status    *string
+	SourceID  *string
+	Open      *bool
+	Q         *string
+	Favorites bool
+	Cursor    *string
+	RowLimit  int32
+}
+
+type ListLeadsRow struct {
+	JobLead  JobLead
+	Favorite bool
+}
+
+func (q *Queries) ListLeads(ctx context.Context, arg ListLeadsParams) ([]ListLeadsRow, error) {
+	rows, err := q.db.Query(ctx, listLeads,
+		arg.Status,
+		arg.SourceID,
+		arg.Open,
+		arg.Q,
+		arg.Favorites,
+		arg.Cursor,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLeadsRow
+	for rows.Next() {
+		var i ListLeadsRow
+		if err := rows.Scan(
+			&i.JobLead.ID,
+			&i.JobLead.TenantID,
+			&i.JobLead.Version,
+			&i.JobLead.SourceID,
+			&i.JobLead.SourceKind,
+			&i.JobLead.ExternalID,
+			&i.JobLead.CompanyName,
+			&i.JobLead.CompanyID,
+			&i.JobLead.Title,
+			&i.JobLead.Location,
+			&i.JobLead.Url,
+			&i.JobLead.PostedAt,
+			&i.JobLead.FirstSeenAt,
+			&i.JobLead.LastSeenAt,
+			&i.JobLead.ClosedAt,
+			&i.JobLead.Status,
+			&i.JobLead.Notes,
+			&i.JobLead.CreatedBy,
+			&i.JobLead.UpdatedAt,
+			&i.Favorite,
 		); err != nil {
 			return nil, err
 		}
@@ -316,6 +450,34 @@ func (q *Queries) RecordCheck(ctx context.Context, arg RecordCheckParams) error 
 		arg.Name,
 		arg.ID,
 	)
+	return err
+}
+
+const removeLeadFavorite = `-- name: RemoveLeadFavorite :execrows
+DELETE FROM job_lead_favorite WHERE lead_id = $1 AND user_id = app_current_user()
+`
+
+func (q *Queries) RemoveLeadFavorite(ctx context.Context, leadID string) (int64, error) {
+	result, err := q.db.Exec(ctx, removeLeadFavorite, leadID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const saveLeadEvidence = `-- name: SaveLeadEvidence :exec
+INSERT INTO job_lead_evidence (tenant_id, lead_id, description)
+VALUES (app_current_tenant(), $1, $2)
+ON CONFLICT (lead_id) DO UPDATE SET description = EXCLUDED.description, observed_at = now()
+`
+
+type SaveLeadEvidenceParams struct {
+	LeadID      string
+	Description string
+}
+
+func (q *Queries) SaveLeadEvidence(ctx context.Context, arg SaveLeadEvidenceParams) error {
+	_, err := q.db.Exec(ctx, saveLeadEvidence, arg.LeadID, arg.Description)
 	return err
 }
 

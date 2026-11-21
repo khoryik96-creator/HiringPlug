@@ -1203,6 +1203,20 @@ type JobLead struct {
 	UpdatedAt   time.Time
 }
 
+type JobLeadEvidence struct {
+	TenantID    string
+	LeadID      string
+	Description string
+	ObservedAt  time.Time
+}
+
+type JobLeadFavorite struct {
+	TenantID  string
+	UserID    string
+	LeadID    string
+	CreatedAt time.Time
+}
+
 type JobMatch struct {
 	ID            string
 	TenantID      string

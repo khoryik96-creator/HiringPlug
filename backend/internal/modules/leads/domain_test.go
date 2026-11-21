@@ -123,3 +123,9 @@ func TestWebLink(t *testing.T) {
 		t.Errorf("an unsafe posting link falls back to the careers page: %+v", postings)
 	}
 }
+
+func TestFeedDescriptionsRemoveMarkupAndRetainParagraphs(t *testing.T) {
+	raw := "<h2>About the role</h2><p>Support <b>developers</b> &amp; users.</p><script>untrusted()</script><p>Improve our tooling.</p>"
+	assert.Equal(t, "About the role\nSupport developers & users.\nImprove our tooling.", *postingDescription(raw, true))
+	assert.Nil(t, postingDescription("<style>ignored</style>", true))
+}

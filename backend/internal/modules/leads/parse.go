@@ -60,6 +60,7 @@ func ParseGreenhouse(body []byte) ([]Posting, error) {
 			ID             int64  `json:"id"`
 			Title          string `json:"title"`
 			AbsoluteURL    string `json:"absolute_url"`
+			Content        string `json:"content"`
 			FirstPublished string `json:"first_published"`
 			UpdatedAt      string `json:"updated_at"`
 			Location       struct {
@@ -76,7 +77,7 @@ func ParseGreenhouse(body []byte) ([]Posting, error) {
 		if posted == nil {
 			posted = when(j.UpdatedAt)
 		}
-		out = append(out, Posting{ExternalID: strconv.FormatInt(j.ID, 10), Title: strings.TrimSpace(j.Title), Location: str(j.Location.Name), URL: str(j.AbsoluteURL), PostedAt: posted})
+		out = append(out, Posting{ExternalID: strconv.FormatInt(j.ID, 10), Title: strings.TrimSpace(j.Title), Location: str(j.Location.Name), URL: str(j.AbsoluteURL), PostedAt: posted, Description: postingDescription(j.Content, true)})
 	}
 	return out, nil
 }
@@ -84,11 +85,12 @@ func ParseGreenhouse(body []byte) ([]Posting, error) {
 // ParseLever reads api.lever.co/v0/postings/<site>?mode=json.
 func ParseLever(body []byte) ([]Posting, error) {
 	var feed []struct {
-		ID         string `json:"id"`
-		Text       string `json:"text"`
-		HostedURL  string `json:"hostedUrl"`
-		CreatedAt  int64  `json:"createdAt"` // milliseconds
-		Categories struct {
+		ID          string `json:"id"`
+		Text        string `json:"text"`
+		HostedURL   string `json:"hostedUrl"`
+		Description string `json:"descriptionPlain"`
+		CreatedAt   int64  `json:"createdAt"` // milliseconds
+		Categories  struct {
 			Location string `json:"location"`
 		} `json:"categories"`
 	}
@@ -97,7 +99,7 @@ func ParseLever(body []byte) ([]Posting, error) {
 	}
 	out := make([]Posting, 0, len(feed))
 	for _, j := range feed {
-		p := Posting{ExternalID: j.ID, Title: strings.TrimSpace(j.Text), Location: str(j.Categories.Location), URL: str(j.HostedURL)}
+		p := Posting{ExternalID: j.ID, Title: strings.TrimSpace(j.Text), Location: str(j.Categories.Location), URL: str(j.HostedURL), Description: postingDescription(j.Description, false)}
 		if j.CreatedAt > 0 {
 			t := time.UnixMilli(j.CreatedAt).UTC()
 			p.PostedAt = &t
@@ -116,6 +118,7 @@ func ParseAshby(body []byte) ([]Posting, error) {
 			Location    string `json:"location"`
 			JobURL      string `json:"jobUrl"`
 			PublishedAt string `json:"publishedAt"`
+			Description string `json:"descriptionPlain"`
 		} `json:"jobs"`
 	}
 	if err := json.Unmarshal(body, &feed); err != nil {
@@ -123,7 +126,7 @@ func ParseAshby(body []byte) ([]Posting, error) {
 	}
 	out := make([]Posting, 0, len(feed.Jobs))
 	for _, j := range feed.Jobs {
-		out = append(out, Posting{ExternalID: j.ID, Title: strings.TrimSpace(j.Title), Location: str(j.Location), URL: str(j.JobURL), PostedAt: when(j.PublishedAt)})
+		out = append(out, Posting{ExternalID: j.ID, Title: strings.TrimSpace(j.Title), Location: str(j.Location), URL: str(j.JobURL), PostedAt: when(j.PublishedAt), Description: postingDescription(j.Description, false)})
 	}
 	return out, nil
 }
@@ -238,6 +241,7 @@ func jobPosting(o map[string]any, pageURL string) (Posting, bool) {
 		p.URL = str(pageURL)
 	}
 	p.Location = str(location(o["jobLocation"]))
+	p.Description = postingDescription(text(o["description"]), true)
 	switch {
 	case text(o["identifier"]) != "":
 		p.ExternalID = text(o["identifier"])

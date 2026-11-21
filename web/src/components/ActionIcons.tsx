@@ -34,6 +34,7 @@ export const LeaveIcon = () => <Svg><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-
 export const MailCheckIcon = () => (
   <Svg><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7" /><path d="m3 7 9 6 9-6" /><path d="m16 19 2 2 4-4" /></Svg>
 );
+export const StarIcon = () => <Svg><path d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.5-4.4 6.3-.9L12 3Z" /></Svg>;
 export const PlusIcon = () => <Svg><path d="M12 5v14M5 12h14" /></Svg>;
 export const CloseIcon = () => <Svg><path d="m6 6 12 12M18 6 6 18" /></Svg>;
 export const SideBySideIcon = () => <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M12 5v14" /></Svg>;

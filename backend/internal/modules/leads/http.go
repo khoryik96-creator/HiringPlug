@@ -68,20 +68,6 @@ func (h *HTTP) CheckLeadSource(ctx context.Context, req api.CheckLeadSourceReque
 	return api.CheckLeadSource202JSONResponse(sourceToAPI(row)), nil
 }
 
-// ListJobLeads handles GET /v1/job-leads.
-func (h *HTTP) ListJobLeads(ctx context.Context, req api.ListJobLeadsRequestObject) (api.ListJobLeadsResponseObject, error) {
-	q := req.Params
-	rows, err := h.svc.Leads(ctx, authz.MustFromContext(ctx), LeadFilter{Status: c.Convert[string](q.Status), SourceID: q.SourceId, Open: q.Open, Q: trimmed(q.Q)})
-	if err != nil {
-		return nil, err
-	}
-	out := api.ListJobLeads200JSONResponse{Items: make([]api.JobLead, len(rows))}
-	for i, r := range rows {
-		out.Items[i] = leadToAPI(r)
-	}
-	return out, nil
-}
-
 // CreateJobLead handles POST /v1/job-leads.
 func (h *HTTP) CreateJobLead(ctx context.Context, req api.CreateJobLeadRequestObject) (api.CreateJobLeadResponseObject, error) {
 	b := req.Body

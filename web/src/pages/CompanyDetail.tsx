@@ -5,6 +5,7 @@ import { DeleteRecord } from "../components/DeleteRecord";
 import { FindHR } from "../components/FindHR";
 
 import { api, type Permission, unwrap } from "../api/client";
+import { hashParam } from "../hashQuery";
 import { IndustrySummary } from "../components/IndustryPicker";
 import { companyKey } from "../api/keys";
 import { CompanyAutofill } from "../components/CompanyAutofill";
@@ -27,7 +28,7 @@ type Tab = "details" | "terms" | "jobs" | "contacts" | "find-hr" | "activity";
  */
 export function CompanyDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
-  const [active, setActive] = useState<Tab>("details");
+  const [active, setActive] = useState<Tab>(() => hashParam("tab") === "find-hr" ? "find-hr" : "details");
   const company = useQuery({
     queryKey: companyKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId: id } } })),

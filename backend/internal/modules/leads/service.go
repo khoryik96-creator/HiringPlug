@@ -23,6 +23,7 @@ import (
 type Service struct {
 	pool         *pgxpool.Pool
 	companies    Companies
+	cvs          CVs
 	allowPrivate bool
 }
 
@@ -184,23 +185,6 @@ func (s *Service) CheckNow(ctx context.Context, p authz.Principal, id string) (s
 			return err
 		}
 		return queueCheck(ctx, tx, p.TenantID, id, at)
-	})
-	return out, err
-}
-
-// LeadFilter narrows the list of leads.
-type LeadFilter struct {
-	Status, SourceID, Q *string
-	Open                *bool
-}
-
-// Leads returns leads, newest first.
-func (s *Service) Leads(ctx context.Context, p authz.Principal, f LeadFilter) ([]store.JobLead, error) {
-	var out []store.JobLead
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		var err error
-		out, err = store.New(tx).ListLeads(ctx, store.ListLeadsParams{Status: f.Status, SourceID: f.SourceID, Open: f.Open, Q: f.Q})
-		return err
 	})
 	return out, err
 }

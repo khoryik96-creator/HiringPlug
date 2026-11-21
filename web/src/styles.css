@@ -1400,3 +1400,18 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .splitter:focus-visible { outline: none; }
 /* Following a leaver: the companies here that may be their new one, or making it. */
 .follow-choose { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+
+/* Leads. Keep the selected ad beside its list where there is room. */
+.leads-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); gap: 1rem; align-items: start; }
+.leads-scroll { overflow-x: auto; }
+.leads-review h3 { margin: 0; }
+.leads-review .pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.leads-filter { border: 0; padding: 0; margin: 0; }
+.leads-filter summary { color: var(--accent); overflow-wrap: anywhere; }
+.leads-filter[open] fieldset { padding-top: 0.5rem; }
+.leads-filter > .row { gap: 0.5rem 1rem; flex-wrap: wrap; }
+.leads-filter label.row { gap: 0.3rem; }
+@media (max-width: 880px) {
+  .leads-split { grid-template-columns: minmax(0, 1fr); }
+  .leads-review { grid-row: 1; }
+}

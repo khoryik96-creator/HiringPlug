@@ -4651,10 +4651,71 @@ class JobLead(BaseModel):
     closedAt: Annotated[AwareDatetime | None, Field(description="When the opening stopped being listed.")]
     status: LeadStatus
     notes: Annotated[str | None, Field(...)]
+    favorite: Annotated[bool | None, Field(description="Whether this lead is in the caller's favorites.")] = (
+        None
+    )
+    description: Annotated[
+        str | None,
+        Field(
+            description="Ad text observed in the source. Returned on the detail endpoint when the source provided it."
+        ),
+    ] = None
+    descriptionObservedAt: AwareDatetime | None = None
+
+
+class JobLeadFavoriteInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    favorite: bool
 
 
 class JobLeadList(BaseModel):
     items: list[JobLead]
+    nextCursor: JobLeadId | None = None
+
+
+class LeadDiscoveryCountry(StrEnum):
+    MY = "MY"
+    SG = "SG"
+    AU = "AU"
+    NZ = "NZ"
+    GB = "GB"
+    US = "US"
+    HK = "HK"
+    ID = "ID"
+    TH = "TH"
+    VN = "VN"
+    PH = "PH"
+    IN = "IN"
+
+
+class LeadDiscoverySource(StrEnum):
+    greenhouse = "greenhouse"
+    lever = "lever"
+    ashby = "ashby"
+    smartrecruiters = "smartrecruiters"
+
+
+class LeadDiscoveryInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: CandidateId
+    documentId: DocumentId
+    countries: Annotated[list[LeadDiscoveryCountry], Field(max_length=12, min_length=1)]
+    sources: Annotated[
+        list[LeadDiscoverySource] | None,
+        Field(description="Default to configured structured job feeds.", max_length=4, min_length=1),
+    ] = None
+    targetRole: Annotated[str | None, Field(max_length=120)] = None
+    cursor: JobLeadId | None = None
+
+
+class LeadDiscoveryPage(BaseModel):
+    items: list[JobLead]
+    role: Annotated[str, Field(description="Role used to match observed job titles.")]
+    nextCursor: JobLeadId | None = None
 
 
 class JobLeadInput(BaseModel):

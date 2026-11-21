@@ -21,7 +21,8 @@ import (
 func careersSite(t *testing.T, openings *atomic.Int32) *httptest.Server {
 	posting := func(id, title string) string {
 		return fmt.Sprintf(`{"@type":"JobPosting","title":%q,"identifier":{"value":%q},"hiringOrganization":{"name":"Contoh Berhad"},
-			"jobLocation":{"address":{"addressLocality":"Kuala Lumpur","addressCountry":"MY"}}}`, title, id)
+			"jobLocation":{"address":{"addressLocality":"Kuala Lumpur","addressCountry":"MY"}},
+			"description":"\u003cp\u003eFictional opening.\u003c/p\u003e\u003cscript\u003ediscard()\u003c/script\u003e"}`, title, id)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -96,6 +97,14 @@ func TestJobLeadsFromACareersPage(t *testing.T) {
 	assert.True(t, src.LastError.IsNull())
 	next, _ := src.NextCheckAt.Get()
 	assert.WithinDuration(t, time.Now().Add(24*time.Hour), next, time.Minute, "checked again tomorrow")
+
+	assert.Nil(t, leads[0].Description, "the list does not load full ads")
+	var detail api.JobLead
+	res = a.request(http.MethodGet, "/v1/job-leads/"+leads[0].Id, token, nil)
+	require.Equal(t, http.StatusOK, res.Status)
+	res.JSON(&detail)
+	require.NotNil(t, detail.Description)
+	assert.Equal(t, "Fictional opening.", *detail.Description)
 
 	t.Run("an opening no longer listed is closed", func(t *testing.T) {
 		openings.Store(1)

@@ -73,12 +73,13 @@ func boardFromPath(parts []string) string {
 
 // Posting is one opening found at a source.
 type Posting struct {
-	ExternalID string
-	Title      string
-	Company    string // empty when the source does not name it
-	Location   *string
-	URL        *string
-	PostedAt   *time.Time
+	ExternalID  string
+	Title       string
+	Company     string // empty when the source does not name it
+	Location    *string
+	URL         *string
+	PostedAt    *time.Time
+	Description *string
 }
 
 // Existing is a lead already known for a source.

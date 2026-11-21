@@ -1,25 +1,37 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { LeadSources } from "../components/LeadSources";
 import { SaveError } from "../components/SaveError";
-import { formatDay, keysOf, LEAD_STATUS } from "../labels";
+import { keysOf, LEAD_STATUS } from "../labels";
+import { LeadDiscovery } from "../components/leads/LeadDiscovery";
+import { LeadList, LeadReview } from "../components/leads/LeadList";
+import { useDebounced } from "../components/useDebounced";
 
-type Lead = Schemas["JobLead"];
 type Filters = { status: Schemas["LeadStatus"] | ""; open: "" | "true" | "false"; q: string };
 
 /** Companies that are hiring: leads from sources and ads saved by hand. */
 export function Leads({ permissions }: { permissions: Permission[] }) {
   const canManage = permissions.includes("leads:manage");
   const [filters, setFilters] = useState<Filters>({ status: "", open: "true", q: "" });
-  const list = useQuery({
-    queryKey: ["job-leads", filters],
-    queryFn: async () => unwrap(await api.GET("/v1/job-leads", {
-      params: { query: { status: filters.status || undefined, open: filters.open === "" ? undefined : filters.open === "true", q: filters.q.trim() || undefined } },
-    })).items,
+  const canDiscover = permissions.includes("candidates:read") && permissions.includes("documents:read");
+  const [discover, setDiscover] = useState(false);
+  const [favorites, setFavorites] = useState(false);
+  const [reviewing, setReviewing] = useState<string>();
+  const query = useDebounced(filters.q.trim(), 300);
+  const list = useInfiniteQuery({
+    queryKey: ["job-leads", "list", filters.status, filters.open, query, favorites],
+    enabled: !discover,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) => unwrap(await api.GET("/v1/job-leads", {
+      signal, params: { query: { status: filters.status || undefined, open: filters.open === "" ? undefined : filters.open === "true",
+        q: query || undefined, limit: 50, cursor: pageParam, favorites: favorites || undefined } },
+    })),
+    getNextPageParam: (page) => page.nextCursor,
   });
+  const items = list.data?.pages.flatMap((page) => page.items);
   const [adding, setAdding] = useState(false);
   const [sources, setSources] = useState(false);
   return (
@@ -28,7 +40,10 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
       <div className="row spread">
         <h2>Leads</h2>
         <div className="row">
-          <input aria-label="Search leads" placeholder="Search" value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} />
+          {canDiscover && <button type="button" aria-pressed={discover} onClick={() => { setDiscover(!discover); setReviewing(undefined); }}>
+            {discover ? "Back to leads" : "Find jobs from a CV"}
+          </button>}
+          {!discover && <><input aria-label="Search leads" placeholder="Search" value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} />
           <select aria-label="Status" value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}>
             <option value="">Any status</option>
             {keysOf(LEAD_STATUS).map((s) => <option key={s} value={s}>{LEAD_STATUS[s]}</option>)}
@@ -36,49 +51,28 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
           <select aria-label="Openings" value={filters.open} onChange={(e) => { setFilters({ ...filters, open: e.target.value as Filters["open"] }); }}>
             <option value="true">Still listed</option><option value="false">Closed</option><option value="">Listed or closed</option>
           </select>
+          <button type="button" aria-pressed={favorites} onClick={() => { setFavorites(!favorites); setReviewing(undefined); }}>Favorites</button>
           <button type="button" aria-expanded={sources} onClick={() => { setSources(!sources); }}>Sources</button>
-          {canManage && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Save a lead</button>}
+          {canManage && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Save a lead</button>}</>}
         </div>
       </div>
-      {canManage && adding && <SaveAd onDone={() => { setAdding(false); }} />}
-      {sources && <LeadSources canManage={canManage} />}
-      <section className="panel" aria-label="Hiring leads">
-        <ErrorMessage error={list.error} />
-        {list.data?.length === 0 && <p className="muted">No leads here yet.{canManage && " Save an ad you found, or add a source that brings them in."}</p>}
-        {list.data && list.data.length > 0 && (
-          <table>
-            <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th></tr></thead>
-            <tbody>{list.data.map((l) => <LeadRow key={l.id} lead={l} canManage={canManage} />)}</tbody>
-          </table>
-        )}
-      </section>
+      {!discover && canManage && adding && <SaveAd onDone={() => { setAdding(false); }} />}
+      {!discover && sources && <LeadSources canManage={canManage} />}
+      <div className={reviewing ? "leads-split" : undefined}>
+        {discover
+          ? <LeadDiscovery canManage={canManage} onReview={setReviewing} />
+          : <section className="panel" aria-label="Hiring leads">
+            <ErrorMessage error={list.error} />
+            {items?.length === 0 && !list.hasNextPage && (
+              <p className="muted">{favorites ? "No favorites match these filters." : "No leads match these filters."}</p>
+            )}
+            {items && items.length > 0 && <LeadList items={items} canManage={canManage} onReview={setReviewing} />}
+            {list.hasNextPage && <button type="button" disabled={list.isFetchingNextPage} onClick={() => { void list.fetchNextPage(); }}>Load more leads</button>}
+          </section>}
+        {reviewing && <LeadReview key={reviewing} id={reviewing} canSeeCompany={permissions.includes("companies:read")}
+          onClose={() => { setReviewing(undefined); }} />}
+      </div>
     </main>
-  );
-}
-
-function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
-  const queryClient = useQueryClient();
-  const setStatus = useMutation({
-    mutationFn: async (status: Schemas["LeadStatus"]) =>
-      unwrap(await api.PATCH("/v1/job-leads/{jobLeadId}", { params: { path: { jobLeadId: l.id } }, body: { version: l.version, status } })),
-    onSettled: async () => { await queryClient.invalidateQueries({ queryKey: ["job-leads"] }); },
-  });
-  return (
-    <tr>
-      <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : l.companyName}</td>
-      <td>{l.url && /^https?:\/\//i.test(l.url) ? <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a> : l.title}{l.notes && <div className="muted">{l.notes}</div>}</td>
-      <td>{l.location}</td>
-      <td className="muted">{formatDay((l.postedAt ?? l.firstSeenAt).slice(0, 10))}{l.closedAt && <> · closed</>}</td>
-      <td>
-        {canManage ? (
-          <select aria-label={`Status of ${l.title} at ${l.companyName}`} value={l.status} disabled={setStatus.isPending}
-            onChange={(e) => { setStatus.mutate(e.target.value as Schemas["LeadStatus"]); }}>
-            {keysOf(LEAD_STATUS).map((s) => <option key={s} value={s}>{LEAD_STATUS[s]}</option>)}
-          </select>
-        ) : LEAD_STATUS[l.status]}
-        <ErrorMessage error={setStatus.error} />
-      </td>
-    </tr>
   );
 }
 

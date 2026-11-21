@@ -51,15 +51,54 @@ UPDATE job_lead SET closed_at = now() WHERE id = @id AND closed_at IS NULL;
 SELECT * FROM job_lead WHERE id = @id;
 
 -- name: ListLeads :many
-SELECT * FROM job_lead
-WHERE (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status))
-  AND (sqlc.narg(source_id)::text IS NULL OR source_id = sqlc.narg(source_id))
-  AND (sqlc.narg(open)::boolean IS NULL OR (closed_at IS NULL) = sqlc.narg(open))
-  AND (sqlc.narg(q)::text IS NULL OR company_name ILIKE '%' || sqlc.narg(q) || '%' OR title ILIKE '%' || sqlc.narg(q) || '%')
-ORDER BY id DESC
-LIMIT 500;
+SELECT sqlc.embed(l), (f.lead_id IS NOT NULL)::boolean AS favorite
+FROM job_lead l
+LEFT JOIN job_lead_favorite f ON f.tenant_id = l.tenant_id AND f.lead_id = l.id AND f.user_id = app_current_user()
+WHERE (sqlc.narg(status)::text IS NULL OR l.status = sqlc.narg(status))
+  AND (sqlc.narg(source_id)::text IS NULL OR l.source_id = sqlc.narg(source_id))
+  AND (sqlc.narg(open)::boolean IS NULL OR (l.closed_at IS NULL) = sqlc.narg(open))
+  AND (sqlc.narg(q)::text IS NULL OR l.company_name ILIKE '%' || sqlc.narg(q) || '%' OR l.title ILIKE '%' || sqlc.narg(q) || '%')
+  AND (NOT @favorites::boolean OR f.lead_id IS NOT NULL)
+  AND (sqlc.narg(cursor)::text IS NULL OR l.id < sqlc.narg(cursor))
+ORDER BY l.id DESC
+LIMIT @row_limit;
+
+-- name: LeadFavorite :one
+SELECT EXISTS (SELECT 1 FROM job_lead_favorite WHERE lead_id = @lead_id AND user_id = app_current_user())::boolean AS favorite;
+
+-- name: AddLeadFavorite :execrows
+INSERT INTO job_lead_favorite (tenant_id, user_id, lead_id)
+SELECT tenant_id, app_current_user(), id FROM job_lead WHERE id = @lead_id
+ON CONFLICT DO NOTHING;
+
+-- name: RemoveLeadFavorite :execrows
+DELETE FROM job_lead_favorite WHERE lead_id = @lead_id AND user_id = app_current_user();
 
 -- name: UpdateLead :one
 UPDATE job_lead SET status = @status, notes = sqlc.narg(notes), company_id = sqlc.narg(company_id), version = version + 1, updated_at = now()
 WHERE id = @id AND version = @expected_version
 RETURNING *;
+
+-- Discovery uses official feed rows and their observed locations, without
+-- letting ambiguous remote postings stand in for a country.
+-- name: LeadDiscoveryPage :many
+SELECT sqlc.embed(l), (f.lead_id IS NOT NULL)::boolean AS favorite
+FROM job_lead l
+JOIN lead_source s ON s.id = l.source_id AND s.tenant_id = l.tenant_id AND s.active
+LEFT JOIN job_lead_favorite f ON f.tenant_id = l.tenant_id AND f.lead_id = l.id AND f.user_id = app_current_user()
+WHERE l.closed_at IS NULL AND l.source_id IS NOT NULL AND l.url IS NOT NULL
+  AND l.status <> 'ignored'
+  AND l.source_kind = ANY(@source_kinds::text[])
+  AND l.location ~* @location_re::text
+  AND to_tsvector('simple', l.title) @@ to_tsquery('simple', @title_query::text)
+  AND (sqlc.narg(cursor)::text IS NULL OR l.id < sqlc.narg(cursor))
+ORDER BY l.id DESC
+LIMIT @row_limit;
+
+-- name: GetLeadEvidence :one
+SELECT * FROM job_lead_evidence WHERE lead_id = @lead_id;
+
+-- name: SaveLeadEvidence :exec
+INSERT INTO job_lead_evidence (tenant_id, lead_id, description)
+VALUES (app_current_tenant(), @lead_id, @description)
+ON CONFLICT (lead_id) DO UPDATE SET description = EXCLUDED.description, observed_at = now();
