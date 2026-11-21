@@ -75,19 +75,39 @@ WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
 -- the job's text (any of its words; each candidate's best CV), best first,
 -- leaving out the given candidates. The snippet marks the shared words.
 -- name: SearchCVs :many
-WITH q AS (
-  SELECT string_agg(quote_literal(l), ' | ')::tsquery AS query
-  FROM unnest(tsvector_to_array(to_tsvector('english', @job_text::text))) AS l
+-- Each term counts its weight times how rare it is in the company's CVs (a
+-- word nearly every CV has counts for almost nothing). A CV needs two terms,
+-- or one of the job's own words or acronyms (weight 2.5 and up), to be a
+-- match at all. Its rank is its share of all the terms' worth (0 to 1).
+WITH t AS (
+  SELECT (@weights::real[])[u.i] AS weight, phraseto_tsquery('english', u.term) AS q
+  FROM unnest(@terms::text[]) WITH ORDINALITY AS u(term, i)
+), terms AS (
+  SELECT q, max(weight) AS weight FROM t WHERE numnode(q) > 0 GROUP BY q
+), n AS (
+  SELECT greatest(count(*), 1)::real AS total FROM cv_search
+), w AS (
+  SELECT terms.q, terms.weight, terms.weight * ln(1 + n.total / (1 + (SELECT count(*) FROM cv_search s WHERE s.terms @@ terms.q)))::real AS score
+  FROM terms, n
+), scored AS (
+  SELECT s.candidate_id, s.document_id, sum(w.score)::real AS rank, count(*) AS hits, max(w.weight) AS top
+  FROM cv_search s JOIN w ON s.terms @@ w.q
+  WHERE NOT (s.candidate_id = ANY (@exclude::text[]))
+  GROUP BY s.candidate_id, s.document_id
 ), best AS (
-  SELECT DISTINCT ON (s.candidate_id) s.candidate_id, s.document_id, ts_rank_cd(s.terms, q.query, 32)::real AS rank
-  FROM cv_search s, q
-  WHERE q.query IS NOT NULL AND s.terms @@ q.query AND NOT (s.candidate_id = ANY (@exclude::text[]))
-  ORDER BY s.candidate_id, rank DESC
+  SELECT DISTINCT ON (candidate_id) candidate_id, document_id, rank
+  FROM scored
+  WHERE hits >= 2 OR top >= 2.5
+  ORDER BY candidate_id, rank DESC
+), q AS (
+  SELECT string_agg(terms.q::text, ' | ')::tsquery AS query FROM terms
+), worth AS (
+  SELECT greatest(sum(score), 0.0001)::real AS total FROM w
 )
-SELECT b.candidate_id, b.rank,
+SELECT b.candidate_id, (b.rank / worth.total)::real AS rank,
        ts_headline('english', d.extracted_text, q.query,
          'MaxFragments=2, MaxWords=14, MinWords=6, FragmentDelimiter=" ... ", StartSel=[[, StopSel=]]')::text AS snippet
-FROM best b JOIN document d ON d.id = b.document_id, q
+FROM best b JOIN document d ON d.id = b.document_id, q, worth
 ORDER BY b.rank DESC, b.candidate_id
 LIMIT @row_limit;
 

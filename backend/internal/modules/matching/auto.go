@@ -141,7 +141,7 @@ func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) 
 		if err != nil {
 			return err
 		}
-		hits, err := s.deps.CVs.SearchCVs(ctx, tx, SearchText(j), onJob, 2*maxSuggestions)
+		hits, err := s.deps.CVs.SearchCVs(ctx, tx, SearchTerms(j), onJob, 2*maxSuggestions)
 		if err != nil {
 			return err
 		}

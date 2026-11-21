@@ -10,7 +10,7 @@ import { Field } from "./Field";
 import { CountryOptions, useFavourites } from "./favourites";
 import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { JdDrop } from "./JdDrop";
-import { companyKey, fillFromJd, formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
+import { companyKey, fillFromJd, formFromJob, JOB_PATHS, type JdFilled, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
 import { SaveError } from "./SaveError";
 
 /**
@@ -28,14 +28,20 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
   const [form, setForm] = useState(opened.form);
   const [jdFileId, setJdFileId] = useState<string | null>(null); // the JD the form was filled in from: kept with the new job
   const [jdCompany, setJdCompany] = useState(""); // the company a JD names, when none on record matched it
+  // What the last JD filled in, so another JD dropped replaces it (and not what was typed).
+  const [jdFilled, setJdFilled] = useState<JdFilled>({});
+  const [jdPickedCompany, setJdPickedCompany] = useState<string | null>(null); // the company id a JD chose
   /** The company a JD names, chosen when one on record has that name (Sdn Bhd and the like aside). */
   const pickJdCompany = async (name: string) => {
     const key = companyKey(name);
     if (!key) return;
     const found = unwrap(await api.GET("/v1/companies", { params: { query: { q: key, limit: 8 } } })).items;
     const match = found.find((c) => companyKey(c.name) === key);
-    if (match) setForm((f) => (f.company ? f : { ...f, company: { id: match.id, name: match.name }, contactId: "" }));
-    else setJdCompany(name);
+    if (match) {
+      setJdCompany("");
+      setForm((f) => (f.company ? f : { ...f, company: { id: match.id, name: match.name }, contactId: "" }));
+      setJdPickedCompany(match.id);
+    } else setJdCompany(name);
   };
   const companyId = form.company?.id;
   const contacts = useQuery({
@@ -89,9 +95,15 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
       {!opened.id && (
         <div className="full">
           <JdDrop readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => {
-            setForm((f) => fillFromJd(f, d));
+            // A company the last JD chose gives way to this JD's; one chosen by hand stays.
+            const companyFromJd = form.company !== null && form.company.id === jdPickedCompany;
+            const filled = fillFromJd(companyFromJd ? { ...form, company: null, contactId: "" } : form, d, jdFilled);
+            setForm(filled.form);
+            setJdFilled(filled.filled);
             setJdFileId(id);
-            if (d.companyName && !form.company) void pickJdCompany(d.companyName).catch(() => { setJdCompany(d.companyName ?? ""); });
+            setJdCompany("");
+            if (companyFromJd) setJdPickedCompany(null);
+            if (d.companyName && (!form.company || companyFromJd)) void pickJdCompany(d.companyName).catch(() => { setJdCompany(d.companyName ?? ""); });
           }} />
         </div>
       )}

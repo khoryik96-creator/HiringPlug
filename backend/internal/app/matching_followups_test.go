@@ -104,7 +104,7 @@ func TestPossibleCandidatesShareTheJobsWords(t *testing.T) {
 	token := tenant.Users[api.RoleRecruiter].Token
 	company := a.createCompany(token, map[string]any{"name": "Maju Bhd"})
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Senior Auditor",
-		"description": "Statutory audit of listed groups, SAP FICO and MFRS reporting. Salary: RM 9,000"})
+		"description": "Statutory audit of listed groups, SAP FICO and MFRS reporting. Proven experience within an advanced team; strong skills. Salary: RM 9,000"})
 	cv := func(first, title, text string) api.Candidate {
 		c := a.createCandidate(token, map[string]any{"firstName": first, "currentTitle": title})
 		withCV(t, a, aiConn, token, c.Id, text)
@@ -113,6 +113,8 @@ func TestPossibleCandidatesShareTheJobsWords(t *testing.T) {
 	best := cv("Aina", "Auditor", "Senior auditor at KPMG: statutory audit of listed groups, MFRS reporting, SAP FICO")
 	some := cv("Ben", "Accountant", "Accountant using SAP for month-end reporting")
 	cv("Chris", "Barista", "Barista: coffee, latte art, customer service")
+	// Shares only the words every job description uses: no match.
+	cv("Fay", "Sales executive", "Proven experience within an advanced sales team; strong skills and experience in retail")
 	onJob := cv("Dina", "Auditor", "Statutory audit, MFRS, SAP FICO, listed groups")
 	a.addToJob(token, job.Id, onJob.Id)
 	noContact := cv("Eva", "Auditor", "Statutory audit, MFRS reporting, SAP FICO, listed groups")
@@ -122,7 +124,7 @@ func TestPossibleCandidatesShareTheJobsWords(t *testing.T) {
 	res := a.request(http.MethodGet, "/v1/matches/suggestions?jobId="+job.Id, tenant.Users[api.RoleViewer].Token, nil)
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	res.JSON(&list)
-	require.Len(t, list.Items, 2, "not the barista, nor who is on the job or withdrew consent")
+	require.Len(t, list.Items, 2, "not the barista, nor generic words alone, nor who is on the job or withdrew consent")
 	assert.Equal(t, best.Id, list.Items[0].CandidateId, "the most shared words first")
 	assert.Equal(t, some.Id, list.Items[1].CandidateId)
 	assert.Greater(t, list.Items[0].Rank, list.Items[1].Rank)

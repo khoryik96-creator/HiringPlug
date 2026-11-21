@@ -108,8 +108,12 @@ func (a matchingCVs) LatestCVText(ctx context.Context, tx pgx.Tx, candidateID st
 	return a.documents.LatestCVText(ctx, tx, candidateID)
 }
 
-func (a matchingCVs) SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude []string, limit int) ([]matching.CVHit, error) {
-	hits, err := a.documents.SearchCVs(ctx, tx, text, exclude, limit)
+func (a matchingCVs) SearchCVs(ctx context.Context, tx pgx.Tx, terms []matching.SearchTerm, exclude []string, limit int) ([]matching.CVHit, error) {
+	words := make([]documents.SearchTerm, len(terms))
+	for i, t := range terms {
+		words[i] = documents.SearchTerm{Text: t.Text, Weight: t.Weight}
+	}
+	hits, err := a.documents.SearchCVs(ctx, tx, words, exclude, limit)
 	out := make([]matching.CVHit, len(hits))
 	for i, h := range hits {
 		out[i] = matching.CVHit{CandidateID: h.CandidateID, Rank: h.Rank, Snippet: h.Snippet}

@@ -1,30 +1,53 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey, contactsKey, jobsKey } from "../api/keys";
 import { linkedinDates } from "../labels";
+import { afterContactAdded, type CompanyMatch, companiesNamed } from "./contactLinkedin";
 import { ErrorMessage } from "./ErrorMessage";
 
-type Move = Schemas["LinkedinMove"];
+/** Where they work now: a LinkedIn role (with its company page), or the current job on a profile PDF (no page). */
+export type Move = Schemas["LinkedinMove"];
 
 const slugOf = (companyUrl: string) => /\/company\/([A-Za-z0-9_-]+)\//.exec(companyUrl)?.[1] ?? "";
 
+/** The company to add them at: one in HiringPlug, or a new one (made when chosen). */
+type Target = { id: string; name: string } | "new";
+
 /**
- * Following a contact who left to where they work now: adds them as a contact
- * there (the company too, if it is new), with a note on the company that a
- * known contact joined it: a business lead.
+ * Following a contact who left to where they work now. The company in
+ * HiringPlug with the same LinkedIn page is certain, so they are added there
+ * at once; otherwise the companies whose names match are offered, and a new
+ * company is made only when the person says so. They are added as a contact
+ * there (an email guessed from colleagues', then verified), with a note on the
+ * company that a known contact joined it: a business lead.
  */
 export function FollowLeaver({ contactId, move }: { contactId: string; move: Move }) {
   const queryClient = useQueryClient();
+  const [choices, setChoices] = useState<CompanyMatch[] | null>(null);
+  const find = useMutation({
+    mutationFn: async (): Promise<{ page: { id: string; name: string } | undefined; named: CompanyMatch[] }> => {
+      const slug = slugOf(move.companyUrl);
+      const page = slug ? unwrap(await api.GET("/v1/companies", { params: { query: { linkedinCompany: slug, limit: 1 } } })).items[0] : undefined;
+      return { page, named: page ? [] : await companiesNamed(move.companyName, move.companyUrl) };
+    },
+    onSuccess: ({ page, named }) => {
+      if (page) follow.mutate(page);
+      else setChoices(named);
+    },
+  });
   const follow = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (target: Target) => {
       const old = unwrap(await api.GET("/v1/contacts/{contactId}", { params: { path: { contactId } } }));
-      const found = unwrap(await api.GET("/v1/companies", { params: { query: { linkedinCompany: slugOf(move.companyUrl), limit: 1 } } })).items[0];
-      const company = found ?? unwrap(await api.POST("/v1/companies", { body: { name: move.companyName, linkedinUrl: move.companyUrl } }));
-      if (found) { // followed already (or added by hand): not twice
+      const isNew = target === "new";
+      const company = isNew ? unwrap(await api.POST("/v1/companies", { body: { name: move.companyName, ...(move.companyUrl ? { linkedinUrl: move.companyUrl } : {}) } })) : target;
+      if (!isNew) {
+        // Followed already (or added by hand): not twice.
         const there = unwrap(await api.GET("/v1/contacts", { params: { query: { companyId: company.id, q: old.fullName, limit: 20 } } })).items
           .find((c) => c.fullName.toLowerCase() === old.fullName.toLowerCase());
-        if (there) return { company, added: there, isNew: false, already: true };
+        if (there) return { company, added: there, isNew, already: true };
+        if (move.companyUrl) await notePage(company.id, move.companyUrl);
       }
       const since = move.since ? ` in ${linkedinDates(move.since)}` : "";
       const added = unwrap(await api.POST("/v1/contacts", {
@@ -40,9 +63,12 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
           body: `Lead: ${old.fullName}${old.title ? `, ${old.title}` : ""} at ${old.companyName} (our contact), joined ${move.companyName}${since}${move.title ? ` as ${move.title}` : ""}.`,
         },
       }));
-      return { company, added, isNew: !found, already: false };
+      // Their old address is the old company's: one is guessed from their new colleagues' (and verified).
+      await afterContactAdded(added, false).catch(() => undefined);
+      return { company, added, isNew, already: false };
     },
     onSuccess: async () => {
+      setChoices(null);
       await queryClient.invalidateQueries({ queryKey: contactsKey });
       await queryClient.invalidateQueries({ queryKey: companiesKey });
     },
@@ -57,14 +83,42 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
       </span>
     );
   }
+  const busy = find.isPending || follow.isPending;
+  if (choices) {
+    return (
+      <span className="follow-choose" role="group" aria-label={`Where ${move.companyName} is in HiringPlug`}>
+        {choices.length > 0
+          ? <span className="muted small">Is it one of these?</span>
+          : <span className="muted small">{move.companyName} is not in HiringPlug yet.</span>}
+        {choices.map((c) => (
+          <button key={c.id} type="button" className="small-button" disabled={busy} onClick={() => { follow.mutate(c); }}>
+            Add at {c.name}{c.detail ? ` (${c.detail})` : ""}
+          </button>
+        ))}
+        <button type="button" className={`small-button${choices.length ? " secondary" : ""}`} disabled={busy} onClick={() => { follow.mutate("new"); }}>
+          {choices.length ? `None of these: create ${move.companyName}` : `Create ${move.companyName} and add them`}
+        </button>
+        <button type="button" className="link small" disabled={busy} onClick={() => { setChoices(null); }}>Cancel</button>
+        <ErrorMessage error={follow.error} />
+      </span>
+    );
+  }
   return (
     <span className="follow-leaver">
-      <button type="button" className="small-button" disabled={follow.isPending} onClick={() => { follow.mutate(); }}>
-        {follow.isPending ? "Adding…" : `Add at ${move.companyName}`}
+      <button type="button" className="small-button" disabled={busy} onClick={() => { find.mutate(); }}>
+        {busy ? "Adding…" : `Add at ${move.companyName}`}
       </button>
-      <ErrorMessage error={follow.error} />
+      <ErrorMessage error={find.error ?? follow.error} />
     </span>
   );
+}
+
+/** A company chosen by name that has no LinkedIn page yet gets theirs, so the next move is found by it. */
+async function notePage(companyId: string, page: string): Promise<void> {
+  try {
+    const c = unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId } } }));
+    if (!c.linkedinUrl) await api.PATCH("/v1/companies/{companyId}", { params: { path: { companyId } }, body: { version: c.version, linkedinUrl: page } });
+  } catch { /* a nicety: the contact is added all the same */ }
 }
 
 /** Where a contact who left works now, each with "Add at …". */

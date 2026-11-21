@@ -56,7 +56,7 @@ type Deps struct {
 	// finds CVs sharing words with a text (possible candidates).
 	CVs interface {
 		LatestCVText(ctx context.Context, tx pgx.Tx, candidateID string) (string, error)
-		SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude []string, limit int) ([]CVHit, error)
+		SearchCVs(ctx context.Context, tx pgx.Tx, terms []SearchTerm, exclude []string, limit int) ([]CVHit, error)
 		// RankCVsByText orders candidates by how many words their CVs share with a text, best first.
 		RankCVsByText(ctx context.Context, tx pgx.Tx, text string, candidateIDs []string, limit int) ([]string, error)
 	}

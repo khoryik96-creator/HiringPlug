@@ -38,14 +38,25 @@ type CVHit struct {
 	Snippet     string  // where the CV has the words, marked [[like this]]
 }
 
-// SearchCVs returns the candidates whose CVs (not formatted ones) share the
-// most words with text, best first, at most limit, leaving out exclude, in
-// the caller's transaction (so only candidates the user may see).
-func (m *Module) SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude []string, limit int) ([]CVHit, error) {
+// SearchTerm is a word or phrase to look for in CVs, with how much it counts.
+type SearchTerm struct {
+	Text   string
+	Weight float32
+}
+
+// SearchCVs returns the candidates whose CVs (not formatted ones) best match
+// the weighted terms (each weighed again by how rare it is in the company's
+// CVs), best first, at most limit, leaving out exclude, in the caller's
+// transaction (so only candidates the user may see).
+func (m *Module) SearchCVs(ctx context.Context, tx pgx.Tx, terms []SearchTerm, exclude []string, limit int) ([]CVHit, error) {
 	if exclude == nil {
 		exclude = []string{}
 	}
-	rows, err := store.New(tx).SearchCVs(ctx, store.SearchCVsParams{JobText: text, Exclude: exclude, RowLimit: int32(min(max(limit, 1), 200))}) //nolint:gosec // capped
+	words, weights := make([]string, len(terms)), make([]float32, len(terms))
+	for i, t := range terms {
+		words[i], weights[i] = t.Text, t.Weight
+	}
+	rows, err := store.New(tx).SearchCVs(ctx, store.SearchCVsParams{Terms: words, Weights: weights, Exclude: exclude, RowLimit: int32(min(max(limit, 1), 200))}) //nolint:gosec // capped
 	out := make([]CVHit, len(rows))
 	for i, r := range rows {
 		out[i] = CVHit{CandidateID: r.CandidateID, Rank: float64(r.Rank), Snippet: r.Snippet}

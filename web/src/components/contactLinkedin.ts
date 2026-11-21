@@ -36,13 +36,29 @@ export function roleAt(roles: Role[], companyLinkedin: string | null | undefined
 export interface CompanyMatch { id: string; name: string; detail: string | null; samePage: boolean }
 
 /** Companies in HiringPlug that may be where they work: the same LinkedIn page first, then similar names. */
-export async function companiesFor(role: Role): Promise<CompanyMatch[]> {
+export function companiesFor(role: Role): Promise<CompanyMatch[]> {
+  return companiesNamed(role.company_name, role.company_url);
+}
+
+const SUFFIX = /\b(sdn\.?|bhd\.?|berhad|plc|inc\.?|ltd\.?|limited|llc|pte\.?|corp\.?)\b|\(m\)/gi;
+/** A company's name without legal suffixes, case or punctuation ("Maju Bank (M) Berhad" -> "maju bank"). */
+export const plainName = (name: string) => name.toLowerCase().replace(SUFFIX, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * Companies in HiringPlug that may be the one named (or with this LinkedIn
+ * page): the same page first, then the same name (suffixes aside), then
+ * similar names.
+ */
+export async function companiesNamed(name: string, page = ""): Promise<CompanyMatch[]> {
   // The first words of the name find "Maju Bank Berhad" from "Maju Bank".
-  const q = role.company_name.replace(/\b(sdn\.?|bhd\.?|berhad|plc|inc\.?|ltd\.?|limited|llc|pte\.?)\b/gi, " ").trim().split(/\s+/).slice(0, 2).join(" ");
+  const q = name.replace(SUFFIX, " ").replace(/[^\p{L}\p{N}&' -]+/gu, " ").trim().split(/\s+/).slice(0, 2).join(" ");
   const items = q ? unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: 8 } } })).items : [];
-  return items
-    .map((c) => ({ id: c.id, name: c.name, detail: c.city, samePage: companyPage(c.linkedinUrl ?? "") === role.company_url }))
-    .sort((a, b) => Number(b.samePage) - Number(a.samePage));
+  const plain = plainName(name);
+  const rank = (c: { name: string; linkedinUrl: string | null }) =>
+    (page && companyPage(c.linkedinUrl ?? "") === page ? 2 : 0) + (plainName(c.name) === plain ? 1 : 0);
+  return [...items]
+    .sort((a, b) => rank(b) - rank(a))
+    .map((c) => ({ id: c.id, name: c.name, detail: c.city, samePage: !!page && companyPage(c.linkedinUrl ?? "") === page }));
 }
 
 /** "Farah binti Aziz" -> first "Farah binti", last "Aziz". */

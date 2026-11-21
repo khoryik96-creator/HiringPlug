@@ -216,3 +216,12 @@ it("shows why formatted notes were refused", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("is too long: shorten the notes")).toBeTruthy();
 });
+it("shows the signature's banner as it is written, and says the invitation leaves it out", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new Uint8Array([137, 80, 78, 71]), { status: 200 }));
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/email-banners"
+    ? ok({ items: [{ id: "ebn_01jbz6w0m0k8q9x2r3s4t5v6w7", name: "Logo", contentType: "image/png", width: 600, height: 120 }] })
+    : ok({ bodyHtml: '<p>Demo</p><img data-banner-id="ebn_01jbz6w0m0k8q9x2r3s4t5v6w7" alt="Logo">', version: 1 }))) as never);
+  renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
+  expect(await screen.findByText(/left out of the Outlook invitation/)).toBeTruthy();
+  expect(document.querySelector(".rich-box img[data-banner-id]")).toBeTruthy();
+});

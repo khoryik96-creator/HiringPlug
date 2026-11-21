@@ -101,7 +101,9 @@ button.composer-tool { background: none; box-shadow: none; }
 .composer-people > .chips-input { flex: 1; }
 .composer-optional { font-size: .8rem; padding: .45rem .3rem; white-space: nowrap; }
 .person-chip.optional { background: var(--soft); border: 1px dashed var(--line-strong); }
-.compose-body .rich-box { min-height: 8rem; }
+/* Room to write, as Outlook gives an event's body; it grows with the message. */
+.compose-body .rich-box { min-height: 16rem; max-height: 55vh; overflow-y: auto; }
+.calendar-overlay > .panel.calendar-form { max-height: 94vh; }
 .compose-body .rich-toolbar .tool, .compose-body .format-tool { width: 30px; height: 30px; min-height: 0; }
 .chips-input { min-height: 2rem; padding: .1rem .2rem; }
 .chips-input input { min-width: 6rem; padding: .2rem .3rem; }

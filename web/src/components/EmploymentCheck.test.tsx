@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Schemas } from "../api/client";
-import { renderWithClient } from "../test-utils";
+import { api, type Schemas } from "../api/client";
+import { ok, renderWithClient } from "../test-utils";
 import { EmploymentCheck, monthYear } from "./EmploymentCheck";
 
 afterEach(() => {
@@ -40,6 +40,17 @@ describe("employment check", () => {
     expect(screen.getByText("No longer at Maju Sdn Bhd")).toBeTruthy();
     expect(screen.getByText(/now Talent Lead at Contoh Bank Berhad, since Apr 2026/)).toBeTruthy();
     expect(screen.getByText("Mar 2021 – Mar 2026")).toBeTruthy();
+  });
+
+  it("offers to add them where they are now, matched by its name here (the PDF has no company page)", async () => {
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies"
+      ? { items: [{ id: "comp_contoh", name: "Contoh Bank", city: null, linkedinUrl: null }], nextCursor: null } : { items: [], nextCursor: null }))) as never);
+    renderWithClient(<EmploymentCheck contact={{ ...contact, employment: moved }} canCheck />);
+    fireEvent.click(screen.getByRole("button", { name: "Add at Contoh Bank Berhad" }));
+    expect(await screen.findByRole("button", { name: "Add at Contoh Bank" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "None of these: create Contoh Bank Berhad" })).toBeTruthy();
+    // No LinkedIn page to look up by: straight to the names.
+    expect((get.mock.calls as unknown[][]).filter((c) => c[0] === "/v1/companies").map((c) => c[1])).toEqual([{ params: { query: { q: "Contoh Bank", limit: 8 } } }]);
   });
 
   it("warns when the profile may be someone else's", () => {

@@ -8,6 +8,7 @@ import { contactKey } from "../api/keys";
 import { formatWhen } from "../labels";
 import { DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
+import { FollowLeaver } from "./FollowLeaver";
 
 type Contact = Schemas["Contact"];
 type Employment = Schemas["ContactEmployment"];
@@ -46,7 +47,7 @@ export function EmploymentCheck({ contact, canCheck }: { contact: Contact; canCh
         <h3>Employment check</h3>
         {e && <span className="muted small">LinkedIn, {formatWhen(e.checkedAt)}</span>}
       </div>
-      {e && <Result e={e} contact={contact} />}
+      {e && <Result e={e} contact={contact} canFollow={canCheck} />}
       {canCheck && (
         <DropZone accept=".pdf" disabled={upload.isPending || e?.status === "reading"}
           label={e ? "Drop a newer LinkedIn PDF" : "Drop their LinkedIn profile PDF"}
@@ -58,7 +59,7 @@ export function EmploymentCheck({ contact, canCheck }: { contact: Contact; canCh
   );
 }
 
-function Result({ e, contact }: { e: Employment; contact: Contact }) {
+function Result({ e, contact, canFollow }: { e: Employment; contact: Contact; canFollow: boolean }) {
   if (e.status === "reading") return <p className="muted" role="status">Reading {e.fileName}…</p>;
   if (e.status === "failed") return <p className="warning">{e.error ?? "It could not be read."}</p>;
   const cur = e.current;
@@ -68,7 +69,9 @@ function Result({ e, contact }: { e: Employment; contact: Contact }) {
         <p className="employment-verdict ok"><strong>Still at {contact.companyName}</strong> · {role(cur)}{cur.startDate && `, since ${monthYear(cur.startDate)}`}</p>
       )}
       {e.verdict === "moved" && cur && (
-        <p className="employment-verdict moved"><strong>No longer at {contact.companyName}</strong> · now {role(cur)}{cur.startDate && `, since ${monthYear(cur.startDate)}`}</p>
+        <p className="employment-verdict moved"><strong>No longer at {contact.companyName}</strong> · now {role(cur)}{cur.startDate && `, since ${monthYear(cur.startDate)}`}
+          {canFollow && cur.company && <>{" "}<FollowLeaver contactId={contact.id} move={{ companyUrl: "", companyName: cur.company, title: cur.title ?? "", since: cur.startDate ?? "" }} /></>}
+        </p>
       )}
       {e.verdict === "no_current_job" && (
         <p className="employment-verdict moved"><strong>No current job on their profile</strong> · they may have left {contact.companyName}</p>

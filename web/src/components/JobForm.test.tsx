@@ -60,6 +60,32 @@ describe("job form", () => {
     expect(sentBody(post)).toMatchObject({ title: "Finance Manager", jdFileId: "jdf_1" });
   });
 
+  it("takes a second JD dropped over the first: what the first filled is replaced, what was typed stays", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);
+    const read = (id: string, details: Record<string, unknown>) => new Response(JSON.stringify({
+      id, jobId: null, fileName: `${id}.txt`, status: "read", error: null, details: { salaryText: null, closesOn: null, ...details }, createdAt: "2026-11-07T00:00:00Z",
+    }), { status: 201 });
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(read("jdf_1", { title: "Finance Manager", location: "Petaling Jaya", country: "MY", workType: "full_time", workArrangement: "hybrid", description: "Lead month-end closing.", openings: 2 }))
+      .mockResolvedValueOnce(read("jdf_2", { title: "Tax Manager", location: null, country: "SG", workType: "contract", workArrangement: null, description: "Run the tax team.", openings: null }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(job));
+    renderWithClient(<JobForm job={null} company={{ id: job.companyId, name: "Maybank" }} onDone={vi.fn()} />);
+    const drop = () => screen.getByLabelText(/Drop the client's JD/);
+    fireEvent.change(drop(), { target: { files: [new File(["a"], "a.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Job title").value).toBe("Finance Manager"); });
+    change("Description", "Our own words."); // typed after the first JD
+    fireEvent.change(drop(), { target: { files: [new File(["b"], "b.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Job title").value).toBe("Tax Manager"); });
+    expect(screen.getByLabelText<HTMLInputElement>("Location").value).toBe(""); // the first JD's, which the second does not say
+    expect(screen.getByLabelText<HTMLSelectElement>("Work type").value).toBe("contract");
+    expect(screen.getByLabelText<HTMLSelectElement>("Where").value).toBe("");
+    expect(screen.getByLabelText<HTMLInputElement>("Openings").value).toBe("1");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Description").value).toBe("Our own words.");
+    fireEvent.click(screen.getByRole("button", { name: "Add job" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toMatchObject({ title: "Tax Manager", jdFileId: "jdf_2" });
+  });
+
   it("chooses the company the JD names when it is on record, and takes how many are wanted", async () => {
     const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
       path === "/v1/settings/fields" ? ok(testFieldSettings())

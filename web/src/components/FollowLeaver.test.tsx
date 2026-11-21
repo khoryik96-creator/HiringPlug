@@ -17,7 +17,7 @@ const ana = {
 };
 
 describe("following a contact who left", () => {
-  it("adds them at their new company, which is new, with a lead note on it", async () => {
+  it("asks before making their new company, when none here has its page or name, then adds them with a lead note", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies" ? { items: [], nextCursor: null } : ana))) as never);
     const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/companies" ? { id: "comp_acme", name: "Acme Bhd" } : path === "/v1/contacts" ? { id: "cont_new", fullName: "Ana Lim" } : { id: "note_1" },
@@ -25,6 +25,9 @@ describe("following a contact who left", () => {
     renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
     expect(screen.getByText(/Now Head of HR at/).textContent).toContain("since Sep 2025");
     fireEvent.click(screen.getByRole("button", { name: "Add at Acme Bhd" }));
+    expect(await screen.findByText("Acme Bhd is not in HiringPlug yet.")).toBeTruthy();
+    expect(post).not.toHaveBeenCalled(); // nothing made until asked
+    fireEvent.click(screen.getByRole("button", { name: "Create Acme Bhd and add them" }));
     expect((await screen.findByRole("status")).textContent).toContain("Added: Ana Lim at Acme Bhd (new company, with a lead note)");
     const sent = Object.fromEntries(post.mock.calls.map((c) => [c[0], (c[1] as { body: unknown }).body]));
     expect(sent["/v1/companies"]).toEqual({ name: "Acme Bhd", linkedinUrl: move.companyUrl });
@@ -50,6 +53,38 @@ describe("following a contact who left", () => {
     const lookup = (get.mock.calls as unknown[][]).find((c) => c[0] === "/v1/companies");
     expect(lookup?.[1]).toEqual({ params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } });
     expect(post.mock.calls.map((c) => c[0])).not.toContain("/v1/companies");
+  });
+
+  it("offers the companies here with a matching name, and gives the one chosen its LinkedIn page", async () => {
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: Record<string, unknown> } }) => {
+      const q = init?.params?.query ?? {};
+      if (path === "/v1/companies") {
+        return Promise.resolve(ok({ items: q.linkedinCompany ? [] : [
+          { id: "comp_acmex", name: "Acme Express", city: null, linkedinUrl: null },
+          { id: "comp_acme", name: "ACME Berhad", city: "Penang", linkedinUrl: null },
+        ], nextCursor: null }));
+      }
+      if (path === "/v1/companies/{companyId}") return Promise.resolve(ok({ id: "comp_acme", name: "ACME Berhad", linkedinUrl: null, version: 3 }));
+      if (path === "/v1/contacts") return Promise.resolve(ok({ items: [], nextCursor: null }));
+      return Promise.resolve(ok(ana));
+    }) as never);
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/contacts" ? { id: "cont_new", fullName: "Ana Lim" } : {}))) as never);
+    const patch = vi.spyOn(api, "PATCH").mockImplementation((() => Promise.resolve(ok({}))) as never);
+    renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add at Acme Bhd" }));
+    await screen.findByText("Is it one of these?");
+    const offered = screen.getAllByRole("button", { name: /^Add at A|^None of these/ });
+    // The same name (legal suffixes aside) first, then similar ones, then a new company.
+    expect(offered.map((b) => b.textContent)).toEqual(["Add at ACME Berhad (Penang)", "Add at Acme Express", "None of these: create Acme Bhd"]);
+    expect((get.mock.calls as unknown[][]).filter((c) => c[0] === "/v1/companies").map((c) => c[1])).toEqual([
+      { params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } }, { params: { query: { q: "Acme", limit: 8 } } },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Add at ACME Berhad (Penang)" }));
+    expect((await screen.findByRole("status")).textContent).toContain("Added: Ana Lim at ACME Berhad (with a lead note)");
+    expect(post.mock.calls.map((c) => c[0])).not.toContain("/v1/companies");
+    const added = (post.mock.calls as unknown[][]).find((c) => c[0] === "/v1/contacts")?.[1] as { body: { companyId: string } };
+    expect(added.body.companyId).toBe("comp_acme");
+    expect(patch).toHaveBeenCalledWith("/v1/companies/{companyId}", { params: { path: { companyId: "comp_acme" } }, body: { version: 3, linkedinUrl: move.companyUrl } });
   });
 
   it("does not add them twice where they are a contact already", async () => {

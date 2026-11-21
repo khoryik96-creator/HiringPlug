@@ -489,8 +489,12 @@ for each of their jobs, with **Score fit** / **Score again**.
   their profile); a board column's count chooses its stage, and in Steps
   "Choose all N" chooses those shown.
 - **Possible candidates** on each job's page (folded under the pipeline): people not on the job whose CVs
-  share the most words with its description and ad (a keyword search of CVs,
-  not the AI, so it works without one), best first, with where their CV has
+  best match the job's distinctive terms (a keyword search of CVs, not the
+  AI, so it works without one): the words every job description uses
+  (experience, proven, within, advanced, skills, strong, team...) are left
+  out; the title, acronyms (ACCA, SAP) and the description's two-word terms
+  count most, and each term counts less the more of the company's CVs have
+  it. A CV needs two terms, or one of the job's own words or acronyms; best first, with where their CV has
   those words. Those who withdrew consent, and those the user may not see, are
   left out. **Add to job** puts them on it (and scores them). A job with no
   description or ad yet asks for one instead.
@@ -650,9 +654,17 @@ for each of their jobs, with **Score fit** / **Score again**.
 - **Follow leavers** ✅: when LinkedIn shows a contact has left, the companion
   also reads their current roles elsewhere (up to three: company, LinkedIn
   page, title, since when). The contact shows **Now at ...** with **Add at
-  ...**: it finds that company by its LinkedIn page (or creates it), adds the
-  person there as a new contact and writes a lead note. The old company's open
-  jobs that had them as contact are listed as needing a new contact.
+  ...**. The company here with the same LinkedIn page is certain, so they are
+  added there at once; otherwise the companies whose names match are offered
+  (the same name, legal suffixes such as Sdn Bhd aside, first), with **None of
+  these: create ...**, and with no match it asks before creating the company.
+  The one chosen gets the LinkedIn page if it had none, so the next move is
+  found by it. The person is added there as a new contact (their old address
+  is not copied: one is guessed from their new colleagues' and verified) and a
+  lead note is written on the company. The same **Add at ...** follows the
+  current job read from a LinkedIn profile PDF (Employment check). The old
+  company's open jobs that had them as contact are listed as needing a new
+  contact.
 - **Fresh contact data** ✅: a new or changed email is verified at once; a
   verified address is checked again every month while the contact works
   there (not if nothing changed it sooner, nor for someone who left). The

@@ -76,19 +76,37 @@ export function jobFields(f: JobFormState) {
  * The form with what a job description says, where the form is still empty
  * (what someone typed is kept).
  */
-export function fillFromJd(form: JobFormState, d: Schemas["JdDetails"]): JobFormState {
-  const pick = (current: string, read: string | null | undefined) => current.trim() ? current : read ?? current;
-  return {
-    ...form,
-    title: pick(form.title, d.title),
-    location: pick(form.location, d.location),
-    country: pick(form.country, d.country),
-    workType: form.workType || (d.workType ?? ""),
-    workArrangement: form.workArrangement || (d.workArrangement ?? ""),
-    description: pick(form.description, d.description),
-    // A new job's 1 is the default, not something typed.
-    openings: d.openings && ["", "1"].includes(form.openings.trim()) ? String(d.openings) : form.openings,
+/** The fields a JD fills in, with what it put there. */
+export type JdFilled = Partial<Record<"title" | "location" | "country" | "workType" | "workArrangement" | "description" | "openings", string>>;
+
+/**
+ * The form filled in from a JD. A field is filled when it is empty, or when
+ * it still holds what the JD dropped before put there (`before`): another JD
+ * replaces it, and leaves out what it does not say. What was typed stays.
+ */
+export function fillFromJd(form: JobFormState, d: Schemas["JdDetails"], before: JdFilled = {}): { form: JobFormState; filled: JdFilled } {
+  const changes: Record<string, string> = {};
+  const filled: JdFilled = {};
+  const read: Record<keyof JdFilled, string> = {
+    title: d.title ?? "", location: d.location ?? "", country: d.country ?? "", workType: d.workType ?? "",
+    workArrangement: d.workArrangement ?? "", description: d.description, openings: d.openings ? String(d.openings) : "",
   };
+  for (const key of Object.keys(read) as (keyof JdFilled)[]) {
+    const current = form[key];
+    const fromLastJd = before[key] !== undefined && current === before[key];
+    // A new job's 1 is the default, not something typed.
+    const empty = !current.trim() || (key === "openings" && current.trim() === "1");
+    const value = read[key];
+    if (!empty && !fromLastJd) continue; // typed: kept
+    if (value) {
+      changes[key] = value;
+      filled[key] = value;
+    } else if (fromLastJd) {
+      changes[key] = key === "openings" ? "1" : ""; // the last JD's, which this one does not say
+    }
+  }
+  // The JD's work type and arrangement are the form's own values (or "").
+  return { form: { ...form, ...(changes as Partial<JobFormState>) }, filled };
 }
 
 /** A company's name without its legal ending and punctuation, to match a JD's to one on record. */

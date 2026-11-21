@@ -7,6 +7,7 @@ import { type ReactNode, useState } from "react";
 import { api, type Schemas, unwrap } from "../../api/client";
 import { emailTemplatesKey } from "../../api/keys";
 import { RichEditor } from "../clientEmail/RichEditor";
+import { useBanners } from "../clientEmail/useBanners";
 import { escapeHtml } from "../clientEmail/richText";
 import { emailSignatureKey } from "../outlook/OutlookComposeTools";
 
@@ -61,7 +62,14 @@ export function useMessage(initialHtml: string, isNew: boolean, enabled: boolean
 
 /** The formatted body, with the email editor's toolbar as icons. */
 export function ComposeBody({ html, resetKey, onChange }: { html: string; resetKey: number; onChange: (html: string) => void }) {
-  return <div className="compose-body"><RichEditor compact iconTools html={html} resetKey={resetKey} onChange={onChange} /></div>;
+  // The signature's banner shows as it is written; Outlook invitations carry text and links only.
+  const { banners, urls } = useBanners();
+  return (
+    <div className="compose-body">
+      <RichEditor compact iconTools html={html} resetKey={resetKey} onChange={onChange} banners={banners} bannerUrls={urls} />
+      {/data-banner-id=/.test(html) && <small className="composer-hint" role="note">The banner shows here but is left out of the Outlook invitation, which carries text and links only.</small>}
+    </div>
+  );
 }
 
 // Salary never goes into a calendar invitation: templates that would show it are not offered.

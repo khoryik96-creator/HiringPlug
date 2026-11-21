@@ -115,18 +115,6 @@ func JobText(j Job) (text string, ok bool) {
 	return clip(b.String(), maxJobText), ok
 }
 
-// SearchText is what possible candidates are looked for with: the job's
-// title, description and ad, without salary or the labels JobText adds.
-func SearchText(j Job) string {
-	parts := []string{j.Title}
-	for _, s := range []*string{j.Description, j.AdTitle, j.AdText} {
-		if t := trimmed(s); t != "" {
-			parts = append(parts, redact.WithoutSalary(t))
-		}
-	}
-	return clip(strings.Join(parts, "\n"), maxJobText)
-}
-
 // Hash identifies a job text, to tell when a score's job has changed since.
 func Hash(text string) string {
 	sum := sha256.Sum256([]byte(text))
