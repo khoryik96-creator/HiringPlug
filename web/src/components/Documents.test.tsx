@@ -115,6 +115,20 @@ describe("CVs and documents", () => {
     expect(await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 })).toBeTruthy();
   });
 
+  it("shows the profile again once a new CV is read: its details may have updated it", async () => {
+    let parseStatus: Document["parseStatus"] = "queued";
+    const cv = () => doc({ id: "doc_new", fileName: "New CV.txt", contentType: "text/plain", extractedText: "New text", parseStatus });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
+    ))) as never);
+    const { client } = renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    const refresh = vi.spyOn(client, "invalidateQueries");
+    await screen.findByRole("button", { name: /^Reading details…/ });
+    expect(refresh).not.toHaveBeenCalledWith({ queryKey: ["candidate", testCandidate().id] });
+    parseStatus = "parsed";
+    await waitFor(() => { expect(refresh).toHaveBeenCalledWith({ queryKey: ["candidate", testCandidate().id] }); }, { timeout: 4000 });
+  });
+
   it("says so when the details asked for could not be read, until dismissed", async () => {
     let parseStatus: Document["parseStatus"] = null;
     const cv = () => doc({ id: "doc_bad", fileName: "Bad CV.txt", contentType: "text/plain", extractedText: "Bad text", parseStatus,

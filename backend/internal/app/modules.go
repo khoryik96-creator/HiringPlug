@@ -180,7 +180,7 @@ func NewModules(d Deps) *Modules {
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
 	}, d.Config.MaxUploadBytes)
 	// Imported CVs fill their candidates in; every CV read suggests a work authorization.
-	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone)
+	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone, profileFromNewestCV{m.Documents, m.Candidates}.ReadDone)
 	m.Market = market.New(d.Pool, market.Deps{
 		Jobs: marketJobs{m.Jobs}, Candidates: marketCandidates{m.Candidates}, Insights: marketInsights{m.Assistant},
 	})

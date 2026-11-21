@@ -257,7 +257,16 @@ The file's name is a hint to the candidate's name ("TAN WEI LING CV.pdf").
 worker reads the profile details out of it: name, email, phone, LinkedIn,
 location, nationality, notice period, skills, work history and education.
 Every value carries the exact CV text it came from, and the server keeps only
-values whose quote is in the CV. On the candidate's page, **Review details
+values whose quote is in the CV. **A new CV updates the profile by itself** ✅:
+once the candidate's newest CV is read, where it says they are now replaces
+what the profile had (job title, current employer, industry, location), empty
+fields are filled (contact details are only ever filled, never replaced; the
+name is kept), new skills are added, and its work history and education are
+taken when they are at least as long as the profile's. A CV older than the
+profile's work history (an old CV found later) only fills empty fields, and
+reading an older CV again changes nothing. The change is audited
+(`candidate.updated_from_cv`, naming the CV) and the page shows it as soon as
+the CV is read. On the candidate's page, **Review details
 from this CV** lists each suggestion next to what the profile has now, with
 the CV's wording: empty profile fields are ticked, filled ones never are, and
 **Use ticked details** saves them (with the usual lost-update protection).

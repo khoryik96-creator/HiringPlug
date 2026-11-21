@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 // PurgeCandidate deletes a candidate's documents for good (the Bin); after
@@ -27,4 +28,14 @@ func (m *Module) PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID stri
 func (m *Module) CVTextOf(ctx context.Context, tx pgx.Tx, documentID string) (candidateID, source, text string, err error) {
 	row, err := store.New(tx).CVTextOf(ctx, documentID)
 	return row.CandidateID, row.Source, row.Text, err
+}
+
+// NewestCV is the candidate's newest CV (not one the app made, not in the
+// bin): "" when they have none.
+func (m *Module) NewestCV(ctx context.Context, tx pgx.Tx, candidateID string) (string, error) {
+	id, err := store.New(tx).NewestCVID(ctx, candidateID)
+	if database.IsNoRows(err) {
+		return "", nil
+	}
+	return id, err
 }

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, ApiError, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadDocument, uploadCandidateDocument } from "../api/files";
+import { candidateKey } from "../api/keys";
 import { CloseIcon, IconButton, ReferenceIcon, SideBySideIcon, SparkIcon, UploadIcon } from "./ActionIcons";
 import { CandidateCv } from "./CandidateCv";
 import { latestCv } from "./CvPane";
@@ -62,6 +63,16 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     refetchInterval: (query) =>
       query.state.data?.some((d) => d.status === "queued" || d.parseStatus === "queued" || d.pdfStatus === "queued") ? 2000 : false,
   });
+
+  // A CV read since: its details may have brought the profile up to date (the newest CV does).
+  const readingNow = (docs.data ?? []).filter(isReading).map((d) => d.id).join(" ");
+  const readingBefore = useRef(readingNow);
+  useEffect(() => {
+    const now = readingNow.split(" ");
+    const done = readingBefore.current.split(" ").some((id) => id && !now.includes(id));
+    readingBefore.current = readingNow;
+    if (done) void queryClient.invalidateQueries({ queryKey: candidateKey(candidateId) });
+  }, [readingNow, candidateId, queryClient]);
 
   const parse = useMutation({
     mutationFn: async (documentId: string) =>

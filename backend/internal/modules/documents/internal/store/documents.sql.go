@@ -576,6 +576,21 @@ func (q *Queries) NewDocumentID(ctx context.Context) (string, error) {
 	return id, err
 }
 
+const newestCVID = `-- name: NewestCVID :one
+SELECT id FROM document
+WHERE candidate_id = $1 AND source <> 'formatted' AND binned_at IS NULL
+ORDER BY id DESC
+LIMIT 1
+`
+
+// The candidate's newest CV (not one the app made, not in the bin), by when it was added.
+func (q *Queries) NewestCVID(ctx context.Context, candidateID string) (string, error) {
+	row := q.db.QueryRow(ctx, newestCVID, candidateID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const purgeBinnedDocument = `-- name: PurgeBinnedDocument :one
 DELETE FROM document WHERE id = $1 AND binned_at IS NOT NULL RETURNING storage_key,pdf_key
 `
