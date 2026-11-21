@@ -17,14 +17,14 @@ for that result and any credit use.
 
 ## Deployment
 
-Use a reviewed, deployed CV Studio-compatible Apollo Cloudflare Worker with
-its D1 database, approved Apollo partner OAuth client, and exact HTTPS
+Deploy the [HiringPlug Apollo Worker](../tools/apollo-broker/README.md)
+before enabling this feature. It uses the CV Studio broker's D1 schema,
+approved Apollo partner OAuth client, and exact HTTPS
 `/callback` redirect registered in Apollo. The broker needs
 `read_user_profile`, `people_match`, and `app_scopes`. The broker must verify
 both the LinkedIn profile and its employer before revealing an address.
-Use the broker release that fixes the exact personal-domain checks and saved
-contact identity checks. Deploying HiringPlug leaves the Worker on its
-existing release.
+The employer name alone cannot establish a match. HiringPlug uses the Worker's
+versioned lookup routes and requires identity verification on a found result.
 
 Set both variables on the API and the Go worker. Docker Compose passes these
 through from the deployment's environment file. On native installations, add
@@ -38,7 +38,7 @@ HP_APOLLO_KEYS_SECRET=<dedicated random secret of at least 32 characters>
 Keep the encryption key across upgrades in the deployment's secret store or
 private environment file. Connect each recruiter's own account from Find HR.
 The Apollo application secret and refresh tokens remain on the broker. A
-shared broker deployment may still call itself CV Studio on the callback page.
+shared deployment can continue serving CV Studio through its original routes.
 To enable Apollo on a Find HR search made before this release, run a new
 search so HiringPlug can bind the company page used in that scan.
 
@@ -64,6 +64,18 @@ returned addresses are encrypted in PostgreSQL and scoped to the recruiter
 and tenant. An explicit confirmation creates a lookup record and Go worker
 job together. The worker commits a claim before dispatch; duplicate clicks
 and worker retries read the same record. A lookup proven to have stopped
-before dispatch can be confirmed again. A lookup with an uncertain result
+before dispatch can be confirmed again. That includes a request that expired
+in the queue and a broker limit that occurred before Apollo was called.
+A limit returned by Apollo after dispatch needs a review in Apollo for any
+credit use. A lookup with an uncertain result
 can only be checked, including after repeat clicks. Results from an earlier
 connection stay private to that connection.
+
+If the broker cannot confirm a disconnect, HiringPlug pauses lookups and keeps
+the encrypted proof so **Retry disconnect** can revoke the same connection.
+If the original broker or encryption key is unavailable, revoke the app in
+Apollo and then forget the connection in HiringPlug.
+
+HiringPlug ships the Leads schema migration `00156` with Apollo so normal
+deployments apply both in order. The migrator also supports databases that
+ran Apollo's `00157` preview before the Leads migration was bundled.

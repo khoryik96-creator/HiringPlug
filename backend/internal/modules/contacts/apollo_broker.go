@@ -29,7 +29,13 @@ type apolloClient struct {
 	http *http.Client
 }
 
+const apolloProtocol = 2
+
 type apolloReply struct {
+	Protocol         int    `json:"protocol"`
+	Connected        *bool  `json:"connected"`
+	IdentityChecked  bool   `json:"identity_checked"`
+	NotDispatched    bool   `json:"not_dispatched"`
 	FlowID           string `json:"flow_id"`
 	AuthorizationURL string `json:"authorization_url"`
 	ConnectionID     string `json:"connection_id"`
@@ -142,10 +148,10 @@ func apolloRandomID() string {
 	return hex.EncodeToString(raw)
 }
 
-func (c apolloClient) confirmation(tenant, user, company, flow string, person apolloPerson) string {
+func (c apolloClient) confirmation(tenant, user, company, flow, cancelledReceipt string, person apolloPerson) string {
 	mac := hmac.New(sha256.New, c.KeysSecret)
 	// A fixed array of strings and a plain struct always marshal successfully.
-	raw, _ := json.Marshal([]any{"apollo-confirm-v1", tenant, user, company, flow, person})
+	raw, _ := json.Marshal([]any{"apollo-confirm-v2", tenant, user, company, flow, cancelledReceipt, person})
 	_, _ = mac.Write(raw)
 	return hex.EncodeToString(mac.Sum(nil))
 }

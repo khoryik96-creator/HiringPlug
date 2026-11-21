@@ -19,6 +19,8 @@ import (
 
 func (s *Service) apolloConnection(row store.HrApolloConnection) api.ApolloConnection {
 	switch {
+	case row.Revoking:
+		return api.ApolloConnection{State: api.ApolloConnectionStateDisconnectedLocally}
 	case !s.apollo.enabled():
 		return api.ApolloConnection{State: api.ApolloConnectionStateDisabled}
 	case row.FlowID == "":
@@ -79,7 +81,7 @@ func (s *Service) startApollo(ctx context.Context, p authz.Principal) (api.Apoll
 			return err
 		}
 		out = s.apolloConnection(row)
-		if out.State == api.ApolloConnectionStateConnected || out.State == api.ApolloConnectionStatePending {
+		if row.FlowID != "" {
 			return nil
 		}
 
@@ -90,7 +92,7 @@ func (s *Service) startApollo(ctx context.Context, p authz.Principal) (api.Apoll
 		secret := apolloRandomID()
 		hash := sha256.Sum256([]byte(secret))
 		reply, status, err := s.apollo.post(requestCtx, "/start", map[string]string{"proof_hash": hex.EncodeToString(hash[:])})
-		if err != nil || !s.apollo.validLogin(reply) {
+		if err != nil || reply.Protocol != apolloProtocol || !s.apollo.validLogin(reply) {
 			return apolloConnectionError(status)
 		}
 		sealed, err := s.apollo.seal(p.TenantID, p.UserID, s.apollo.BrokerOrigin, reply.FlowID, "proof", secret)
@@ -175,33 +177,64 @@ func (s *Service) disconnectApollo(ctx context.Context, p authz.Principal) (api.
 		}
 		var err error
 		row, err = getApolloRow(ctx, q, p.UserID)
-		if err != nil || row.FlowID == "" {
+		if err != nil || row.FlowID == "" || row.Revoking {
 			return err
 		}
-		if err := q.DeleteApolloConnection(ctx, row.FlowID); err != nil {
+		if err := q.MarkApolloRevoking(ctx, row.FlowID); err != nil {
 			return err
 		}
-		return audit.Record(ctx, tx, audit.Entry{Action: "contacts.apollo_disconnected", EntityType: "user", EntityID: p.UserID})
+		return audit.Record(ctx, tx, audit.Entry{Action: "contacts.apollo_revocation_started", EntityType: "user", EntityID: p.UserID})
 	})
 	if err != nil || row.FlowID == "" {
 		return out, err
 	}
-	if !row.ExpiresAt.After(time.Now()) {
-		return out, nil
-	}
+
+	// Keep the sealed proof until the broker acknowledges revocation. Lookups
+	// are blocked locally immediately, including on an expired OAuth flow.
+	out.State = api.ApolloConnectionStateDisconnectedLocally
 	proof, err := s.apolloProof(row)
 	if err != nil || !s.apollo.enabled() {
-		out.State = api.ApolloConnectionStateDisconnectedLocally
 		return out, nil
-	}
-	path, key := "/disconnect", "connection_id"
-	if row.AccountName == nil {
-		path, key = "/cancel", "flow_id"
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if _, status, err := s.apollo.post(requestCtx, path, map[string]string{key: row.FlowID, "secret": proof}); err != nil && status != http.StatusUnauthorized {
-		out.State = api.ApolloConnectionStateDisconnectedLocally
+	reply, _, err := s.apollo.post(requestCtx, "/disconnect-v2", map[string]string{"connection_id": row.FlowID, "secret": proof})
+	if err != nil || reply.Protocol != apolloProtocol || reply.Connected == nil || *reply.Connected {
+		return out, nil
 	}
-	return out, nil
+	return s.finishApolloDisconnect(ctx, p, row.FlowID, "contacts.apollo_disconnected")
+}
+
+func (s *Service) finishApolloDisconnect(ctx context.Context, p authz.Principal, flow, action string) (api.ApolloConnection, error) {
+	var out api.ApolloConnection
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		if err := q.LockApolloAccount(ctx); err != nil {
+			return err
+		}
+		row, err := getApolloRow(ctx, q, p.UserID)
+		if err != nil {
+			return err
+		}
+		if row.Revoking && row.FlowID == flow {
+			if err := q.DeleteApolloConnection(ctx, flow); err != nil {
+				return err
+			}
+			if err := audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "user", EntityID: p.UserID}); err != nil {
+				return err
+			}
+			row = store.HrApolloConnection{}
+		}
+		out = s.apolloConnection(row)
+		return nil
+	})
+	return out, err
+}
+
+func (s *Service) forgetApollo(ctx context.Context, p authz.Principal) (api.ApolloConnection, error) {
+	row, err := s.readApolloConnection(ctx, p)
+	if err != nil {
+		return api.ApolloConnection{}, err
+	}
+	return s.finishApolloDisconnect(ctx, p, row.FlowID, "contacts.apollo_connection_forgotten")
 }

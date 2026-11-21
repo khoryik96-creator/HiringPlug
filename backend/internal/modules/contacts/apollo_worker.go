@@ -33,7 +33,10 @@ func (s *Service) runApolloLookup(ctx context.Context, job jobqueue.Job) error {
 		q := store.New(tx)
 		row, err := q.ClaimApolloLookup(ctx, in.LookupId)
 		if database.IsNoRows(err) {
-			return nil // even after a lease is lost, only the initial claim can send
+			// Expiry is conditional on being unclaimed. A job replay never
+			// sends an operation that was already claimed.
+			_, err = expireQueuedApolloLookup(ctx, tx, in.LookupId)
+			return err
 		}
 		if err != nil {
 			return err
@@ -77,7 +80,7 @@ func (s *Service) runApolloLookup(ctx context.Context, job jobqueue.Job) error {
 	if subject.URL != "" {
 		if proof, proofErr := s.apolloProof(work.connection); proofErr == nil {
 			auth := apolloLookupAuth(work, proof)
-			reply, status, _ := s.apollo.post(ctx, "/reveal", map[string]any{
+			reply, status, _ := s.apollo.post(ctx, "/reveal-v2", map[string]any{
 				"connection_id": auth["connection_id"], "secret": proof, "operation_id": auth["operation_id"], "confirmed": true, "person": subject,
 			})
 			result = normalizeApolloReply(reply, status)
@@ -92,12 +95,25 @@ func (s *Service) runApolloLookup(ctx context.Context, job jobqueue.Job) error {
 
 func normalizeApolloReply(reply apolloReply, status int) api.ApolloLookup {
 	out := api.ApolloLookup{State: api.ApolloLookupStateUnconfirmed}
+	if reply.NotDispatched {
+		switch api.ApolloLookupState(reply.State) {
+		case api.ApolloLookupStateLimited:
+			return api.ApolloLookup{State: api.ApolloLookupStateCancelled, Reason: ptr(api.ApolloLookupReasonRetryableLimit)}
+		case api.ApolloLookupStateAuthRequired:
+			return api.ApolloLookup{State: api.ApolloLookupStateCancelled, Reason: ptr(api.ApolloLookupReasonReconnectRequired)}
+		default:
+			return out
+		}
+	}
 	if status == http.StatusUnauthorized {
 		out.State = api.ApolloLookupStateAuthRequired
 		return out
 	}
 	switch api.ApolloLookupState(reply.State) {
 	case api.ApolloLookupStateFound:
+		if !reply.IdentityChecked {
+			return out
+		}
 		if reason := apolloEmailReject(reply.Email); reason != "" {
 			return api.ApolloLookup{State: api.ApolloLookupStateNotFound, Reason: &reason}
 		}
@@ -156,4 +172,16 @@ func (s *Service) saveApolloResult(ctx context.Context, p authz.Principal, w apo
 		return err
 	})
 	return row, connection, err
+}
+
+func expireQueuedApolloLookup(ctx context.Context, tx pgx.Tx, id string) (store.HrApolloLookup, error) {
+	row, err := store.New(tx).ExpireQueuedApolloLookup(ctx, id)
+	if database.IsNoRows(err) {
+		return row, nil
+	}
+	if err != nil {
+		return row, err
+	}
+	return row, audit.Record(ctx, tx, audit.Entry{Action: "contacts.apollo_lookup_outcome", EntityType: "company", EntityID: row.CompanyID,
+		Changes: map[string]any{"lookupId": id, "state": row.State, "reason": "queue_expired"}})
 }

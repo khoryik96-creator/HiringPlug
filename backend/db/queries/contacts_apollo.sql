@@ -9,14 +9,18 @@ INSERT INTO hr_apollo_connection (flow_id, broker_origin, proof_sealed, authoriz
 VALUES ($1, $2, $3, $4, now() + interval '10 minutes')
 ON CONFLICT (tenant_id, user_id) DO UPDATE
 SET flow_id = excluded.flow_id, broker_origin = excluded.broker_origin, proof_sealed = excluded.proof_sealed,
-  authorize_url = excluded.authorize_url, expires_at = excluded.expires_at, account_name = NULL;
+  authorize_url = excluded.authorize_url, expires_at = excluded.expires_at, account_name = NULL, revoking = false;
 
 -- name: FinishApolloFlow :one
 UPDATE hr_apollo_connection SET account_name = $2, expires_at = now() + interval '30 days', authorize_url = ''
-WHERE user_id = app_current_user() AND flow_id = $1 AND account_name IS NULL AND expires_at > now() RETURNING *;
+WHERE user_id = app_current_user() AND flow_id = $1 AND account_name IS NULL AND NOT revoking AND expires_at > now() RETURNING *;
 
 -- name: DeleteApolloConnection :exec
-DELETE FROM hr_apollo_connection WHERE user_id = app_current_user() AND flow_id = $1;
+DELETE FROM hr_apollo_connection WHERE user_id = app_current_user() AND flow_id = $1 AND revoking;
+
+-- name: MarkApolloRevoking :exec
+UPDATE hr_apollo_connection SET revoking = true, authorize_url = ''
+WHERE user_id = app_current_user() AND flow_id = $1 AND NOT revoking;
 
 -- name: FindApolloLookup :one
 SELECT * FROM hr_apollo_lookup
@@ -29,7 +33,13 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'queued') RETURNING *;
 
 -- name: ClaimApolloLookup :one
 UPDATE hr_apollo_lookup SET state = 'sending', updated_at = now()
-WHERE id = $1 AND state = 'queued' RETURNING *;
+WHERE id = $1 AND state = 'queued' AND created_at > now() - interval '15 minutes'
+RETURNING *;
+
+-- name: ExpireQueuedApolloLookup :one
+UPDATE hr_apollo_lookup SET state = 'cancelled', reason = 'queue_expired', updated_at = now()
+WHERE id = $1 AND state = 'queued' AND created_at <= now() - interval '15 minutes'
+RETURNING *;
 
 -- name: FinishApolloLookup :one
 UPDATE hr_apollo_lookup SET state = $2, email_sealed = $3, email_status = $4, reason = $5, updated_at = now()
@@ -37,10 +47,13 @@ WHERE id = $1 AND state IN ('sending','pending','unconfirmed')
 RETURNING *;
 
 -- name: HRWorkEmail :many
-SELECT email FROM contact
-WHERE company_id = $1 AND lower(rtrim(linkedin_url, '/')) = lower(sqlc.arg(profile_url)::text)
-  AND email IS NOT NULL
-ORDER BY id LIMIT 2;
+SELECT c.email FROM contact c
+WHERE c.company_id = $1 AND lower(rtrim(c.linkedin_url, '/')) = lower(sqlc.arg(profile_url)::text)
+  AND c.status = 'active' AND c.email IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM contact_mailbox_check m WHERE m.contact_id = c.id AND m.email = c.email AND m.status = 'invalid'
+  )
+ORDER BY c.id LIMIT 2;
 
 -- name: ExpireApolloFlow :exec
 UPDATE hr_apollo_connection SET expires_at = now()

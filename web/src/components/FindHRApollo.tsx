@@ -52,23 +52,25 @@ export function ApolloConnectionDialog({ connection, onClose }: { connection: Re
     {connection.isPending && <p role="status">Checking connection…</p>}
     {state === "disabled" && <p>Ask your HiringPlug administrator to configure the Apollo sign-in broker.</p>}
     {state === "connected" && <p>Connected as <strong>{current?.accountName}</strong>.</p>}
-    {state === "expired" && <p>Your Apollo sign-in has expired. Connect again to continue.</p>}
-    {state === "failed" && <p>Apollo didn’t finish sign-in. Connect again and approve access in Apollo.</p>}
-    {state === "disconnected_locally" && <p>Disconnected in HiringPlug. Revoke the app in Apollo to end access there.</p>}
+    {state === "expired" && <p>Your Apollo sign-in has expired. Disconnect it, then connect again.</p>}
+    {state === "failed" && <p>Apollo didn’t finish sign-in. Cancel this attempt, then connect again.</p>}
+    {state === "disconnected_locally" && <p>HiringPlug stopped lookups. Retry disconnecting to end access at the broker.</p>}
     {state === "pending" && <p>Open Apollo to sign in, then return here to check your connection.</p>}
     <div className="row hr-apollo-actions">
       {state === "pending" && current?.authorizationUrl &&
         <a href={current.authorizationUrl} target="_blank" rel="noopener noreferrer">Open Apollo ↗</a>}
       {state === "pending" && <button type="button" className="primary" disabled={change.isPending}
         onClick={() => { change.mutate("poll"); }}>{change.isPending ? "Checking…" : "Check connection"}</button>}
-      {(state === "connected" || state === "pending") && <button type="button" disabled={change.isPending} onClick={() => { change.mutate("disconnect"); }}>
-        {state === "pending" ? "Cancel sign-in" : "Disconnect"}
+      {(state === "connected" || state === "pending" || state === "expired" || state === "failed" || state === "disconnected_locally") && <button type="button" disabled={change.isPending} onClick={() => { change.mutate("disconnect"); }}>
+        {state === "pending" || state === "failed" ? "Cancel sign-in" : state === "disconnected_locally" ? "Retry disconnect" : "Disconnect"}
       </button>}
-      {(state === "disconnected" || state === "expired" || state === "failed" || state === "disconnected_locally") &&
+      {state === "disconnected" &&
         <button type="button" className="primary" disabled={change.isPending} onClick={() => { change.mutate("start"); }}>
           {change.isPending ? "Starting…" : "Connect Apollo"}
         </button>}
     </div>
+    {state === "disconnected_locally" && <p><button type="button" className="link" disabled={change.isPending}
+      onClick={() => { change.mutate("forget"); }}>I revoked access in Apollo. Forget this connection.</button></p>}
   </ApolloDialog>;
 }
 
@@ -96,6 +98,9 @@ const absent: Record<NonNullable<Lookup["reason"]>, string> = {
   email_redacted: "Apollo kept the email hidden.",
   email_unusable: "Apollo returned an unusable address.",
   contact_unconfirmed: "Apollo couldn’t confirm that the saved address belongs to this person at this company.",
+  queue_expired: "The lookup expired in the queue.",
+  retryable_limit: "The broker was busy before it could start this lookup.",
+  reconnect_required: "Disconnect and reconnect Apollo to try again.",
 };
 
 const statusLabel: Record<NonNullable<Lookup["emailStatus"]>, string> = {
@@ -135,7 +140,7 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
     {result && <div aria-live="polite">
       {result.email && <p className="hr-apollo-address"><strong>{result.email}</strong><br />
         <span className="muted">{result.state === "existing" ? "Already in HiringPlug. No Apollo credit used." : statusLabel[result.emailStatus ?? "unknown"]}</span></p>}
-      {issues[result.state] && <p>{issues[result.state]}</p>}
+      {issues[result.state] && <p>{result.state === "cancelled" && result.reason ? absent[result.reason] : issues[result.state]}</p>}
       {result.state === "not_found" && <p>{absent[result.reason ?? "email_not_returned"]} Check Apollo for any credit use.</p>}
       {(result.state === "ready" || result.state === "cancelled") && result.confirmation && <>
         <p>This lookup may use a credit from your Apollo account, even if no email is returned.</p>
@@ -146,7 +151,8 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
       </>}
       {(result.state === "unconfirmed" || result.state === "pending") && <button type="button" disabled={change.isPending}
         onClick={() => { change.mutate({ action: "check" }); }}>{change.isPending ? "Checking…" : "Check lookup status"}</button>}
-      {(result.state === "disconnected" || result.state === "auth_required") &&
+      {(result.state === "disconnected" || result.state === "auth_required" ||
+        (result.state === "cancelled" && result.reason === "reconnect_required" && !result.confirmation)) &&
         <button type="button" onClick={openConnection}>Open Apollo connection</button>}
       {(result.state === "busy" || ((result.state === "queued" || result.state === "sending") && !polling)) &&
         <button type="button" disabled={lookup.isFetching} onClick={() => { void lookup.refetch(); }}>Refresh status</button>}

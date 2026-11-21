@@ -16,7 +16,7 @@ func TestApolloAcceptsBusinessDomainsThatSharePersonalProviderPrefixes(t *testin
 	for _, email := range []string{"hr@proton.com", "hr@mail.example.com", "hr@live.example.com"} {
 		t.Run(email, func(t *testing.T) {
 			t.Parallel()
-			result := normalizeApolloReply(apolloReply{State: "found", Email: email, EmailStatus: "new-apollo-status"}, http.StatusOK)
+			result := normalizeApolloReply(apolloReply{State: "found", IdentityChecked: true, Email: email, EmailStatus: "new-apollo-status"}, http.StatusOK)
 			assert.Equal(t, api.ApolloLookupStateFound, result.State)
 			assert.Equal(t, ptr(api.ApolloLookupEmailStatusUnknown), result.EmailStatus)
 		})
@@ -27,7 +27,7 @@ func TestApolloAcceptsBusinessDomainsThatSharePersonalProviderPrefixes(t *testin
 	} {
 		t.Run(email, func(t *testing.T) {
 			t.Parallel()
-			result := normalizeApolloReply(apolloReply{State: "found", Email: email}, http.StatusOK)
+			result := normalizeApolloReply(apolloReply{State: "found", IdentityChecked: true, Email: email}, http.StatusOK)
 			assert.Equal(t, api.ApolloLookupStateNotFound, result.State)
 			assert.Equal(t, &reason, result.Reason)
 			assert.Nil(t, result.Email)
@@ -52,4 +52,16 @@ func TestApolloRejectsUnexpectedOAuthDestinationStateAndCallback(t *testing.T) {
 	} {
 		assert.False(t, client.validLogin(apolloReply{FlowID: id, AuthorizationURL: bad}), bad)
 	}
+}
+
+func TestApolloRequiresBrokerIdentityVerification(t *testing.T) {
+	t.Parallel()
+	result := normalizeApolloReply(apolloReply{State: "found", Email: "hr@work.example"}, http.StatusOK)
+	assert.Equal(t, api.ApolloLookupStateUnconfirmed, result.State)
+	assert.Nil(t, result.Email)
+	result = normalizeApolloReply(apolloReply{State: "limited"}, http.StatusOK)
+	assert.Equal(t, api.ApolloLookupStateLimited, result.State)
+	result = normalizeApolloReply(apolloReply{State: "limited", NotDispatched: true}, http.StatusOK)
+	assert.Equal(t, api.ApolloLookupReasonRetryableLimit, *result.Reason)
+	assert.Equal(t, api.ApolloLookupStateCancelled, result.State)
 }

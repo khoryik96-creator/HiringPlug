@@ -1,13 +1,15 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./api/client";
 import { App, initials } from "./App";
-import { setToken } from "./auth";
+import { clearToken, getToken, setToken } from "./auth";
 import { ok, RECRUITER, testCandidate, testFieldSettings, testMe } from "./test-utils";
 
 afterEach(() => {
   cleanup();
+  clearToken();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   window.location.hash = "";
@@ -44,6 +46,66 @@ describe("app", () => {
     await screen.findByRole("heading", { name: "Bob Lee" });
     expect(screen.queryByRole("form", { name: "Edit profile" })).toBeNull();
     expect(within(screen.getByRole("region", {name: "Candidate"})).getByText("bob@example.com")).toBeTruthy();
+  });
+  it("drops a late Apollo sign-in response after the recruiter switches accounts", async () => {
+    if (typeof HTMLDialogElement.prototype.showModal !== "function") {
+      Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
+      Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value(this: HTMLDialogElement) { this.open = false; } });
+    }
+    let resolveLate: (result: never) => void = () => { throw Error("Expected a pending request"); };
+    const late = new Promise<never>((resolve) => { resolveLate = resolve; });
+    const me = testMe(["companies:read", "contacts.apollo:use"]);
+    const company = {
+      id: "comp_aaaaaaaaaaaaaaaaaaaaaaaaaa", name: "Fixture company", type: "client",
+      linkedinUrl: "https://www.linkedin.com/company/fixture/", version: 1,
+    };
+    vi.spyOn(api, "GET").mockImplementation((path: string) => {
+      switch (path) {
+        case "/v1/me": return Promise.resolve(ok({ ...me, user: { ...me.user, name: getToken() === "test-first" ? "First recruiter" : "Second recruiter" } }));
+        case "/v1/companies/{companyId}": return Promise.resolve(ok(company));
+        case "/v1/companies/{companyId}/hr-scan": return Promise.resolve(ok({ scan: null }));
+        case "/v1/contacts/apollo": return Promise.resolve(ok({ state: "disconnected" }));
+        case "/v1/settings/fields": return Promise.resolve(ok(testFieldSettings()));
+      }
+      return Promise.resolve(ok({ items: [] }));
+    });
+    const post = vi.spyOn(api, "POST").mockImplementation((path: string) => {
+      switch (path) {
+        case "/v1/contacts/apollo": return late;
+        case "/v1/auth/sign-in": return Promise.resolve(ok({ token: "test-second" }));
+        default: return Promise.resolve(ok(undefined));
+      }
+    });
+    const openApollo = async () => {
+      fireEvent.click(await screen.findByRole("tab", { name: "Find HR" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Apollo" }));
+      return screen.findByRole("button", { name: "Connect Apollo" });
+    };
+
+    const mounted = vi.spyOn(QueryClient.prototype, "mount");
+    setToken("test-first");
+    window.location.hash = `#/companies/${company.id}`;
+    render(<App />);
+    fireEvent.click(await openApollo());
+    const firstSession = mounted.mock.contexts.at(-1);
+    expect(firstSession).toBeInstanceOf(QueryClient);
+    await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/contacts/apollo", { body: { action: "start" } }); });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    const signIn = await screen.findByRole("form", { name: "Sign in" });
+    fireEvent.change(within(signIn).getByLabelText("Email"), { target: { value: "second@example.test" } });
+    fireEvent.change(within(signIn).getByLabelText("Password"), { target: { value: "fixture-password" } });
+    fireEvent.submit(signIn);
+    await screen.findByRole("link", { name: "Your account: Second recruiter" });
+    await openApollo();
+    expect(mounted.mock.contexts.at(-1)).not.toBe(firstSession);
+    await act(async () => {
+      resolveLate(ok({ state: "pending", authorizationUrl: "https://app.apollo.io/#/oauth/authorize?fixture=first-user" }));
+      await late;
+      await new Promise((done) => { setTimeout(done, 0); });
+    });
+    expect(screen.getByRole("button", { name: "Connect Apollo" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Open Apollo/ })).toBeNull();
   });
 });
 

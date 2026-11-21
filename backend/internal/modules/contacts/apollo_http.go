@@ -28,6 +28,8 @@ func (h *HTTP) UpdateApolloConnection(ctx context.Context, req api.UpdateApolloC
 		out, err = h.svc.pollApollo(ctx, p)
 	case api.ApolloConnectionActionActionDisconnect:
 		out, err = h.svc.disconnectApollo(ctx, p)
+	case api.ApolloConnectionActionActionForget:
+		out, err = h.svc.forgetApollo(ctx, p)
 	default:
 		err = apperr.Validation(apperr.FieldErrors{{Field: "action", Message: "choose a sign-in action"}})
 	}

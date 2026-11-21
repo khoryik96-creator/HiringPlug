@@ -17,7 +17,7 @@ import { SignIn } from "./pages/SignIn";
 import { Menu } from "./components/Menu";
 import { Calendar, menu, resolve, type Route } from "./routes";
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const newSessionQueries = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 function useHash(): string {
   const [hash, setHash] = useState(window.location.hash);
@@ -167,16 +167,23 @@ function CalendarDock({ userId, modal, onClose }: { userId: string; modal: boole
 export function App() {
   useHash(); // re-render on navigation
   const [signedIn, setSignedIn] = useState(getToken() !== null);
+  const [queryClient, setQueryClient] = useState(newSessionQueries);
   // The public careers page: never behind sign-in. (hash re-renders on change.)
   const careers = careersRoute(window.location);
   // A booking page: also public.
   const booking = bookingRoute(window.location);
   // Invitation and password reset links: also never behind sign-in.
   const link = authLinkRoute(window.location.hash);
+  const changeSession = (signedIn: boolean) => {
+    // Pending mutations retain their original client. Give the next sign-in
+    // a separate client so late responses cannot populate its cache.
+    queryClient.clear();
+    setQueryClient(newSessionQueries());
+    setSignedIn(signedIn);
+  };
   const signOut = () => {
     clearToken();
-    queryClient.clear();
-    setSignedIn(false);
+    changeSession(false);
   };
   return (
     <QueryClientProvider client={queryClient}>
@@ -186,11 +193,11 @@ export function App() {
         // Public: candidates are never asked to sign in.
         <Careers key={careers.slug} route={careers} pathStyle={!window.location.hash.startsWith("#/careers/")} />
       ) : link ? (
-        <ChoosePassword key={link.token} token={link.token} onSignedIn={() => { queryClient.clear(); setSignedIn(true); }} />
+        <ChoosePassword key={link.token} token={link.token} onSignedIn={() => { changeSession(true); }} />
       ) : signedIn ? (
         <Shell onSignOut={signOut} />
       ) : (
-        <SignIn onSignedIn={() => { setSignedIn(true); }} />
+        <SignIn onSignedIn={() => { changeSession(true); }} />
       )}
     </QueryClientProvider>
   );

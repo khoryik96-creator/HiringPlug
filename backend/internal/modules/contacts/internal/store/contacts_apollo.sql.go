@@ -39,7 +39,8 @@ func (q *Queries) ApolloUserActive(ctx context.Context, id string) (bool, error)
 
 const claimApolloLookup = `-- name: ClaimApolloLookup :one
 UPDATE hr_apollo_lookup SET state = 'sending', updated_at = now()
-WHERE id = $1 AND state = 'queued' RETURNING tenant_id, user_id, id, flow_id, company_id, linkedin_company_id, profile_url, person_name, linkedin_company_name, linkedin_company_url, state, email_sealed, email_status, reason, updated_at, created_at
+WHERE id = $1 AND state = 'queued' AND created_at > now() - interval '15 minutes'
+RETURNING tenant_id, user_id, id, flow_id, company_id, linkedin_company_id, profile_url, person_name, linkedin_company_name, linkedin_company_url, state, email_sealed, email_status, reason, updated_at, created_at
 `
 
 func (q *Queries) ClaimApolloLookup(ctx context.Context, id string) (HrApolloLookup, error) {
@@ -117,7 +118,7 @@ func (q *Queries) CreateApolloLookup(ctx context.Context, arg CreateApolloLookup
 }
 
 const deleteApolloConnection = `-- name: DeleteApolloConnection :exec
-DELETE FROM hr_apollo_connection WHERE user_id = app_current_user() AND flow_id = $1
+DELETE FROM hr_apollo_connection WHERE user_id = app_current_user() AND flow_id = $1 AND revoking
 `
 
 func (q *Queries) DeleteApolloConnection(ctx context.Context, flowID string) error {
@@ -142,6 +143,36 @@ WHERE user_id = app_current_user() AND flow_id = $1 AND account_name IS NULL
 func (q *Queries) ExpireApolloFlow(ctx context.Context, flowID string) error {
 	_, err := q.db.Exec(ctx, expireApolloFlow, flowID)
 	return err
+}
+
+const expireQueuedApolloLookup = `-- name: ExpireQueuedApolloLookup :one
+UPDATE hr_apollo_lookup SET state = 'cancelled', reason = 'queue_expired', updated_at = now()
+WHERE id = $1 AND state = 'queued' AND created_at <= now() - interval '15 minutes'
+RETURNING tenant_id, user_id, id, flow_id, company_id, linkedin_company_id, profile_url, person_name, linkedin_company_name, linkedin_company_url, state, email_sealed, email_status, reason, updated_at, created_at
+`
+
+func (q *Queries) ExpireQueuedApolloLookup(ctx context.Context, id string) (HrApolloLookup, error) {
+	row := q.db.QueryRow(ctx, expireQueuedApolloLookup, id)
+	var i HrApolloLookup
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.ID,
+		&i.FlowID,
+		&i.CompanyID,
+		&i.LinkedinCompanyID,
+		&i.ProfileUrl,
+		&i.PersonName,
+		&i.LinkedinCompanyName,
+		&i.LinkedinCompanyUrl,
+		&i.State,
+		&i.EmailSealed,
+		&i.EmailStatus,
+		&i.Reason,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const findApolloLookup = `-- name: FindApolloLookup :one
@@ -180,7 +211,7 @@ func (q *Queries) FindApolloLookup(ctx context.Context, arg FindApolloLookupPara
 
 const finishApolloFlow = `-- name: FinishApolloFlow :one
 UPDATE hr_apollo_connection SET account_name = $2, expires_at = now() + interval '30 days', authorize_url = ''
-WHERE user_id = app_current_user() AND flow_id = $1 AND account_name IS NULL AND expires_at > now() RETURNING tenant_id, user_id, flow_id, broker_origin, proof_sealed, authorize_url, account_name, expires_at
+WHERE user_id = app_current_user() AND flow_id = $1 AND account_name IS NULL AND NOT revoking AND expires_at > now() RETURNING tenant_id, user_id, flow_id, broker_origin, proof_sealed, authorize_url, account_name, expires_at, revoking
 `
 
 type FinishApolloFlowParams struct {
@@ -200,6 +231,7 @@ func (q *Queries) FinishApolloFlow(ctx context.Context, arg FinishApolloFlowPara
 		&i.AuthorizeUrl,
 		&i.AccountName,
 		&i.ExpiresAt,
+		&i.Revoking,
 	)
 	return i, err
 }
@@ -249,7 +281,7 @@ func (q *Queries) FinishApolloLookup(ctx context.Context, arg FinishApolloLookup
 }
 
 const getApolloConnection = `-- name: GetApolloConnection :one
-SELECT tenant_id, user_id, flow_id, broker_origin, proof_sealed, authorize_url, account_name, expires_at FROM hr_apollo_connection WHERE user_id = $1
+SELECT tenant_id, user_id, flow_id, broker_origin, proof_sealed, authorize_url, account_name, expires_at, revoking FROM hr_apollo_connection WHERE user_id = $1
 `
 
 func (q *Queries) GetApolloConnection(ctx context.Context, userID string) (HrApolloConnection, error) {
@@ -264,6 +296,7 @@ func (q *Queries) GetApolloConnection(ctx context.Context, userID string) (HrApo
 		&i.AuthorizeUrl,
 		&i.AccountName,
 		&i.ExpiresAt,
+		&i.Revoking,
 	)
 	return i, err
 }
@@ -297,10 +330,13 @@ func (q *Queries) GetApolloLookup(ctx context.Context, id string) (HrApolloLooku
 }
 
 const hRWorkEmail = `-- name: HRWorkEmail :many
-SELECT email FROM contact
-WHERE company_id = $1 AND lower(rtrim(linkedin_url, '/')) = lower($2::text)
-  AND email IS NOT NULL
-ORDER BY id LIMIT 2
+SELECT c.email FROM contact c
+WHERE c.company_id = $1 AND lower(rtrim(c.linkedin_url, '/')) = lower($2::text)
+  AND c.status = 'active' AND c.email IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM contact_mailbox_check m WHERE m.contact_id = c.id AND m.email = c.email AND m.status = 'invalid'
+  )
+ORDER BY c.id LIMIT 2
 `
 
 type HRWorkEmailParams struct {
@@ -338,7 +374,7 @@ func (q *Queries) LockApolloAccount(ctx context.Context) error {
 }
 
 const lockApolloConnectionForLookup = `-- name: LockApolloConnectionForLookup :one
-SELECT tenant_id, user_id, flow_id, broker_origin, proof_sealed, authorize_url, account_name, expires_at FROM hr_apollo_connection WHERE user_id = $1 FOR SHARE
+SELECT tenant_id, user_id, flow_id, broker_origin, proof_sealed, authorize_url, account_name, expires_at, revoking FROM hr_apollo_connection WHERE user_id = $1 FOR SHARE
 `
 
 func (q *Queries) LockApolloConnectionForLookup(ctx context.Context, userID string) (HrApolloConnection, error) {
@@ -353,8 +389,19 @@ func (q *Queries) LockApolloConnectionForLookup(ctx context.Context, userID stri
 		&i.AuthorizeUrl,
 		&i.AccountName,
 		&i.ExpiresAt,
+		&i.Revoking,
 	)
 	return i, err
+}
+
+const markApolloRevoking = `-- name: MarkApolloRevoking :exec
+UPDATE hr_apollo_connection SET revoking = true, authorize_url = ''
+WHERE user_id = app_current_user() AND flow_id = $1 AND NOT revoking
+`
+
+func (q *Queries) MarkApolloRevoking(ctx context.Context, flowID string) error {
+	_, err := q.db.Exec(ctx, markApolloRevoking, flowID)
+	return err
 }
 
 const setApolloFlow = `-- name: SetApolloFlow :exec
@@ -362,7 +409,7 @@ INSERT INTO hr_apollo_connection (flow_id, broker_origin, proof_sealed, authoriz
 VALUES ($1, $2, $3, $4, now() + interval '10 minutes')
 ON CONFLICT (tenant_id, user_id) DO UPDATE
 SET flow_id = excluded.flow_id, broker_origin = excluded.broker_origin, proof_sealed = excluded.proof_sealed,
-  authorize_url = excluded.authorize_url, expires_at = excluded.expires_at, account_name = NULL
+  authorize_url = excluded.authorize_url, expires_at = excluded.expires_at, account_name = NULL, revoking = false
 `
 
 type SetApolloFlowParams struct {

@@ -1912,6 +1912,7 @@ class Action(StrEnum):
     start = "start"
     poll = "poll"
     disconnect = "disconnect"
+    forget = "forget"
 
 
 class ApolloConnectionAction(BaseModel):
@@ -1976,6 +1977,9 @@ class Reason1(StrEnum):
     email_redacted = "email_redacted"
     email_unusable = "email_unusable"
     contact_unconfirmed = "contact_unconfirmed"
+    queue_expired = "queue_expired"
+    retryable_limit = "retryable_limit"
+    reconnect_required = "reconnect_required"
 
 
 class ApolloLookup(BaseModel):

@@ -127,6 +127,15 @@ func (s *Service) lookupApollo(ctx context.Context, p authz.Principal, companyID
 			return err
 		}
 		receipt, err := q.FindApolloLookup(ctx, store.FindApolloLookupParams{LinkedinCompanyID: person.CompanyID, ProfileUrl: profile})
+		if err == nil && receipt.State == string(api.ApolloLookupStateQueued) {
+			expired, expireErr := expireQueuedApolloLookup(ctx, tx, receipt.ID)
+			if expireErr != nil {
+				return expireErr
+			}
+			if expired.ID != "" {
+				receipt = expired
+			}
+		}
 		switch {
 		case err == nil && receipt.State != string(api.ApolloLookupStateCancelled):
 			out = s.apolloReceipt(receipt, row)
@@ -145,6 +154,12 @@ func (s *Service) lookupApollo(ctx context.Context, p authz.Principal, companyID
 
 		if receipt.ID != "" {
 			out.State = api.ApolloLookupStateCancelled
+			if receipt.Reason != nil {
+				out.Reason = ptr(api.ApolloLookupReason(*receipt.Reason))
+				if *out.Reason == api.ApolloLookupReasonReconnectRequired && receipt.FlowID == row.FlowID {
+					return nil
+				}
+			}
 		}
 		busy, err := q.ApolloLookupInProgress(ctx, row.FlowID)
 		if err != nil {
@@ -154,7 +169,7 @@ func (s *Service) lookupApollo(ctx context.Context, p authz.Principal, companyID
 			out.State = api.ApolloLookupStateBusy
 			return nil
 		}
-		confirmation := s.apollo.confirmation(p.TenantID, p.UserID, companyID, row.FlowID, person)
+		confirmation := s.apollo.confirmation(p.TenantID, p.UserID, companyID, row.FlowID, receipt.ID, person)
 		if in.Action == api.ApolloLookupRequestActionPreview {
 			out.Confirmation = &confirmation
 			return nil
@@ -193,7 +208,7 @@ func (s *Service) apolloReceipt(receipt store.HrApolloLookup, conn store.HrApoll
 	if receipt.ID == "" {
 		return api.ApolloLookup{State: api.ApolloLookupStateIneligible}
 	}
-	if conn.FlowID != receipt.FlowID || conn.BrokerOrigin != s.apollo.BrokerOrigin {
+	if conn.Revoking || conn.FlowID != receipt.FlowID || conn.BrokerOrigin != s.apollo.BrokerOrigin {
 		return api.ApolloLookup{State: api.ApolloLookupStatePreviousConnection}
 	}
 	out := api.ApolloLookup{State: api.ApolloLookupState(receipt.State)}
@@ -220,7 +235,7 @@ func (s *Service) checkApolloLookup(ctx context.Context, p authz.Principal, w ap
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	reply, status, err := s.apollo.post(requestCtx, "/lookup-status", apolloLookupAuth(w, proof))
+	reply, status, err := s.apollo.post(requestCtx, "/lookup-status-v2", apolloLookupAuth(w, proof))
 	if err != nil && status != http.StatusUnauthorized {
 		return api.ApolloLookup{State: api.ApolloLookupStateUnconfirmed}, nil
 	}
