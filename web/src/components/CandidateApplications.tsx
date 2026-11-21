@@ -18,7 +18,7 @@ import { needsDetails, StagePrompt } from "./StagePrompt";
 import { type MoveRequest, useMoveApplication } from "./useMoveApplication";
 
 /** The jobs a candidate is on, with their stage; add them to another job. */
-export function CandidateApplications({ candidateId, canUpdate, permissions }: { candidateId: string; canUpdate: boolean; permissions: Permission[] }) {
+export function CandidateApplications({ candidateId, candidateName, canUpdate, permissions }: { candidateId: string; candidateName?: string; canUpdate: boolean; permissions: Permission[] }) {
   const list = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
@@ -63,7 +63,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
               {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}
               {permissions.includes("placements:read") && <ApplicationPlacement applicationId={a.id} stage={a.stage} permissions={permissions} />}
               {permissions.includes("interviews:read") && (
-                <ApplicationInterviews applicationId={a.id} closed={["rejected", "withdrawn", "placed"].includes(a.stage)} permissions={permissions} />
+                <ApplicationInterviews applicationId={a.id} candidateId={candidateId} candidateName={candidateName} closed={["rejected", "withdrawn", "placed"].includes(a.stage)} permissions={permissions} />
               )}
             </div>
           </li>

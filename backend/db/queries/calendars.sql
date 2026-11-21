@@ -35,10 +35,10 @@ SELECT * FROM calendar_event WHERE user_id=app_current_user() AND (status='activ
 -- name: CalendarEvent :one
 SELECT * FROM calendar_event WHERE id= @id;
 -- name: InsertCalendarEvent :one
-INSERT INTO calendar_event(tenant_id,user_id,title,notes,location,starts_at,ends_at,time_zone,all_day,teams,attendees,source,sync_status)
-VALUES(app_current_tenant(),app_current_user(),@title,@notes,@location,@starts_at,@ends_at,@time_zone,@all_day,@teams,@attendees,'local',@sync_status) RETURNING *;
+INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,time_zone,all_day,teams,attendees,source,sync_status)
+VALUES(app_current_tenant(),app_current_user(),@title,@notes,sqlc.narg(notes_html),@location,@starts_at,@ends_at,@time_zone,@all_day,@teams,@attendees,'local',@sync_status) RETURNING *;
 -- name: UpdateCalendarEvent :one
-UPDATE calendar_event SET title= @title,notes= @notes,location= @location,starts_at= @starts_at,ends_at= @ends_at,time_zone= @time_zone,all_day= @all_day,teams= @teams,attendees= @attendees,version=version+1,sync_status= @sync_status,sync_error=NULL,updated_at=now()
+UPDATE calendar_event SET title= @title,notes= @notes,notes_html=sqlc.narg(notes_html),location= @location,starts_at= @starts_at,ends_at= @ends_at,time_zone= @time_zone,all_day= @all_day,teams= @teams,attendees= @attendees,version=version+1,sync_status= @sync_status,sync_error=NULL,updated_at=now()
 WHERE id= @id AND version= @expected_version AND source='local' AND status='active' RETURNING *;
 -- name: CancelCalendarEvent :one
 UPDATE calendar_event SET status='cancelled',version=version+1,sync_status= @sync_status,sync_error=NULL,updated_at=now() WHERE id= @id AND version= @expected_version AND source='local' RETURNING *;
@@ -67,8 +67,8 @@ SELECT pg_advisory_unlock(hashtextextended(@tenant_id::text || ':calendar-source
 -- name: InterviewInvitation :one
 SELECT * FROM calendar_event WHERE source='interview_invitation' AND source_id= @interview_id;
 -- name: InsertInterviewInvitation :one
-INSERT INTO calendar_event(tenant_id,user_id,title,notes,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder)
-VALUES(app_current_tenant(),app_current_user(),@title,@notes,@location,@starts_at,@ends_at,'interview_invitation',@interview_id,@source_version,'active','pending',@teams,@attendees,@invitation_calendar,@invitation_subject,@reminder_minutes,@candidate_reminder)
+INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder)
+VALUES(app_current_tenant(),app_current_user(),@title,@notes,sqlc.narg(notes_html),@location,@starts_at,@ends_at,'interview_invitation',@interview_id,@source_version,'active','pending',@teams,@attendees,@invitation_calendar,@invitation_subject,@reminder_minutes,@candidate_reminder)
 RETURNING *;
 -- name: SaveCandidateResponse :exec
 UPDATE calendar_event SET candidate_response = sqlc.narg(response)
@@ -88,7 +88,10 @@ WHERE id= @id AND version= @expected_version AND candidate_reminder AND status='
 UPDATE calendar_event SET candidate_reminder_sent_for= @starts_at
 WHERE id= @id AND candidate_reminder_version= @reminder_version AND starts_at= @starts_at;
 -- name: SyncInterviewInvitation :one
-UPDATE calendar_event SET source_version= @source_version,title= @title,notes= @notes,location= @location,
+UPDATE calendar_event SET source_version= @source_version,title= @title,notes= @notes,
+ -- A moved interview's invitation shows its instructions again, so no old time or place stays in a formatted message.
+ notes_html=CASE WHEN starts_at <> @starts_at OR ends_at <> @ends_at OR location <> @location THEN NULL ELSE notes_html END,
+ location= @location,
  starts_at= @starts_at,ends_at= @ends_at,status= @status,version=version+1,updated_at=now(),
  sync_status=CASE WHEN sync_status IN ('failed','conflict') THEN sync_status ELSE 'pending' END
 WHERE id= @id AND source_version< @source_version
@@ -114,7 +117,7 @@ INSERT INTO calendar_event(tenant_id,user_id,title,notes,location,starts_at,ends
 VALUES(app_current_tenant(),@user_id,@title,@notes,@location,@starts_at,@ends_at,'UTC',@all_day,@attendees,'outlook',@source_id,'active','synced',@remote_id,@connection_id,sqlc.narg(remote_key),sqlc.narg(web_url),sqlc.narg(join_url))
 ON CONFLICT(tenant_id,user_id,source,source_id) DO UPDATE SET title=excluded.title,notes=excluded.notes,location=excluded.location,starts_at=excluded.starts_at,ends_at=excluded.ends_at,all_day=excluded.all_day,attendees=excluded.attendees,status='active',remote_key=excluded.remote_key,web_url=excluded.web_url,join_url=excluded.join_url,version=calendar_event.version+1,updated_at=now();
 -- name: UpdateManagedFromOutlook :exec
-UPDATE calendar_event SET title= @title,notes= @notes,location= @location,starts_at= @starts_at,ends_at= @ends_at,all_day= @all_day,attendees= @attendees,status= @status,remote_key=sqlc.narg(remote_key),web_url=sqlc.narg(web_url),join_url=sqlc.narg(join_url),version=version+1,sent_version=version+1,remote_snapshot= @remote_snapshot,sync_status='synced',sync_error=NULL WHERE id= @id AND version=sent_version;
+UPDATE calendar_event SET title= @title,notes= @notes,notes_html=CASE WHEN @plain_body::boolean THEN NULL ELSE notes_html END,location= @location,starts_at= @starts_at,ends_at= @ends_at,all_day= @all_day,attendees= @attendees,status= @status,remote_key=sqlc.narg(remote_key),web_url=sqlc.narg(web_url),join_url=sqlc.narg(join_url),version=version+1,sent_version=version+1,remote_snapshot= @remote_snapshot,sync_status='synced',sync_error=NULL WHERE id= @id AND version=sent_version;
 -- name: MarkCalendarConflict :exec
 UPDATE calendar_event SET sync_status='conflict',sync_error='Outlook changed this meeting. Manage its schedule in HiringPlug, or explicitly keep the HiringPlug schedule.',remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot WHERE id= @id;
 -- name: RemoteEventsInWindow :many

@@ -90,7 +90,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
     ...(permissions.includes("documents:read") ? [{ id: "cv" as const, label: "CV & files", content:
       <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} permissions={permissions} /> }] : []),
     ...(permissions.includes("pipeline:read") ? [{ id: "jobs" as const, label: "Jobs", content: <>
-      <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />
+      <CandidateApplications candidateId={c.id} candidateName={[c.firstName, c.lastName].filter(Boolean).join(" ")} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />
       <StageMoves candidateId={c.id} title="Stage history" limit={50} />
     </> }] : []),
     { id: "activity", label: "Activity", content: <Timeline compact subjectType="candidate" subjectId={c.id} permissions={permissions} /> },

@@ -148,7 +148,7 @@ export const ROUTES: Route[] = [
       <main>
         <h2>AI provider</h2>
         <section className="panel">
-          <p>Only owners and admins choose the AI provider and enter its API key (DeepSeek, Claude or ChatGPT).</p>
+          <p>Only owners and admins choose the AI provider and enter its API key (DeepSeek, Claude, ChatGPT or Qwen).</p>
           <p className="muted">You are signed in as {c.me.user.name}, {c.me.role.replace("_", " ")} at {c.me.tenant.name}. Ask an owner or admin, or sign in with their account.</p>
         </section>
       </main>

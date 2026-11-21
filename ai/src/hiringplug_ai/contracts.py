@@ -302,6 +302,7 @@ class AiProviderName(StrEnum):
     deepseek = "deepseek"
     claude = "claude"
     openai = "openai"
+    qwen = "qwen"
 
 
 class AiProviderChoice(StrEnum):
@@ -310,6 +311,7 @@ class AiProviderChoice(StrEnum):
     deepseek = "deepseek"
     claude = "claude"
     openai = "openai"
+    qwen = "qwen"
 
 
 class Status(StrEnum):
@@ -340,7 +342,11 @@ class AiProviderInput(BaseModel):
     )
     model: Annotated[
         str,
-        Field(description="e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5", max_length=100, min_length=1),
+        Field(
+            description="e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5, qwen-plus",
+            max_length=100,
+            min_length=1,
+        ),
     ]
     apiKey: Annotated[
         str | None, Field(description="Leave out to keep the saved key.", max_length=500, min_length=8)
@@ -369,7 +375,7 @@ class AiStatus(BaseModel):
     provider: Annotated[
         str | None,
         Field(
-            description="As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), or the server's AI."
+            description="As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI."
         ),
     ]
     message: Annotated[str | None, Field(description="Why, in words safe to show (never a key).")]
@@ -384,7 +390,9 @@ class AiProviderReportedJob(BaseModel):
     provider: Annotated[
         str,
         Field(
-            description="deepseek, claude, openai, or server (the server's own).", max_length=40, min_length=1
+            description="deepseek, claude, openai, qwen, or server (the server's own).",
+            max_length=40,
+            min_length=1,
         ),
     ]
     ok: bool
@@ -819,6 +827,12 @@ class CalendarAttendee(BaseModel):
     )
     email: EmailStr
     name: Annotated[str | None, Field(max_length=150)] = None
+    optional: Annotated[
+        bool | None,
+        Field(
+            description="An optional attendee (Outlook's Optional, the meeting's Cc). Meeting invitations have no Bcc. Defaults to false."
+        ),
+    ] = None
 
 
 class CalendarEventInput(BaseModel):
@@ -830,6 +844,13 @@ class CalendarEventInput(BaseModel):
     endsAt: AwareDatetime
     timeZone: Annotated[str, Field(max_length=64, min_length=1)]
     notes: Annotated[str | None, Field(max_length=4000)] = None
+    notesHtml: Annotated[
+        str | None,
+        Field(
+            description="The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text.",
+            max_length=30000,
+        ),
+    ] = None
     location: Annotated[str | None, Field(max_length=500)] = None
     attendees: Annotated[list[CalendarAttendee], Field(max_length=50)]
     allDay: bool
@@ -845,6 +866,7 @@ class CalendarEventUpdate(BaseModel):
     endsAt: AwareDatetime
     timeZone: Annotated[str, Field(max_length=64, min_length=1)]
     notes: Annotated[str | None, Field(max_length=4000)] = None
+    notesHtml: Annotated[str | None, Field(max_length=30000)] = None
     location: Annotated[str | None, Field(max_length=500)] = None
     attendees: Annotated[list[CalendarAttendee], Field(max_length=50)]
     allDay: bool
@@ -881,6 +903,9 @@ class CalendarEvent(BaseModel):
     endsAt: AwareDatetime
     timeZone: str
     notes: str
+    notesHtml: Annotated[
+        str | None, Field(description="The formatted notes, when they were written formatted.")
+    ] = None
     location: str
     attendees: list[CalendarAttendee]
     allDay: bool
@@ -4008,6 +4033,20 @@ class InterviewInvitationInput(BaseModel):
     reminderMinutes: Annotated[int, Field(ge=0, le=1440)]
     candidateReminder: Annotated[
         bool | None, Field(description="Email the candidate the day before. Defaults to off.")
+    ] = None
+    bodyHtml: Annotated[
+        str | None,
+        Field(
+            description="The invitation's message, formatted, as the candidate sees it in Outlook (else the interview's instructions). Dropped for the instructions when the interview moves, so no old time stays in it.",
+            max_length=30000,
+        ),
+    ] = None
+    optional: Annotated[
+        list[EmailStr] | None,
+        Field(
+            description="Optional attendees (Outlook's Optional, the meeting's Cc), e.g. the hiring manager. Meeting invitations have no Bcc.",
+            max_length=20,
+        ),
     ] = None
 
 
@@ -8094,7 +8133,8 @@ class AiProviders(BaseModel):
         bool, Field(description="The server can store API keys (HP_AI_KEYS_SECRET is set).")
     ]
     providers: Annotated[
-        list[AiProviderEntry], Field(description="Every provider, in the order deepseek, claude, openai.")
+        list[AiProviderEntry],
+        Field(description="Every provider, in the order deepseek, claude, openai, qwen."),
     ]
 
 

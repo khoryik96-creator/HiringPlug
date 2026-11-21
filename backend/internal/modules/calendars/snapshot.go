@@ -198,7 +198,7 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 	if e.IsCancelled {
 		status = "cancelled"
 	}
-	if err := q.UpdateManagedFromOutlook(ctx, store.UpdateManagedFromOutlookParams{ID: row.ID, Title: title, Notes: notes, Location: bounded(e.Location.DisplayName, 500), StartsAt: start, EndsAt: end, AllDay: e.IsAllDay, Attendees: attendees, Status: status, RemoteKey: e.key(), WebUrl: safeWebURL(e.WebLink), JoinUrl: e.join(), RemoteSnapshot: snapshot}); err != nil {
+	if err := q.UpdateManagedFromOutlook(ctx, store.UpdateManagedFromOutlookParams{ID: row.ID, Title: title, Notes: notes, PlainBody: e.Body.ContentType == "text", Location: bounded(e.Location.DisplayName, 500), StartsAt: start, EndsAt: end, AllDay: e.IsAllDay, Attendees: attendees, Status: status, RemoteKey: e.key(), WebUrl: safeWebURL(e.WebLink), JoinUrl: e.join(), RemoteSnapshot: snapshot}); err != nil {
 		return err
 	}
 	updated, err := q.CalendarEvent(ctx, row.ID)

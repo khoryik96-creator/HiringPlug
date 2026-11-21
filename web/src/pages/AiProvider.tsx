@@ -1,5 +1,5 @@
-// Settings > AI provider: which AI the company uses (DeepSeek, Claude or
-// ChatGPT with its own API key, the server's own, or none), each provider's
+// Settings > AI provider: which AI the company uses (DeepSeek, Claude,
+// ChatGPT or Qwen with its own API key, the server's own, or none), each provider's
 // model and key, and whether they work. Keys are never shown back: only their
 // last four characters.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,6 +21,8 @@ export const PROVIDERS: Record<Name, { label: string; maker: string; models: str
   deepseek: { label: "DeepSeek", maker: "DeepSeek", models: ["deepseek-v4-flash"], keysAt: "https://platform.deepseek.com/api_keys" },
   claude: { label: "Claude", maker: "Anthropic", models: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"], keysAt: "https://platform.claude.com/settings/keys" },
   openai: { label: "ChatGPT", maker: "OpenAI", models: ["gpt-5.5"], keysAt: "https://platform.openai.com/api-keys" },
+  // Alibaba Cloud Model Studio, international (Singapore): keys from its international console.
+  qwen: { label: "Qwen", maker: "Alibaba Cloud", models: ["qwen-plus", "qwen3-max", "qwen-flash"], keysAt: "https://modelstudio.console.alibabacloud.com/?tab=playground#/api-key" },
 };
 
 export function AiProvider() {

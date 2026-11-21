@@ -1,10 +1,11 @@
 """The AI providers, behind one small interface (`complete`).
 
 - `connect` builds the provider a company chose in Settings > AI provider
-  (DeepSeek, Claude or ChatGPT, with its own sealed key), following CV Studio's
-  provider layer: Claude and DeepSeek through the Anthropic Messages API
-  (DeepSeek's Anthropic-compatible endpoint, thinking off), ChatGPT through
-  OpenAI's Responses API.
+  (DeepSeek, Claude, ChatGPT or Qwen, with its own sealed key), following CV
+  Studio's provider layer: Claude and DeepSeek through the Anthropic Messages
+  API (DeepSeek's Anthropic-compatible endpoint, thinking off), ChatGPT
+  through OpenAI's Responses API, Qwen through Alibaba Cloud Model Studio's
+  OpenAI-compatible chat API.
 - `OpenAICompatible` is the server's own provider (HP_AI_*): the OpenAI-style
   chat API of DeepSeek, a host running its open model, or your own server.
 
@@ -96,6 +97,7 @@ class OpenAICompatible:
 def connect(access: AiAccess, secret: str, timeout_seconds: float) -> Provider:
     """The provider a company chose, with its key opened."""
     from .messages import Messages  # noqa: PLC0415 - keeps the SDK out of the env-only path
+    from .qwen import Qwen  # noqa: PLC0415
     from .responses import Responses  # noqa: PLC0415
 
     try:
@@ -104,4 +106,6 @@ def connect(access: AiAccess, secret: str, timeout_seconds: float) -> Provider:
         raise ProviderError(str(exc)) from exc
     if access.provider == AiProviderName.openai:
         return Responses(key, access.model, timeout_seconds)
+    if access.provider == AiProviderName.qwen:
+        return Qwen(key, access.model, timeout_seconds)
     return Messages(access.provider.value, key, access.model, timeout_seconds)

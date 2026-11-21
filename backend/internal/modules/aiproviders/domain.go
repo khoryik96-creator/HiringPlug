@@ -19,7 +19,7 @@ import (
 
 // Providers are the providers a company can enter a key for, in the order
 // they are shown.
-var Providers = []string{"deepseek", "claude", "openai"}
+var Providers = []string{"deepseek", "claude", "openai", "qwen"}
 
 // Choices are what a company can switch to: a provider, the server's own
 // provider ("server") or none ("off").
@@ -27,7 +27,7 @@ var Choices = append([]string{"server", "off"}, Providers...)
 
 // DefaultModels is the model each provider starts with (CV Studio's choices,
 // the newest at the time of writing).
-var DefaultModels = map[string]string{"deepseek": "deepseek-v4-flash", "claude": "claude-opus-5-5", "openai": "gpt-5.5"}
+var DefaultModels = map[string]string{"deepseek": "deepseek-v4-flash", "claude": "claude-opus-5-5", "openai": "gpt-5.5", "qwen": "qwen-plus"}
 
 var modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,99}$`)
 

@@ -40,6 +40,43 @@ shared/delegated calendars are not included.
   import and webhook subscriptions are not part of this integration.
 - Outlook events are read-only in HiringPlug; **Open in Outlook** opens them at
   their source. Recurring occurrences come from Microsoft's calendarView.
+- **New appointment** and **Schedule interview** open the same Outlook-style
+  composer: Send (or Save when no one is invited) and Discard in a toolbar,
+  a large title, attendees as chips, the date with a start time and an end
+  time that shows how long it lasts, an online meeting (**Teams**, **Google
+  Meet** or **Zoom**), the place and the notes, with the user's day beside it
+  (the new meeting drawn on it, and "Overlaps your calendar" when it does).
+  Teams on a Teams-enabled Outlook calendar needs nothing pasted: Outlook adds
+  the link when it sends the invitation. For Google Meet and Zoom (or a Teams
+  link made elsewhere) the user pastes the meeting link, checked to belong to
+  that service; **New Google Meet**, **Schedule in Zoom** and **New Teams
+  meeting** open the service to make one. The link is kept in the location,
+  after the place and separated by ";" as Outlook writes several locations, so
+  Outlook and the candidate's calendar show their own Join button and
+  HiringPlug shows **Join Google Meet / Zoom / Teams**. An interview can also
+  be another link, in person (an address) or by phone.
+- The body is formatted as in an email (bold, italic, underline, lists, links,
+  fonts and colours, from the email editor's toolbar) and goes to Outlook as
+  the event's HTML body, kept to text formatting and links (no images or
+  scripts); HiringPlug keeps its plain text beside it. A new appointment or
+  interview starts with the person's email signature (Settings > Your
+  account), and the signature icon takes it out or puts it back. **Optional**
+  adds optional attendees: Outlook's Optional, the meeting's Cc. Outlook
+  meeting invitations have no Bcc (every attendee is listed on the invite).
+- An interview's **Template** icon fills the title and message from an email
+  template (Settings > Email templates), with the candidate's and job's
+  details and the interview's time, length and place as composed. Templates
+  that would show a salary are not offered. The message's text becomes the
+  interview's instructions; the formatted message is the Outlook invitation's
+  body. When the interview moves, the invitation goes back to the plain
+  instructions, so no old time or place stays in it.
+- Scheduling an interview with Outlook connected sends the candidate's Outlook
+  invitation in the same step (the **Outlook invitation** toggle, its reminder
+  and **Email candidate a day before** sit in the toolbar as icons), with any
+  optional attendees, e.g. the hiring manager. If the invitation
+  cannot be sent (no valid candidate address, for example) the interview is
+  still scheduled and the reason is shown; it can be sent later from the
+  interview.
 - Own HiringPlug appointments can be created, edited and cancelled. Adding
   attendees explicitly sends Microsoft invitations; changing or cancelling them
   sends updates/cancellations. The form names these actions. Ordinary appointments
@@ -51,7 +88,8 @@ shared/delegated calendars are not included.
   Outlook is working receives the native hold instead of another ICS email copy;
   while their connection is failing or needs reconnecting they are emailed.
 - On a scheduled interview, open **Outlook invitation** and check the candidate's
-  address before sending. The organizer can add a Teams meeting for a video
+  address before sending (Teams starts ticked for an interview scheduled as a
+  Teams meeting). The organizer can add a Teams meeting for a video
   interview when the connected default calendar supports Teams. The reminder
   choice sets the Outlook event reminder. Each attendee's calendar keeps its
   own notification settings.

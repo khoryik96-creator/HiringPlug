@@ -3,6 +3,7 @@ package calendars
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,10 +27,16 @@ func candidateAttendee(row store.CalendarEvent) (string, error) {
 	if err := json.Unmarshal(row.Attendees, &people); err != nil {
 		return "", err
 	}
-	if len(people) == 1 {
-		return string(people[0].Email), nil
+	if required := requiredAttendees(people); len(required) == 1 {
+		return string(required[0].Email), nil
 	}
 	return "", nil
+}
+
+// requiredAttendees leaves out the optional ones (an invitation's Cc): the
+// candidate is an invitation's one required attendee.
+func requiredAttendees(people []api.CalendarAttendee) []api.CalendarAttendee {
+	return slices.DeleteFunc(slices.Clone(people), func(a api.CalendarAttendee) bool { return a.Optional != nil && *a.Optional })
 }
 
 // A refresh maps the pinned attendee only. The organizer's own response and
@@ -78,10 +85,15 @@ func responseOnly(row store.CalendarEvent, observed graphEvent) bool {
 	var sent graphEvent
 	if json.Unmarshal(row.RemoteSnapshot, &sent) != nil ||
 		sent.Subject != observed.Subject || sent.Body != observed.Body || sent.Location != observed.Location ||
-		sent.IsAllDay != observed.IsAllDay || len(sent.Attendees) != 1 || len(observed.Attendees) != 1 {
+		sent.IsAllDay != observed.IsAllDay || len(sent.Attendees) == 0 || len(sent.Attendees) != len(observed.Attendees) {
 		return false
 	}
-	return strings.EqualFold(sent.Attendees[0].EmailAddress.Address, observed.Attendees[0].EmailAddress.Address)
+	for i := range sent.Attendees { // the same people (replies change only their status)
+		if !strings.EqualFold(sent.Attendees[i].EmailAddress.Address, observed.Attendees[i].EmailAddress.Address) {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *Module) SetInterviewReminder(ctx context.Context, tx pgx.Tx, p authz.Principal, id string, in api.InterviewOutlookReminderInput) (api.InterviewInvitation, error) {

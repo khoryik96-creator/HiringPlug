@@ -364,8 +364,9 @@ the panel takes the whole width).
   judge or guess race, religion, age, gender, marital status, health or
   nationality, and to ignore instructions written inside a CV.
 - **Provider.** Chosen per company in **Settings > AI provider** (owners and
-  admins, `aiproviders:manage`): DeepSeek, Claude (Anthropic) or ChatGPT
-  (OpenAI) with the company's own API key and model, the server's own
+  admins, `aiproviders:manage`): DeepSeek, Claude (Anthropic), ChatGPT
+  (OpenAI) or Qwen (Alibaba Cloud Model Studio) with the company's own API
+  key and model, the server's own
   provider, or off. Each provider keeps its key and model, so switching back
   and forth needs no retyping; saving a key sends the provider a tiny request
   and shows whether it works (key refused, no credit, unknown model...). Keys
@@ -373,7 +374,9 @@ the panel takes the whole width).
   (only the last four characters), never logged or audited, and opened only by
   the AI worker. The calls follow CV Studio's provider layer: Claude and
   DeepSeek through the Messages API (DeepSeek's Anthropic-compatible endpoint,
-  thinking off), ChatGPT through the Responses API; a request is sent again
+  thinking off), ChatGPT through the Responses API, Qwen through Model
+  Studio's OpenAI-compatible chat API (the international endpoint in
+  Singapore, thinking off; keys from its international console); a request is sent again
   only on 429/529 (the provider did no work), never after an error that might
   have billed. The server's own provider (`HP_AI_PROVIDER`,
   `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL`: any
@@ -850,8 +853,10 @@ lead's company (with the built-in email check).
   format Indeed and aggregators read). Posting through the boards' partner
   programmes comes once those accounts exist.
 - **Interviews** ✅: on each of a candidate's jobs (candidate page), recruiters
-  schedule interviews: title, date and time, length, in person / video /
-  phone, the address or meeting link, the interviewers (any of the company's
+  schedule interviews in an Outlook-style composer (see
+  [calendar.md](calendar.md#scheduling-behavior)): title, date, start and end
+  time, Teams / Google Meet / Zoom / another link, in person or by phone, the
+  address or meeting link, the interviewers (any of the company's
   users) and instructions for the candidate. Scheduling moves the application
   to the interview stage if it is at an earlier one; closed or placed
   applications get no new interviews. An interviewer already booked at that
@@ -1664,7 +1669,10 @@ Email composers show Cc and Bcc on demand beside To. Filled copy recipients and 
 
 The Calendar icon opens the full calendar. The dock icon beside it opens the calendar
 on the right while you stay on your current page. Day, Week, Month, and Agenda
-selections are remembered in this browser. Today returns to the current date.
+selections are remembered in this browser. As in Outlook, a meeting's block
+shows its title first (wrapping to fill the time it takes) and then its time;
+a short one shows both on one line, and a month day shows three meetings with
+"+2 more" opening the day. Today returns to the current date.
 Calendar supports local appointments,
 Microsoft default-calendar connection, Teams when supported, and Outlook busy-time
 checks for interviews and booking links. HiringPlug meetings sync as private holds;

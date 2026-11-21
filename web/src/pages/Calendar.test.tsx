@@ -4,6 +4,7 @@ import { api, type Schemas } from "../api/client";
 import { invalidField, ok, renderWithClient, sentBody } from "../test-utils";
 import { Calendar } from "./Calendar";
 import { EventForm } from "../components/calendar/EventForm";
+import { clockRange } from "../components/calendar/CalendarTimeGrid";
 import { addDays, dateLabel, daysFor, localInput, sameDay, startDay, timeLabel, zonedInput, wallTime } from "../components/calendar/dates";
 const disconnected: Schemas["OutlookConnection"] = { connected: false, ready: false, status: "disconnected", callbackUrl: "http://app.test/v1/calendar/callback", version: 0, address: null, calendarName: null, lastSyncAt: null, error: null, teamsAvailable: false };
 const connection: Schemas["OutlookConnection"] = { ...disconnected, connected: true, ready: true, status: "ok", address: "recruiter@agency.test", teamsAvailable: true };
@@ -22,8 +23,11 @@ it("finishes OAuth in the original signed-in session and removes the ticket from
 it("makes attendee invitations explicit and highlights rejected fields", async () => {
   const post = vi.spyOn(api, "POST").mockResolvedValue(invalidField("attendees", "Enter valid email addresses."));
   renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
-  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Interview" } }); fireEvent.change(screen.getByLabelText("Attendees"), { target: { value: "invalid" } });
-  fireEvent.click(screen.getByRole("button", { name: "Create & send invitations" }));
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Interview" } });
+  const people = screen.getByLabelText("Attendees");
+  fireEvent.change(people, { target: { value: "invalid" } }); fireEvent.keyDown(people, { key: "Enter" });
+  expect(screen.getByText("invalid")).toBeTruthy(); // a chip, as in Outlook
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(await screen.findByText("Enter valid email addresses.")).toBeTruthy(); expect(screen.getByLabelText("Attendees").getAttribute("aria-invalid")).toBe("true");
   expect(sentBody(post)).toMatchObject({ title: "Interview", attendees: [{ email: "invalid" }] });
 });
@@ -31,9 +35,11 @@ it("requires valid intervals before sending and uses local midnight for all-day 
   const post = vi.spyOn(api, "POST").mockResolvedValue(ok({})); const onSaved = vi.fn();
   renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={disconnected} onClose={vi.fn()} onSaved={onSaved}/>);
   fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Day off" } }); fireEvent.click(screen.getByLabelText("All day"));
-  expect(screen.getByLabelText<HTMLInputElement>("Start").value).toBe("2026-11-18T00:00"); expect(screen.getByLabelText<HTMLInputElement>("End").value).toBe("2026-11-19T00:00");
-  fireEvent.click(screen.getByRole("button", { name: "Save appointment" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
-  expect(sentBody(post)).toMatchObject({ allDay: true, attendees: [] });
+  expect(screen.getByLabelText<HTMLInputElement>("Start date").value).toBe("2026-11-18"); expect(screen.getByLabelText<HTMLInputElement>("End date").value).toBe("2026-11-18");
+  fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2026-11-19" } }); // the last day, as people say it
+  fireEvent.click(screen.getByRole("button", { name: "Save" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  expect(sentBody(post)).toMatchObject({ allDay: true, attendees: [], startsAt: wallTime("2026-11-18T00:00", zone).toISOString(), endsAt: wallTime("2026-11-20T00:00", zone).toISOString() });
 });
 it("says that a Teams meeting's changed notes stay in HiringPlug", () => {
   const event = { id: "cev_1", version: 1, title: "Interview", notes: "", location: "", startsAt: "2026-11-18T01:00:00Z", endsAt: "2026-11-18T02:00:00Z", timeZone: "Asia/Kuala_Lumpur", allDay: false, attendees: [], teams: true } as unknown as Schemas["CalendarEvent"];
@@ -68,7 +74,8 @@ it("shows hourly appointments, opens an exact early slot, and advances one day",
   expect(day.getByRole("button", { name: /Morning interview/ }).style.width).toContain("50%");
   expect(day.getByRole("button", { name: /Overlapping phone screen/ }).style.left).toBe("50%");
   fireEvent.click(day.getByRole("button", { name: `New appointment at ${timeLabel(slot(6).toISOString())}` }));
-  expect(screen.getByLabelText<HTMLInputElement>("Start").value).toBe(localInput(slot(6)));
+  expect(screen.getByLabelText<HTMLInputElement>("Start date").value).toBe(localInput(slot(6)).slice(0, 10));
+  expect(screen.getByLabelText<HTMLInputElement>("Start time").value).toBe(localInput(slot(6)).slice(11, 16));
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(screen.getByRole("button", { name: "Next period" }));
   await waitFor(() => { expect(read).toHaveBeenLastCalledWith("/v1/calendar/events", {
@@ -86,7 +93,8 @@ it("shows seven hourly week columns and opens the selected day's slot", async ()
   if (!selected) throw new Error("Missing Wednesday");
   selected.setHours(6);
   fireEvent.click(within(week.getByRole("group", { name: dateLabel(selected) })).getByRole("button", { name: `New appointment ${dateLabel(selected)} at ${timeLabel(selected.toISOString())}` }));
-  expect(screen.getByLabelText<HTMLInputElement>("Start").value).toBe(localInput(selected));
+  expect(screen.getByLabelText<HTMLInputElement>("Start date").value).toBe(localInput(selected).slice(0, 10));
+  expect(screen.getByLabelText<HTMLInputElement>("Start time").value).toBe(localInput(selected).slice(11, 16));
 });
 
 it("preserves the event timezone and refuses ambiguous or missing DST wall times", () => {
@@ -94,4 +102,96 @@ it("preserves the event timezone and refuses ambiguous or missing DST wall times
   expect(zonedInput(new Date("2026-11-18T01:00:00Z"), "Asia/Kuala_Lumpur")).toBe("2026-11-18T09:00");
   expect(() => wallTime("2026-03-08T02:30", "America/New_York")).toThrow(/does not exist/);
   expect(() => wallTime("2026-11-01T01:30", "America/New_York")).toThrow(/occurs twice/);
+});
+
+it("puts a Google Meet or Zoom link in the location beside the place, and checks it is one", async () => {
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({})); const onSaved = vi.fn();
+  renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={onSaved}/>);
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Client catch-up" } });
+  fireEvent.click(screen.getByRole("radio", { name: "Google Meet" }));
+  expect(screen.getByRole("link", { name: "New Google Meet ↗" }).getAttribute("href")).toBe("https://meet.google.com/new");
+  fireEvent.change(screen.getByLabelText("Google Meet link"), { target: { value: "https://zoom.us/j/123" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("This is not a Google Meet link.")).toBeTruthy();
+  expect(post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Google Meet link"), { target: { value: "https://meet.google.com/abc-defg-hij" } });
+  fireEvent.change(screen.getByLabelText("Location"), { target: { value: "Room 3" } });
+  fireEvent.change(screen.getByLabelText("End time"), { target: { value: "30" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+  expect(sentBody(post)).toMatchObject({ location: "Room 3; https://meet.google.com/abc-defg-hij", teams: false,
+    startsAt: new Date(2026, 10, 18, 9).toISOString(), endsAt: new Date(2026, 10, 18, 9, 30).toISOString() });
+});
+it("lets Outlook make a Teams meeting, and opens a saved link back in its own service", async () => {
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({})); const onSaved = vi.fn();
+  renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={onSaved}/>);
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Sync" } });
+  fireEvent.click(screen.getByRole("radio", { name: "Teams" }));
+  expect(screen.getByText(/Outlook adds the Teams link/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Save" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+  expect(sentBody(post)).toMatchObject({ teams: true, location: "" });
+  cleanup();
+  const event = { id: "cev_1", version: 1, title: "Sync", notes: "", location: "Room 3; https://us02web.zoom.us/j/81", startsAt: "2026-11-18T01:00:00Z", endsAt: "2026-11-18T02:00:00Z", timeZone: "Asia/Kuala_Lumpur", allDay: false, attendees: [], teams: false } as unknown as Schemas["CalendarEvent"];
+  renderWithClient(<EventForm event={event} date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
+  expect(screen.getByRole("radio", { name: "Zoom" }).getAttribute("aria-checked")).toBe("true");
+  expect(screen.getByLabelText<HTMLInputElement>("Zoom link").value).toBe("https://us02web.zoom.us/j/81");
+  expect(screen.getByLabelText<HTMLInputElement>("Location").value).toBe("Room 3");
+});
+it("keeps an opened appointment's meeting as it was unless one is picked", async () => {
+  const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({})); const onSaved = vi.fn();
+  const event = { id: "cev_1", version: 3, title: "Old call", notes: "", location: "Microsoft Teams Meeting", startsAt: "2026-11-18T01:00:00Z", endsAt: "2026-11-18T02:00:00Z", timeZone: "Asia/Kuala_Lumpur", allDay: false, attendees: [], teams: false } as unknown as Schemas["CalendarEvent"];
+  renderWithClient(<EventForm event={event} date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={onSaved}/>);
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Old call, moved" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+  expect(sentBody(put)).toMatchObject({ title: "Old call, moved", teams: false, location: "Microsoft Teams Meeting", version: 3 });
+});
+it("asks for the Teams link when Outlook cannot make the meeting", async () => {
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({}));
+  renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={{ ...connection, teamsAvailable: false }} onClose={vi.fn()} onSaved={vi.fn()}/>);
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Sync" } });
+  fireEvent.click(screen.getByRole("radio", { name: "Teams" }));
+  expect(screen.queryByText(/Outlook adds the Teams link/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("Paste the Teams meeting link.")).toBeTruthy();
+  expect(post).not.toHaveBeenCalled();
+});
+it("shows three meetings a month day and opens the day for the rest", async () => {
+  const today = startDay(new Date());
+  const at = (h: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), h).toISOString();
+  const base = { version: 1, notes: "", location: "", timeZone: "UTC", allDay: false, teams: false, attendees: [], source: "local", sourceId: null, status: "active", syncStatus: "local", syncError: null, webUrl: null, joinUrl: null, editable: true };
+  const items = [8, 9, 10, 11, 12].map((h) => ({ ...base, id: `cev_${String(h)}`, title: `Meeting at ${String(h)}`, startsAt: at(h), endsAt: at(h + 1) }));
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ items, connection: disconnected }));
+  renderWithClient(<Calendar />);
+  fireEvent.click(screen.getByRole("button", { name: "Month" }));
+  expect(await screen.findByRole("button", { name: /Meeting at 10/ })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Meeting at 11/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "+2 more" }));
+  expect(screen.getByRole("button", { name: "Day" }).getAttribute("aria-pressed")).toBe("true");
+  expect(await screen.findByRole("button", { name: /Meeting at 12/ })).toBeTruthy();
+});
+it("writes a meeting's time as Outlook does", () => {
+  const day = (h: number, m = 0) => new Date(2026, 10, 18, h, m).toISOString();
+  const am = new Date(2026, 0, 1, 9).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (/AM$/.test(am)) { // in a 12-hour locale
+    expect(clockRange(day(9), day(9, 30))).toBe("9:00 – 9:30 AM");
+    expect(clockRange(day(11, 30), day(13))).toBe("11:30 AM – 1:00 PM");
+  } else {
+    expect(clockRange(day(9), day(9, 30))).toContain("–");
+  }
+});
+it("invites optional attendees and sends the notes formatted, with the signature", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ bodyHtml: "<p>Best, Demo</p>", version: 1 }));
+  const post = vi.spyOn(api, "POST").mockResolvedValue(ok({})); const onSaved = vi.fn();
+  renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={onSaved}/>);
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Client catch-up" } });
+  const to = screen.getByLabelText("Attendees");
+  fireEvent.change(to, { target: { value: "hr@maju.test" } }); fireEvent.keyDown(to, { key: "Enter" });
+  fireEvent.click(screen.getByRole("button", { name: "Optional" }));
+  const cc = screen.getByLabelText("Optional attendees");
+  fireEvent.change(cc, { target: { value: "boss@maju.test" } }); fireEvent.keyDown(cc, { key: "Enter" });
+  await waitFor(() => { expect(screen.getByRole("button", { name: "Signature" }).getAttribute("aria-pressed")).toBe("true"); });
+  fireEvent.click(screen.getByRole("button", { name: "Send" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+  const body = sentBody(post) as { attendees: unknown; notes: string; notesHtml: string };
+  expect(body.attendees).toEqual([{ email: "hr@maju.test" }, { email: "boss@maju.test", optional: true }]);
+  expect(body.notesHtml).toContain('<div data-signature="true"><p>Best, Demo</p></div>');
+  expect(body.notes).toBe(""); // the signature is not the appointment's notes
 });

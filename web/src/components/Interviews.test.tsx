@@ -26,6 +26,33 @@ const reads = (items: Schemas["Interview"][]) =>
     return Promise.resolve(ok({ items }));
   }) as never);
 
+/** The composer's date and start time, as a user picks them. */
+const pickTime = () => {
+  fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-11-10" } });
+  fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "10:00" } });
+};
+const addInterviewer = async (id: string) => {
+  const add = await screen.findByRole("combobox", { name: "Add interviewer" });
+  await within(add).findByRole("option", { name: "Aina" });
+  fireEvent.change(add, { target: { value: id } });
+};
+const connected = { connected: true, ready: true, status: "ok", callbackUrl: "", version: 1, address: "me@agency.test", calendarName: null, lastSyncAt: null, error: null, teamsAvailable: true };
+const CALENDAR: Schemas["Permission"][] = [...RECRUITER, "interviews:read", "interviews:schedule", "calendars:use"];
+/** Reads for a user whose Outlook is connected (Teams available unless said otherwise). */
+const readsWithOutlook = (teamsAvailable = true) =>
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => {
+    if (path === "/v1/me") return Promise.resolve(ok(me));
+    if (path === "/v1/calendar/connection") return Promise.resolve(ok({ ...connected, teamsAvailable }));
+    if (path === "/v1/calendar/events") return Promise.resolve(ok({ items: [], connection: connected }));
+    if (path === "/v1/email-signature") return Promise.resolve(ok({ bodyHtml: "<p>Best, Demo</p>", version: 1 }));
+    if (path === "/v1/email-templates") return Promise.resolve(ok({ fields: [], placeholders: [], items: [
+      { id: "etp_1", version: 1, name: "Interview invitation", subject: "Interview for {{job.title}}", body: "Hi", bodyHtml: null, createdAt: "", updatedAt: "" },
+      { id: "etp_2", version: 1, name: "Offer chat", subject: "Your offer", body: "We can offer {{candidate.expectedSalary}}", bodyHtml: null, createdAt: "", updatedAt: "" },
+    ] }));
+    if (path === "/v1/users") return Promise.resolve(ok({ items: [{ id: me.user.id, name: "Demo", role: "recruiter", canInterview: true }, { id: "usr_2", name: "Aina", role: "hiring_manager", canInterview: true }] }));
+    return Promise.resolve(ok({ items: [] }));
+  }) as never);
+
 describe("interviews", () => {
   it("schedules with the chosen interviewers, and offers to go ahead when someone is busy", async () => {
     reads([]);
@@ -36,9 +63,11 @@ describe("interviews", () => {
       .mockResolvedValueOnce(ok(interview()));
     renderWithClient(<ApplicationInterviews applicationId="appl_1" closed={false} permissions={[...RECRUITER, "interviews:read", "interviews:schedule"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
-    fireEvent.change(screen.getByLabelText("Date and time"), { target: { value: "2026-11-10T10:00" } });
-    fireEvent.click(await screen.findByLabelText("Aina"));
-    expect(screen.queryByLabelText("Vee")).toBeNull(); // viewers cannot interview
+    pickTime();
+    const add = await screen.findByRole("combobox", { name: "Add interviewer" });
+    await within(add).findByRole("option", { name: "Aina" });
+    expect(within(add).queryByRole("option", { name: "Vee" })).toBeNull(); // viewers cannot interview
+    fireEvent.change(add, { target: { value: "usr_2" } });
     fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Aina: Panel");
@@ -57,8 +86,8 @@ describe("interviews", () => {
       .mockResolvedValueOnce(ok(interview()));
     renderWithClient(<ApplicationInterviews applicationId="appl_1" closed={false} permissions={[...RECRUITER, "interviews:read", "interviews:schedule"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
-    fireEvent.change(screen.getByLabelText("Date and time"), { target: { value: "2026-11-10T10:00" } });
-    fireEvent.click(await screen.findByLabelText("Aina"));
+    pickTime();
+    await addInterviewer("usr_2");
     fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Aina: an appointment in their calendar");
@@ -66,6 +95,112 @@ describe("interviews", () => {
     fireEvent.click(within(alert).getByRole("button", { name: "Schedule anyway" })); // there was none without named clashes
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
     expect(sentBody(post, 1)).toMatchObject({ ignoreClashes: true });
+  });
+
+  it("schedules a Zoom interview and sends the Outlook invitation in the same step", async () => {
+    readsWithOutlook();
+    const post = vi.spyOn(api, "POST").mockResolvedValueOnce(ok(interview({ version: 1 }))).mockResolvedValueOnce(ok({ status: "pending" }));
+    renderWithClient(<ApplicationInterviews applicationId="appl_1" candidateName="Siti Aisyah" closed={false} permissions={CALENDAR} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
+    pickTime();
+    await addInterviewer("usr_2");
+    expect(screen.getByText("Siti Aisyah")).toBeTruthy(); // the candidate is invited
+    fireEvent.click(screen.getByRole("radio", { name: "Zoom" }));
+    const link = screen.getByLabelText("Zoom link");
+    fireEvent.change(link, { target: { value: "https://meet.google.com/abc-defg-hij" } });
+    fireEvent.blur(link);
+    expect(screen.getByRole("alert").textContent).toBe("This is not a Zoom link.");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => { expect(screen.getAllByText("This is not a Zoom link.")).toHaveLength(2); }); // refused on sending too
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.change(link, { target: { value: "https://us02web.zoom.us/j/8123456789?pwd=abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    expect(sentBody(post)).toMatchObject({ mode: "video", location: "https://us02web.zoom.us/j/8123456789?pwd=abc", interviewerIds: ["usr_2"] });
+    expect(post.mock.calls[1]?.[0]).toBe("/v1/interviews/{interviewId}/outlook-invitation");
+    expect(sentBody(post, 1)).toMatchObject({ version: 1, teams: false, reminderMinutes: 15 });
+  });
+
+  it("writes the invitation from a template, with the signature and optional attendees", async () => {
+    readsWithOutlook();
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(path === "/v1/email-drafts"
+      ? ok({ to: [], subject: "Interview for Accountant on [Interview time]", body: "", missing: [],
+        bodyHtml: "<p>Dear Siti, we meet on {{interview.when}} ({{interview.length}}) at [Interview place].</p>" })
+      : path === "/v1/applications/{applicationId}/interviews" ? ok(interview({ version: 3 })) : ok({ status: "pending" }))) as never);
+    renderWithClient(<ApplicationInterviews applicationId="appl_1" candidateId="cand_1" closed={false} permissions={[...CALENDAR, "emails:send"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
+    pickTime();
+    await addInterviewer("usr_2");
+    await waitFor(() => { expect(screen.getByRole("button", { name: "Signature" }).getAttribute("aria-pressed")).toBe("true"); }); // added, as Outlook does
+    fireEvent.click(screen.getByRole("radio", { name: "Google Meet" }));
+    fireEvent.change(screen.getByLabelText("Google Meet link"), { target: { value: "https://meet.google.com/abc-defg-hij" } });
+    fireEvent.click(screen.getByRole("button", { name: "Template" }));
+    expect(await screen.findByRole("menuitem", { name: "Interview invitation" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Offer chat" })).toBeNull(); // salary never goes into an invitation
+    fireEvent.click(screen.getByRole("menuitem", { name: "Interview invitation" }));
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Title").value).toMatch(/^Interview for Accountant on Tuesday/); });
+    const cc = screen.getByLabelText("Optional attendees");
+    fireEvent.change(cc, { target: { value: "aina@client.test" } }); fireEvent.keyDown(cc, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const calls = post.mock.calls as unknown as [string, { body: Record<string, unknown> }][];
+    await waitFor(() => { expect(calls.some(([p]) => p === "/v1/interviews/{interviewId}/outlook-invitation")).toBe(true); });
+    const created = calls.find(([p]) => p === "/v1/applications/{applicationId}/interviews")?.[1];
+    expect(created?.body.instructions).toBe("Dear Siti, we meet on Tuesday, November 10 at 10:00 AM (1 hr) at https://meet.google.com/abc-defg-hij.".replace("Tuesday, November 10 at 10:00 AM", new Date(2026, 10, 10, 10).toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" })));
+    const sent = calls.find(([p]) => p === "/v1/interviews/{interviewId}/outlook-invitation")?.[1];
+    expect(sent?.body.optional).toEqual(["aina@client.test"]);
+    expect(sent?.body.bodyHtml).toContain("Dear Siti");
+    expect(sent?.body.bodyHtml).toContain('data-signature="true"');
+  });
+
+  it("lets Outlook make the Teams meeting, and keeps the interview when the invitation fails", async () => {
+    readsWithOutlook();
+    const post = vi.spyOn(api, "POST").mockResolvedValueOnce(ok(interview({ version: 2 })))
+      .mockResolvedValueOnce(failure("INTERVIEW_NOT_ALLOWED", "Add a valid email address to the candidate profile before sending.", undefined, 422));
+    renderWithClient(<ApplicationInterviews applicationId="appl_1" closed={false} permissions={CALENDAR} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
+    pickTime();
+    await addInterviewer("usr_2");
+    expect((await screen.findByRole("radio", { name: "Teams" })).getAttribute("aria-checked")).toBe("true"); // Teams by default when Outlook offers it
+    expect(screen.getByText(/Outlook adds the Teams link/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Reminder"), { target: { value: "60" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("The interview is scheduled.")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("Add a valid email address");
+    expect(sentBody(post)).toMatchObject({ mode: "video", location: "Microsoft Teams Meeting" });
+    expect(sentBody(post, 1)).toMatchObject({ version: 2, teams: true, reminderMinutes: 60 });
+  });
+
+  it("schedules without an invitation when the Outlook invitation is switched off, in person", async () => {
+    readsWithOutlook(false);
+    const post = vi.spyOn(api, "POST").mockResolvedValueOnce(ok(interview()));
+    renderWithClient(<ApplicationInterviews applicationId="appl_1" closed={false} permissions={CALENDAR} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
+    pickTime();
+    await addInterviewer("usr_2");
+    fireEvent.click(await screen.findByRole("button", { name: "Outlook invitation" }));
+    fireEvent.click(screen.getByRole("radio", { name: "In person" }));
+    fireEvent.change(screen.getByLabelText("Address"), { target: { value: "Level 12, Menara Maju" } });
+    fireEvent.change(screen.getByLabelText("End time"), { target: { value: "90" } });
+    fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
+    expect(sentBody(post)).toMatchObject({ mode: "in_person", location: "Level 12, Menara Maju", durationMinutes: 90 });
+  });
+
+  it("keeps a changed interview's place as it was unless a new one is picked", async () => {
+    reads([]);
+    const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(interview()));
+    renderWithClient(<InterviewItem interview={interview({ location: null })} permissions={[...RECRUITER, "interviews:read", "interviews:schedule"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change" }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Second interview" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalled(); });
+    expect(sentBody(patch)).toMatchObject({ title: "Second interview", mode: "video", location: null, version: 1 });
+  });
+
+  it("shows which service an interview's link joins", async () => {
+    reads([]);
+    renderWithClient(<InterviewItem interview={interview({ location: "https://meet.google.com/abc-defg-hij" })} permissions={["interviews:read"]} />);
+    expect((await screen.findByRole("link", { name: "Join Google Meet" })).getAttribute("href")).toBe("https://meet.google.com/abc-defg-hij");
   });
 
   it("asks interviewers for feedback once the interview has taken place", async () => {

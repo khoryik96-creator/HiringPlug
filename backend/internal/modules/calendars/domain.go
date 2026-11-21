@@ -14,13 +14,15 @@ import (
 
 // Attendee is independent of the HTTP contract and provider representations.
 type Attendee struct {
-	Email string  `json:"email"`
-	Name  *string `json:"name,omitempty"`
+	Email    string  `json:"email"`
+	Name     *string `json:"name,omitempty"`
+	Optional bool    `json:"optional,omitempty"` // Outlook's Optional: the meeting's Cc
 }
 
 // Input is deliberately independent of Graph's representation.
 type Input struct {
 	Title, Notes, Location, TimeZone string
+	NotesHTML                        string // formatted notes, cleaned in normalize; Notes is then their text
 	Start, End                       time.Time
 	AllDay, Teams                    bool
 	Attendees                        []Attendee
@@ -30,6 +32,13 @@ func normalize(in Input) (Input, error) {
 	var errs apperr.FieldErrors
 	in.Title = strings.TrimSpace(in.Title)
 	in.Notes = strings.TrimSpace(in.Notes)
+	if in.NotesHTML != "" {
+		var text string
+		in.NotesHTML, text = cleanNotes(in.NotesHTML)
+		if in.Notes == "" && in.NotesHTML != "" { // the notes as text, unless the composer gave them (without its signature)
+			in.Notes = bounded(text, 4000)
+		}
+	}
 	in.Location = strings.TrimSpace(in.Location)
 	if in.Title == "" {
 		errs.Add("title", "enter a title")
@@ -47,7 +56,7 @@ func normalize(in Input) (Input, error) {
 			errs.Add("allDay", "all-day events must start and end at midnight in the selected time zone")
 		}
 	}
-	seen := map[string]bool{}
+	seen := map[string]int{} // where each address is in out
 	out := make([]Attendee, 0, len(in.Attendees))
 	for _, a := range in.Attendees {
 		address := strings.ToLower(strings.TrimSpace(a.Email))
@@ -56,11 +65,13 @@ func normalize(in Input) (Input, error) {
 			errs.Add("attendees", "enter valid email addresses")
 			continue
 		}
-		if !seen[address] {
-			seen[address] = true
-			a.Email = address
-			out = append(out, a)
+		if i, ok := seen[address]; ok {
+			out[i].Optional = out[i].Optional && a.Optional // required, if asked for both ways
+			continue
 		}
+		seen[address] = len(out)
+		a.Email = address
+		out = append(out, a)
 	}
 	in.Attendees = out
 	return in, errs.Err()

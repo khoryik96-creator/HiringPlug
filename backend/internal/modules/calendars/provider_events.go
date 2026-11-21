@@ -84,7 +84,11 @@ func (e graphEvent) attendees() []api.CalendarAttendee {
 			continue
 		}
 		name := bounded(a.EmailAddress.Name, 150)
-		out = append(out, api.CalendarAttendee{Email: toEmail(a.EmailAddress.Address), Name: &name})
+		attendee := api.CalendarAttendee{Email: toEmail(a.EmailAddress.Address), Name: &name}
+		if strings.EqualFold(a.Type, "optional") {
+			attendee.Optional = ptr(true)
+		}
+		out = append(out, attendee)
 	}
 	return out
 }
@@ -165,9 +169,17 @@ func eventBody(row store.CalendarEvent) ([]byte, error) {
 		if a.Name != nil {
 			name = *a.Name
 		}
-		people = append(people, map[string]any{"emailAddress": map[string]string{"address": string(a.Email), "name": name}, "type": "required"})
+		kind := "required"
+		if a.Optional != nil && *a.Optional {
+			kind = "optional"
+		}
+		people = append(people, map[string]any{"emailAddress": map[string]string{"address": string(a.Email), "name": name}, "type": kind})
 	}
-	body := map[string]any{"subject": row.Title, "body": map[string]string{"contentType": "text", "content": row.Notes}, "start": map[string]string{"dateTime": start.Format("2006-01-02T15:04:05"), "timeZone": zone}, "end": map[string]string{"dateTime": end.Format("2006-01-02T15:04:05"), "timeZone": zone}, "isAllDay": row.AllDay, "location": map[string]string{"displayName": row.Location}, "attendees": people, "transactionId": transactionID(row, row.RemoteGeneration)}
+	content := map[string]string{"contentType": "text", "content": row.Notes}
+	if row.NotesHtml != nil && *row.NotesHtml != "" {
+		content = map[string]string{"contentType": "html", "content": *row.NotesHtml}
+	}
+	body := map[string]any{"subject": row.Title, "body": content, "start": map[string]string{"dateTime": start.Format("2006-01-02T15:04:05"), "timeZone": zone}, "end": map[string]string{"dateTime": end.Format("2006-01-02T15:04:05"), "timeZone": zone}, "isAllDay": row.AllDay, "location": map[string]string{"displayName": row.Location}, "attendees": people, "transactionId": transactionID(row, row.RemoteGeneration)}
 	if row.Teams {
 		body["isOnlineMeeting"] = true
 		body["onlineMeetingProvider"] = "teamsForBusiness"
@@ -188,7 +200,7 @@ func transactionID(row store.CalendarEvent, generation int32) string {
 }
 
 // patchBody is what a change sends to an event already in Outlook: never its
-// transaction ID, and the notes only when they changed and the event is no
+// transaction ID, and the notes only when they changed (or are formatted) and the event is no
 // Teams meeting (its body carries the join details; replacing it can turn the
 // online meeting off).
 func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
@@ -199,7 +211,9 @@ func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
 	delete(patch, "transactionId")
 	var sent graphEvent
 	_ = json.Unmarshal(row.RemoteSnapshot, &sent)
-	if row.Teams || sent.OnlineMeeting != nil || (sent.Body.ContentType == "text" && strings.TrimSpace(sent.Body.Content) == strings.TrimSpace(row.Notes)) {
+	// Formatted notes are always sent (Outlook rewrites HTML, so it cannot be compared).
+	formatted := row.NotesHtml != nil && *row.NotesHtml != ""
+	if row.Teams || sent.OnlineMeeting != nil || (!formatted && sent.Body.ContentType == "text" && strings.TrimSpace(sent.Body.Content) == strings.TrimSpace(row.Notes)) {
 		delete(patch, "body")
 	}
 	return json.Marshal(patch)

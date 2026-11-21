@@ -306,6 +306,7 @@ type CalendarEvent struct {
 	CandidateReminderVersion   int32
 	CandidateReminderQueuedFor *time.Time
 	CandidateReminderSentFor   *time.Time
+	NotesHtml                  *string
 }
 
 type CalendarOauthState struct {

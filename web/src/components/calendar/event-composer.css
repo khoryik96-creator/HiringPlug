@@ -1,0 +1,108 @@
+/* The Outlook-style event composer (appointments and interviews). */
+.composer { display: flex; flex-direction: column; min-width: 0; }
+.composer-bar { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; padding: .55rem .8rem; border-bottom: 1px solid var(--line); background: var(--soft); border-radius: 14px 14px 0 0; }
+.calendar-overlay .composer-bar { position: sticky; top: 0; z-index: 2; } /* in the dialog, Send stays in reach */
+.panel.composer-panel { padding: 0; }
+.composer-bar > button, .composer-bar > label, .composer-bar > .composer-tool { min-height: 2.1rem; }
+.composer-send { display: inline-flex; align-items: center; gap: .4rem; padding-inline: 1.1rem; }
+.composer-bar-note { margin-left: .3rem; }
+.composer-close { margin-left: auto; border: 0; background: none; box-shadow: none; padding: .35rem; color: var(--muted); display: inline-flex; }
+.composer-close:hover { color: var(--ink); background: var(--accent-soft); }
+.composer-sep { width: 1px; align-self: stretch; background: var(--line-strong); margin: .15rem .2rem; }
+.composer-tool { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; color: var(--text); border: 1px solid transparent; border-radius: 8px; padding: 0 .5rem; }
+.composer-tool select { border: 0; background: transparent; padding: .25rem 1.6rem .25rem .2rem; font-size: .85rem; min-height: 0; box-shadow: none; }
+.composer-tool:hover { background: var(--surface); border-color: var(--line); }
+button.composer-tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--line-strong); color: var(--accent-dark); }
+button.composer-tool { background: none; box-shadow: none; }
+
+.composer-body { display: grid; gap: 1rem; padding: .8rem 1.1rem 1rem; }
+.composer-body.with-side { grid-template-columns: minmax(0, 1fr) 15.5rem; }
+.composer-main { display: grid; gap: .2rem; min-width: 0; align-content: start; }
+.composer-title { font-size: 1.2rem; font-weight: 600; border: 0; border-bottom: 2px solid var(--line); border-radius: 0; padding: .35rem .1rem .45rem; box-shadow: none; background: transparent; width: 100%; }
+.composer-title:focus { outline: none; border-bottom-color: var(--accent); box-shadow: none; }
+.composer-row { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr); gap: .45rem; align-items: start; padding: .35rem 0; border-bottom: 1px solid var(--line); }
+.composer-row:last-of-type { border-bottom: 0; }
+.composer-icon { color: var(--muted); padding-top: .4rem; display: flex; justify-content: center; }
+.composer-fields { display: grid; gap: .35rem; min-width: 0; }
+.composer-plain { border-color: transparent; box-shadow: none; background: transparent; padding-left: .2rem; width: 100%; }
+.composer-plain:hover, .composer-plain:focus { border-color: var(--line-strong); background: var(--surface); }
+.composer-when { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+.composer-when input[type="date"] { width: auto; flex: 0 0 auto; }
+.composer-time { width: auto; min-width: 7.5rem; max-width: 14rem; flex: 0 0 auto; }
+.composer-toggle { display: inline-flex; align-items: center; gap: .35rem; font-size: .9rem; margin-left: .3rem; }
+.composer-hint { color: var(--muted); font-size: .82rem; margin: 0; }
+.composer-notes textarea { width: 100%; min-height: 7.5rem; border-color: var(--line); }
+.composer-mode { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; width: fit-content; }
+.composer-mode button { border: 0; border-radius: 0; box-shadow: none; background: var(--surface); padding: .35rem .8rem; font-size: .85rem; }
+.composer-mode button + button { border-left: 1px solid var(--line-strong); }
+.composer-mode button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-dark); font-weight: 600; }
+
+.chips-input { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; padding: .2rem; border: 1px solid transparent; border-radius: 8px; min-height: 2.3rem; }
+.chips-input:focus-within, .chips-input:hover { border-color: var(--line-strong); background: var(--surface); }
+.chips-input input { flex: 1; min-width: 9rem; border: 0; box-shadow: none; background: transparent; padding: .3rem; }
+.chips-input input:focus { outline: none; box-shadow: none; }
+.chips-input select { border: 0; box-shadow: none; background: transparent; color: var(--accent-dark); width: auto; font-size: .85rem; }
+.person-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .18rem .3rem .18rem .2rem; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: .85rem; max-width: 100%; overflow-wrap: anywhere; }
+.person-chip .avatar { width: 1.45rem; height: 1.45rem; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 700; flex-shrink: 0; }
+.person-chip small { color: var(--muted); white-space: nowrap; }
+.person-chip button { border: 0; background: none; box-shadow: none; padding: 0 .25rem; min-height: 0; color: var(--muted); font-size: 1rem; line-height: 1; }
+.person-chip.required { background: #e9f2fd; }
+.person-chip.required .avatar { background: #3a78c3; }
+
+.meeting-choices { display: flex; flex-wrap: wrap; gap: .35rem; }
+.meeting-choice { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; padding: .2rem .6rem; min-height: 0; font-size: .8rem; background: var(--surface); }
+.meeting-choice[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-dark); font-weight: 600; }
+.service-mark { width: 1.15rem; height: 1.15rem; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.meeting-link { display: flex; gap: .4rem; align-items: center; }
+.meeting-link input { flex: 1; min-width: 0; }
+.meeting-link .button { white-space: nowrap; font-size: .85rem; }
+
+.day-peek { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); padding: .6rem; align-self: start; position: sticky; top: .5rem; }
+.day-peek header { display: grid; gap: .15rem; margin-bottom: .5rem; font-size: .9rem; }
+.day-peek-clash { color: #9b2c2c; font-size: .8rem; font-weight: 600; }
+.day-peek-allday { font-size: .75rem; background: var(--accent-soft); border-radius: 4px; padding: .15rem .35rem; margin-bottom: .25rem; }
+.day-peek-grid { position: relative; overflow: hidden; background: var(--surface); border-radius: 6px; border: 1px solid var(--line); }
+.day-peek-hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); height: 0; }
+.day-peek-hour span { position: absolute; left: .25rem; top: .1rem; font-size: .66rem; color: var(--muted); }
+.day-peek-event, .day-peek-new { position: absolute; left: 2.6rem; right: .3rem; border-radius: 4px; padding: .1rem .35rem; font-size: .72rem; overflow: hidden; line-height: 1.25; }
+.day-peek-event { background: #f0eafb; border-left: 3px solid #8560dc; color: #35274c; }
+.day-peek-event.calendar-source-outlook { background: #eaf4fd; border-left-color: #3182c5; }
+.day-peek-event.calendar-source-booking { background: #edf6f1; border-left-color: #3a9270; }
+.day-peek-new { left: 3.4rem; background: repeating-linear-gradient(135deg, var(--accent-soft) 0 6px, #fff 6px 10px); border: 1.5px dashed var(--accent); color: var(--accent-dark); font-weight: 600; z-index: 1; }
+.day-peek-new.clash { border-color: #c0504d; color: #9b2c2c; left: calc(50% + 1.4rem); }
+/* An appointment the new meeting overlaps, and the meeting, side by side as in Outlook. */
+.day-peek-event.beside { right: calc(50% - 1.2rem); }
+
+.calendar-overlay > .panel.calendar-form { width: min(980px, 100%); }
+.interview-compose { margin: .6rem 0; }
+.composer-saved { background: #e6f5ec; border: 1px solid #bfe3cc; border-radius: 8px; padding: .5rem .7rem; }
+@media (max-width: 760px) {
+  .composer-body.with-side { grid-template-columns: minmax(0, 1fr); }
+  .day-peek { position: static; }
+  .composer-bar-note { display: none; }
+  .meeting-link { flex-wrap: wrap; }
+  .meeting-link input { flex-basis: 100%; }
+}
+.join-link { display: inline-flex; align-items: center; gap: .3rem; }
+
+/* Icon tools in the bar; the Send button stays a labelled button. */
+.composer-bar { gap: .2rem; padding: .4rem .6rem; }
+.composer-bar .icon-action { width: 32px; height: 32px; }
+.composer-bar .icon-action[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-dark); }
+.composer-send { min-height: 32px; padding: .3rem .9rem; margin-right: .2rem; }
+.composer-tool { min-height: 32px; font-size: .8rem; }
+.composer-menu { position: relative; display: inline-flex; }
+.composer-popover { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; display: grid; min-width: 14rem; max-height: 16rem; overflow: auto;
+  padding: .3rem; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 8px 28px #241a3a2e; }
+.composer-popover button { text-align: left; border: 0; box-shadow: none; background: none; padding: .4rem .55rem; border-radius: 6px; min-height: 0; font-size: .85rem; }
+.composer-popover button:hover { background: var(--accent-soft); }
+.composer-popover > span { padding: .4rem .55rem; }
+.composer-people { display: flex; align-items: flex-start; gap: .3rem; }
+.composer-people > .chips-input { flex: 1; }
+.composer-optional { font-size: .8rem; padding: .45rem .3rem; white-space: nowrap; }
+.person-chip.optional { background: var(--soft); border: 1px dashed var(--line-strong); }
+.compose-body .rich-box { min-height: 8rem; }
+.compose-body .rich-toolbar .tool, .compose-body .format-tool { width: 30px; height: 30px; min-height: 0; }
+.chips-input { min-height: 2rem; padding: .1rem .2rem; }
+.chips-input input { min-width: 6rem; padding: .2rem .3rem; }
+.composer-fields > .chips-input + .chips-input { margin-top: -.1rem; }

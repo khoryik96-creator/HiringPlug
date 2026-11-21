@@ -10,11 +10,13 @@ import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 import { InterviewForm } from "./InterviewForm";
 import { InterviewInvitation } from "./InterviewInvitation";
+import { ServiceMark } from "./calendar/Composer";
+import { joinOf, SHORT_LABEL, TEAMS_LOCATION } from "./calendar/meeting";
 
 type Interview = Schemas["Interview"];
 
 /** An application's interviews, with scheduling for those who may. */
-export function ApplicationInterviews({ applicationId, closed, permissions }: { applicationId: string; closed: boolean; permissions: Permission[] }) {
+export function ApplicationInterviews({ applicationId, candidateId, candidateName, closed, permissions }: { applicationId: string; candidateId?: string; candidateName?: string; closed: boolean; permissions: Permission[] }) {
   const [scheduling, setScheduling] = useState(false);
   const list = useQuery({
     queryKey: applicationInterviewsKey(applicationId),
@@ -28,7 +30,7 @@ export function ApplicationInterviews({ applicationId, closed, permissions }: { 
       {canSchedule && !closed && !scheduling && (
         <IconButton label="Schedule interview" icon={<CalendarPlusIcon />} onClick={() => { setScheduling(true); }} />
       )}
-      {scheduling && <InterviewForm applicationId={applicationId} onDone={() => { setScheduling(false); }} />}
+      {scheduling && <InterviewForm applicationId={applicationId} candidateId={candidateId} candidateName={candidateName} permissions={permissions} onDone={() => { setScheduling(false); }} />}
     </div>
   );
 }
@@ -51,8 +53,10 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
   const canSchedule = permissions.includes("interviews:schedule");
   const onPanel = iv.interviewers.some((p) => p.userId === me.data?.user.id);
   const mine = iv.feedback.find((f) => f.userId === me.data?.user.id);
-  const link = iv.location && /^https?:\/\//.test(iv.location);
-  if (editing) return <InterviewForm applicationId={iv.applicationId} interview={iv} onDone={() => { setEditing(false); }} />;
+  const join = joinOf(iv.location);
+  const link = !join && iv.location && /^https?:\/\//.test(iv.location);
+  const place = iv.location === TEAMS_LOCATION ? "Microsoft Teams" : iv.location;
+  if (editing) return <InterviewForm applicationId={iv.applicationId} interview={iv} permissions={permissions} onDone={() => { setEditing(false); }} />;
   return (
     <article className="interview" aria-label={`${iv.title} with ${iv.candidateName}`}>
       <div className="row spread">
@@ -61,7 +65,8 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
           <span className={`badge ${iv.status}`}>{INTERVIEW_STATUS[iv.status]}</span>
           <div className="muted">
             {formatWhen(iv.startsAt)} · {iv.durationMinutes} min · {INTERVIEW_MODE[iv.mode]}
-            {iv.location && <> · {link ? <a href={iv.location} target="_blank" rel="noreferrer">join</a> : iv.location}</>}
+            {join ? <> · <a className="join-link" href={join.url} target="_blank" rel="noreferrer"><ServiceMark service={join.service} /> Join {SHORT_LABEL[join.service]}</a></>
+              : iv.location && <> · {link ? <a href={iv.location} target="_blank" rel="noreferrer">join</a> : place}</>}
           </div>
           <div className="muted">With {iv.interviewers.map((p) => p.name).join(", ")}</div>
         </div>

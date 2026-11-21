@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
+import { TEAMS_LOCATION } from "./calendar/meeting";
 import { ErrorMessage } from "./ErrorMessage";
 
 type Interview = Schemas["Interview"];
@@ -16,7 +17,7 @@ const responses: Record<NonNullable<Invitation["candidateResponse"]>, string> = 
 
 export function InterviewInvitation({ interview }: { interview: Interview }) {
   const [open, setOpen] = useState(false);
-  const [teams, setTeams] = useState(false);
+  const [teams, setTeams] = useState(interview.location === TEAMS_LOCATION); // chosen when it was scheduled
   const [minutes, setMinutes] = useState(15);
   const [candidateReminder, setCandidateReminder] = useState(false);
   const [now] = useState(() => Date.now());

@@ -34,3 +34,18 @@ it("shows the recipient and sends only with the organizer's chosen Teams and rem
   expect(sentBody(post)).toEqual({ version: 2, teams: true, reminderMinutes: 30 });
   expect((await screen.findByRole("link", { name: "Join Teams" })).getAttribute("href")).toBe(attach.joinUrl);
 });
+
+it("starts with Teams ticked for an interview scheduled as a Teams meeting", async () => {
+  const state = {
+    status: "none", canSend: true, teamsAvailable: true, teams: false, reminderMinutes: 0,
+    recipient: "nadia@example.test", joinUrl: null, issue: null,
+  } satisfies Schemas["InterviewInvitation"];
+  vi.spyOn(api, "GET").mockResolvedValue(ok(state));
+  renderWithClient(<InterviewInvitation interview={{ ...interview, location: "Microsoft Teams Meeting" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
+  expect((await screen.findByLabelText<HTMLInputElement>("Microsoft Teams meeting")).checked).toBe(true);
+  cleanup();
+  renderWithClient(<InterviewInvitation interview={{ ...interview, location: "https://zoom.us/j/1" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
+  expect((await screen.findByLabelText<HTMLInputElement>("Microsoft Teams meeting")).checked).toBe(false);
+});

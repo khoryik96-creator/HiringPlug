@@ -125,7 +125,7 @@ func eventAPI(row store.CalendarEvent) (api.CalendarEvent, error) {
 	if err := json.Unmarshal(row.Attendees, &people); err != nil {
 		return api.CalendarEvent{}, err
 	}
-	return api.CalendarEvent{Id: row.ID, Version: int(row.Version), Title: row.Title, Notes: row.Notes, Location: row.Location, StartsAt: row.StartsAt, EndsAt: row.EndsAt, TimeZone: row.TimeZone, AllDay: row.AllDay, Teams: row.Teams, Attendees: people, Source: api.CalendarEventSource(row.Source), SourceId: c.OrNull(row.SourceID), Status: api.CalendarEventStatus(row.Status), SyncStatus: api.CalendarEventSyncStatus(row.SyncStatus), SyncError: c.OrNull(row.SyncError), WebUrl: c.OrNull(row.WebUrl), JoinUrl: c.OrNull(row.JoinUrl), Editable: row.Source == "local" && row.Status == "active"}, nil
+	return api.CalendarEvent{Id: row.ID, Version: int(row.Version), Title: row.Title, Notes: row.Notes, NotesHtml: c.OrNull(row.NotesHtml), Location: row.Location, StartsAt: row.StartsAt, EndsAt: row.EndsAt, TimeZone: row.TimeZone, AllDay: row.AllDay, Teams: row.Teams, Attendees: people, Source: api.CalendarEventSource(row.Source), SourceId: c.OrNull(row.SourceID), Status: api.CalendarEventStatus(row.Status), SyncStatus: api.CalendarEventSyncStatus(row.SyncStatus), SyncError: c.OrNull(row.SyncError), WebUrl: c.OrNull(row.WebUrl), JoinUrl: c.OrNull(row.JoinUrl), Editable: row.Source == "local" && row.Status == "active"}, nil
 }
 func (s *Service) save(ctx context.Context, p authz.Principal, id string, version int, in Input) (api.CalendarEvent, error) {
 	var out api.CalendarEvent
@@ -156,7 +156,7 @@ func (s *Service) save(ctx context.Context, p authz.Principal, id string, versio
 		}
 		var row store.CalendarEvent
 		if id == "" {
-			row, err = q.InsertCalendarEvent(ctx, store.InsertCalendarEventParams{Title: in.Title, Notes: in.Notes, Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync})
+			row, err = q.InsertCalendarEvent(ctx, store.InsertCalendarEventParams{Title: in.Title, Notes: in.Notes, NotesHtml: orNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync})
 		} else {
 			before, e := q.CalendarEvent(ctx, id)
 			if database.IsNoRows(e) {
@@ -171,7 +171,7 @@ func (s *Service) save(ctx context.Context, p authz.Principal, id string, versio
 			if before.Source != "local" {
 				return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this interview or booking in its original HiringPlug screen, or open an external event in Outlook.")
 			}
-			row, err = q.UpdateCalendarEvent(ctx, store.UpdateCalendarEventParams{ID: id, ExpectedVersion: int32(version), Title: in.Title, Notes: in.Notes, Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync}) //nolint:gosec // range checked above
+			row, err = q.UpdateCalendarEvent(ctx, store.UpdateCalendarEventParams{ID: id, ExpectedVersion: int32(version), Title: in.Title, Notes: in.Notes, NotesHtml: orNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync}) //nolint:gosec // range checked above
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("calendar event")
 			}

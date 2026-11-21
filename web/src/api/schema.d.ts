@@ -4991,22 +4991,22 @@ export interface components {
          */
         DecimalAmount: string;
         /**
-         * @description deepseek = DeepSeek, claude = Claude (Anthropic), openai = ChatGPT (OpenAI).
+         * @description deepseek = DeepSeek, claude = Claude (Anthropic), openai = ChatGPT (OpenAI), qwen = Qwen (Alibaba Cloud Model Studio).
          * @enum {string}
          */
-        AiProviderName: "deepseek" | "claude" | "openai";
+        AiProviderName: "deepseek" | "claude" | "openai" | "qwen";
         /**
          * @description A provider, "server" (the server's own HP_AI_* provider) or "off".
          * @enum {string}
          */
-        AiProviderChoice: "server" | "off" | "deepseek" | "claude" | "openai";
+        AiProviderChoice: "server" | "off" | "deepseek" | "claude" | "openai" | "qwen";
         AiProviders: {
             active: components["schemas"]["AiProviderChoice"];
             /** @description The server has its own AI provider set up (HP_AI_*). */
             serverAvailable: boolean;
             /** @description The server can store API keys (HP_AI_KEYS_SECRET is set). */
             keysSupported: boolean;
-            /** @description Every provider, in the order deepseek, claude, openai. */
+            /** @description Every provider, in the order deepseek, claude, openai, qwen. */
             providers: components["schemas"]["AiProviderEntry"][];
         };
         AiProviderEntry: {
@@ -5030,7 +5030,7 @@ export interface components {
             provider: components["schemas"]["AiProviderChoice"];
         };
         AiProviderInput: {
-            /** @description e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5 */
+            /** @description e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5, qwen-plus */
             model: string;
             /** @description Leave out to keep the saved key. */
             apiKey?: string;
@@ -5048,7 +5048,7 @@ export interface components {
         AiStatus: {
             /** @description The latest call to the provider failed, within the last hour. */
             down: boolean;
-            /** @description As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), or the server's AI. */
+            /** @description As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI. */
             provider: string | null;
             /** @description Why, in words safe to show (never a key). */
             message: string | null;
@@ -5064,7 +5064,7 @@ export interface components {
             failedAt: string | null;
         };
         AiProviderReportedJob: {
-            /** @description deepseek, claude, openai, or server (the server's own). */
+            /** @description deepseek, claude, openai, qwen, or server (the server's own). */
             provider: string;
             ok: boolean;
             /** @description Why it failed, in words safe to show. */
@@ -5435,6 +5435,8 @@ export interface components {
             /** Format: email */
             email: string;
             name?: string;
+            /** @description An optional attendee (Outlook's Optional, the meeting's Cc). Meeting invitations have no Bcc. Defaults to false. */
+            optional?: boolean;
         };
         CalendarEventInput: {
             title: string;
@@ -5444,6 +5446,8 @@ export interface components {
             endsAt: string;
             timeZone: string;
             notes?: string;
+            /** @description The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text. */
+            notesHtml?: string;
             location?: string;
             attendees: components["schemas"]["CalendarAttendee"][];
             allDay: boolean;
@@ -5457,6 +5461,7 @@ export interface components {
             endsAt: string;
             timeZone: string;
             notes?: string;
+            notesHtml?: string;
             location?: string;
             attendees: components["schemas"]["CalendarAttendee"][];
             allDay: boolean;
@@ -5473,6 +5478,8 @@ export interface components {
             endsAt: string;
             timeZone: string;
             notes: string;
+            /** @description The formatted notes, when they were written formatted. */
+            notesHtml?: string | null;
             location: string;
             attendees: components["schemas"]["CalendarAttendee"][];
             allDay: boolean;
@@ -8388,6 +8395,10 @@ export interface components {
             reminderMinutes: number;
             /** @description Email the candidate the day before. Defaults to off. */
             candidateReminder?: boolean;
+            /** @description The invitation's message, formatted, as the candidate sees it in Outlook (else the interview's instructions). Dropped for the instructions when the interview moves, so no old time stays in it. */
+            bodyHtml?: string;
+            /** @description Optional attendees (Outlook's Optional, the meeting's Cc), e.g. the hiring manager. Meeting invitations have no Bcc. */
+            optional?: string[];
         };
         InterviewOutlookReminderInput: {
             version: number;

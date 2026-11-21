@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
@@ -140,9 +141,19 @@ func (m *Module) SendInterviewInvitation(ctx context.Context, tx pgx.Tx, p authz
 		if in.Teams && (!conn.TeamsAvailable || meeting.Mode != "video") {
 			return out, apperr.Validation(apperr.FieldErrors{{Field: "teams", Message: "choose a video interview and a Teams-enabled Outlook calendar"}})
 		}
-		attendees, _ := json.Marshal([]api.CalendarAttendee{{Email: toEmail(email)}})
+		people := []api.CalendarAttendee{{Email: toEmail(email)}}
+		for _, cc := range optionalAttendees(in.Optional, email) {
+			people = append(people, api.CalendarAttendee{Email: toEmail(cc), Optional: ptr(true)})
+		}
+		attendees, _ := json.Marshal(people)
+		var bodyHTML *string
+		if in.BodyHtml != nil {
+			if safe, _ := cleanNotes(*in.BodyHtml); safe != "" {
+				bodyHTML = &safe
+			}
+		}
 		row, err = q.InsertInterviewInvitation(ctx, store.InsertInterviewInvitationParams{
-			InterviewID: ptr(id), SourceVersion: int32(in.Version), Title: meeting.Title, Notes: meeting.Instructions, Location: bounded(meeting.Location, 500), //nolint:gosec // checked against the database version
+			InterviewID: ptr(id), SourceVersion: int32(in.Version), Title: meeting.Title, Notes: meeting.Instructions, NotesHtml: bodyHTML, Location: bounded(meeting.Location, 500), //nolint:gosec // checked against the database version
 			StartsAt: meeting.Start, EndsAt: meeting.End, Teams: in.Teams, Attendees: attendees, ReminderMinutes: int32(in.ReminderMinutes), //nolint:gosec // reminder range is bounded by the contract
 			InvitationSubject: ptr(conn.SubjectID), InvitationCalendar: ptr(conn.CalendarID), CandidateReminder: reminder,
 		})
@@ -230,9 +241,29 @@ func (s *Service) invitationRecipient(ctx context.Context, tx pgx.Tx, meeting Me
 		if err := json.Unmarshal(row.Attendees, &people); err != nil {
 			return "", "", err
 		}
-		if len(people) != 1 || !strings.EqualFold(string(people[0].Email), address) {
+		required := requiredAttendees(people)
+		if len(required) != 1 || !strings.EqualFold(string(required[0].Email), address) {
 			return "", "The candidate email changed. Review the original invitation in Outlook.", nil
 		}
 	}
 	return address, "", nil
+}
+
+// optionalAttendees are the invitation's Cc: valid addresses, once each, not the candidate's.
+func optionalAttendees(in *[]openapi_types.Email, candidate string) []string {
+	if in == nil {
+		return nil
+	}
+	seen := map[string]bool{strings.ToLower(candidate): true}
+	var out []string
+	for _, e := range *in {
+		address := strings.ToLower(strings.TrimSpace(string(e)))
+		parsed, err := mail.ParseAddress(address)
+		if err != nil || parsed.Address != address || seen[address] {
+			continue
+		}
+		seen[address] = true
+		out = append(out, address)
+	}
+	return out
 }

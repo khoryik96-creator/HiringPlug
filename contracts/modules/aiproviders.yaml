@@ -5,8 +5,8 @@ x-module:
   name: aiproviders
   description: >
     The AI provider a company uses for the assistant, CV vs job matching,
-    market insights and reading CVs: DeepSeek, Claude (Anthropic) or ChatGPT
-    (OpenAI) with the company's own API key, the server's own provider
+    market insights and reading CVs: DeepSeek, Claude (Anthropic), ChatGPT
+    (OpenAI) or Qwen (Alibaba Cloud) with the company's own API key, the server's own provider
     (HP_AI_*), or none. Keys are sealed (encrypted) when saved, never shown
     again, and opened only by the AI worker. Each provider keeps its key and
     model, so switching back and forth needs no retyping.
@@ -165,12 +165,12 @@ components:
   schemas:
     AiProviderName:
       type: string
-      description: deepseek = DeepSeek, claude = Claude (Anthropic), openai = ChatGPT (OpenAI).
-      enum: [deepseek, claude, openai]
+      description: deepseek = DeepSeek, claude = Claude (Anthropic), openai = ChatGPT (OpenAI), qwen = Qwen (Alibaba Cloud Model Studio).
+      enum: [deepseek, claude, openai, qwen]
     AiProviderChoice:
       type: string
       description: A provider, "server" (the server's own HP_AI_* provider) or "off".
-      enum: [server, off, deepseek, claude, openai]
+      enum: [server, off, deepseek, claude, openai, qwen]
     AiProviders:
       type: object
       required: [active, serverAvailable, keysSupported, providers]
@@ -180,7 +180,7 @@ components:
         keysSupported: { type: boolean, description: The server can store API keys (HP_AI_KEYS_SECRET is set). }
         providers:
           type: array
-          description: Every provider, in the order deepseek, claude, openai.
+          description: Every provider, in the order deepseek, claude, openai, qwen.
           items: { $ref: '#/components/schemas/AiProviderEntry' }
     AiProviderEntry:
       type: object
@@ -211,7 +211,7 @@ components:
       additionalProperties: false
       required: [model]
       properties:
-        model: { type: string, minLength: 1, maxLength: 100, description: 'e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5' }
+        model: { type: string, minLength: 1, maxLength: 100, description: 'e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5, qwen-plus' }
         apiKey:
           type: string
           minLength: 8
@@ -242,7 +242,7 @@ components:
       required: [down, provider, message, since, failedAt]
       properties:
         down: { type: boolean, description: "The latest call to the provider failed, within the last hour." }
-        provider: { type: string, nullable: true, description: "As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), or the server's AI." }
+        provider: { type: string, nullable: true, description: "As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI." }
         message: { type: string, nullable: true, description: "Why, in words safe to show (never a key)." }
         since: { type: string, format: date-time, nullable: true, description: When the failures began. }
         failedAt: { type: string, format: date-time, nullable: true, description: The latest failure. }
@@ -251,7 +251,7 @@ components:
       additionalProperties: false
       required: [provider, ok, error, at]
       properties:
-        provider: { type: string, minLength: 1, maxLength: 40, description: "deepseek, claude, openai, or server (the server's own)." }
+        provider: { type: string, minLength: 1, maxLength: 40, description: "deepseek, claude, openai, qwen, or server (the server's own)." }
         ok: { type: boolean }
         error: { type: string, nullable: true, maxLength: 500, description: "Why it failed, in words safe to show." }
         at: { type: string, format: date-time }

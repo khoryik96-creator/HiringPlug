@@ -27,6 +27,21 @@ const withClaude = state({
 });
 
 describe("AI provider settings", () => {
+  it("offers Qwen with its own key, Model Studio's default model and where to get a key", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(state({ providers: [...state().providers as object[], { provider: "qwen", ...none }] })));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(state()));
+    renderWithClient(<AiProvider />);
+    const card = await screen.findByRole("region", { name: "Qwen" });
+    expect(within(card).getByText("Alibaba Cloud")).toBeTruthy();
+    expect(within(card).getByLabelText<HTMLInputElement>("Model").value).toBe("qwen-plus");
+    expect(within(card).getByRole("link", { name: "Get a key" }).getAttribute("href")).toContain("modelstudio.console.alibabacloud.com");
+    expect(screen.getByRole("radio", { name: "Qwen" })).toHaveProperty("disabled", true);
+    fireEvent.change(within(card).getByLabelText("API key"), { target: { value: "sk-qwen-secret-1234" } });
+    fireEvent.click(within(card).getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(put.mock.calls[0]?.[1]).toMatchObject({ params: { path: { aiProvider: "qwen" } }, body: { model: "qwen-plus", apiKey: "sk-qwen-secret-1234" } });
+  });
+
   it("saves a key with the default model and never shows it back", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(state()));
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(withClaude));

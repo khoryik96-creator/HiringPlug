@@ -86,8 +86,9 @@ func TestCompaniesChooseTheirAIProviderWithTheirOwnKeys(t *testing.T) {
 	assert.Equal(t, api.AiProviderChoiceServer, st.Active)
 	assert.False(t, st.ServerAvailable)
 	assert.True(t, st.KeysSupported)
-	require.Len(t, st.Providers, 3)
-	assert.Equal(t, []api.AiProviderName{"deepseek", "claude", "openai"}, []api.AiProviderName{st.Providers[0].Provider, st.Providers[1].Provider, st.Providers[2].Provider})
+	require.Len(t, st.Providers, 4)
+	assert.Equal(t, []api.AiProviderName{"deepseek", "claude", "openai", "qwen"},
+		[]api.AiProviderName{st.Providers[0].Provider, st.Providers[1].Provider, st.Providers[2].Provider, st.Providers[3].Provider})
 	assert.False(t, a.assistantOn(recruiter))
 
 	res := a.request(http.MethodPut, "/v1/ai-providers/claude", owner, map[string]any{"model": "claude-opus-5-5"})

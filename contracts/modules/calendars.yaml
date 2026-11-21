@@ -386,6 +386,9 @@ components:
         name:
           type: string
           maxLength: 150
+        optional:
+          type: boolean
+          description: An optional attendee (Outlook's Optional, the meeting's Cc). Meeting invitations have no Bcc. Defaults to false.
       additionalProperties: false
     CalendarEventInput:
       type: object
@@ -415,6 +418,10 @@ components:
         notes:
           type: string
           maxLength: 4000
+        notesHtml:
+          type: string
+          maxLength: 30000
+          description: The notes formatted (bold, lists, links...), sent to Outlook as the event's body. Kept to text formatting and links; notes is then their plain text.
         location:
           type: string
           maxLength: 500
@@ -457,6 +464,9 @@ components:
         notes:
           type: string
           maxLength: 4000
+        notesHtml:
+          type: string
+          maxLength: 30000
         location:
           type: string
           maxLength: 500
@@ -512,6 +522,10 @@ components:
           type: string
         notes:
           type: string
+        notesHtml:
+          type: string
+          nullable: true
+          description: The formatted notes, when they were written formatted.
         location:
           type: string
         attendees:

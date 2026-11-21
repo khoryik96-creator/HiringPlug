@@ -7,11 +7,13 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { EventForm } from "../components/calendar/EventForm";
 import { EventDetails } from "../components/calendar/EventDetails";
 import { CalendarTimeGrid } from "../components/calendar/CalendarTimeGrid";
-import { addDays, daysFor, dateLabel, sameDay, timeLabel, type CalendarView } from "../components/calendar/dates";
+import { addDays, daysFor, dateLabel, sameDay, type CalendarView } from "../components/calendar/dates";
 import "./calendar-workspace.css";
 
 type Event = Schemas["CalendarEvent"];
 const views = ["month", "week", "day", "agenda"] as const;
+/** Meetings a month day shows before "+2 more" (which opens the day), as Outlook does. */
+const MONTH_SHOWN = 3;
 export function Calendar({ docked = false, userId }: { docked?: boolean; userId?: string }) {
   const client = useQueryClient();
   const [date, setDate] = useState(() => new Date());
@@ -82,10 +84,11 @@ export function Calendar({ docked = false, userId }: { docked?: boolean; userId?
         ? <CalendarTimeGrid days={days} events={events} onOpen={setSelected} onCreate={status ? newAppointment : undefined}/>
         : mode === "agenda" ? <div className="calendar-agenda">{days.map((day) => <div key={day.toISOString()} className="calendar-agenda-day"><strong>{dateLabel(day)}</strong><div>{onDay(day).length ? onDay(day).map((event) => <EventButton key={event.id} event={event} onClick={() => { setSelected(event); }}/>) : <span className="muted small">No appointments</span>}</div></div>)}</div> : <div className="calendar-month-scroll">
         <div className="calendar-weekdays">{days.slice(0, 7).map((day) => <span key={day.toISOString()}>{day.toLocaleDateString(undefined, { weekday: "short" })}</span>)}</div>
-        <div className="calendar-grid">{days.map((day) => <div key={day.toISOString()} className={`calendar-day ${day.getMonth() !== date.getMonth() ? "calendar-outside" : ""}`}><button className={`calendar-date ${sameDay(day, new Date()) ? "calendar-today" : ""}`} aria-label={`New appointment ${dateLabel(day)}`} onClick={() => { setDate(day); newAppointment(); }}>{day.getDate()}</button>{onDay(day).map((event) => <EventButton key={event.id} event={event} onClick={() => { setSelected(event); }}/>)}</div>)}</div>
+        <div className="calendar-grid">{days.map((day) => <div key={day.toISOString()} className={`calendar-day ${day.getMonth() !== date.getMonth() ? "calendar-outside" : ""}`}><button className={`calendar-date ${sameDay(day, new Date()) ? "calendar-today" : ""}`} aria-label={`New appointment ${dateLabel(day)}`} onClick={() => { setDate(day); newAppointment(); }}>{day.getDate()}</button>{onDay(day).slice(0, MONTH_SHOWN).map((event) => <EventButton key={event.id} event={event} onClick={() => { setSelected(event); }}/>)}
+          {onDay(day).length > MONTH_SHOWN && <button type="button" className="calendar-more" onClick={() => { setDate(day); chooseView("day"); }}>+{onDay(day).length - MONTH_SHOWN} more</button>}</div>)}</div>
       </div>}
     </section>
     {(form || selected) && createPortal(<div className="calendar-overlay" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setForm(false); setSelected(null); } }}>{form && status ? <EventForm key={editing?.id ?? "new"} event={editing} date={slot ?? date} startAtSlot={slot !== undefined} connection={status} onClose={() => { setForm(false); }} onSaved={changed}/> : selected && <EventDetails event={selected} onClose={() => { setSelected(null); }} onEdit={() => { setEditing(selected); setForm(true); }} onChanged={changed}/>}</div>, document.body)}
   </Container>;
 }
-function EventButton({ event, onClick }: { event: Event; onClick: () => void }) { return <button className={`calendar-event calendar-source-${event.source} ${event.status === "cancelled" ? "calendar-cancelled" : ""}`} onClick={onClick}><span className="calendar-event-time">{event.allDay ? "All day" : timeLabel(event.startsAt)}</span><span>{event.title}</span>{(event.syncStatus === "failed" || event.syncStatus === "conflict") && <span aria-label="Sync needs attention">!</span>}</button>; }
+function EventButton({ event, onClick }: { event: Event; onClick: () => void }) { return <button className={`calendar-event calendar-source-${event.source} ${event.status === "cancelled" ? "calendar-cancelled" : ""}`} onClick={onClick}><span className="calendar-event-time">{event.allDay ? "All day" : new Date(event.startsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</span><span>{event.title}</span>{(event.syncStatus === "failed" || event.syncStatus === "conflict") && <span aria-label="Sync needs attention">!</span>}</button>; }

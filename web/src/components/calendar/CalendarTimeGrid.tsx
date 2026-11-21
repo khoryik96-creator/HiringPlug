@@ -83,6 +83,9 @@ export function CalendarTimeGrid({ days, events, onOpen, onCreate }: {
   // labels so a lost or repeated DST hour cannot shift the other days' rows.
   const weekHour = new Intl.DateTimeFormat(undefined, { timeZone: "UTC", hour: "2-digit", minute: "2-digit" });
   const labelFor = (index: number) => week ? weekHour.format(index * hour) : timeLabel(atHour(from, index, false).toISOString());
+  // What the hour rows show: "9 AM", as Outlook writes them (labelFor names the slot buttons).
+  const weekHourShort = new Intl.DateTimeFormat(undefined, { timeZone: "UTC", hour: "numeric" });
+  const shownHour = (index: number) => week ? weekHourShort.format(index * hour) : atHour(from, index, false).toLocaleTimeString(undefined, { hour: "numeric" });
   return <section aria-label={week ? "Week calendar" : "Day calendar"} className="calendar-day-view">
     <div ref={viewport} className="calendar-day-scroll">
       <div className={week ? "calendar-time-width" : undefined}>
@@ -96,7 +99,7 @@ export function CalendarTimeGrid({ days, events, onOpen, onCreate }: {
         </div>}
         <div className="calendar-time-body" style={{ gridTemplateColumns }}>
           <div className="calendar-time-labels">
-            {rows.map((index) => <time key={index} style={{ height: height(index) }}>{labelFor(index)}</time>)}
+            {rows.map((index) => <time key={index} style={{ height: height(index) }}>{shownHour(index)}</time>)}
           </div>
           {columns.map((column) => <div key={column.from} className="calendar-time-column" role={week ? "group" : undefined} aria-label={week ? dateLabel(column.day) : undefined}>
             {rows.map((index) => {
@@ -108,19 +111,31 @@ export function CalendarTimeGrid({ days, events, onOpen, onCreate }: {
               </div>;
             })}
             <div className="calendar-day-timed">
-              {placeEvents(column, week, hours).map(({ event, start, end, lane, columns }) => <button key={event.id} type="button"
-                className={eventClass(event)} onClick={() => { onOpen(event); }}
-                style={{ top: start * rowHeight, height: (end - start) * rowHeight, left: `${lane / columns * 100}%`, width: `calc(${100 / columns}% - 4px)` }}
-                title={`${timeLabel(event.startsAt)}–${timeLabel(event.endsAt)} · ${event.title}`}>
-                <span className="calendar-event-time">{timeLabel(event.startsAt)}–{timeLabel(event.endsAt)}</span>
-                <span>{event.title}</span>
-              </button>)}
+              {placeEvents(column, week, hours).map(({ event, start, end, lane, columns }) => {
+                // As Outlook: the title first, then the time; one line when the meeting is short.
+                const short = (end - start) * rowHeight < 44;
+                return <button key={event.id} type="button"
+                  className={`${eventClass(event)}${short ? " calendar-event-short" : ""}${short && columns > 1 ? " calendar-event-narrow" : ""}`} onClick={() => { onOpen(event); }}
+                  style={{ top: start * rowHeight, height: (end - start) * rowHeight, left: `${lane / columns * 100}%`, width: `calc(${100 / columns}% - 4px)` }}
+                  title={`${timeLabel(event.startsAt)}–${timeLabel(event.endsAt)} · ${event.title}`}>
+                  <span className="calendar-event-title">{event.title}</span>
+                  <span className="calendar-event-time">{clockRange(event.startsAt, event.endsAt)}</span>
+                </button>;
+              })}
             </div>
           </div>)}
         </div>
       </div>
     </div>
   </section>;
+}
+
+/** "9:00 – 9:30 AM", or "11:30 AM – 1:00 PM" across noon. */
+export function clockRange(from: string, to: string): string {
+  const at = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const [a, b] = [at(from), at(to)];
+  const period = (s: string) => /\s?([AP]M)$/i.exec(s)?.[1];
+  return period(a) && period(a) === period(b) ? `${a.replace(/\s?[AP]M$/i, "")} – ${b}` : `${a} – ${b}`;
 }
 
 function eventClass(event: Event) {

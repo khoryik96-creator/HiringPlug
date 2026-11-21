@@ -1,9 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
 import { api, type Schemas, unwrap } from "../../api/client";
 import { ErrorMessage } from "../ErrorMessage";
+import { ServiceMark } from "./Composer";
 import { dateLabel, timeLabel } from "./dates";
+import { joinOf, SHORT_LABEL } from "./meeting";
 
 export function EventDetails({ event, onClose, onEdit, onChanged }: { event: Schemas["CalendarEvent"]; onClose: () => void; onEdit: () => void; onChanged: () => void }) {
+  const join = joinOf(event.location);
   const action = useMutation({ mutationFn: async (kind: "cancel" | "retry") => {
     const path = kind === "cancel" ? "/v1/calendar/events/{eventId}/cancel" : "/v1/calendar/events/{eventId}/retry";
     return unwrap(await api.POST(path, { params: { path: { eventId: event.id } }, body: { version: event.version } }));
@@ -12,6 +15,7 @@ export function EventDetails({ event, onClose, onEdit, onChanged }: { event: Sch
     <div className="calendar-heading"><span className="badge">{event.source === "local" ? "Appointment" : event.source === "interview_invitation" ? "Interview invitation" : event.source}</span><button autoFocus onClick={onClose}>Close</button></div>
     <h3>{event.title}</h3>{event.status === "cancelled" && <p className="warning">Cancelled in HiringPlug; Outlook cancellation is awaiting confirmation.</p>}<p>{dateLabel(new Date(event.startsAt))} · {event.allDay ? "All day" : `${timeLabel(event.startsAt)} – ${timeLabel(event.endsAt)}`}</p>
     {event.location && <p>{event.location}</p>}
+    {!event.joinUrl && join && <p><a className="button primary join-link" href={join.url} target="_blank" rel="noreferrer"><ServiceMark service={join.service} /> Join {SHORT_LABEL[join.service]}</a></p>}
     {event.notes && <p className="calendar-notes">{event.notes}</p>}
     {event.attendees.length > 0 && <p className="muted small">{event.attendees.map((a) => a.name ? `${a.name} <${a.email}>` : a.email).join(", ")}</p>}
     {event.syncStatus === "pending" && <p role="status" className="muted">Waiting to sync with Outlook.</p>}

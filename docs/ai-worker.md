@@ -379,8 +379,9 @@ answer ("the AI provider did not answer in time"), not a retry loop.
 AI jobs carry the provider the company chose (`ai`: provider, model, sealed
 key); `Deps.provider` opens the key (`keys.py`, `HP_AI_KEYS_SECRET`) and
 builds `providers/messages.py` (Claude, and DeepSeek's Anthropic-compatible
-endpoint, with Anthropic's SDK) or `providers/responses.py` (ChatGPT, OpenAI's
-Responses API). A job without `ai` uses the server's own provider,
+endpoint, with Anthropic's SDK), `providers/responses.py` (ChatGPT, OpenAI's
+Responses API) or `providers/qwen.py` (Qwen, Alibaba Cloud Model Studio's
+OpenAI-compatible chat API, international endpoint, thinking off). A job without `ai` uses the server's own provider,
 `OpenAICompatible` (DeepSeek's API, hosts of its open model, self-hosted
 servers): `HP_AI_PROVIDER` (off / openai_compatible), `HP_AI_PROVIDER_URL`,
 `HP_AI_PROVIDER_KEY` (never logged or printed), `HP_AI_MODEL`,
