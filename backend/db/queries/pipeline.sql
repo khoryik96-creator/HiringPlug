@@ -35,6 +35,7 @@ SELECT * FROM application WHERE candidate_id = @candidate_id ORDER BY id DESC;
 
 -- name: PageJobApplications :many
 SELECT * FROM application WHERE job_order_id = @job_order_id
+  AND (sqlc.narg(stage)::text IS NULL OR stage = sqlc.narg(stage)::text)
   AND (sqlc.narg(cursor)::text IS NULL OR id > sqlc.narg(cursor)::text)
 ORDER BY id LIMIT @row_limit;
 
@@ -189,3 +190,9 @@ RETURNING *;
 
 -- name: DeleteJobStagePlan :execrows
 DELETE FROM job_stage_plan WHERE job_order_id = @job_order_id AND version = @expected_version;
+
+-- name: PipelineColumnCounts :many
+SELECT stage, step, count(*)::int AS n,
+  count(*) FILTER (WHERE stage <> 'placed' AND stage_changed_at <= now() - interval '7 days')::int AS waiting
+FROM application WHERE job_order_id = @job_order_id
+GROUP BY stage, step;

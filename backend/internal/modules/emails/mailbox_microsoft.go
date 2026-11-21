@@ -46,7 +46,7 @@ func (s *Service) sendLargeMicrosoftMail(ctx context.Context, endpoint OAuthProv
 	target := root + "/" + url.PathEscape(created.ID)
 	sent := false
 	defer func() {
-		if !sent {
+		if !sent && !errors.Is(err, mail.ErrUncertain) {
 			_, _ = s.providerRequest(ctx, "DELETE", target, "application/json", token, nil)
 		}
 	}()
@@ -59,7 +59,7 @@ func (s *Service) sendLargeMicrosoftMail(ctx context.Context, endpoint OAuthProv
 			return err
 		}
 	}
-	if _, err = s.providerRequest(ctx, "POST", target+"/send", "application/json", token, nil); err != nil {
+	if err = s.providerSend(ctx, target+"/send", "application/json", token, nil); err != nil {
 		return err
 	}
 	sent = true

@@ -150,7 +150,7 @@ func (s *Service) busyRows(ctx context.Context, tx pgx.Tx, users []string, from,
 	for _, r := range rows {
 		keys = append(keys, sourceOf(r.Source, r.SourceID))
 	}
-	gone, err := s.gone(ctx, tx, keys)
+	gone, err := s.gone(ctx, tx, keys, true)
 	if err != nil {
 		return nil, err
 	}
@@ -168,10 +168,9 @@ type sourceKey struct{ kind, id string }
 // gone are the interview and booking holds among keys whose source no longer
 // stands (deleted with its candidate, cancelled, ...). They are checked for
 // the whole company, not as the caller (an interview on a candidate the
-// caller may not see still stands), and cleared at once in tx: cancelled,
-// their time freed and their Outlook copies queued for deletion. Nothing is
-// queued per read, so a page viewed again and again adds no work.
-func (s *Service) gone(ctx context.Context, tx pgx.Tx, keys []sourceKey) (map[sourceKey]bool, error) {
+// caller may not see still stands). Reconciliation may clear them during a
+// sync. Calendar GET only filters them out of its response.
+func (s *Service) gone(ctx context.Context, tx pgx.Tx, keys []sourceKey, reconcile bool) (map[sourceKey]bool, error) {
 	gone := map[sourceKey]bool{}
 	ids := map[string][]string{}
 	for _, k := range keys {
@@ -197,6 +196,9 @@ func (s *Service) gone(ctx context.Context, tx pgx.Tx, keys []sourceKey) (map[so
 					gone[sourceKey{kind, id}] = true
 				}
 			}
+		}
+		if !reconcile {
+			return nil
 		}
 		for k := range gone {
 			if err := s.reconcileSource(ctx, tx, tenant, k.kind, k.id); err != nil {

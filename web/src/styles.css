@@ -397,6 +397,17 @@ select { max-width: 100%; }
 .doc-btn:hover { border-color: var(--accent); color: var(--accent); }
 .doc-btn.primary-soft { background: var(--accent-soft); border-color: transparent; color: #1e3a8a; }
 .docs-upload { margin-top: 0.8rem; display: grid; gap: 0.6rem; }
+.cv-replacement-panel {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.cv-replacement { min-width: 0; border: 0; margin: 0; padding: 0; }
+.cv-replacement legend { margin-bottom: 0.35rem; font-size: 0.85rem; font-weight: 600; }
+.cv-replacement label { font-weight: 400; }
 .doc-kind { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .doc-kind legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; }
 .doc-kind label { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.7rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; font-size: 0.85rem; cursor: pointer; }

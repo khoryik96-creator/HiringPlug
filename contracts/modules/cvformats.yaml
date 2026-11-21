@@ -141,6 +141,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FormattedCv' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -246,6 +247,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        replaceDocumentIds:
+          type: array
+          items: { $ref: '#/components/schemas/DocumentId' }
+          description: Formatted CVs to move to the Bin once the replacement is saved.
         templateId: { $ref: '#/components/schemas/CvTemplateId' }
         applicationId:
           description: The job the CV is for (its title and company can appear in the CV).
@@ -268,6 +273,10 @@ components:
       additionalProperties: false
       required: [documentId]
       properties:
+        replaceDocumentIds:
+          type: array
+          items: { $ref: '#/components/schemas/DocumentId' }
+          description: Formatted CVs to move to the Bin once the replacement is saved.
         documentId:
           description: The CV to format (one the candidate sent, PDF or Word).
           allOf: [{ $ref: '#/components/schemas/DocumentId' }]

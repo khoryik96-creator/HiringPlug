@@ -238,3 +238,25 @@ func TestEmailIsRetriedWhileTheMailServerIsBusy(t *testing.T) {
 	reason, _ := e.Error.Get()
 	assert.Contains(t, reason, "451")
 }
+
+func TestEmailWithUnconfirmedAttemptIsNotSentAgain(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	candidate := a.createCandidate(token, map[string]any{"firstName": "Aina"})
+	address := tenant.ID + "@example.test"
+	r := a.request(http.MethodPost, "/v1/emails", token,
+		map[string]any{"to": []string{address}, "subject": "Only once", "body": "Message", "candidateId": candidate.Id})
+	require.Equal(t, http.StatusAccepted, r.Status)
+	var queued api.Email
+	r.JSON(&queued)
+	_, err := testutil.Current.Admin.Exec(context.Background(), "UPDATE email SET delivery_attempted_at=now() WHERE id=$1", queued.Id)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	delivered := a.emails(token, candidate.Id)
+	require.Len(t, delivered, 1)
+	assert.Equal(t, api.EmailStatusFailed, delivered[0].Status)
+	reason, _ := delivered[0].Error.Get()
+	assert.Contains(t, reason, "Check Sent mail")
+}

@@ -37,7 +37,7 @@ const kindIndex = (st: OpenStage) => OPEN_STAGES.indexOf(st);
  * that the job no longer has. With the standard stages (own: false) a move
  * names only the stage, as it always did.
  */
-export function columnsFor(steps: Step[], apps: Application[], own = true): Column[] {
+export function columnsFor(steps: Step[], apps: Pick<Application, "stage">[], own = true): Column[] {
   const out: Column[] = steps.map((s) => ({ key: s.key, label: s.label, stage: s.stage, step: own ? s.key : undefined }));
   for (const st of OPEN_STAGES) {
     if (out.some((c) => c.stage === st) || !apps.some((a) => a.stage === st)) continue;
@@ -48,7 +48,7 @@ export function columnsFor(steps: Step[], apps: Application[], own = true): Colu
 }
 
 /** The column a candidate is in (undefined when rejected or withdrawn). */
-export function columnOf(a: Application, columns: Column[]): Column | undefined {
+export function columnOf(a: Pick<Application, "stage" | "step">, columns: Column[]): Column | undefined {
   if (a.stage === "rejected" || a.stage === "withdrawn") return undefined;
   return columns.find((c) => c.step !== undefined && c.step === a.step && c.stage === a.stage) ?? columns.find((c) => c.stage === a.stage);
 }

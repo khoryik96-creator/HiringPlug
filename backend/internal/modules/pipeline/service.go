@@ -9,6 +9,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -167,22 +168,35 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 }
 
 // ForJob returns a job's pipeline, in the order candidates were added.
-func (s *Service) ForJob(ctx context.Context, p authz.Principal, jobID string, cursor *string, limit int32) ([]View, *string, error) {
+func (s *Service) ForJob(ctx context.Context, p authz.Principal, jobID string, cursor, stage *string, limit int32, includeCounts bool) ([]View, *string, *[]api.PipelineColumnCount, error) {
 	var out []View
 	var next *string
+	var counts *[]api.PipelineColumnCount
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if err := s.requireJob(ctx, tx, jobID); err != nil {
 			return err
 		}
-		rows, err := store.New(tx).PageJobApplications(ctx, store.PageJobApplicationsParams{JobOrderID: jobID, Cursor: cursor, RowLimit: limit + 1})
+		rows, err := store.New(tx).PageJobApplications(ctx, store.PageJobApplicationsParams{JobOrderID: jobID, Cursor: cursor, Stage: stage, RowLimit: limit + 1})
 		if err != nil {
 			return err
 		}
 		rows, next = applicationPage(rows, limit)
 		out, err = s.views(ctx, tx, rows)
-		return err
+		if err != nil || !includeCounts {
+			return err
+		}
+		groups, err := store.New(tx).PipelineColumnCounts(ctx, jobID)
+		if err != nil {
+			return err
+		}
+		value := make([]api.PipelineColumnCount, 0, len(groups))
+		for _, g := range groups {
+			value = append(value, api.PipelineColumnCount{Stage: api.Stage(g.Stage), Step: apiconv.OrNull(g.Step), Count: int(g.N), Waiting: int(g.Waiting)})
+		}
+		counts = &value
+		return nil
 	})
-	return out, next, err
+	return out, next, counts, err
 }
 
 // ForCandidate returns the jobs a candidate is on, newest first.

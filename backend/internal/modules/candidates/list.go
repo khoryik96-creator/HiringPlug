@@ -64,11 +64,11 @@ func (o Order) paging(p authz.Principal, cursor *string) (string, *string, int32
 	if sort == "" || sort == "newest" {
 		return "newest", cursor, 0
 	}
-	return sort, nil, int32(o.Offset) //nolint:gosec // 0..10000 per the contract
+	return sort, cursor, int32(o.Offset) //nolint:gosec // bounded by the contract
 }
 
 // maxOffset is the contract's limit on offset: a sorted list pages that far.
-const maxOffset = 10000
+const maxOffset = 1000000
 
 // nextPage records where the next page starts, when there are more rows.
 func (o Order) nextPage(sort string, more bool, lastID string, limit int) (*string, *int) {
@@ -80,9 +80,9 @@ func (o Order) nextPage(sort string, more bool, lastID string, limit int) (*stri
 	}
 	next := o.Offset + limit
 	if next > maxOffset {
-		return nil, nil
+		return &lastID, nil
 	}
-	return nil, &next
+	return &lastID, &next
 }
 
 // listRows runs the newest-first query (which keeps its index plan) or the
@@ -97,7 +97,7 @@ func (s *Service) listRows(ctx context.Context, tx pgx.Tx, f Filter, inIDs []str
 	}
 	sorted, err := q.ListCandidatesSorted(ctx, store.ListCandidatesSortedParams{
 		Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, InIds: inIDs, SimilarNames: false,
-		Sort: sort, RowOffset: offset, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+		Sort: sort, Cursor: cursor, RowOffset: offset, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	})
 	rows := make([]store.ListCandidatesRow, len(sorted))
 	for i, r := range sorted {

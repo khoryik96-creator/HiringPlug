@@ -27,6 +27,19 @@ func (q *Queries) AttachToEmail(ctx context.Context, arg AttachToEmailParams) (i
 	return result.RowsAffected(), nil
 }
 
+const beginEmailDelivery = `-- name: BeginEmailDelivery :execrows
+UPDATE email SET delivery_attempted_at = now()
+WHERE id = $1 AND status = 'queued' AND delivery_attempted_at IS NULL
+`
+
+func (q *Queries) BeginEmailDelivery(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, beginEmailDelivery, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const bindEmailDelivery = `-- name: BindEmailDelivery :exec
 UPDATE email SET mailbox_ref=$1,delivery_mode = $2 WHERE id = $3
 `
@@ -226,7 +239,7 @@ func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, 
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -259,6 +272,7 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.DeliveryMode,
 		&i.BouncedTo,
 		&i.BouncedAt,
+		&i.DeliveryAttemptedAt,
 	)
 	return i, err
 }
@@ -382,7 +396,7 @@ INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addre
 VALUES (app_current_tenant(), $1, $2, $3, $4::text[],
         $5::text[], $6::text[], $7, $8, $9, $10, $11,
         $12, coalesce($13::text, app_current_user()), $14, $15)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at
 `
 
 type InsertEmailParams struct {
@@ -449,6 +463,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.DeliveryMode,
 		&i.BouncedTo,
 		&i.BouncedAt,
+		&i.DeliveryAttemptedAt,
 	)
 	return i, err
 }
@@ -546,7 +561,7 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id, e.mailbox_ref, e.delivery_mode, e.bounced_to, e.bounced_at FROM email e
+SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id, e.mailbox_ref, e.delivery_mode, e.bounced_to, e.bounced_at, e.delivery_attempted_at FROM email e
 WHERE e.candidate_id = $1
    OR e.id IN (SELECT ec.email_id FROM email_candidate ec WHERE ec.candidate_id = $1::text)
 ORDER BY e.id DESC LIMIT 200
@@ -589,6 +604,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.DeliveryMode,
 			&i.BouncedTo,
 			&i.BouncedAt,
+			&i.DeliveryAttemptedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -601,7 +617,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 }
 
 const listContactEmails = `-- name: ListContactEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]Email, error) {
@@ -640,6 +656,7 @@ func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]E
 			&i.DeliveryMode,
 			&i.BouncedTo,
 			&i.BouncedAt,
+			&i.DeliveryAttemptedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -915,6 +932,15 @@ type RefreshMailboxSecretParams struct {
 
 func (q *Queries) RefreshMailboxSecret(ctx context.Context, arg RefreshMailboxSecretParams) error {
 	_, err := q.db.Exec(ctx, refreshMailboxSecret, arg.SealedSecret, arg.ID)
+	return err
+}
+
+const releaseEmailDelivery = `-- name: ReleaseEmailDelivery :exec
+UPDATE email SET delivery_attempted_at = NULL WHERE id = $1 AND status = 'queued'
+`
+
+func (q *Queries) ReleaseEmailDelivery(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, releaseEmailDelivery, id)
 	return err
 }
 

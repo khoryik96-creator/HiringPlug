@@ -26,7 +26,7 @@ UPDATE studio_cv
    SET status = $1, document_id = $2, file_name = $3,
        error = $4, warning = $5, pay_removed = $6, finished_at = now()
  WHERE id = $7 AND status = 'queued'
-RETURNING id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at
+RETURNING id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at, replace_document_ids
 `
 
 type FinishStudioCvParams struct {
@@ -68,12 +68,13 @@ func (q *Queries) FinishStudioCv(ctx context.Context, arg FinishStudioCvParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.FinishedAt,
+		&i.ReplaceDocumentIds,
 	)
 	return i, err
 }
 
 const getStudioCv = `-- name: GetStudioCv :one
-SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at FROM studio_cv WHERE id = $1
+SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at, replace_document_ids FROM studio_cv WHERE id = $1
 `
 
 func (q *Queries) GetStudioCv(ctx context.Context, id string) (StudioCv, error) {
@@ -97,6 +98,7 @@ func (q *Queries) GetStudioCv(ctx context.Context, id string) (StudioCv, error) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.FinishedAt,
+		&i.ReplaceDocumentIds,
 	)
 	return i, err
 }
@@ -120,19 +122,20 @@ func (q *Queries) GetTemplate(ctx context.Context, id string) (CvTemplate, error
 }
 
 const insertStudioCv = `-- name: InsertStudioCv :one
-INSERT INTO studio_cv (id, tenant_id, candidate_id, source_document_id, blind, neutral_gender, correct_language, alignment, created_by)
-VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, $7, app_current_user())
-RETURNING id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at
+INSERT INTO studio_cv (id, tenant_id, candidate_id, source_document_id, blind, neutral_gender, correct_language, alignment, created_by, replace_document_ids)
+VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, $7, app_current_user(), $8::text[])
+RETURNING id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at, replace_document_ids
 `
 
 type InsertStudioCvParams struct {
-	ID               string
-	CandidateID      string
-	SourceDocumentID string
-	Blind            bool
-	NeutralGender    bool
-	CorrectLanguage  bool
-	Alignment        string
+	ID                 string
+	CandidateID        string
+	SourceDocumentID   string
+	Blind              bool
+	NeutralGender      bool
+	CorrectLanguage    bool
+	Alignment          string
+	ReplaceDocumentIds []string
 }
 
 func (q *Queries) InsertStudioCv(ctx context.Context, arg InsertStudioCvParams) (StudioCv, error) {
@@ -144,6 +147,7 @@ func (q *Queries) InsertStudioCv(ctx context.Context, arg InsertStudioCvParams) 
 		arg.NeutralGender,
 		arg.CorrectLanguage,
 		arg.Alignment,
+		arg.ReplaceDocumentIds,
 	)
 	var i StudioCv
 	err := row.Scan(
@@ -164,6 +168,7 @@ func (q *Queries) InsertStudioCv(ctx context.Context, arg InsertStudioCvParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.FinishedAt,
+		&i.ReplaceDocumentIds,
 	)
 	return i, err
 }
@@ -195,7 +200,7 @@ func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) 
 }
 
 const listStudioCvs = `-- name: ListStudioCvs :many
-SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at FROM studio_cv WHERE candidate_id = $1 ORDER BY created_at DESC, id DESC LIMIT 10
+SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at, replace_document_ids FROM studio_cv WHERE candidate_id = $1 ORDER BY created_at DESC, id DESC LIMIT 10
 `
 
 func (q *Queries) ListStudioCvs(ctx context.Context, candidateID string) ([]StudioCv, error) {
@@ -225,6 +230,7 @@ func (q *Queries) ListStudioCvs(ctx context.Context, candidateID string) ([]Stud
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.FinishedAt,
+			&i.ReplaceDocumentIds,
 		); err != nil {
 			return nil, err
 		}

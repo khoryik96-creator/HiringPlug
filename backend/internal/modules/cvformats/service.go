@@ -162,6 +162,7 @@ func (s *Service) TemplateFile(ctx context.Context, p authz.Principal, id string
 
 // Options are how a formatted CV is made.
 type Options struct {
+	Replace                    []string
 	TemplateID                 string
 	ApplicationID              *string
 	ShowContact, IncludeSalary bool
@@ -230,7 +231,7 @@ func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID str
 			}
 		}
 		fileName = FileName(cand, agency, o.Blind)
-		docID, undo, err = s.deps.Documents.AddFormatted(ctx, tx, p.TenantID, candidateID, fileName, out)
+		docID, undo, err = s.deps.Documents.AddFormatted(ctx, tx, p.TenantID, p.UserID, candidateID, fileName, out, o.Replace)
 		if err != nil {
 			return err
 		}

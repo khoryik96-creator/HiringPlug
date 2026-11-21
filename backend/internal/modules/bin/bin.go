@@ -79,6 +79,10 @@ type Pipeline interface {
 // (notes module) and what the AI said about them (assistant module, deleted
 // with a candidate's or job's notes, and with applications).
 type Files interface {
+	DocumentLabel(ctx context.Context, tx pgx.Tx, id string) (string, error)
+	BinActiveDocument(ctx context.Context, tx pgx.Tx, id string) error
+	RestoreDocument(ctx context.Context, tx pgx.Tx, id string) error
+	PurgeDocument(ctx context.Context, tx pgx.Tx, id string) ([]string, error)
 	PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]string, error)
 	DeleteNotes(ctx context.Context, tx pgx.Tx, subjectType string, ids []string) error
 }
@@ -88,6 +92,9 @@ type Taken func(error) bool
 
 // Deps are the modules the Bin works through.
 type Deps struct {
+	Users interface {
+		UserNames(context.Context, pgx.Tx, []string) (map[string]string, error)
+	}
 	Candidates Candidates
 	Contacts   Contacts
 	Companies  Companies
@@ -113,4 +120,9 @@ func New(pool *pgxpool.Pool, deps Deps) *Module {
 // JobHandlers returns the handlers for the module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindBinPurge: m.service.purge, api.JobKindBinRemoveFiles: m.service.removeFiles}
+}
+
+// RecordDocument keeps a CV replaced by a recruiter for the ordinary Bin retention period.
+func (m *Module) RecordDocument(ctx context.Context, tx pgx.Tx, tenantID, id, name, actorID string) error {
+	return m.service.recordDocument(ctx, tx, tenantID, id, name, actorID)
 }

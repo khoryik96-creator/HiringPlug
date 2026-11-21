@@ -94,6 +94,8 @@ func (s *Service) purgeRecords(ctx context.Context, tx pgx.Tx, e store.BinEntry)
 		return err
 	}
 	switch e.Kind {
+	case "document":
+		return d.Files.PurgeDocument(ctx, tx, e.RecordID)
 	case "candidate":
 		apps, err := d.Pipeline.ApplicationsOf(ctx, tx, []string{e.RecordID}, nil)
 		if err == nil {

@@ -171,7 +171,6 @@ func New(pool *pgxpool.Pool, deps Deps, sender mail.Sender, files *blob.Store) *
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{
-		api.JobKindEmailSend: m.service.deliver, api.JobKindEmailInterviewReminder: m.service.deliver,
 		api.JobKindEmailBounceScan: m.service.scanBounces, api.JobKindEmailOutlookSync: m.service.syncOutlook,
 	}
 }

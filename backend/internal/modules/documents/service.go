@@ -32,6 +32,7 @@ type Service struct {
 	whenDone       []ReadDoneHook
 	enrichIndustry func(context.Context, pgx.Tx, *api.ParsedProfile) error
 	industryLabels func(context.Context, pgx.Tx) ([]string, error)
+	recordBinned   func(context.Context, pgx.Tx, string, string, string, string) error
 	ai             AIAllowance // nil: the AI never fills in CV readings
 }
 
@@ -53,7 +54,7 @@ type TextReadHook func(ctx context.Context, tx pgx.Tx, tenantID, candidateID str
 // Upload stores a file for a candidate and queues its text extraction. The
 // document row and the job are committed together: there is never a document
 // that nobody will process, or a job for a document that does not exist.
-func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, source, fileName string, data []byte) (Document, error) {
+func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, source, fileName string, data []byte, replace []string) (Document, error) {
 	contentType, ok := DetectContentType(fileName, data)
 	if !ok {
 		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload "+filekind.Accepted+".")
@@ -68,7 +69,7 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, so
 			return duplicateError(*same)
 		}
 		var err error
-		doc, storedKey, err = s.add(ctx, tx, p.TenantID, candidateID, source, fileName, contentType, data)
+		doc, storedKey, err = s.add(ctx, tx, p.TenantID, p.UserID, candidateID, source, fileName, contentType, data, replace)
 		return err
 	})
 	if err != nil && storedKey != "" {
@@ -81,7 +82,7 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, so
 // add stores a file for a candidate, records it and queues its text
 // extraction, in the caller's transaction. storedKey is set once the file is
 // written, so the caller can remove it if the transaction rolls back.
-func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName, contentType string, data []byte) (doc Document, storedKey string, err error) {
+func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, actorID, candidateID, source, fileName, contentType string, data []byte, replace []string) (doc Document, storedKey string, err error) {
 	var read *api.DocumentTextExtractedJob
 	if filekind.ReadHere(contentType) { // read before anything is stored: no text, no file
 		r := readHere("", contentType, data)
@@ -96,6 +97,12 @@ func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, sou
 	}
 	if !exists {
 		return Document{}, "", apperr.NotFound("candidate")
+	}
+	if err := checkCVSlots(ctx, tx, candidateID, source == "formatted", replace); err != nil {
+		return Document{}, "", err
+	}
+	if err := s.binReplaced(ctx, tx, tenantID, actorID, replace); err != nil {
+		return Document{}, "", err
 	}
 	q := store.New(tx)
 	id, err := q.NewDocumentID(ctx)

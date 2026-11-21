@@ -13,7 +13,12 @@ RETURNING *;
 SELECT * FROM bin_entry ORDER BY binned_at DESC, id DESC LIMIT 500;
 
 -- name: GetBinEntry :one
-SELECT * FROM bin_entry WHERE id = @id;
+SELECT * FROM bin_entry WHERE id = @id FOR UPDATE;
 
 -- name: DeleteBinEntry :execrows
 DELETE FROM bin_entry WHERE id = @id;
+
+-- name: InsertDocumentBinEntry :one
+INSERT INTO bin_entry (tenant_id,kind,record_id,label,binned_by,binned_name,purge_after)
+VALUES (app_current_tenant(),'document',@record_id,@label,@binned_by,@binned_name,@purge_after)
+RETURNING *;

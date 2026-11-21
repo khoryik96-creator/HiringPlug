@@ -14,11 +14,11 @@ type HTTP struct{ svc *Service }
 
 // ListJobApplications handles GET /v1/jobs/{jobId}/applications.
 func (h *HTTP) ListJobApplications(ctx context.Context, req api.ListJobApplicationsRequestObject) (api.ListJobApplicationsResponseObject, error) {
-	views, next, err := h.svc.ForJob(ctx, authz.MustFromContext(ctx), req.JobId, req.Params.Cursor, applicationPageSize(req.Params.Limit, 1000))
+	views, next, counts, err := h.svc.ForJob(ctx, authz.MustFromContext(ctx), req.JobId, req.Params.Cursor, c.Convert[string](req.Params.Stage), applicationPageSize(req.Params.Limit, 1000), req.Params.IncludeCounts != nil && *req.Params.IncludeCounts)
 	if err != nil {
 		return nil, err
 	}
-	return api.ListJobApplications200JSONResponse{Items: toAPIList(views), NextCursor: next}, nil
+	return api.ListJobApplications200JSONResponse{Items: toAPIList(views), NextCursor: next, Counts: counts}, nil
 }
 
 // AddApplication handles POST /v1/jobs/{jobId}/applications.

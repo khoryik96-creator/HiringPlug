@@ -109,6 +109,9 @@ func (h *HTTP) FormatCv(ctx context.Context, req api.FormatCvRequestObject) (api
 		ApplicationID: b.ApplicationId, ShowContact: b.ShowContact != nil && *b.ShowContact,
 		IncludeSalary: b.IncludeSalary != nil && *b.IncludeSalary, Blind: b.Blind != nil && *b.Blind,
 	}
+	if b.ReplaceDocumentIds != nil {
+		o.Replace = *b.ReplaceDocumentIds
+	}
 	if b.TemplateId != nil {
 		o.TemplateID = *b.TemplateId
 	}
@@ -127,6 +130,9 @@ func (h *HTTP) StartStudioCv(ctx context.Context, req api.StartStudioCvRequestOb
 	b := req.Body
 	o := StudioOptions{DocumentID: b.DocumentId, Blind: b.Blind != nil && *b.Blind,
 		NeutralGender: b.NeutralGender != nil && *b.NeutralGender, CorrectLanguage: b.CorrectLanguage != nil && *b.CorrectLanguage}
+	if b.ReplaceDocumentIds != nil {
+		o.Replace = *b.ReplaceDocumentIds
+	}
 	if b.Alignment != nil {
 		o.Alignment = string(*b.Alignment)
 	}

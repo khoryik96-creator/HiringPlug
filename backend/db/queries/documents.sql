@@ -14,7 +14,7 @@ SELECT * FROM document WHERE id = @id;
 -- name: ListDocumentsForCandidate :many
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key,
        status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at,
-       parse_status, NULL::jsonb AS parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error
+       parse_status, NULL::jsonb AS parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at
 FROM document WHERE candidate_id = @candidate_id
 ORDER BY id DESC;
 
@@ -173,3 +173,19 @@ DELETE FROM document WHERE candidate_id = @candidate_id RETURNING storage_key, p
 -- A document's candidate, kind and text (for other modules reading a CV just read).
 -- name: CVTextOf :one
 SELECT candidate_id, source, coalesce(extracted_text, '')::text AS text FROM document WHERE id = @id;
+
+-- name: LockCandidateCVs :exec
+SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':candidate-cvs:' || @candidate_id::text, 0));
+
+-- name: CVsInCategory :many
+SELECT id FROM document WHERE candidate_id = @candidate_id AND binned_at IS NULL
+  AND (source = 'formatted') = @formatted::boolean;
+
+-- name: BinDocument :execrows
+UPDATE document SET binned_at = now(), updated_at = now() WHERE id = @id AND binned_at IS NULL;
+
+-- name: RestoreBinnedDocument :execrows
+UPDATE document SET binned_at = NULL, updated_at = now() WHERE id = @id AND binned_at IS NOT NULL;
+
+-- name: PurgeBinnedDocument :one
+DELETE FROM document WHERE id = @id AND binned_at IS NOT NULL RETURNING storage_key,pdf_key;

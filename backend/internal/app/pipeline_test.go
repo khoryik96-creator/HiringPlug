@@ -151,4 +151,16 @@ func TestPipelineReturnsAllApplicationsAcrossTheOldLimit(t *testing.T) {
 	require.Len(t, last.Items, 1)
 	assert.Greater(t, last.Items[0].Id, first.Items[999].Id)
 	assert.Nil(t, last.NextCursor)
+
+	r := a.request(http.MethodGet, path+"?limit=100&stage=applied&includeCounts=true", recruiter.Token, nil)
+	require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
+	var stage api.ApplicationList
+	r.JSON(&stage)
+	require.Len(t, stage.Items, 100)
+	require.NotNil(t, stage.Counts)
+	require.Len(t, *stage.Counts, 1)
+	assert.Equal(t, api.StageApplied, (*stage.Counts)[0].Stage)
+	assert.Equal(t, 1001, (*stage.Counts)[0].Count)
+	require.NotNil(t, stage.NextCursor)
+	assert.Equal(t, first.Items[99].Id, *stage.NextCursor)
 }

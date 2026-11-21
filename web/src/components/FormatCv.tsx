@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Document, type Permission, type Schemas, unwrap } from "../api/client";
+import { api, ApiError, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { loadApplications } from "../api/applications";
 import { candidateApplicationsKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
@@ -9,6 +9,8 @@ import { fieldErrors } from "./forms";
 import { SaveError } from "./SaveError";
 
 export const cvTemplatesKey = ["cv-templates"] as const;
+
+import { CvReplacement, replacementCount } from "./CvReplacement";
 
 export const studioCvsKey = (candidateId: string) => ["studio-cvs", candidateId] as const;
 
@@ -26,10 +28,26 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
   });
   const cvs = (docs.data ?? []).filter((d) => d.source !== "formatted" && READABLE.has(d.contentType));
+  const formatted = (docs.data ?? []).filter((d) => d.source === "formatted");
+  const [replace, setReplace] = useState<string[]>([]);
+  const required = replacementCount(formatted, true);
+  const selected = replace.filter((id) => formatted.some((d) => d.id === id));
+  const selection = {
+    ids: selected,
+    ready: !docs.isPending && selected.length === required,
+    refresh: (error: unknown) => {
+      if (error instanceof ApiError && error.code === "DOCUMENT_LIMIT") {
+        setReplace([]);
+        void docs.refetch();
+      }
+    },
+    choice: <CvReplacement documents={formatted} required={required} selected={selected} onChange={setReplace} />,
+  };
   const [picked, setPicked] = useState<"studio" | "template" | null>(null);
   const mode = picked ?? (cvs.length > 0 ? "studio" : "template");
   return (
     <div className="panel format-cv">
+      <ErrorMessage error={docs.error} />
       <div className="choice" role="radiogroup" aria-label="Make it from">
         <label className={mode === "studio" ? "on" : undefined}>
           <input type="radio" name="format-mode" checked={mode === "studio"} disabled={cvs.length === 0} onChange={() => { setPicked("studio"); }} />
@@ -41,8 +59,8 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
         </label>
       </div>
       {mode === "studio"
-        ? <StudioForm candidateId={candidateId} cvs={cvs} onDone={onDone} />
-        : <TemplateForm candidateId={candidateId} permissions={permissions} onDone={onDone} />}
+        ? <StudioForm candidateId={candidateId} cvs={cvs} selection={selection} onDone={onDone} />
+        : <TemplateForm candidateId={candidateId} permissions={permissions} selection={selection} onDone={onDone} />}
     </div>
   );
 }
@@ -74,7 +92,9 @@ function saveSummaryChoice(choice: SummaryChoice) {
   try { localStorage.setItem(SUMMARY_KEY, JSON.stringify({ write, length, focus })); } catch { /* private window: not remembered */ }
 }
 
-function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Document[]; onDone: () => void }) {
+type Replacement = { ids: string[]; ready: boolean; refresh: (error: unknown) => void; choice: React.ReactNode };
+
+function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: string; cvs: Document[]; selection: Replacement; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     documentId: "", blind: false, neutralGender: false, correctLanguage: true, alignment: "left" as "left" | "justify",
@@ -86,11 +106,13 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
     mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/studio-cvs", {
       params: { path: { candidateId } },
       body: {
+        ...(selection.ids.length ? { replaceDocumentIds: selection.ids } : {}),
         documentId, blind: form.blind, neutralGender: form.blind && form.neutralGender, correctLanguage: form.correctLanguage,
         alignment: form.alignment, summary: writes ? summary.length : "none",
         ...(writes ? { summaryFocus: summary.focus, ...(summary.direction.trim() ? { summaryDirection: summary.direction.trim() } : {}) } : {}),
       },
     })),
+    onError: selection.refresh,
     onSuccess: async () => {
       if (!form.blind) saveSummaryChoice(summary);
       await queryClient.invalidateQueries({ queryKey: studioCvsKey(candidateId) });
@@ -98,7 +120,7 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
     },
   });
   return (
-    <form className="form-grid" aria-label="Format their CV" onSubmit={(e) => { e.preventDefault(); start.mutate(); }}>
+    <form className="form-grid" aria-label="Format their CV" onSubmit={(e) => { e.preventDefault(); if (selection.ready) start.mutate(); }}>
       <label className="field full">CV
         <select required value={documentId} onChange={(e) => { setForm({ ...form, documentId: e.target.value }); }}>
           {cvs.map((d) => <option key={d.id} value={d.id}>{d.fileName} ({d.source}, {new Date(d.createdAt).toLocaleDateString("en-GB")})</option>)}
@@ -125,9 +147,10 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
           <option value="justify">Justified</option>
         </select>
       </label>
+      {selection.choice}
       <ErrorMessage error={fieldErrors(start.error).summaryDirection ? null : start.error} />
       <div className="row full">
-        <button type="submit" disabled={start.isPending}>Format CV</button>
+        <button type="submit" disabled={start.isPending || !selection.ready}>Format CV</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
     </form>
@@ -159,7 +182,7 @@ function SummaryOptions({ choice, onChange, error }: { choice: SummaryChoice; on
   );
 }
 
-function TemplateForm({ candidateId, permissions, onDone }: { candidateId: string; permissions: Permission[]; onDone: () => void }) {
+function TemplateForm({ candidateId, permissions, selection, onDone }: { candidateId: string; permissions: Permission[]; selection: Replacement; onDone: () => void }) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: cvTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/cv-templates")).items });
   const apps = useQuery({
@@ -172,17 +195,19 @@ function TemplateForm({ candidateId, permissions, onDone }: { candidateId: strin
     mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/formatted-cvs", {
       params: { path: { candidateId } },
       body: {
+        ...(selection.ids.length ? { replaceDocumentIds: selection.ids } : {}),
         templateId: form.templateId, blind: form.blind, showContact: form.showContact && !form.blind, includeSalary: form.includeSalary,
         ...(form.applicationId ? { applicationId: form.applicationId } : {}), ...(form.summary.trim() ? { summary: form.summary.trim() } : {}),
       },
     })),
+    onError: selection.refresh,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
       onDone();
     },
   });
   return (
-    <form className="form-grid" aria-label="Make formatted CV" onSubmit={(e) => { e.preventDefault(); make.mutate(); }}>
+    <form className="form-grid" aria-label="Make formatted CV" onSubmit={(e) => { e.preventDefault(); if (selection.ready) make.mutate(); }}>
       <ErrorMessage error={templates.error} />
       <label className="field">Template
         <select value={form.templateId} onChange={(e) => { setForm({ ...form, templateId: e.target.value }); }}>
@@ -210,9 +235,10 @@ function TemplateForm({ candidateId, permissions, onDone }: { candidateId: strin
       <label className="field full">Your summary for the client (optional)
         <textarea rows={4} value={form.summary} onChange={(e) => { setForm({ ...form, summary: e.target.value }); }} />
       </label>
+      {selection.choice}
       <SaveError error={make.error} shown={[]} onReload={onDone} />
       <div className="row full">
-        <button type="submit" disabled={make.isPending}>Make formatted CV</button>
+        <button type="submit" disabled={make.isPending || !selection.ready}>Make formatted CV</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
         {permissions.includes("cvformats.templates:manage") && <a href="#/cv-templates" className="muted">CV templates</a>}
       </div>

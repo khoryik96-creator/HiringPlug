@@ -67,6 +67,9 @@ func mailboxSMTPError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, mail.ErrUncertain) {
+		return mail.ErrUncertain
+	}
 	if errors.Is(err, errPrivateMailboxSMTP) {
 		return fmt.Errorf("%w: the SMTP server resolves to a private network address", mail.ErrPermanent)
 	}

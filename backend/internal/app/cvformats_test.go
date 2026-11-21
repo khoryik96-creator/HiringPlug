@@ -131,8 +131,10 @@ func TestFormattedCvs(t *testing.T) {
 		assert.Contains(t, res.Header.Get("Content-Disposition"), "CV - Siti Aisyah.pdf")
 	})
 
+	var contactDocument string
 	t.Run("contact and salary when asked, salary only for those who may see it", func(t *testing.T) {
-		_, text := a.formatCv(recruiter, c.Id, map[string]any{"showContact": true, "includeSalary": true, "summary": "Strong IFRS."}, http.StatusCreated)
+		withDetails, text := a.formatCv(recruiter, c.Id, map[string]any{"showContact": true, "includeSalary": true, "summary": "Strong IFRS."}, http.StatusCreated)
+		contactDocument = withDetails.DocumentId
 		assert.Contains(t, text, "Email: siti@example.com")
 		assert.Contains(t, text, "Current salary: MYR 8,500 a month")
 		assert.Contains(t, text, "Summary|Strong IFRS.")
@@ -154,7 +156,12 @@ func TestFormattedCvs(t *testing.T) {
 	})
 
 	t.Run("blind: no name, contact or nationality, and checked before saving", func(t *testing.T) {
-		out, text := a.formatCv(recruiter, c.Id, map[string]any{"blind": true, "showContact": true, "summary": "Siti is strong in IFRS."}, http.StatusCreated)
+		body := map[string]any{"blind": true, "showContact": true, "summary": "Siti is strong in IFRS."}
+		a.formatCv(recruiter, c.Id, body, http.StatusConflict)
+		initialDocument := out.DocumentId
+		body["replaceDocumentIds"] = []string{initialDocument}
+		out, text := a.formatCv(recruiter, c.Id, body, http.StatusCreated)
+		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+initialDocument+"/pdf", recruiter, nil).Status)
 		assert.NotContains(t, out.FileName, "Siti")
 		assert.Contains(t, out.FileName, "(Blinded).docx")
 		assert.Contains(t, text, "Candidate C-")
@@ -167,8 +174,9 @@ func TestFormattedCvs(t *testing.T) {
 		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
 		var named api.CvTemplate
 		res.JSON(&named)
-		res = a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/formatted-cvs", recruiter, map[string]any{"templateId": named.Id, "blind": true})
+		res = a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/formatted-cvs", recruiter, map[string]any{"templateId": named.Id, "blind": true, "replaceDocumentIds": []string{contactDocument}})
 		assert.Equal(t, api.ErrorCodeCVNOTBLIND, res.Error().Error.Code, "the template's own text gives the name away: not saved")
+		assert.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/documents/"+contactDocument+"/file", recruiter, nil).Status)
 	})
 
 	t.Run("the company's own template", func(t *testing.T) {
@@ -182,7 +190,7 @@ func TestFormattedCvs(t *testing.T) {
 		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
 		var tpl api.CvTemplate
 		res.JSON(&tpl)
-		_, text := a.formatCv(recruiter, c.Id, map[string]any{"templateId": tpl.Id}, http.StatusCreated)
+		_, text := a.formatCv(recruiter, c.Id, map[string]any{"templateId": tpl.Id, "replaceDocumentIds": []string{contactDocument}}, http.StatusCreated)
 		assert.Equal(t, "CONTOH CV: Siti Aisyah (S.A.)", text)
 
 		std := a.request(http.MethodGet, "/v1/cv-templates/standard/file", recruiter, nil)

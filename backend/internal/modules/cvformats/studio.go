@@ -40,6 +40,7 @@ var formattable = map[string]bool{
 
 // StudioOptions are how a studio CV is made.
 type StudioOptions struct {
+	Replace                               []string
 	DocumentID                            string
 	Blind, NeutralGender, CorrectLanguage bool
 	Alignment                             string // left or justify
@@ -107,6 +108,9 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 		if src.CandidateID != candidateID || src.Source == "formatted" || !formattable[src.ContentType] {
 			return apperr.New(api.ErrorCodeSTUDIOCVSOURCE, "Choose a CV this candidate sent (PDF or Word), not one made by the app.")
 		}
+		if err := s.deps.Documents.CheckFormattedCapacity(ctx, tx, candidateID, o.Replace); err != nil {
+			return err
+		}
 		access, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID)
 		if err != nil {
 			return err
@@ -135,7 +139,7 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 		}
 		if out, err = q.InsertStudioCv(ctx, store.InsertStudioCvParams{
 			ID: id, CandidateID: candidateID, SourceDocumentID: src.ID, Blind: o.Blind, NeutralGender: o.NeutralGender,
-			CorrectLanguage: o.CorrectLanguage, Alignment: o.Alignment,
+			CorrectLanguage: o.CorrectLanguage, Alignment: o.Alignment, ReplaceDocumentIds: append([]string{}, o.Replace...),
 		}); err != nil {
 			return err
 		}
@@ -227,9 +231,12 @@ func (s *Service) saveStudio(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		return err
 	}
 	name := FileName(cand, agency, run.Blind)
-	docID, undo, err := s.deps.Documents.AddFormatted(ctx, tx, job.TenantID, run.CandidateID, name, docx)
+	docID, undo, err := s.deps.Documents.AddFormatted(ctx, tx, job.TenantID, run.CreatedBy, run.CandidateID, name, docx, run.ReplaceDocumentIds)
 	if err != nil {
 		undo()
+		if e, ok := apperr.As(err); ok && e.Code == api.ErrorCodeDOCUMENTLIMIT {
+			return fail("The formatted CV list changed. Start again and choose which CV to replace.")
+		}
 		return err
 	}
 	var warning *string

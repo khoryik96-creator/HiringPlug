@@ -255,3 +255,24 @@ it("flags who waits too long, the next interview and an offer's deadline", async
   expect(chips).toHaveLength(1); // the next one only
   expect(chips[0]?.textContent).toBe(new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(at)));
 });
+
+it("chooses the entire stage across pages while the first load stays small", async () => {
+  const applied = { ...siti, stage: "applied" as const };
+  const later = { ...applied, id: "appl_next", candidateId: "cand_next", candidateName: "Next page candidate" };
+  const get = vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: { cursor?: string; stage?: string } } }) => {
+    if (path !== "/v1/jobs/{jobId}/applications") return Promise.resolve(ok({ items: [] }));
+    const query = init?.params?.query;
+    if (query?.cursor) return Promise.resolve(ok({ items: [later] }));
+    if (query?.stage) return Promise.resolve(ok({ items: [applied], nextCursor: applied.id }));
+    return Promise.resolve(ok({ items: [applied], nextCursor: applied.id, counts: [{ stage: "applied", step: null, count: 2, waiting: 0 }] }));
+  }) as never);
+  renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate />);
+  const chooseStage = await screen.findByRole("button", { name: "Choose all 2 in Applied" });
+  expect(screen.queryByRole("link", { name: "Next page candidate" })).toBeNull();
+  expect(get).toHaveBeenCalledWith("/v1/jobs/{jobId}/applications", expect.objectContaining({
+    params: { path: { jobId: base.jobId }, query: { limit: 100, includeCounts: true } },
+  }));
+  fireEvent.click(chooseStage);
+  expect(await screen.findByText("2 chosen")).toBeTruthy();
+  expect(cardOf("Next page candidate").className).toContain("picked");
+});

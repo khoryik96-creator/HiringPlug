@@ -20,7 +20,11 @@ import (
 )
 
 func (m *Module) OutsideJobHandlers() jobqueue.OutsideHandlers {
-	return jobqueue.OutsideHandlers{api.JobKindEmailOutlookScheduled: m.service.submitOutlook}
+	return jobqueue.OutsideHandlers{
+		api.JobKindEmailOutlookScheduled:  m.service.submitOutlook,
+		api.JobKindEmailSend:              m.service.deliverOutside,
+		api.JobKindEmailInterviewReminder: m.service.deliverOutside,
+	}
 }
 
 func (m *Module) DeadJobHandlers() jobqueue.Handlers {

@@ -62,6 +62,10 @@ type Sender interface {
 // misconfigured server); other errors are worth retrying.
 var ErrPermanent = errors.New("permanent")
 
+// ErrUncertain means the provider may have accepted delivery. A retry requires
+// a person or a provider receipt to establish whether it was sent.
+var ErrUncertain = errors.New("delivery could not be confirmed. Check Sent mail before trying again")
+
 // Config is how to reach the mail server.
 type Config struct {
 	Addr        string // host:port, e.g. smtp.example.com:587
@@ -145,9 +149,16 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 		return err
 	}
 	if err := w.Close(); err != nil {
-		return classify(err)
+		var reply *textproto.Error
+		if errors.As(err, &reply) {
+			return classify(err)
+		}
+		return ErrUncertain
 	}
-	return c.Quit()
+	// DATA received a success reply. A disconnect during QUIT means the
+	// message was still accepted and must not be retried.
+	_ = c.Quit()
+	return nil
 }
 
 // classify marks SMTP 5xx replies (refused for good) as permanent.

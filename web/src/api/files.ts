@@ -3,10 +3,11 @@
 import { getToken } from "../auth";
 import { type Document, type Schemas, throwFor } from "./client";
 
-export async function uploadCandidateDocument(candidateId: string, source: Schemas["DocumentSource"], file: Blob, fileName: string): Promise<void> {
+export async function uploadCandidateDocument(candidateId: string, source: Schemas["DocumentSource"], file: Blob, fileName: string, replace: string[] = []): Promise<void> {
   const body = new FormData();
   body.append("source", source);
   body.append("file", file, fileName);
+  for (const id of replace) body.append("replaceDocumentIds", id);
   const res = await fetch(`/v1/candidates/${encodeURIComponent(candidateId)}/documents`, {
     method: "POST",
     body,

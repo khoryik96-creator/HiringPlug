@@ -53,7 +53,7 @@ export type CandidateSort = Schemas["CandidateSort"];
 export type PageAt = { cursor?: string; offset?: number };
 /** The next page of a list or search, from the server's answer. */
 export const nextPage = (last: { nextCursor?: string | null; nextOffset?: number | null }): PageAt | undefined =>
-  last.nextCursor ? { cursor: last.nextCursor } : last.nextOffset != null ? { offset: last.nextOffset } : undefined;
+  last.nextCursor ? { cursor: last.nextCursor, ...(last.nextOffset != null ? { offset: last.nextOffset } : {}) } : last.nextOffset != null ? { offset: last.nextOffset } : undefined;
 
 /**
  * Columns whose header sorts the list, like a spreadsheet: the first click

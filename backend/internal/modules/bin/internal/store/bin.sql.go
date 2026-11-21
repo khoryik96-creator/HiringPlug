@@ -23,7 +23,7 @@ func (q *Queries) DeleteBinEntry(ctx context.Context, id string) (int64, error) 
 }
 
 const getBinEntry = `-- name: GetBinEntry :one
-SELECT id, tenant_id, kind, record_id, label, went_with, binned_by, binned_name, binned_at, purge_after FROM bin_entry WHERE id = $1
+SELECT id, tenant_id, kind, record_id, label, went_with, binned_by, binned_name, binned_at, purge_after FROM bin_entry WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetBinEntry(ctx context.Context, id string) (BinEntry, error) {
@@ -65,6 +65,44 @@ func (q *Queries) InsertBinEntry(ctx context.Context, arg InsertBinEntryParams) 
 		arg.RecordID,
 		arg.Label,
 		arg.WentWith,
+		arg.BinnedName,
+		arg.PurgeAfter,
+	)
+	var i BinEntry
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Kind,
+		&i.RecordID,
+		&i.Label,
+		&i.WentWith,
+		&i.BinnedBy,
+		&i.BinnedName,
+		&i.BinnedAt,
+		&i.PurgeAfter,
+	)
+	return i, err
+}
+
+const insertDocumentBinEntry = `-- name: InsertDocumentBinEntry :one
+INSERT INTO bin_entry (tenant_id,kind,record_id,label,binned_by,binned_name,purge_after)
+VALUES (app_current_tenant(),'document',$1,$2,$3,$4,$5)
+RETURNING id, tenant_id, kind, record_id, label, went_with, binned_by, binned_name, binned_at, purge_after
+`
+
+type InsertDocumentBinEntryParams struct {
+	RecordID   string
+	Label      string
+	BinnedBy   string
+	BinnedName string
+	PurgeAfter time.Time
+}
+
+func (q *Queries) InsertDocumentBinEntry(ctx context.Context, arg InsertDocumentBinEntryParams) (BinEntry, error) {
+	row := q.db.QueryRow(ctx, insertDocumentBinEntry,
+		arg.RecordID,
+		arg.Label,
+		arg.BinnedBy,
 		arg.BinnedName,
 		arg.PurgeAfter,
 	)

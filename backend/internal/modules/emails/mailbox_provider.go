@@ -27,6 +27,15 @@ import (
 // Provider replies may include tokens, subjects or addresses. Errors contain
 // only fixed messages/status codes, never a provider's response text.
 func (s *Service) providerRequest(ctx context.Context, method, target, contentType, token string, body []byte) ([]byte, error) {
+	return s.mailboxRequest(ctx, method, target, contentType, token, body, false)
+}
+
+func (s *Service) providerSend(ctx context.Context, target, contentType, token string, body []byte) error {
+	_, err := s.mailboxRequest(ctx, "POST", target, contentType, token, body, true)
+	return err
+}
+
+func (s *Service) mailboxRequest(ctx context.Context, method, target, contentType, token string, body []byte, submitting bool) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.New("mail provider request could not be created")
@@ -37,14 +46,23 @@ func (s *Service) providerRequest(ctx context.Context, method, target, contentTy
 	}
 	response, err := s.connections.HTTPClient.Do(req)
 	if err != nil {
+		if submitting {
+			return nil, mail.ErrUncertain
+		}
 		return nil, errors.New("mail provider could not be reached")
 	}
 	defer func() { _ = response.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
+		if submitting {
+			return nil, mail.ErrUncertain
+		}
 		return nil, errors.New("mail provider response could not be read")
 	}
 	if response.StatusCode/100 != 2 {
+		if submitting && response.StatusCode >= 500 {
+			return nil, mail.ErrUncertain
+		}
 		if response.StatusCode == 401 || response.StatusCode == 403 {
 			return nil, fmt.Errorf("%w: mailbox authorization was refused; reconnect the mailbox", mail.ErrPermanent)
 		}
@@ -169,12 +187,10 @@ func (s *Service) sendOAuthMailbox(ctx context.Context, row store.EmailMailbox, 
 	endpoint := s.endpoint(row.Provider)
 	if row.Provider == "google" {
 		body, _ := json.Marshal(map[string]string{"raw": base64.RawURLEncoding.EncodeToString(raw)})
-		_, err = s.providerRequest(ctx, "POST", endpoint.SendURL, "application/json", token, body)
-		return err
+		return s.providerSend(ctx, endpoint.SendURL, "application/json", token, body)
 	}
 	if len(raw) <= 2<<20 {
-		_, err = s.providerRequest(ctx, "POST", endpoint.SendURL, "text/plain", token, []byte(base64.StdEncoding.EncodeToString(raw)))
-		return err
+		return s.providerSend(ctx, endpoint.SendURL, "text/plain", token, []byte(base64.StdEncoding.EncodeToString(raw)))
 	}
 	return s.sendLargeMicrosoftMail(ctx, endpoint, token, msg)
 }

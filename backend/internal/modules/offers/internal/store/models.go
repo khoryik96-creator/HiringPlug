@@ -719,6 +719,7 @@ type Document struct {
 	PdfKey             *string
 	PdfError           *string
 	ParseError         *string
+	BinnedAt           *time.Time
 }
 
 type DocumentAiUse struct {
@@ -729,32 +730,33 @@ type DocumentAiUse struct {
 }
 
 type Email struct {
-	ID               string
-	TenantID         string
-	CandidateID      *string
-	ApplicationID    *string
-	ToAddresses      []string
-	CcAddresses      []string
-	Subject          string
-	Body             string
-	SentBy           string
-	SenderName       string
-	ReplyTo          string
-	Status           string
-	Error            *string
-	CreatedAt        time.Time
-	SentAt           *time.Time
-	BodyHtml         *string
-	BccAddresses     []string
-	Salary           bool
-	SalaryRestricted bool
-	Calendar         *string
-	FeesRestricted   bool
-	ContactID        *string
-	MailboxRef       *string
-	DeliveryMode     string
-	BouncedTo        []string
-	BouncedAt        *time.Time
+	ID                  string
+	TenantID            string
+	CandidateID         *string
+	ApplicationID       *string
+	ToAddresses         []string
+	CcAddresses         []string
+	Subject             string
+	Body                string
+	SentBy              string
+	SenderName          string
+	ReplyTo             string
+	Status              string
+	Error               *string
+	CreatedAt           time.Time
+	SentAt              *time.Time
+	BodyHtml            *string
+	BccAddresses        []string
+	Salary              bool
+	SalaryRestricted    bool
+	Calendar            *string
+	FeesRestricted      bool
+	ContactID           *string
+	MailboxRef          *string
+	DeliveryMode        string
+	BouncedTo           []string
+	BouncedAt           *time.Time
+	DeliveryAttemptedAt *time.Time
 }
 
 type EmailAttachment struct {
@@ -1540,23 +1542,24 @@ type StageTemplate struct {
 }
 
 type StudioCv struct {
-	ID               string
-	TenantID         string
-	CandidateID      string
-	SourceDocumentID string
-	Status           string
-	Blind            bool
-	NeutralGender    bool
-	CorrectLanguage  bool
-	Alignment        string
-	DocumentID       *string
-	FileName         *string
-	Error            *string
-	Warning          *string
-	PayRemoved       int32
-	CreatedBy        string
-	CreatedAt        time.Time
-	FinishedAt       *time.Time
+	ID                 string
+	TenantID           string
+	CandidateID        string
+	SourceDocumentID   string
+	Status             string
+	Blind              bool
+	NeutralGender      bool
+	CorrectLanguage    bool
+	Alignment          string
+	DocumentID         *string
+	FileName           *string
+	Error              *string
+	Warning            *string
+	PayRemoved         int32
+	CreatedBy          string
+	CreatedAt          time.Time
+	FinishedAt         *time.Time
+	ReplaceDocumentIds []string
 }
 
 type StudioCvAiUse struct {

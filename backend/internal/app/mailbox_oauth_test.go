@@ -51,7 +51,7 @@ func TestMailboxOAuthProvidersAndRefreshSurviveSendRetry(t *testing.T) {
 				case "/sendMail":
 					assert.Equal(t, "Bearer synthetic-refreshed", r.Header.Get("Authorization"))
 					if sends.Add(1) == 1 {
-						w.WriteHeader(503)
+						w.WriteHeader(http.StatusTooManyRequests)
 						return
 					}
 					var raw []byte

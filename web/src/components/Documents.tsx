@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
+import { api, ApiError, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadDocument, uploadCandidateDocument } from "../api/files";
 import { CloseIcon, IconButton, ReferenceIcon, SideBySideIcon, SparkIcon, UploadIcon } from "./ActionIcons";
 import { CandidateCv } from "./CandidateCv";
@@ -13,6 +13,7 @@ import { CV_TYPES, DropZone } from "./DropZone";
 import { findMatches, matchText } from "./duplicateCvs";
 import { ErrorMessage } from "./ErrorMessage";
 import { fileKind } from "./fileKind";
+import { CvReplacement, replacementCount } from "./CvReplacement";
 import { FormatCv } from "./FormatCv";
 import { DetailsButton, isReading, ReadProgress } from "./ReadDetails";
 import { StudioProgress, useStudioRun } from "./StudioProgress";
@@ -82,6 +83,28 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", candidateId] }),
   });
   const canDelete = permissions.includes("documents:delete");
+  const canBin = permissions.includes("bin:manage");
+  const bin = useMutation({
+    mutationFn: async (id: string) => unwrap(await api.POST("/v1/bin", { body: { kind: "document", id } })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
+      await queryClient.invalidateQueries({ queryKey: ["bin"] });
+    },
+  });
+
+  const [replacement, setReplacement] = useState<File | null>(null);
+  const [replace, setReplace] = useState<string[]>([]);
+  const inCategory = (docs.data ?? []).filter((d) => (d.source === "formatted") === (source === "formatted"));
+  const required = replacementCount(inCategory, source === "formatted");
+  const chosen = replace.filter((id) => inCategory.some((d) => d.id === id));
+  function acceptUpload(file: File) {
+    if (required) {
+      setReplace([]);
+      setReplacement(file);
+    } else {
+      upload.mutate({ file, ids: [] });
+    }
+  }
 
   // Before uploading: exactly a CV they have is skipped; one with the same name is asked about.
   const [checking, setChecking] = useState(false);
@@ -95,17 +118,25 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       const [m] = await findMatches([file], candidateId);
       if (m?.sameContent) setNotice(`Skipped: ${file.name} is exactly ${matchText(m.sameContent)}, already here.`);
       else if (m && m.sameName.length > 0) setAsking({ file, others: m.sameName });
-      else upload.mutate(file);
+      else acceptUpload(file);
     } catch {
-      upload.mutate(file); // the check is a help, not a gate: the server refuses an exact copy anyway
+      acceptUpload(file); // the check is a help, not a gate: the server refuses an exact copy anyway
     } finally {
       setChecking(false);
     }
   };
   const upload = useMutation({
-    mutationFn: (file: File) => uploadCandidateDocument(candidateId, source, file, file.name),
+    mutationFn: ({ file, ids }: { file: File; ids: string[] }) => uploadCandidateDocument(candidateId, source, file, file.name, ids),
+    onError: async (error, { file }) => {
+      if (error instanceof ApiError && error.code === "DOCUMENT_LIMIT") {
+        setReplace([]);
+        setReplacement(file);
+        await queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
+      }
+    },
     onSuccess: async () => {
       setUploading(false);
+      setReplacement(null);
       await queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
     },
   });
@@ -146,7 +177,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     const word = kindOf(d) === "DOC" || kindOf(d) === "DOCX";
     // A formatted CV (our own output) is read only for comparing: no review, read again from the menu.
     const rereadFormatted = canReread && d.source === "formatted";
-    const menu = fromMenu || rereadFormatted || d.pdfStatus === "failed" || (canDelete && d.source === "formatted");
+    const menu = canBin || fromMenu || rereadFormatted || d.pdfStatus === "failed" || (canDelete && d.source === "formatted");
     return menu && (
       <div className="doc-buttons">
         <details className="doc-more">
@@ -160,6 +191,13 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               Read details again (for comparing)
             </button>}
             {d.pdfStatus === "failed" && <p className="muted small">No PDF copy (the Word file is fine).</p>}
+            {canBin && <button type="button" role="menuitem" disabled={bin.isPending}
+              onClick={(e) => {
+                e.currentTarget.closest("details")?.removeAttribute("open");
+                if (window.confirm(`Move "${d.fileName}" to the Bin for 30 days?`)) bin.mutate(d.id);
+              }}>
+              Move to Bin
+            </button>}
             {canDelete && d.source === "formatted" && (
               <button type="button" role="menuitem" className="danger" disabled={remove.isPending}
                 onClick={(e) => {
@@ -192,7 +230,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
                 if (all.some((d) => d.source === "formatted")) setAgain(true); else setFormatting(true);
               }} />)}
           {canUpload && !uploading && <IconButton label="Upload" icon={<UploadIcon />} className="icon-primary" onClick={() => { setUploading(true); }} />}
-          {uploading && <IconButton label="Cancel upload" icon={<CloseIcon />} onClick={() => { setUploading(false); }} />}
+          {uploading && <IconButton label="Cancel upload" icon={<CloseIcon />} disabled={upload.isPending || checking} onClick={() => { setReplacement(null); setUploading(false); }} />}
         </div>
       </div>
       {uploading && (
@@ -201,11 +239,11 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
             <legend>What is it?</legend>
             {SOURCES.map((s) => (
               <label key={s} className={source === s ? "on" : undefined}>
-                <input type="radio" name={`source-${candidateId}`} checked={source === s} onChange={() => { setSource(s); }} /> {SOURCE_LABEL[s]}
+                <input type="radio" name={`source-${candidateId}`} checked={source === s} disabled={upload.isPending || checking} onChange={() => { setReplacement(null); setAsking(null); setSource(s); }} /> {SOURCE_LABEL[s]}
               </label>
             ))}
           </fieldset>
-          <DropZone accept={CV_TYPES} disabled={upload.isPending || checking} label={upload.isPending ? "Uploading…" : checking ? "Checking…" : "Drop the file here"}
+          <DropZone accept={CV_TYPES} disabled={upload.isPending || checking || replacement !== null} label={upload.isPending ? "Uploading…" : checking ? "Checking…" : "Drop the file here"}
             hint="PDF, Word, text, or a photo of the CV" onFiles={(files) => { if (files[0]) void check(files[0]); }} />
           {notice && <p className="muted" role="status">{notice}</p>}
           {asking && (
@@ -215,11 +253,19 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
                 Upload it as well?
               </p>
               <div className="row">
-                <button type="button" className="doc-btn primary" onClick={() => { const f = asking.file; setAsking(null); upload.mutate(f); }}>Upload anyway</button>
+                <button type="button" className="doc-btn primary" onClick={() => { const f = asking.file; setAsking(null); acceptUpload(f); }}>Upload anyway</button>
                 <button type="button" className="doc-btn" onClick={() => { setNotice(`${asking.file.name} was not uploaded.`); setAsking(null); }}>Don&apos;t upload</button>
               </div>
             </div>
           )}
+          {replacement && <div className="cv-replacement-panel">
+            <CvReplacement documents={inCategory} required={required} selected={chosen} onChange={setReplace} />
+            <div className="row">
+              <button type="button" className="doc-btn primary" disabled={chosen.length !== required || upload.isPending || docs.isFetching}
+                onClick={() => { upload.mutate({ file: replacement, ids: chosen }); }}>{required ? "Replace and upload" : "Upload CV"}</button>
+              <button type="button" className="doc-btn" disabled={upload.isPending} onClick={() => { setReplacement(null); upload.reset(); }}>Cancel</button>
+            </div>
+          </div>}
         </div>
       )}
       {again && (
@@ -233,7 +279,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
       {canFormat && <StudioProgress run={studio} />}
-      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? remove.error} />
+      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? remove.error ?? bin.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
       {selected && comparing && all.length >= 2 && <CvCompare docs={all} firstId={selected.id} />}
       {oneCv && selected.extractionWarnings.map((w) => <p key={w} className="warning small">{w}</p>)}

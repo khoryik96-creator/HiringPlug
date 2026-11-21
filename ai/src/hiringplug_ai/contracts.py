@@ -132,6 +132,7 @@ class ErrorCode(StrEnum):
     CV_NOT_BLIND = "CV_NOT_BLIND"
     DOCUMENT_DUPLICATE = "DOCUMENT_DUPLICATE"
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
+    DOCUMENT_LIMIT = "DOCUMENT_LIMIT"
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
     EMAIL_UNDELIVERABLE = "EMAIL_UNDELIVERABLE"
@@ -756,6 +757,7 @@ class BinKind(StrEnum):
     candidate = "candidate"
     contact = "contact"
     company = "company"
+    document = "document"
 
 
 class BinCheck(BaseModel):
@@ -5322,7 +5324,15 @@ class Application(BaseModel):
     updatedAt: AwareDatetime
 
 
+class PipelineColumnCount(BaseModel):
+    stage: Stage
+    step: Annotated[str | None, Field(...)]
+    count: int
+    waiting: int
+
+
 class ApplicationList(BaseModel):
+    counts: list[PipelineColumnCount] | None = None
     nextCursor: Annotated[
         ApplicationId | None,
         Field(description="Continue after this application ID when more results are available."),
@@ -6434,7 +6444,9 @@ class CandidateSearch(BaseModel):
     offset: Annotated[
         int | None,
         Field(
-            description="With a sort other than newest, the nextOffset of the previous page.", ge=0, le=10000
+            description="With a sort other than newest, the nextOffset of the previous page.",
+            ge=0,
+            le=1000000,
         ),
     ] = None
 
@@ -6998,6 +7010,10 @@ class FormatCvInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    replaceDocumentIds: Annotated[
+        list[DocumentId] | None,
+        Field(description="Formatted CVs to move to the Bin once the replacement is saved."),
+    ] = None
     templateId: CvTemplateId | None = None
     applicationId: Annotated[
         ApplicationId | None,
@@ -7028,6 +7044,10 @@ class StudioCvInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    replaceDocumentIds: Annotated[
+        list[DocumentId] | None,
+        Field(description="Formatted CVs to move to the Bin once the replacement is saved."),
+    ] = None
     documentId: Annotated[
         DocumentId, Field(description="The CV to format (one the candidate sent, PDF or Word).")
     ]

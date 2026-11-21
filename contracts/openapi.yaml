@@ -137,6 +137,10 @@ x-error-codes:
     module: documents
     status: 409
     description: The document has no extracted text yet (still being read, scanned without OCR, or unreadable), so there is nothing to parse.
+  DOCUMENT_LIMIT:
+    module: documents
+    status: 409
+    description: Choose which active CVs in this category to replace.
   DOCUMENT_NOT_DELETABLE:
     module: documents
     status: 409
@@ -717,7 +721,7 @@ paths:
     post:
       operationId: binRecord
       tags: ["bin"]
-      summary: Delete a candidate, contact or company (to the Bin)
+      summary: Move a candidate, contact, company or CV to the Bin
       description: >
         A company's contacts and jobs are moved to moveTo (another company) when it is given, and otherwise go to the Bin with it.
 
@@ -1121,7 +1125,7 @@ paths:
         - name: offset
           in: query
           description: With a sort other than newest, the `nextOffset` of the previous page.
-          schema: {type: integer, minimum: 0, maximum: 10000, default: 0}
+          schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}
       responses:
         '200':
           description: OK
@@ -1293,7 +1297,7 @@ paths:
       tags: [candidates]
       summary: Merge a duplicate into this candidate
       description: >
-        The duplicate's CVs, jobs and notes move to this candidate; this candidate's empty fields (and salary, if none) are filled from the duplicate; then the duplicate is deleted. If both are on the same job, this candidate's application is kept. `version` is this candidate's.
+        The duplicate's CVs, jobs and notes move to this candidate; this candidate's empty fields (and salary, if none) are filled from the duplicate; then the duplicate is deleted. If both are on the same job, this candidate's application is kept. `version` is this candidate's. A merge that would exceed either CV limit requires removing a CV first.
 
       x-permission: candidates:merge
       requestBody:
@@ -2725,6 +2729,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FormattedCv'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
@@ -2806,6 +2811,10 @@ paths:
                   type: string
                   format: binary
                 source: {$ref: '#/components/schemas/DocumentSource'}
+                replaceDocumentIds:
+                  type: array
+                  items: {$ref: '#/components/schemas/DocumentId'}
+                  description: Active CV IDs in the same category to move to the Bin after saving the new file.
       responses:
         '201':
           description: Created
@@ -2817,7 +2826,7 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409':
-          description: The candidate already has this exact file (DOCUMENT_DUPLICATE).
+          description: This file is a duplicate or the candidate is at their CV limit.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
@@ -6717,6 +6726,12 @@ paths:
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}
+        - name: stage
+          in: query
+          schema: {$ref: '#/components/schemas/Stage'}
+        - name: includeCounts
+          in: query
+          schema: {type: boolean}
       responses:
         '200':
           description: OK
@@ -8124,6 +8139,7 @@ components:
         - CV_NOT_BLIND
         - DOCUMENT_DUPLICATE
         - DOCUMENT_HAS_NO_TEXT
+        - DOCUMENT_LIMIT
         - DOCUMENT_NOT_DELETABLE
         - EMAIL_DO_NOT_CONTACT
         - EMAIL_UNDELIVERABLE
@@ -8708,7 +8724,7 @@ components:
       pattern: '^bin_[0-9a-hjkmnp-tv-z]{26}$'
     BinKind:
       type: string
-      enum: [candidate, contact, company]
+      enum: [candidate, contact, company, document]
     BinInput:
       type: object
       additionalProperties: false
@@ -9520,7 +9536,7 @@ components:
         limit: {type: integer, minimum: 1, maximum: 100, default: 25}
         cursor: {$ref: '#/components/schemas/CandidateId'}
         sort: {$ref: '#/components/schemas/CandidateSort'}
-        offset: {type: integer, minimum: 0, maximum: 10000, description: "With a sort other than newest, the nextOffset of the previous page."}
+        offset: {type: integer, minimum: 0, maximum: 1000000, description: "With a sort other than newest, the nextOffset of the previous page."}
     SalaryCap:
       type: object
       additionalProperties: false
@@ -9549,7 +9565,7 @@ components:
       type: string
       enum: [newest, name, name_desc, notice, notice_desc, current_salary_asc, current_salary_desc, expected_salary_asc, expected_salary_desc]
       description: >-
-        newest (the default) pages with nextCursor; the others page with nextOffset (up to 10,000 rows). name is A to Z (accents ignored), notice shortest first; unknown notice periods and salaries come last. Salary sorts use monthly equivalents, ringgit first and each other currency together, and only for roles that may see salaries.
+        Use nextCursor for any sort. nextOffset remains available for older clients and as a fallback. name is A to Z (accents ignored), notice shortest first; unknown notice periods and salaries come last. Salary sorts use monthly equivalents, ringgit first and each other currency together, and only for roles that may see salaries.
     CandidateSearchPage:
       type: object
       required: [items, nextCursor, terms]
@@ -11058,6 +11074,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        replaceDocumentIds:
+          type: array
+          items: {$ref: '#/components/schemas/DocumentId'}
+          description: Formatted CVs to move to the Bin once the replacement is saved.
         templateId: {$ref: '#/components/schemas/CvTemplateId'}
         applicationId:
           description: The job the CV is for (its title and company can appear in the CV).
@@ -11080,6 +11100,10 @@ components:
       additionalProperties: false
       required: [documentId]
       properties:
+        replaceDocumentIds:
+          type: array
+          items: {$ref: '#/components/schemas/DocumentId'}
+          description: Formatted CVs to move to the Bin once the replacement is saved.
         documentId:
           description: The CV to format (one the candidate sent, PDF or Word).
           allOf: [{$ref: '#/components/schemas/DocumentId'}]
@@ -14804,10 +14828,21 @@ components:
         stageChangedAt: {type: string, format: date-time, description: When it entered its current stage.}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
+    PipelineColumnCount:
+      type: object
+      required: [stage, step, count, waiting]
+      properties:
+        stage: {$ref: '#/components/schemas/Stage'}
+        step: {type: string, nullable: true}
+        count: {type: integer}
+        waiting: {type: integer}
     ApplicationList:
       type: object
       required: [items]
       properties:
+        counts:
+          type: array
+          items: {$ref: '#/components/schemas/PipelineColumnCount'}
         nextCursor:
           $ref: '#/components/schemas/ApplicationId'
           description: Continue after this application ID when more results are available.

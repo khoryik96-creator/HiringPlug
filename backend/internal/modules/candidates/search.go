@@ -19,15 +19,11 @@ import (
 // CVs is what search needs from the documents module: the candidates whose
 // CVs match a boolean search (as a text search query), and where.
 type CVs interface {
-	CandidatesWithMatchingCV(ctx context.Context, tx pgx.Tx, ts string, limit int) ([]string, error)
 	CVSnippets(ctx context.Context, tx pgx.Tx, ts string, candidateIDs []string) (map[string]string, error)
 }
 
 // SearchCVsWith gives search the documents module (wired after both exist).
 func (m *Module) SearchCVsWith(c CVs) { m.service.cvs = c }
-
-// MaxCVMatches is the most candidates a boolean search finds by their CVs.
-const MaxCVMatches = 20000
 
 // SearchFilter is an advanced search: every part given must hold.
 type SearchFilter struct {
@@ -105,21 +101,6 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	if f.SalaryMax != nil && !canSeeSalary(p) {
 		return page, apperr.Validation(apperr.FieldErrors{{Field: "expectedSalaryMax", Message: "needs a role that may see salaries"}})
 	}
-	var cvIDs []string
-	var cvQuery *string
-	cvLimit := MaxCVMatches
-	if plan == nil {
-		cvQuery = ts
-	} else {
-		cvQuery = prefilter
-		cvLimit = 0 // a necessary prefilter must include every match
-	}
-	if cvQuery != nil && s.cvs != nil {
-		var err error
-		if cvIDs, err = s.cvs.CandidatesWithMatchingCV(ctx, tx, *cvQuery, cvLimit); err != nil {
-			return page, err
-		}
-	}
 	industryIDs := []string{}
 	if len(f.Industries) > 0 && s.industries != nil {
 		var err error
@@ -135,7 +116,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	sort, cur, offset := f.Order.paging(p, cursor)
 	in := store.SearchCandidatesParams{
-		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), BooleanPlan: plan, Prefilter: prefilter,
+		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), BooleanPlan: plan, Prefilter: prefilter,
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
@@ -170,7 +151,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		return page, err
 	}
 	snippets := map[string]string{}
-	if len(matched) > 0 {
+	if len(matched) > 0 && s.cvs != nil {
 		if snippets, err = s.cvs.CVSnippets(ctx, tx, *ts, matched); err != nil {
 			return page, err
 		}
@@ -207,8 +188,8 @@ func searchRows(ctx context.Context, q *store.Queries, in store.SearchCandidates
 		return q.SearchCandidates(ctx, in)
 	}
 	sorted, err := q.SearchCandidatesSorted(ctx, store.SearchCandidatesSortedParams{
-		Sort: sort, RowOffset: offset, IndustryCandidateIds: in.IndustryCandidateIds, Ts: in.Ts, Query: in.Query, Phones: in.Phones,
-		CvIds: in.CvIds, BooleanPlan: in.BooleanPlan, Prefilter: in.Prefilter, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
+		Sort: sort, RowOffset: offset, Cursor: in.Cursor, IndustryCandidateIds: in.IndustryCandidateIds, Ts: in.Ts, Query: in.Query, Phones: in.Phones,
+		BooleanPlan: in.BooleanPlan, Prefilter: in.Prefilter, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
 		Residence: in.Residence, Sources: in.Sources, Industries: in.Industries, Skills: in.Skills, AllSkills: in.AllSkills,
 		Tags: in.Tags, Specializations: in.Specializations, Certifications: in.Certifications, Location: in.Location, NoticeMaxDays: in.NoticeMaxDays, SalaryMax: in.SalaryMax, SalaryCurrency: in.SalaryCurrency,
 		Owner: in.Owner, InIds: in.InIds, UpdatedWithinDays: in.UpdatedWithinDays, RowLimit: in.RowLimit,

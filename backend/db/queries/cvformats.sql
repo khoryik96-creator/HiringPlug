@@ -29,8 +29,8 @@ SELECT pg_advisory_xact_lock(hashtextextended('studio_cv:' || app_current_tenant
 SELECT EXISTS (SELECT 1 FROM studio_cv WHERE candidate_id = @candidate_id AND status = 'queued' AND created_at > now() - interval '15 minutes');
 
 -- name: InsertStudioCv :one
-INSERT INTO studio_cv (id, tenant_id, candidate_id, source_document_id, blind, neutral_gender, correct_language, alignment, created_by)
-VALUES (@id, app_current_tenant(), @candidate_id, @source_document_id, @blind, @neutral_gender, @correct_language, @alignment, app_current_user())
+INSERT INTO studio_cv (id, tenant_id, candidate_id, source_document_id, blind, neutral_gender, correct_language, alignment, created_by, replace_document_ids)
+VALUES (@id, app_current_tenant(), @candidate_id, @source_document_id, @blind, @neutral_gender, @correct_language, @alignment, app_current_user(), @replace_document_ids::text[])
 RETURNING *;
 
 -- name: GetStudioCv :one

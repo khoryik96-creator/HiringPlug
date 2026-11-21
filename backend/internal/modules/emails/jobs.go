@@ -21,19 +21,8 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 )
 
-// deliver handles email.send: it sends one queued email through the mail
-// server, in a transaction scoped to the job's tenant.
-//
-// A failure worth retrying (the server is down for a moment) fails the job, so
-// the queue tries again later and the email stays queued; a permanent one (a
-// refused address, no mail server set up) or the last attempt marks the email
-// failed with the reason. Delivery is at least once: if the server accepted
-// the email but the transaction then could not commit, it is sent again.
-func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
-	var payload api.EmailSendJob
-	if err := job.Decode(&payload); err != nil {
-		return err
-	}
+// deliver applies consent and reminder guards to a claimed delivery attempt.
+func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job, payload api.EmailSendJob, claimed bool, mayHaveDelivered *bool) error {
 	if job.Kind == api.JobKindEmailInterviewReminder && payload.InterviewReminder == nil {
 		return errors.New("interview reminder is missing its delivery guard")
 	}
@@ -49,77 +38,83 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if e.Status != string(api.EmailStatusQueued) {
 		return nil // already sent, or given up on
 	}
-	if reminder := payload.InterviewReminder; reminder != nil {
-		if s.deps.InterviewReminders == nil {
-			return errors.New("interview reminder guard is unavailable")
-		}
-		body, err := s.deps.InterviewReminders.ReminderBody(ctx, tx, job.TenantID, *reminder, e.ToAddresses)
-		if err != nil {
-			return err
-		}
-		if body == "" { // no longer due (moved, turned off, declined, cancelled): it never was an email, so it is not kept as a failed one
-			if err := q.DeleteQueuedEmail(ctx, e.ID); err != nil {
-				return err
-			}
-			return audit.Record(ctx, tx, audit.Entry{Action: "email.reminder_skipped", EntityType: "email", EntityID: e.ID})
-		}
-		e.Body = body
-		if err := q.UpdateQueuedReminderBody(ctx, store.UpdateQueuedReminderBodyParams{ID: e.ID, Body: body}); err != nil {
-			return err
-		}
-	}
-	agency, err := s.deps.Tenants.TenantName(ctx, tx, job.TenantID)
-	if err != nil {
-		return err
-	}
-	msg := mail.Message{
-		FromName: e.SenderName + " (" + agency + ")", ReplyTo: e.ReplyTo,
-		To: e.ToAddresses, Cc: e.CcAddresses, Bcc: e.BccAddresses, Subject: e.Subject, Body: e.Body,
-	}
-	if e.Calendar != nil {
-		msg.Calendar = *e.Calendar
-	}
 	var sendErr error
 	var provider string
-	if payload.AccountNotice == nil || !*payload.AccountNotice {
-		guardErr := s.checkRecipientConsent(ctx, tx, job.TenantID, payload.ConsentCandidateId, slices.Concat(e.ToAddresses, e.CcAddresses, e.BccAddresses))
-		var optedOut *apperr.Error
-		if errors.As(guardErr, &optedOut) && optedOut.Code == api.ErrorCodeEMAILDONOTCONTACT {
-			sendErr = fmt.Errorf("%w: a recipient opted out before delivery", mail.ErrPermanent)
-		} else if guardErr != nil {
-			return guardErr
+	if !claimed {
+		sendErr = mail.ErrUncertain
+	} else {
+		if reminder := payload.InterviewReminder; reminder != nil {
+			if s.deps.InterviewReminders == nil {
+				return errors.New("interview reminder guard is unavailable")
+			}
+			body, err := s.deps.InterviewReminders.ReminderBody(ctx, tx, job.TenantID, *reminder, e.ToAddresses)
+			if err != nil {
+				return err
+			}
+			if body == "" { // no longer due (moved, turned off, declined, cancelled): it never was an email, so it is not kept as a failed one
+				if err := q.DeleteQueuedEmail(ctx, e.ID); err != nil {
+					return err
+				}
+				return audit.Record(ctx, tx, audit.Entry{Action: "email.reminder_skipped", EntityType: "email", EntityID: e.ID})
+			}
+			e.Body = body
+			if err := q.UpdateQueuedReminderBody(ctx, store.UpdateQueuedReminderBodyParams{ID: e.ID, Body: body}); err != nil {
+				return err
+			}
 		}
-	}
-	if e.FeesRestricted {
-		if s.deps.Invoices == nil {
-			return errors.New("invoice delivery guard is unavailable")
-		}
-		ok, err := s.deps.Invoices.MayDeliver(ctx, tx, e.ID)
+		agency, err := s.deps.Tenants.TenantName(ctx, tx, job.TenantID)
 		if err != nil {
 			return err
 		}
-		if !ok {
-			sendErr = fmt.Errorf("%w: the invoice recipient changed", mail.ErrPermanent)
+		msg := mail.Message{
+			FromName: e.SenderName + " (" + agency + ")", ReplyTo: e.ReplyTo,
+			To: e.ToAddresses, Cc: e.CcAddresses, Bcc: e.BccAddresses, Subject: e.Subject, Body: e.Body,
 		}
-	}
-	if sendErr == nil {
-		switch partsErr := s.files2parts(ctx, q, e, &msg); {
-		case errors.Is(partsErr, os.ErrNotExist): // gone for good: retrying cannot help
-			sendErr = fmt.Errorf("%w: a banner or attached file of this email is missing", mail.ErrPermanent)
-		case partsErr != nil:
-			return partsErr
-		default:
-			provider, sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
-			if errors.Is(sendErr, mail.ErrPermanent) && e.MailboxRef != nil && e.Calendar != nil {
-				// An invitation must arrive: when the sender's mailbox cannot send
-				// it (disconnected, signed out), it goes from the server's address.
-				logx.From(ctx).Info("invitation sent from the server: the mailbox could not send it", "email_id", e.ID)
-				provider, sendErr = "", s.sender.Send(ctx, msg)
+		if e.Calendar != nil {
+			msg.Calendar = *e.Calendar
+		}
+		if payload.AccountNotice == nil || !*payload.AccountNotice {
+			guardErr := s.checkRecipientConsent(ctx, tx, job.TenantID, payload.ConsentCandidateId, slices.Concat(e.ToAddresses, e.CcAddresses, e.BccAddresses))
+			var optedOut *apperr.Error
+			if errors.As(guardErr, &optedOut) && optedOut.Code == api.ErrorCodeEMAILDONOTCONTACT {
+				sendErr = fmt.Errorf("%w: a recipient opted out before delivery", mail.ErrPermanent)
+			} else if guardErr != nil {
+				return guardErr
 			}
 		}
-	}
-	if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && job.Attempts < job.MaxAttempts {
-		return sendErr
+		if e.FeesRestricted {
+			if s.deps.Invoices == nil {
+				return errors.New("invoice delivery guard is unavailable")
+			}
+			ok, err := s.deps.Invoices.MayDeliver(ctx, tx, e.ID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				sendErr = fmt.Errorf("%w: the invoice recipient changed", mail.ErrPermanent)
+			}
+		}
+		if sendErr == nil {
+			switch partsErr := s.files2parts(ctx, q, e, &msg); {
+			case errors.Is(partsErr, os.ErrNotExist): // gone for good: retrying cannot help
+				sendErr = fmt.Errorf("%w: a banner or attached file of this email is missing", mail.ErrPermanent)
+			case partsErr != nil:
+				return partsErr
+			default:
+				*mayHaveDelivered = true // a panic or unknown result may follow delivery
+				provider, sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
+				if errors.Is(sendErr, mail.ErrPermanent) && e.MailboxRef != nil && e.Calendar != nil {
+					// An invitation must arrive: when the sender's mailbox cannot send
+					// it (disconnected, signed out), it goes from the server's address.
+					logx.From(ctx).Info("invitation sent from the server: the mailbox could not send it", "email_id", e.ID)
+					provider, sendErr = "", s.sender.Send(ctx, msg)
+				}
+			}
+		}
+		*mayHaveDelivered = *mayHaveDelivered && (sendErr == nil || errors.Is(sendErr, mail.ErrUncertain))
+		if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && !errors.Is(sendErr, mail.ErrUncertain) && job.Attempts < job.MaxAttempts {
+			return sendErr
+		}
 	}
 	status, action := api.EmailStatusSent, "email.sent"
 	var reason *string

@@ -780,39 +780,42 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 }
 
 const listCandidatesSorted = `-- name: ListCandidatesSorted :many
+WITH anchor AS MATERIALIZED (
+  SELECT app_candidate_order_key($1::text, a.name_text, a.notice_period_value, a.notice_period_unit, ac.current_currency, ac.current_amount, ac.current_period, ac.expected_currency, ac.expected_min, ac.expected_period) AS key
+  FROM candidate a LEFT JOIN candidate_compensation ac ON ac.candidate_id = a.id
+  WHERE a.id = $9::text
+)
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
        c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
        c.nationality, c.residence_country, c.source, c.industry
 FROM candidate c
 LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
-WHERE ($1::text IS NULL
-       OR CASE WHEN $2::boolean
-            THEN app_normalize_text($1::text) <% c.name_text
-            ELSE c.search_text LIKE ALL (app_search_patterns($1::text))
-              OR c.phone = ANY ($3::text[])
+CROSS JOIN LATERAL (SELECT app_candidate_order_key($1::text, c.name_text, c.notice_period_value, c.notice_period_unit, cc.current_currency, cc.current_amount, cc.current_period, cc.expected_currency, cc.expected_min, cc.expected_period) AS key) ordered
+WHERE ($2::text IS NULL
+       OR CASE WHEN $3::boolean
+            THEN app_normalize_text($2::text) <% c.name_text
+            ELSE c.search_text LIKE ALL (app_search_patterns($2::text))
+              OR c.phone = ANY ($4::text[])
           END)
-  AND ($4::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($4::text)])
-  AND ($5::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($5::text)])
-  AND ($6::text IS NULL OR c.owner_id = $6::text)
-  AND ($7::text[] IS NULL OR c.id = ANY ($7::text[])) -- a folder's
+  AND ($5::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($5::text)])
+  AND ($6::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($6::text)])
+  AND ($7::text IS NULL OR c.owner_id = $7::text)
+  AND ($8::text[] IS NULL OR c.id = ANY ($8::text[])) -- a folder's
+AND (NOT EXISTS (SELECT 1 FROM anchor) OR (
+  CASE WHEN $1::text = 'name_desc' THEN ordered.key < (SELECT key FROM anchor)
+       ELSE ordered.key > (SELECT key FROM anchor) END
+  OR (ordered.key = (SELECT key FROM anchor) AND c.id < $9::text)
+))
 ORDER BY
-  CASE WHEN $8::text = 'name' THEN c.name_text END ASC,
-  CASE WHEN $8::text = 'name_desc' THEN c.name_text END DESC,
-  CASE WHEN $8::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $8::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
-  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN $8::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN $8::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN $8::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $8::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN $8::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $8::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $1::text = 'name_desc' THEN ordered.key END DESC,
+  CASE WHEN $1::text <> 'name_desc' THEN ordered.key END ASC,
   c.id DESC
-LIMIT $10 OFFSET $9
+LIMIT $11 OFFSET CASE WHEN EXISTS (SELECT 1 FROM anchor) THEN 0 ELSE $10::int END
 `
 
 type ListCandidatesSortedParams struct {
+	Sort         string
 	Query        *string
 	SimilarNames bool
 	Phones       []string
@@ -820,7 +823,7 @@ type ListCandidatesSortedParams struct {
 	Skill        *string
 	Owner        *string
 	InIds        []string
-	Sort         string
+	Cursor       *string
 	RowOffset    int32
 	RowLimit     int32
 }
@@ -854,6 +857,7 @@ type ListCandidatesSortedRow struct {
 // Salaries only for roles that may see them (row-level security); for others the sort is newest first.
 func (q *Queries) ListCandidatesSorted(ctx context.Context, arg ListCandidatesSortedParams) ([]ListCandidatesSortedRow, error) {
 	rows, err := q.db.Query(ctx, listCandidatesSorted,
+		arg.Sort,
 		arg.Query,
 		arg.SimilarNames,
 		arg.Phones,
@@ -861,7 +865,7 @@ func (q *Queries) ListCandidatesSorted(ctx context.Context, arg ListCandidatesSo
 		arg.Skill,
 		arg.Owner,
 		arg.InIds,
-		arg.Sort,
+		arg.Cursor,
 		arg.RowOffset,
 		arg.RowLimit,
 	)
@@ -1310,60 +1314,62 @@ SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.cur
        (CASE WHEN $1::jsonb IS NOT NULL THEN (matches.hits & 1) <> 0
              ELSE $2::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', $2::text) END)::boolean AS profile_hit,
        (CASE WHEN $1::jsonb IS NOT NULL THEN (matches.hits & 2) <> 0
-             ELSE c.id = ANY ($3::text[]) END)::boolean AS cv_hit
+             ELSE cv.candidate_id IS NOT NULL END)::boolean AS cv_hit
 FROM candidate c
 CROSS JOIN LATERAL (SELECT app_candidate_boolean_matches(c.id, c.profile_terms, $1::jsonb) AS hits OFFSET 0) matches
+LEFT JOIN app_cv_candidate_matches(
+  CASE WHEN $1::jsonb IS NULL THEN $2::text ELSE $3::text END
+) cv ON cv.candidate_id = c.id
 WHERE ($4::text IS NULL OR c.id < $4::text)
   AND ($5::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns($5::text))
        OR c.phone = ANY ($6::text[]))
-  AND ($7::text IS NULL OR c.profile_terms @@ to_tsquery('english', $7::text)
-       OR c.id = ANY ($3::text[]))
+  AND ($3::text IS NULL OR c.profile_terms @@ to_tsquery('english', $3::text)
+       OR cv.candidate_id IS NOT NULL)
   AND (CASE WHEN $1::jsonb IS NOT NULL THEN matches.hits <> 0
             ELSE $2::text IS NULL OR c.profile_terms @@ to_tsquery('english', $2::text)
-                 OR c.id = ANY ($3::text[]) END)
-  AND (cardinality($8::text[]) = 0 OR c.availability = ANY ($8::text[]))
-  AND (cardinality($9::text[]) = 0 OR (CASE
+                 OR cv.candidate_id IS NOT NULL END)
+  AND (cardinality($7::text[]) = 0 OR c.availability = ANY ($7::text[]))
+  AND (cardinality($8::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
          WHEN c.work_authorization = 'requires_visa' THEN 'needs_pass'
          WHEN c.work_authorization = 'expat_eligible' AND c.work_authorization_basis = 'permanent_resident' THEN 'pr'
          WHEN c.work_authorization = 'expat_eligible' THEN 'expat'
-         ELSE 'unknown' END) = ANY ($9::text[]))
-  AND (cardinality($10::text[]) = 0 OR c.nationality = ANY ($10::text[]))
-  AND (cardinality($11::text[]) = 0 OR c.residence_country = ANY ($11::text[]))
-  AND (cardinality($12::text[]) = 0 OR c.source = ANY ($12::text[]))
-  AND (cardinality($13::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($13::text[])) OR c.id = ANY($14::text[]))
-  AND (cardinality($15::text[]) = 0
-       OR ($16::boolean AND app_lower_array(c.skills) @> app_lower_array($15::text[]))
-       OR (NOT $16::boolean AND app_lower_array(c.skills) && app_lower_array($15::text[])))
-  AND (cardinality($17::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($17::text[]))
-  AND (cardinality($18::text[]) = 0 OR lower(c.specialization) = ANY (app_lower_array($18::text[])))
-  AND (cardinality($19::text[]) = 0 OR app_lower_array(c.certifications) @> app_lower_array($19::text[]))
-  AND ($20::text IS NULL
-       OR c.location ILIKE '%' || replace(replace(replace($20::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-  AND ($21::int IS NULL OR (c.notice_period_value IS NOT NULL AND
-       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $21::int))
+         ELSE 'unknown' END) = ANY ($8::text[]))
+  AND (cardinality($9::text[]) = 0 OR c.nationality = ANY ($9::text[]))
+  AND (cardinality($10::text[]) = 0 OR c.residence_country = ANY ($10::text[]))
+  AND (cardinality($11::text[]) = 0 OR c.source = ANY ($11::text[]))
+  AND (cardinality($12::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($12::text[])) OR c.id = ANY($13::text[]))
+  AND (cardinality($14::text[]) = 0
+       OR ($15::boolean AND app_lower_array(c.skills) @> app_lower_array($14::text[]))
+       OR (NOT $15::boolean AND app_lower_array(c.skills) && app_lower_array($14::text[])))
+  AND (cardinality($16::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($16::text[]))
+  AND (cardinality($17::text[]) = 0 OR lower(c.specialization) = ANY (app_lower_array($17::text[])))
+  AND (cardinality($18::text[]) = 0 OR app_lower_array(c.certifications) @> app_lower_array($18::text[]))
+  AND ($19::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($19::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($20::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $20::int))
   -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
-  AND ($22::text IS NULL OR EXISTS (
+  AND ($21::text IS NULL OR EXISTS (
        SELECT 1 FROM candidate_compensation cc
-       WHERE cc.candidate_id = c.id AND cc.expected_currency = $23::text
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $22::text
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
-             <= ($22::text)::numeric))
-  AND ($24::text IS NULL OR c.owner_id = $24::text)
-  AND ($25::text[] IS NULL OR c.id = ANY ($25::text[])) -- a folder's
-  AND ($26::int IS NULL OR c.updated_at >= now() - make_interval(days => $26::int))
+             <= ($21::text)::numeric))
+  AND ($23::text IS NULL OR c.owner_id = $23::text)
+  AND ($24::text[] IS NULL OR c.id = ANY ($24::text[])) -- a folder's
+  AND ($25::int IS NULL OR c.updated_at >= now() - make_interval(days => $25::int))
 ORDER BY c.id DESC
-LIMIT $27
+LIMIT $26
 `
 
 type SearchCandidatesParams struct {
 	BooleanPlan          []byte
 	Ts                   *string
-	CvIds                []string
+	Prefilter            *string
 	Cursor               *string
 	Query                *string
 	Phones               []string
-	Prefilter            *string
 	Availability         []string
 	WaKinds              []string
 	Nationality          []string
@@ -1420,11 +1426,10 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 	rows, err := q.db.Query(ctx, searchCandidates,
 		arg.BooleanPlan,
 		arg.Ts,
-		arg.CvIds,
+		arg.Prefilter,
 		arg.Cursor,
 		arg.Query,
 		arg.Phones,
-		arg.Prefilter,
 		arg.Availability,
 		arg.WaKinds,
 		arg.Nationality,
@@ -1488,6 +1493,11 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 }
 
 const searchCandidatesSorted = `-- name: SearchCandidatesSorted :many
+WITH anchor AS MATERIALIZED (
+  SELECT app_candidate_order_key($4::text, a.name_text, a.notice_period_value, a.notice_period_unit, ac.current_currency, ac.current_amount, ac.current_period, ac.expected_currency, ac.expected_min, ac.expected_period) AS key
+  FROM candidate a LEFT JOIN candidate_compensation ac ON ac.candidate_id = a.id
+  WHERE a.id = $26::text
+)
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
        c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
@@ -1495,18 +1505,22 @@ SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.cur
        (CASE WHEN $1::jsonb IS NOT NULL THEN (matches.hits & 1) <> 0
              ELSE $2::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', $2::text) END)::boolean AS profile_hit,
        (CASE WHEN $1::jsonb IS NOT NULL THEN (matches.hits & 2) <> 0
-             ELSE c.id = ANY ($3::text[]) END)::boolean AS cv_hit
+             ELSE cv.candidate_id IS NOT NULL END)::boolean AS cv_hit
 FROM candidate c
 CROSS JOIN LATERAL (SELECT app_candidate_boolean_matches(c.id, c.profile_terms, $1::jsonb) AS hits OFFSET 0) matches
 LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
-WHERE ($4::text IS NULL
-       OR c.search_text LIKE ALL (app_search_patterns($4::text))
-       OR c.phone = ANY ($5::text[]))
-  AND ($6::text IS NULL OR c.profile_terms @@ to_tsquery('english', $6::text)
-       OR c.id = ANY ($3::text[]))
+LEFT JOIN app_cv_candidate_matches(
+  CASE WHEN $1::jsonb IS NULL THEN $2::text ELSE $3::text END
+) cv ON cv.candidate_id = c.id
+CROSS JOIN LATERAL (SELECT app_candidate_order_key($4::text, c.name_text, c.notice_period_value, c.notice_period_unit, cc.current_currency, cc.current_amount, cc.current_period, cc.expected_currency, cc.expected_min, cc.expected_period) AS key) ordered
+WHERE ($5::text IS NULL
+       OR c.search_text LIKE ALL (app_search_patterns($5::text))
+       OR c.phone = ANY ($6::text[]))
+  AND ($3::text IS NULL OR c.profile_terms @@ to_tsquery('english', $3::text)
+       OR cv.candidate_id IS NOT NULL)
   AND (CASE WHEN $1::jsonb IS NOT NULL THEN matches.hits <> 0
             ELSE $2::text IS NULL OR c.profile_terms @@ to_tsquery('english', $2::text)
-                 OR c.id = ANY ($3::text[]) END)
+                 OR cv.candidate_id IS NOT NULL END)
   AND (cardinality($7::text[]) = 0 OR c.availability = ANY ($7::text[]))
   AND (cardinality($8::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
@@ -1537,29 +1551,25 @@ WHERE ($4::text IS NULL
   AND ($23::text IS NULL OR c.owner_id = $23::text)
   AND ($24::text[] IS NULL OR c.id = ANY ($24::text[])) -- a folder's
   AND ($25::int IS NULL OR c.updated_at >= now() - make_interval(days => $25::int))
+AND (NOT EXISTS (SELECT 1 FROM anchor) OR (
+  CASE WHEN $4::text = 'name_desc' THEN ordered.key < (SELECT key FROM anchor)
+       ELSE ordered.key > (SELECT key FROM anchor) END
+  OR (ordered.key = (SELECT key FROM anchor) AND c.id < $26::text)
+))
 ORDER BY
-  CASE WHEN $26::text = 'name' THEN c.name_text END ASC,
-  CASE WHEN $26::text = 'name_desc' THEN c.name_text END DESC,
-  CASE WHEN $26::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $26::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
-  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN $26::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN $26::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN $26::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $26::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN $26::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $26::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $4::text = 'name_desc' THEN ordered.key END DESC,
+  CASE WHEN $4::text <> 'name_desc' THEN ordered.key END ASC,
   c.id DESC
-LIMIT $28 OFFSET $27
+LIMIT $28 OFFSET CASE WHEN EXISTS (SELECT 1 FROM anchor) THEN 0 ELSE $27::int END
 `
 
 type SearchCandidatesSortedParams struct {
 	BooleanPlan          []byte
 	Ts                   *string
-	CvIds                []string
+	Prefilter            *string
+	Sort                 string
 	Query                *string
 	Phones               []string
-	Prefilter            *string
 	Availability         []string
 	WaKinds              []string
 	Nationality          []string
@@ -1579,7 +1589,7 @@ type SearchCandidatesSortedParams struct {
 	Owner                *string
 	InIds                []string
 	UpdatedWithinDays    *int32
-	Sort                 string
+	Cursor               *string
 	RowOffset            int32
 	RowLimit             int32
 }
@@ -1617,10 +1627,10 @@ func (q *Queries) SearchCandidatesSorted(ctx context.Context, arg SearchCandidat
 	rows, err := q.db.Query(ctx, searchCandidatesSorted,
 		arg.BooleanPlan,
 		arg.Ts,
-		arg.CvIds,
+		arg.Prefilter,
+		arg.Sort,
 		arg.Query,
 		arg.Phones,
-		arg.Prefilter,
 		arg.Availability,
 		arg.WaKinds,
 		arg.Nationality,
@@ -1640,7 +1650,7 @@ func (q *Queries) SearchCandidatesSorted(ctx context.Context, arg SearchCandidat
 		arg.Owner,
 		arg.InIds,
 		arg.UpdatedWithinDays,
-		arg.Sort,
+		arg.Cursor,
 		arg.RowOffset,
 		arg.RowLimit,
 	)

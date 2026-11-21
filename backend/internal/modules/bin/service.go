@@ -35,6 +35,8 @@ type Check struct {
 func (s *Service) linked(ctx context.Context, tx pgx.Tx, kind, id string) (label string, contacts, jobs []string, apps []Application, err error) {
 	d := s.deps
 	switch kind {
+	case "document":
+		label, err = d.Files.DocumentLabel(ctx, tx, id)
 	case "candidate":
 		if label, err = d.Candidates.Label(ctx, tx, id); err == nil {
 			apps, err = d.Pipeline.ApplicationsOf(ctx, tx, []string{id}, nil)
@@ -118,6 +120,8 @@ func (s *Service) Bin(ctx context.Context, p authz.Principal, kind, id, moveTo s
 			return err
 		}
 		switch kind {
+		case "document":
+			err = d.Files.BinActiveDocument(ctx, tx, id)
 		case "candidate":
 			_, err = d.Candidates.Bin(ctx, tx, id)
 		case "contact":
@@ -183,6 +187,11 @@ func (s *Service) Restore(ctx context.Context, p authz.Principal, entryID string
 		went := decodeWentWith(e.WentWith)
 		var apps []Application
 		switch e.Kind {
+		case "document":
+			if !time.Now().Before(e.PurgeAfter) {
+				return apperr.NotFound("unexpired bin entry")
+			}
+			err = d.Files.RestoreDocument(ctx, tx, e.RecordID)
 		case "candidate":
 			err = d.Candidates.Restore(ctx, tx, e.RecordID)
 			if err == nil {

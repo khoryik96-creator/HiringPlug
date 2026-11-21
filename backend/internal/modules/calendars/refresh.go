@@ -170,6 +170,6 @@ func (s *Service) reconcileHolds(ctx context.Context, tx pgx.Tx, user string, fr
 			keys = append(keys, sourceOf(h.Source, *h.SourceID))
 		}
 	}
-	_, err = s.gone(ctx, tx, keys)
+	_, err = s.gone(ctx, tx, keys, true)
 	return err
 }

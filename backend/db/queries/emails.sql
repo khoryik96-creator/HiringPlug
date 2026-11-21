@@ -179,3 +179,10 @@ INSERT INTO email_signature (tenant_id, user_id, body_html) VALUES (app_current_
 ON CONFLICT (tenant_id, user_id) DO UPDATE SET body_html = excluded.body_html, version = email_signature.version + 1, updated_at = now()
   WHERE email_signature.version = @version
 RETURNING *;
+
+-- name: BeginEmailDelivery :execrows
+UPDATE email SET delivery_attempted_at = now()
+WHERE id = @id AND status = 'queued' AND delivery_attempted_at IS NULL;
+
+-- name: ReleaseEmailDelivery :exec
+UPDATE email SET delivery_attempted_at = NULL WHERE id = @id AND status = 'queued';

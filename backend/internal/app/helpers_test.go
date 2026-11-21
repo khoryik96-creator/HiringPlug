@@ -211,12 +211,15 @@ func (a *testApp) checkAgainstContract(req *http.Request, res *response) {
 }
 
 // upload sends a multipart upload. Pass source "" to leave the field out.
-func (a *testApp) upload(path, token, source, fileName string, content []byte) *response {
+func (a *testApp) upload(path, token, source, fileName string, content []byte, replace ...string) *response {
 	a.t.Helper()
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 	if source != "" {
 		require.NoError(a.t, w.WriteField("source", source))
+	}
+	for _, id := range replace {
+		require.NoError(a.t, w.WriteField("replaceDocumentIds", id))
 	}
 	if fileName != "" {
 		part, err := w.CreateFormFile("file", fileName)

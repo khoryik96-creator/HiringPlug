@@ -720,18 +720,25 @@ func (q *Queries) PageCandidateApplications(ctx context.Context, arg PageCandida
 
 const pageJobApplications = `-- name: PageJobApplications :many
 SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1
-  AND ($2::text IS NULL OR id > $2::text)
-ORDER BY id LIMIT $3
+  AND ($2::text IS NULL OR stage = $2::text)
+  AND ($3::text IS NULL OR id > $3::text)
+ORDER BY id LIMIT $4
 `
 
 type PageJobApplicationsParams struct {
 	JobOrderID string
+	Stage      *string
 	Cursor     *string
 	RowLimit   int32
 }
 
 func (q *Queries) PageJobApplications(ctx context.Context, arg PageJobApplicationsParams) ([]Application, error) {
-	rows, err := q.db.Query(ctx, pageJobApplications, arg.JobOrderID, arg.Cursor, arg.RowLimit)
+	rows, err := q.db.Query(ctx, pageJobApplications,
+		arg.JobOrderID,
+		arg.Stage,
+		arg.Cursor,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -755,6 +762,45 @@ func (q *Queries) PageJobApplications(ctx context.Context, arg PageJobApplicatio
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pipelineColumnCounts = `-- name: PipelineColumnCounts :many
+SELECT stage, step, count(*)::int AS n,
+  count(*) FILTER (WHERE stage <> 'placed' AND stage_changed_at <= now() - interval '7 days')::int AS waiting
+FROM application WHERE job_order_id = $1
+GROUP BY stage, step
+`
+
+type PipelineColumnCountsRow struct {
+	Stage   string
+	Step    *string
+	N       int32
+	Waiting int32
+}
+
+func (q *Queries) PipelineColumnCounts(ctx context.Context, jobOrderID string) ([]PipelineColumnCountsRow, error) {
+	rows, err := q.db.Query(ctx, pipelineColumnCounts, jobOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PipelineColumnCountsRow
+	for rows.Next() {
+		var i PipelineColumnCountsRow
+		if err := rows.Scan(
+			&i.Stage,
+			&i.Step,
+			&i.N,
+			&i.Waiting,
 		); err != nil {
 			return nil, err
 		}

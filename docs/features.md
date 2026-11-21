@@ -38,6 +38,13 @@ still be docked. Email composers reveal candidate/CV controls and extra
 formatting on demand; CC/BCC, field insertion, attachments, templates, booking,
 preview and validation keep their existing behavior.
 
+A candidate can keep three formatted CVs and four non-formatted CVs. When a
+category is full, upload or formatting asks which existing CV to replace.
+The old CV goes to Settings → Bin only once the new CV is saved. An admin can
+move any CV to the Bin from its file menu and restore a binned CV when there
+is room in the same category. Word and PDF copies of a formatted CV count as
+one file. Files still in the Bin are permanently removed after 30 days.
+
 
 Context from your answers: **agency and in-house**, **your own team and other
 companies (SaaS)**, **local first, cloud later**, and every version 1

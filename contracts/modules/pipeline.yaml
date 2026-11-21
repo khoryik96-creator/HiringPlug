@@ -44,6 +44,12 @@ paths:
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 1000, default: 1000 }
+        - name: stage
+          in: query
+          schema: { $ref: '#/components/schemas/Stage' }
+        - name: includeCounts
+          in: query
+          schema: { type: boolean }
       responses:
         '200':
           description: OK
@@ -506,10 +512,21 @@ components:
         stageChangedAt: { type: string, format: date-time, description: When it entered its current stage. }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    PipelineColumnCount:
+      type: object
+      required: [stage, step, count, waiting]
+      properties:
+        stage: { $ref: '#/components/schemas/Stage' }
+        step: { type: string, nullable: true }
+        count: { type: integer }
+        waiting: { type: integer }
     ApplicationList:
       type: object
       required: [items]
       properties:
+        counts:
+          type: array
+          items: { $ref: '#/components/schemas/PipelineColumnCount' }
         nextCursor:
           $ref: '#/components/schemas/ApplicationId'
           description: Continue after this application ID when more results are available.

@@ -16,6 +16,9 @@ x-module:
       description: "Delete formatted CVs (made by HiringPlug); candidates' own CVs are always kept."
       roles: [owner, admin, recruiter, sourcer]
   errorCodes:
+    DOCUMENT_LIMIT:
+      status: 409
+      description: Choose which active CVs in this category to replace.
     DOCUMENT_DUPLICATE:
       status: 409
       description: "The candidate already has this exact file (the same bytes): it is not uploaded again. `details.existingDocumentId` is the one they have."
@@ -91,6 +94,10 @@ paths:
                   type: string
                   format: binary
                 source: { $ref: '#/components/schemas/DocumentSource' }
+                replaceDocumentIds:
+                  type: array
+                  items: { $ref: '#/components/schemas/DocumentId' }
+                  description: Active CV IDs in the same category to move to the Bin after saving the new file.
       responses:
         '201':
           description: Created
@@ -102,7 +109,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The candidate already has this exact file (DOCUMENT_DUPLICATE).
+          description: This file is a duplicate or the candidate is at their CV limit.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

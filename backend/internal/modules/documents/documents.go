@@ -35,6 +35,7 @@ import (
 // it here (rather than importing that module's types) keeps the dependency
 // small and lets tests substitute it.
 type Candidates interface {
+	Binned(ctx context.Context, tx pgx.Tx, ids []string) ([]string, error)
 	Exists(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
 	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 }
@@ -87,7 +88,7 @@ func (m *Module) AddFileAs(ctx context.Context, tx pgx.Tx, tenantID, candidateID
 	if same != nil {
 		return same.DocumentID, func() {}, nil
 	}
-	doc, key, err := m.service.add(ctx, tx, tenantID, candidateID, source, fileName, contentType, data)
+	doc, key, err := m.service.add(ctx, tx, tenantID, "", candidateID, source, fileName, contentType, data, nil)
 	undo = func() {
 		if key != "" {
 			_ = m.service.files.Delete(key)
@@ -100,9 +101,9 @@ func (m *Module) AddFileAs(ctx context.Context, tx pgx.Tx, tenantID, candidateID
 // candidate, in the caller's transaction; it is read and parsed like any CV,
 // so it can be compared with the original, and turned into a PDF. undo removes the stored file;
 // call it if the transaction rolls back.
-func (m *Module) AddFormatted(ctx context.Context, tx pgx.Tx, tenantID, candidateID, fileName string, data []byte) (documentID string, undo func(), err error) {
-	doc, key, err := m.service.add(ctx, tx, tenantID, candidateID, "formatted", fileName,
-		ContentTypeDOCX, data)
+func (m *Module) AddFormatted(ctx context.Context, tx pgx.Tx, tenantID, actorID, candidateID, fileName string, data []byte, replace []string) (documentID string, undo func(), err error) {
+	doc, key, err := m.service.add(ctx, tx, tenantID, actorID, candidateID, "formatted", fileName,
+		ContentTypeDOCX, data, replace)
 	undo = func() {
 		if key != "" {
 			_ = m.service.files.Delete(key)

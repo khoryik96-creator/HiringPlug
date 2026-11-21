@@ -48,7 +48,8 @@ type Deps struct {
 	}
 	// Documents saves the result as the candidate's formatted CV (documents module).
 	Documents interface {
-		AddFormatted(ctx context.Context, tx pgx.Tx, tenantID, candidateID, fileName string, data []byte) (string, func(), error)
+		CheckFormattedCapacity(ctx context.Context, tx pgx.Tx, candidateID string, replace []string) error
+		AddFormatted(ctx context.Context, tx pgx.Tx, tenantID, actorID, candidateID, fileName string, data []byte, replace []string) (string, func(), error)
 	}
 	Tenants interface {
 		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)

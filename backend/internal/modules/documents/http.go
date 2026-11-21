@@ -26,6 +26,7 @@ type HTTP struct {
 // (multipart/form-data with fields `source` and `file`, in any order).
 func (h *HTTP) UploadCandidateDocument(ctx context.Context, req api.UploadCandidateDocumentRequestObject) (api.UploadCandidateDocumentResponseObject, error) {
 	var source, fileName string
+	var replace []string
 	var data []byte
 	var fields apperr.FieldErrors
 	for {
@@ -43,6 +44,12 @@ func (h *HTTP) UploadCandidateDocument(ctx context.Context, req api.UploadCandid
 				return nil, uploadReadError(err)
 			}
 			source = strings.TrimSpace(string(b))
+		case "replaceDocumentIds":
+			id, err := io.ReadAll(io.LimitReader(part, 64))
+			if err != nil {
+				return nil, uploadReadError(err)
+			}
+			replace = append(replace, strings.TrimSpace(string(id)))
 		case "file":
 			fileName = part.FileName()
 			data, err = io.ReadAll(io.LimitReader(part, h.maxUploadBytes+1))
@@ -54,7 +61,7 @@ func (h *HTTP) UploadCandidateDocument(ctx context.Context, req api.UploadCandid
 					fmt.Sprintf("Files can be at most %d MB.", h.maxUploadBytes>>20))
 			}
 		default:
-			fields.Add(part.FormName(), "unexpected field; send only source and file")
+			fields.Add(part.FormName(), "unexpected field; send source, file and optional replaceDocumentIds")
 		}
 	}
 	if !api.DocumentSource(source).Valid() {
@@ -66,7 +73,7 @@ func (h *HTTP) UploadCandidateDocument(ctx context.Context, req api.UploadCandid
 	if err := fields.Err(); err != nil {
 		return nil, err
 	}
-	doc, err := h.svc.Upload(ctx, authz.MustFromContext(ctx), req.CandidateId, source, fileName, data)
+	doc, err := h.svc.Upload(ctx, authz.MustFromContext(ctx), req.CandidateId, source, fileName, data, replace)
 	if err != nil {
 		return nil, err
 	}

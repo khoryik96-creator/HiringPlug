@@ -8,7 +8,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { ErrorMessage } from "./ErrorMessage";
 
-type Kind = Schemas["BinKind"];
+type Kind = Exclude<Schemas["BinKind"], "document">;
 const LIST: Record<Kind, string> = { candidate: "#/candidates", contact: "#/contacts", company: "#/companies" };
 
 const plural = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? "" : "s"}`;

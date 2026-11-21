@@ -51,7 +51,7 @@ paths:
     post:
       operationId: binRecord
       tags: ["bin"]
-      summary: Delete a candidate, contact or company (to the Bin)
+      summary: Move a candidate, contact, company or CV to the Bin
       description: >
         A company's contacts and jobs are moved to moveTo (another company)
         when it is given, and otherwise go to the Bin with it.
@@ -124,7 +124,7 @@ components:
       pattern: '^bin_[0-9a-hjkmnp-tv-z]{26}$'
     BinKind:
       type: string
-      enum: [candidate, contact, company]
+      enum: [candidate, contact, company, document]
     BinInput:
       type: object
       additionalProperties: false

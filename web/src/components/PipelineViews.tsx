@@ -5,9 +5,14 @@
 //   first), the column folded after 8, a "next" button on each line.
 // Clicking a person's line chooses them for the bar above (email, move), as
 // the cards did.
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { Application, Schemas } from "../api/client";
+import { api, type Application, type Permission, type Schemas, unwrap } from "../api/client";
+import { applicationsKey, candidatesKey } from "../api/keys";
+import { IconButton, PlusIcon } from "./ActionIcons";
+import { ErrorMessage } from "./ErrorMessage";
+import { type Picked, SearchPicker } from "./SearchPicker";
 import { CHANNEL, STAGE } from "../labels";
 import { daysInStage, MoveMenu, offerChip, timeInStage, type Upcoming, waitTone, when } from "./ApplicationCard";
 import { FitBadge, type Match } from "./Fit";
@@ -98,40 +103,46 @@ export function PipelineSteps(props: Shared & {
   /** The column shown (its key), or everyone. */
   stage: string; onStage: (key: string) => void; order: (a: Application, b: Application) => number;
   /** Choose (or, all chosen, unchoose) everyone shown. */
-  onPickAll?: (apps: Application[], on: boolean) => void;
+  onPickAll?: (on: boolean) => void;
+  countOf: (column: Column) => number;
+  waitingOf: (column: Column) => number;
+  activeCount: number;
+  pending: boolean;
+  choosing: boolean;
+  onMore?: () => void;
 }) {
   const { apps, stage, now, columns } = props;
   const column = columns.find((c) => c.key === stage);
   const inColumn = (c: Column) => apps.filter((a) => columnOf(a, columns)?.key === c.key);
   const shown = (column ? inColumn(column) : [...apps]).sort(props.order);
-  const allPicked = shown.length > 0 && shown.every((a) => props.picked.includes(a.id));
+  const total = column ? props.countOf(column) : props.activeCount;
+  const allPicked = shown.length >= total && shown.length > 0 && shown.every((a) => props.picked.includes(a.id));
   const where = column ? ` in ${column.label}` : "";
   return (
     <div className="pipeline-steps">
       <div className="funnel" role="tablist" aria-label="Stages" style={{ "--cols": columns.length } as React.CSSProperties}>
         <button type="button" role="tab" aria-selected={stage === "all"} className="stage-step all" onClick={() => { props.onStage("all"); }}>
-          <small>All</small><b>{apps.length}</b>
+          <small>All</small><b>{props.activeCount}</b>
         </button>
         {columns.map((c) => {
-          const inStage = inColumn(c);
-          const long = inStage.filter((a) => waiting(a, now)).length;
+          const long = props.waitingOf(c);
           return (
             <button key={c.key} type="button" role="tab" aria-selected={stage === c.key} className={`stage-step stage-${c.stage}`} onClick={() => { props.onStage(c.key); }}>
-              <small>{c.label}</small><b>{inStage.length}</b>
+              <small>{c.label}</small><b>{props.countOf(c)}</b>
               {long > 0 && <span className="stage-wait">{long} waiting 7+ days</span>}
             </button>
           );
         })}
       </div>
-      {props.onPickAll && shown.length > 0 && (
+      {props.onPickAll && total > 0 && (
         <div className="step-tools">
-          <button type="button" className="link" onClick={() => { props.onPickAll?.(shown, !allPicked); }}>
-            {allPicked ? `Unchoose all ${String(shown.length)}${where}` : `Choose all ${String(shown.length)}${where}`}
+          <button type="button" className="link" disabled={props.choosing} onClick={() => { props.onPickAll?.(!allPicked); }}>
+            {allPicked ? `Unchoose all ${String(total)}${where}` : `Choose all ${String(total)}${where}`}
           </button>
         </div>
       )}
       <div role="list" aria-label={column ? column.label : "Everyone"} className="step-rows">
-        {shown.length === 0 && <p className="column-empty">{column?.stage === "placed" ? "Nobody placed yet" : "Nobody here"}</p>}
+        {shown.length === 0 && total === 0 && <p className="column-empty">{column?.stage === "placed" ? "Nobody placed yet" : "Nobody here"}</p>}
         {shown.map((a) => {
           const next = nextStep(a, columns);
           const days = daysInStage(a, now);
@@ -160,6 +171,7 @@ export function PipelineSteps(props: Shared & {
           );
         })}
       </div>
+      {props.onMore && <button type="button" className="link" disabled={props.pending} onClick={props.onMore}>Load more</button>}
     </div>
   );
 }
@@ -195,7 +207,10 @@ export function BoardLine(props: Shared & { a: Application; onDragStart: (a: App
 }
 
 /** A column's people: the first 8, then "+N more" opens the rest. */
-export function FoldedLines(props: Shared & { lines: Application[]; onDragStart: (a: Application) => void }) {
+export function FoldedLines(props: Shared & {
+  lines: Application[]; onDragStart: (a: Application) => void;
+  total: number; onMore?: () => void; moreLabel: string; pending: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const shown = open ? props.lines : props.lines.slice(0, FOLD);
   return (
@@ -203,8 +218,11 @@ export function FoldedLines(props: Shared & { lines: Application[]; onDragStart:
       {shown.map((a) => <div role="listitem" key={a.id}><BoardLine {...props} a={a} /></div>)}
       {props.lines.length > FOLD && (
         <button type="button" className="link fold-more" onClick={() => { setOpen(!open); }}>
-          {open ? "Show fewer" : `+${String(props.lines.length - FOLD)} more`}
+          {open ? "Show fewer" : `+${String(props.total - FOLD)} more`}
         </button>
+      )}
+      {props.onMore && (open || props.lines.length <= FOLD) && (
+        <button type="button" className="link" disabled={props.pending} onClick={props.onMore}>{props.moreLabel}</button>
       )}
     </>
   );
@@ -215,4 +233,65 @@ const VIEW_KEY = "hp.pipelineView";
 export function usePipelineView(): [PipelineView, (v: PipelineView) => void] {
   const [view, setView] = useState<PipelineView>(() => { try { return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "steps"; } catch { return "steps"; } });
   return [view, (v) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* not remembered */ } }];
+}
+
+/** Put a candidate on this job. */
+export function AddCandidate({ jobId }: { jobId: string }) {
+  const queryClient = useQueryClient();
+  const [picked, setPicked] = useState<Picked | null>(null);
+  const add = useMutation({
+    mutationFn: async (candidateId: string) =>
+      unwrap(await api.POST("/v1/jobs/{jobId}/applications", { params: { path: { jobId } }, body: { candidateId } })),
+    onSuccess: () => {
+      setPicked(null);
+      void queryClient.invalidateQueries({ queryKey: applicationsKey });
+    },
+  });
+  return (
+    <div className="row">
+      <SearchPicker
+        value={picked}
+        onChange={(p) => { setPicked(p); add.reset(); }}
+        queryKey={candidatesKey}
+        placeholder="Add a candidate"
+        noMatch="No matching candidates."
+        search={async (q) =>
+          unwrap(await api.GET("/v1/candidates", { params: { query: { q, limit: 8 } } })).items.map((c) => ({ id: c.id, name: c.fullName, detail: c.currentTitle }))}
+      />
+      {picked && <IconButton label="Add to job" icon={<PlusIcon />} className="icon-outline" disabled={add.isPending} onClick={() => { add.mutate(picked.id); }} />}
+      <ErrorMessage error={add.error} />
+    </div>
+  );
+}
+
+/**
+ * What is coming up for candidates, by application: the next scheduled
+ * interview (8 weeks ahead) and a sent offer's last day to answer. Read with
+ * the user's own permissions: without one, that part is simply not shown.
+ */
+export function useUpcoming(permissions: Permission[], now: number): Map<string, Upcoming> {
+  const interviews = useQuery({
+    queryKey: ["interviews", "upcoming", Math.floor(now / 3_600_000)],
+    queryFn: async () => unwrap(await api.GET("/v1/interviews", { params: { query: {
+      from: new Date(now).toISOString(), to: new Date(now + 56 * 86_400_000).toISOString(),
+    } } })).items,
+    enabled: permissions.includes("interviews:read"),
+    retry: false,
+  });
+  const offers = useQuery({
+    queryKey: ["offers", "sent"],
+    queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { status: "sent" } } })).items,
+    enabled: permissions.includes("offers:read"),
+    retry: false,
+  });
+  const out = new Map<string, Upcoming>();
+  for (const i of interviews.data ?? []) {
+    if (i.status !== "scheduled" || Date.parse(i.startsAt) < now) continue;
+    const had = out.get(i.applicationId);
+    if (!had?.interviewAt || i.startsAt < had.interviewAt) out.set(i.applicationId, { ...had, interviewAt: i.startsAt });
+  }
+  for (const o of offers.data ?? []) {
+    if (o.expiresOn) out.set(o.applicationId, { ...out.get(o.applicationId), offerExpiresOn: o.expiresOn });
+  }
+  return out;
 }

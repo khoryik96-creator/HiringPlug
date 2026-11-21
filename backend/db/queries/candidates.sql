@@ -98,18 +98,21 @@ SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.cur
        (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 1) <> 0
              ELSE sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) END)::boolean AS profile_hit,
        (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 2) <> 0
-             ELSE c.id = ANY (@cv_ids::text[]) END)::boolean AS cv_hit
+             ELSE cv.candidate_id IS NOT NULL END)::boolean AS cv_hit
 FROM candidate c
 CROSS JOIN LATERAL (SELECT app_candidate_boolean_matches(c.id, c.profile_terms, sqlc.narg(boolean_plan)::jsonb) AS hits OFFSET 0) matches
+LEFT JOIN app_cv_candidate_matches(
+  CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NULL THEN sqlc.narg(ts)::text ELSE sqlc.narg(prefilter)::text END
+) cv ON cv.candidate_id = c.id
 WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR c.phone = ANY (@phones::text[]))
   AND (sqlc.narg(prefilter)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(prefilter)::text)
-       OR c.id = ANY (@cv_ids::text[]))
+       OR cv.candidate_id IS NOT NULL)
   AND (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN matches.hits <> 0
             ELSE sqlc.narg(ts)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text)
-                 OR c.id = ANY (@cv_ids::text[]) END)
+                 OR cv.candidate_id IS NOT NULL END)
   AND (cardinality(@availability::text[]) = 0 OR c.availability = ANY (@availability::text[]))
   AND (cardinality(@wa_kinds::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
@@ -371,6 +374,11 @@ SELECT * FROM screening_call_salary WHERE call_id=ANY(@call_ids::text[]);
 -- offset. A separate query so the newest-first list keeps its index plan.
 -- Keep its filters in step with ListCandidates.
 -- name: ListCandidatesSorted :many
+WITH anchor AS MATERIALIZED (
+  SELECT app_candidate_order_key(@sort::text, a.name_text, a.notice_period_value, a.notice_period_unit, ac.current_currency, ac.current_amount, ac.current_period, ac.expected_currency, ac.expected_min, ac.expected_period) AS key
+  FROM candidate a LEFT JOIN candidate_compensation ac ON ac.candidate_id = a.id
+  WHERE a.id = sqlc.narg(cursor)::text
+)
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
        c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
@@ -378,6 +386,7 @@ SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.cur
 FROM candidate c
 -- Salaries only for roles that may see them (row-level security); for others the sort is newest first.
 LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
+CROSS JOIN LATERAL (SELECT app_candidate_order_key(@sort::text, c.name_text, c.notice_period_value, c.notice_period_unit, cc.current_currency, cc.current_amount, cc.current_period, cc.expected_currency, cc.expected_min, cc.expected_period) AS key) ordered
 WHERE (sqlc.narg(query)::text IS NULL
        OR CASE WHEN sqlc.arg(similar_names)::boolean
             THEN app_normalize_text(sqlc.narg(query)::text) <% c.name_text
@@ -388,25 +397,26 @@ WHERE (sqlc.narg(query)::text IS NULL
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
   AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
+AND (NOT EXISTS (SELECT 1 FROM anchor) OR (
+  CASE WHEN @sort::text = 'name_desc' THEN ordered.key < (SELECT key FROM anchor)
+       ELSE ordered.key > (SELECT key FROM anchor) END
+  OR (ordered.key = (SELECT key FROM anchor) AND c.id < sqlc.narg(cursor)::text)
+))
 ORDER BY
-  CASE WHEN @sort::text = 'name' THEN c.name_text END ASC,
-  CASE WHEN @sort::text = 'name_desc' THEN c.name_text END DESC,
-  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
-  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN @sort::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN @sort::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'name_desc' THEN ordered.key END DESC,
+  CASE WHEN @sort::text <> 'name_desc' THEN ordered.key END ASC,
   c.id DESC
-LIMIT @row_limit OFFSET @row_offset;
+LIMIT @row_limit OFFSET CASE WHEN EXISTS (SELECT 1 FROM anchor) THEN 0 ELSE @row_offset::int END;
 
 -- SearchCandidates in another order (CandidateSort, not newest), paged by
 -- offset. A separate query so the newest-first search keeps its index plan.
 -- Keep its filters in step with SearchCandidates (a test runs both).
 -- name: SearchCandidatesSorted :many
+WITH anchor AS MATERIALIZED (
+  SELECT app_candidate_order_key(@sort::text, a.name_text, a.notice_period_value, a.notice_period_unit, ac.current_currency, ac.current_amount, ac.current_period, ac.expected_currency, ac.expected_min, ac.expected_period) AS key
+  FROM candidate a LEFT JOIN candidate_compensation ac ON ac.candidate_id = a.id
+  WHERE a.id = sqlc.narg(cursor)::text
+)
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
        c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
@@ -414,19 +424,23 @@ SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.cur
        (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 1) <> 0
              ELSE sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) END)::boolean AS profile_hit,
        (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN (matches.hits & 2) <> 0
-             ELSE c.id = ANY (@cv_ids::text[]) END)::boolean AS cv_hit
+             ELSE cv.candidate_id IS NOT NULL END)::boolean AS cv_hit
 FROM candidate c
 CROSS JOIN LATERAL (SELECT app_candidate_boolean_matches(c.id, c.profile_terms, sqlc.narg(boolean_plan)::jsonb) AS hits OFFSET 0) matches
 -- Salaries only for roles that may see them (row-level security); for others the sort is newest first.
 LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
+LEFT JOIN app_cv_candidate_matches(
+  CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NULL THEN sqlc.narg(ts)::text ELSE sqlc.narg(prefilter)::text END
+) cv ON cv.candidate_id = c.id
+CROSS JOIN LATERAL (SELECT app_candidate_order_key(@sort::text, c.name_text, c.notice_period_value, c.notice_period_unit, cc.current_currency, cc.current_amount, cc.current_period, cc.expected_currency, cc.expected_min, cc.expected_period) AS key) ordered
 WHERE (sqlc.narg(query)::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR c.phone = ANY (@phones::text[]))
   AND (sqlc.narg(prefilter)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(prefilter)::text)
-       OR c.id = ANY (@cv_ids::text[]))
+       OR cv.candidate_id IS NOT NULL)
   AND (CASE WHEN sqlc.narg(boolean_plan)::jsonb IS NOT NULL THEN matches.hits <> 0
             ELSE sqlc.narg(ts)::text IS NULL OR c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text)
-                 OR c.id = ANY (@cv_ids::text[]) END)
+                 OR cv.candidate_id IS NOT NULL END)
   AND (cardinality(@availability::text[]) = 0 OR c.availability = ANY (@availability::text[]))
   AND (cardinality(@wa_kinds::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
@@ -457,20 +471,16 @@ WHERE (sqlc.narg(query)::text IS NULL
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
   AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
   AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
+AND (NOT EXISTS (SELECT 1 FROM anchor) OR (
+  CASE WHEN @sort::text = 'name_desc' THEN ordered.key < (SELECT key FROM anchor)
+       ELSE ordered.key > (SELECT key FROM anchor) END
+  OR (ordered.key = (SELECT key FROM anchor) AND c.id < sqlc.narg(cursor)::text)
+))
 ORDER BY
-  CASE WHEN @sort::text = 'name' THEN c.name_text END ASC,
-  CASE WHEN @sort::text = 'name_desc' THEN c.name_text END DESC,
-  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
-  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN @sort::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN @sort::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'name_desc' THEN ordered.key END DESC,
+  CASE WHEN @sort::text <> 'name_desc' THEN ordered.key END ASC,
   c.id DESC
-LIMIT @row_limit OFFSET @row_offset;
+LIMIT @row_limit OFFSET CASE WHEN EXISTS (SELECT 1 FROM anchor) THEN 0 ELSE @row_offset::int END;
 
 
 -- The Bin (bin module): a binned candidate is hidden by the database; these run with app.show_binned on.

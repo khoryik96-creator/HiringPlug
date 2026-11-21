@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 
-const KIND = { candidate: "Candidate", contact: "Contact", company: "Company" } as const;
+const KIND = { candidate: "Candidate", contact: "Contact", company: "Company", document: "CV" } as const;
 const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 export function Bin() {
@@ -19,7 +19,7 @@ export function Bin() {
   return (
     <main>
       <h2>Bin</h2>
-      <p className="muted">Deleted candidates, contacts and companies wait here 30 days, then are deleted for good.</p>
+      <p className="muted">Deleted candidates, contacts, companies and replaced CVs wait here 30 days, then are deleted for good.</p>
       <ErrorMessage error={bin.error ?? restore.error} />
       {bin.data && items.length === 0 && <p className="muted">The Bin is empty.</p>}
       {items.length > 0 && (

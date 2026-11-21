@@ -86,6 +86,28 @@ func TestCandidateListSorts(t *testing.T) {
 	assert.Equal(t, []string{"Mei", "Zara"}, rest)
 	assert.Nil(t, more)
 
+	for _, sort := range []string{"name", "name_desc", "notice", "notice_desc", "current_salary_asc", "current_salary_desc", "expected_salary_asc", "expected_salary_desc"} {
+		path := "/v1/candidates?sort=" + sort
+		want, _ := names(path, token)
+		var paged []string
+		query := path + "&limit=2"
+		for range 4 {
+			r := a.request(http.MethodGet, query, token, nil)
+			require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
+			var page api.CandidatePage
+			r.JSON(&page)
+			for _, c := range page.Items {
+				paged = append(paged, c.FullName)
+			}
+			cursor, cursorErr := page.NextCursor.Get()
+			if cursorErr != nil {
+				break
+			}
+			query = path + "&limit=2&cursor=" + cursor
+		}
+		assert.Equal(t, want, paged, "keyset pages for %s", sort)
+	}
+
 	// Without salary access a salary sort is just newest first (nothing about salaries leaks).
 	got, _ = names("/v1/candidates?sort=current_salary_desc", tenant.Users[api.RoleSourcer].Token)
 	assert.Equal(t, []string{"Élise", "Badrul", "Mei", "Aina", "Zara"}, got)

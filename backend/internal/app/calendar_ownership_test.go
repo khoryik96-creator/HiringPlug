@@ -116,9 +116,8 @@ func TestCalendarDisconnectForgetsOnlyWhatOutlookDeleted(t *testing.T) {
 	}
 }
 
-// A stale hold is cleared the first time it is read, without queuing work on
-// every view of the page.
-func TestCalendarAStaleHoldIsClearedOnReadWithoutQueuingWorkEachTime(t *testing.T) {
+// A stale hold is omitted from reads without changing the calendar or queuing work.
+func TestCalendarReadsHideStaleHoldsWithoutChangingThem(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
@@ -136,7 +135,7 @@ func TestCalendarAStaleHoldIsClearedOnReadWithoutQueuingWorkEachTime(t *testing.
 	}
 	var status string
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), `SELECT status FROM calendar_event WHERE tenant_id=$1 AND source_id=$2`, tenant.ID, iv.Id).Scan(&status))
-	assert.Equal(t, "cancelled", status, "cleared at the first read")
+	assert.Equal(t, "active", status, "calendar GET leaves reconciliation to the worker")
 	var queued int
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), `SELECT count(*) FROM job WHERE tenant_id=$1 AND kind='calendar.source_changed' AND status='pending'`, tenant.ID).Scan(&queued))
 	assert.Zero(t, queued, "no job per view")

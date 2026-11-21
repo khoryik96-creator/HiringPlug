@@ -203,6 +203,7 @@ func NewModules(d Deps) *Modules {
 		Mailer: automationMailer{m.Emails}, TimeZone: d.Config.TimeZone,
 	})
 	m.Bin = bin.New(d.Pool, binDeps(m, d.Files.Delete))
+	m.Documents.BinWith(m.Bin.RecordDocument)
 	m.Folders = folders.New(d.Pool, folderUsers{m.Identity}, folderRecords{m.Candidates, m.Contacts, m.Companies})
 	// The lists show a folder's records.
 	m.Candidates.UseFolders(m.Folders.ItemsOf(folders.Candidates))

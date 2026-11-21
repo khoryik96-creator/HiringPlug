@@ -29,7 +29,9 @@ describe("formatted CVs", () => {
     fireEvent.change(await screen.findByLabelText("For"), { target: { value: "appl_1" } });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "ctpl_1" } });
     expect(screen.queryByLabelText(/Include current and expected salary/)).toBeNull(); // only with salary permission
-    fireEvent.click(screen.getByRole("button", { name: "Make formatted CV" }));
+    const submit = screen.getByRole<HTMLButtonElement>("button", { name: "Make formatted CV" });
+    await waitFor(() => { expect(submit.disabled).toBe(false); });
+    fireEvent.click(submit);
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ templateId: "ctpl_1", blind: false, showContact: false, includeSalary: false, applicationId: "appl_1" });
   });
@@ -47,7 +49,9 @@ describe("formatted CVs", () => {
     fireEvent.click(await screen.findByLabelText("Show email and phone"));
     fireEvent.click(screen.getByLabelText(/Blind CV/));
     expect(screen.queryByLabelText("Show email and phone")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Make formatted CV" }));
+    const submit = screen.getByRole<HTMLButtonElement>("button", { name: "Make formatted CV" });
+    await waitFor(() => { expect(submit.disabled).toBe(false); });
+    fireEvent.click(submit);
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toMatchObject({ blind: true, showContact: false });
   });

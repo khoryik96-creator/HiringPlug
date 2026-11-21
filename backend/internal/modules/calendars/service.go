@@ -77,17 +77,6 @@ func (s *Service) list(ctx context.Context, p authz.Principal, from, to time.Tim
 		return out, err
 	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if s.deps.Sources != nil {
-			meetings, err := s.deps.Sources.MeetingsFor(ctx, tx, p.UserID, from, to)
-			if err != nil {
-				return err
-			}
-			for _, m := range meetings {
-				if _, err := s.holdIn(ctx, tx, p.TenantID, p.UserID, m); err != nil {
-					return err
-				}
-			}
-		}
 		rows, err := store.New(tx).ListCalendarEvents(ctx, store.ListCalendarEventsParams{FromTime: from, ToTime: to})
 		if err != nil {
 			return err
@@ -101,7 +90,7 @@ func (s *Service) list(ctx context.Context, p authz.Principal, from, to time.Tim
 				keys = append(keys, sourceOf(row.Source, *row.SourceID))
 			}
 		}
-		gone, err := s.gone(ctx, tx, keys) // an interview deleted with its candidate is not shown, and is cleared
+		gone, err := s.gone(ctx, tx, keys, false) // hide stale holds while the worker reconciles them
 		if err != nil {
 			return err
 		}

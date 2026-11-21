@@ -22,6 +22,10 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   expandable skills, and has a slim notice/salary ribbon with natural height.
 - CV library selection drives a single viewer and toolbar. Existing document,
   stage-move, salary-note and privacy behavior is retained; see `docs/features.md`.
+- Each candidate can keep three formatted CVs and four other CVs. At the limit,
+  choose which files to move to the Bin when the new one saves. Admins can also
+  move a CV to the Bin from its file menu, then restore it within 30 days if
+  there is room in its category.
 
 ## External JobAdder migration tool
 
