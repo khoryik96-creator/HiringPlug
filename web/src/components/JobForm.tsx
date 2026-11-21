@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type InputHTMLAttributes, useState } from "react";
+import { type InputHTMLAttributes, useRef, useState } from "react";
 
 import { api, type JobOrder, unwrap } from "../api/client";
 import { contactsKey, jobKey, jobsKey } from "../api/keys";
@@ -32,10 +32,12 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
   const [jdFilled, setJdFilled] = useState<JdFilled>({});
   const [jdPickedCompany, setJdPickedCompany] = useState<string | null>(null); // the company id a JD chose
   /** The company a JD names, chosen when one on record has that name (Sdn Bhd and the like aside). */
-  const pickJdCompany = async (name: string) => {
+  const jdReads = useRef(0); // which JD read is the latest: an earlier one's company lookup arriving late is ignored
+  const pickJdCompany = async (name: string, read: number) => {
     const key = companyKey(name);
     if (!key) return;
     const found = unwrap(await api.GET("/v1/companies", { params: { query: { q: key, limit: 8 } } })).items;
+    if (read !== jdReads.current) return;
     const match = found.find((c) => companyKey(c.name) === key);
     if (match) {
       setJdCompany("");
@@ -95,15 +97,20 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
       {!opened.id && (
         <div className="full">
           <JdDrop readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => {
-            // A company the last JD chose gives way to this JD's; one chosen by hand stays.
+            const read = ++jdReads.current;
+            // A company the last JD chose gives way to this JD's (kept, with its contact, when it names the same one); one chosen by hand stays.
             const companyFromJd = form.company !== null && form.company.id === jdPickedCompany;
-            const filled = fillFromJd(companyFromJd ? { ...form, company: null, contactId: "" } : form, d, jdFilled);
+            const sameCompany = companyFromJd && !!d.companyName && companyKey(d.companyName) === companyKey(form.company?.name ?? "");
+            const replaceCompany = companyFromJd && !sameCompany;
+            const filled = fillFromJd(replaceCompany ? { ...form, company: null, contactId: "" } : form, d, jdFilled);
             setForm(filled.form);
             setJdFilled(filled.filled);
             setJdFileId(id);
             setJdCompany("");
-            if (companyFromJd) setJdPickedCompany(null);
-            if (d.companyName && (!form.company || companyFromJd)) void pickJdCompany(d.companyName).catch(() => { setJdCompany(d.companyName ?? ""); });
+            if (replaceCompany) setJdPickedCompany(null);
+            if (d.companyName && (!form.company || replaceCompany)) {
+              void pickJdCompany(d.companyName, read).catch(() => { if (read === jdReads.current) setJdCompany(d.companyName ?? ""); });
+            }
           }} />
         </div>
       )}

@@ -46,3 +46,19 @@ func TestSearchTermsAreFewAndHeaviestFirst(t *testing.T) {
 		assert.GreaterOrEqual(t, terms[i-1].Weight, terms[i].Weight)
 	}
 }
+
+func TestOneGenericWordIsNeverEnoughOnItsOwn(t *testing.T) {
+	jd := "JOB SUMMARY\nLOCATION: KUALA LUMPUR\nREQUIREMENTS\nExperience with SAP, ASP.NET and Node.js.\nBased in Kuala Lumpur. Kuala Lumpur office."
+	got := weightsOf(SearchTerms(Job{Title: "Senior Finance Manager", Description: &jd}))
+	// One term of weight 2.5 or more makes a match by itself (SearchCVs): role and seniority words, and headings, never do.
+	assert.Less(t, got["manager"], float32(2.5), "a sales manager is not a finance manager")
+	assert.Less(t, got["senior"], float32(2.5))
+	assert.Equal(t, float32(titleWeight), got["finance"], "the field still counts")
+	assert.NotContains(t, got, "summary", "a heading")
+	assert.Less(t, got["location"], float32(2.5))
+	assert.NotContains(t, got, "kuala lumpur", "a place, not a skill")
+	assert.Equal(t, float32(acronymWeight), got["sap"], "a short acronym, even on a heading-like line")
+	assert.Contains(t, got, "asp.net", "a dotted name is one term")
+	assert.Contains(t, got, "node.js")
+	assert.Less(t, weightsOf(SearchTerms(Job{Title: "Go Developer"}))["go"], float32(2.5), "a short word that is not an acronym")
+}

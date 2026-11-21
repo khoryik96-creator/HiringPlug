@@ -26,6 +26,7 @@ const (
 	maxSearchTerms = 30
 	titleWeight    = 4
 	titlePhrase    = 6
+	roleWeight     = 2 // a job title's role or seniority word (manager, senior): only with another term
 	acronymWeight  = 2.5
 	phraseWeight   = 2.5
 	wordWeight     = 1
@@ -65,7 +66,16 @@ responsibility responsible result results review reviewing right role roles sala
 similar skill skilled skills solid   solve solving sound specific stakeholder stakeholders  
 start strong success successful successfully support supporting take task tasks team teams thinking time timely together
  track train  two understand understanding upon use used using various verbal way ways well whole willing
-willingness within without work worked working works world written year years`)
+willingness within without work worked working works world written year years
+summary overview duties location locations hours title note notes remarks
+sdn bhd berhad pte ltd limited malaysia singapore kuala lumpur selangor petaling jaya penang johor bahru shah alam
+cyberjaya putrajaya klang ipoh melaka sabah sarawak`)
+
+// roleWords are a job title's words that say how senior, or what kind of
+// post, not what field: many CVs have them, so one alone does not make a match.
+var roleWords = setOf(`manager managers senior junior executive executives officer assistant associate head lead leader specialist
+consultant analyst director supervisor coordinator administrator admin staff clerk intern trainee principal chief deputy vice
+president representative member partner advisor adviser sr jr ii iii iv engineer developer`)
 
 // short words that are terms, not noise.
 var shortTerms = setOf(`ai ar ap bi hr it qa qc ui ux pr go c# c++ r 3d gl kl pj`)
@@ -81,21 +91,36 @@ func setOf(words string) map[string]bool {
 type token struct {
 	raw, lower string
 	breakAfter bool // a sentence or line ends after it: no phrase across it
+	shouted    bool // on a line written in capitals (a heading): its words are not acronyms
 }
+
+// sentenceEnd splits a line where a phrase cannot run on: a full stop before a
+// space (not the dot in ASP.NET or Node.js), and other punctuation.
+var sentenceEnd = regexp.MustCompile(`[;•:,]|\.(?:\s|$)`)
 
 func tokens(text string) []token {
 	var out []token
-	for _, line := range strings.FieldsFunc(text, func(r rune) bool { return r == '\n' || r == '.' || r == ';' || r == '•' || r == ':' || r == ',' }) {
-		ws := wordRe.FindAllString(line, -1)
-		for i, w := range ws {
-			w = strings.Trim(w, "./-&")
-			if w == "" {
-				continue
+	for _, line := range strings.Split(text, "\n") {
+		shouted := strings.ToUpper(line) == line && strings.ToLower(line) != line
+		for _, part := range sentenceEnd.Split(line, -1) {
+			ws := wordRe.FindAllString(part, -1)
+			for i, w := range ws {
+				w = strings.Trim(w, "./-&")
+				if w == "" {
+					continue
+				}
+				out = append(out, token{raw: w, lower: strings.ToLower(w), breakAfter: i == len(ws)-1, shouted: shouted})
 			}
-			out = append(out, token{raw: w, lower: strings.ToLower(w), breakAfter: i == len(ws)-1})
 		}
 	}
 	return out
+}
+
+// strongAcronym is a word in capitals that names a qualification or system:
+// a short one anywhere (SAP, ACCA, IFRS), a longer one only on a line not
+// written in capitals (a heading's SUMMARY is not an acronym).
+func strongAcronym(t token) bool {
+	return isAcronym(t.raw) && (len([]rune(t.raw)) <= 4 || !t.shouted)
 }
 
 // useful is a word worth searching for: not generic, not a bare number, long enough or a known short term.
@@ -129,6 +154,21 @@ func isAcronym(raw string) bool {
 	return upper >= 2 && len([]rune(raw)) <= 8
 }
 
+// titleWordWeight is a title word's weight: its role or seniority words, and
+// short words that are not acronyms ("Go", "R"), count only with another term.
+func titleWordWeight(t token, w float32) float32 {
+	letters := 0
+	for _, r := range t.lower {
+		if unicode.IsLetter(r) {
+			letters++
+		}
+	}
+	if roleWords[t.lower] || (letters < 3 && !isAcronym(t.raw)) {
+		return min(w, roleWeight)
+	}
+	return w
+}
+
 // SearchTerms is what a job's possible candidates are looked for with: at
 // most 30 terms, the heaviest first (title words, phrases, acronyms, then the
 // description's words by how often it uses them).
@@ -144,7 +184,7 @@ func SearchTerms(j Job) []SearchTerm {
 		for _, t := range tokens(s) {
 			if useful(t) {
 				words = append(words, t.lower)
-				add(t.lower, w)
+				add(t.lower, titleWordWeight(t, w))
 			}
 		}
 		if len(words) >= 2 && len(words) <= 4 {
@@ -165,7 +205,7 @@ func SearchTerms(j Job) []SearchTerm {
 				continue
 			}
 			counts[t.lower]++
-			if isAcronym(t.raw) {
+			if strongAcronym(t) {
 				add(t.lower, acronymWeight)
 			}
 			if i+1 < len(ts) && !t.breakAfter && useful(ts[i+1]) {

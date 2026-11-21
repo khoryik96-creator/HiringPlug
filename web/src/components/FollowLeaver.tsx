@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
-import { companiesKey, contactsKey, jobsKey } from "../api/keys";
+import { companiesKey, contactKey, contactsKey, jobsKey } from "../api/keys";
 import { linkedinDates } from "../labels";
 import { afterContactAdded, type CompanyMatch, companiesNamed } from "./contactLinkedin";
 import { ErrorMessage } from "./ErrorMessage";
@@ -12,8 +12,8 @@ export type Move = Schemas["LinkedinMove"];
 
 const slugOf = (companyUrl: string) => /\/company\/([A-Za-z0-9_-]+)\//.exec(companyUrl)?.[1] ?? "";
 
-/** The company to add them at: one in HiringPlug, or a new one (made when chosen). */
-type Target = { id: string; name: string } | "new";
+/** The company to add them at: one in HiringPlug (found by its LinkedIn page, or chosen by name), or a new one (made when chosen). */
+type Target = { id: string; name: string; byName?: boolean } | "new";
 
 /**
  * Following a contact who left to where they work now. The company in
@@ -41,13 +41,17 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
     mutationFn: async (target: Target) => {
       const old = unwrap(await api.GET("/v1/contacts/{contactId}", { params: { path: { contactId } } }));
       const isNew = target === "new";
+      const byName = !isNew && target.byName === true;
       const company = isNew ? unwrap(await api.POST("/v1/companies", { body: { name: move.companyName, ...(move.companyUrl ? { linkedinUrl: move.companyUrl } : {}) } })) : target;
       if (!isNew) {
         // Followed already (or added by hand): not twice.
         const there = unwrap(await api.GET("/v1/contacts", { params: { query: { companyId: company.id, q: old.fullName, limit: 20 } } })).items
           .find((c) => c.fullName.toLowerCase() === old.fullName.toLowerCase());
-        if (there) return { company, added: there, isNew, already: true };
-        if (move.companyUrl) await notePage(company.id, move.companyUrl);
+        if (there) {
+          await markLeft(old);
+          return { company, added: there, isNew, already: true };
+        }
+        if (move.companyUrl && byName) await notePage(company.id, move.companyUrl);
       }
       const since = move.since ? ` in ${linkedinDates(move.since)}` : "";
       const added = unwrap(await api.POST("/v1/contacts", {
@@ -65,10 +69,12 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
       }));
       // Their old address is the old company's: one is guessed from their new colleagues' (and verified).
       await afterContactAdded(added, false).catch(() => undefined);
+      await markLeft(old);
       return { company, added, isNew, already: false };
     },
     onSuccess: async () => {
       setChoices(null);
+      await queryClient.invalidateQueries({ queryKey: contactKey(contactId) });
       await queryClient.invalidateQueries({ queryKey: contactsKey });
       await queryClient.invalidateQueries({ queryKey: companiesKey });
     },
@@ -91,7 +97,7 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
           ? <span className="muted small">Is it one of these?</span>
           : <span className="muted small">{move.companyName} is not in HiringPlug yet.</span>}
         {choices.map((c) => (
-          <button key={c.id} type="button" className="small-button" disabled={busy} onClick={() => { follow.mutate(c); }}>
+          <button key={c.id} type="button" className="small-button" disabled={busy} onClick={() => { follow.mutate({ id: c.id, name: c.name, byName: true }); }}>
             Add at {c.name}{c.detail ? ` (${c.detail})` : ""}
           </button>
         ))}
@@ -111,6 +117,12 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
       <ErrorMessage error={find.error ?? follow.error} />
     </span>
   );
+}
+
+/** They work elsewhere now: their old record says they left (so nothing is sent there any more). */
+async function markLeft(old: Schemas["Contact"]): Promise<void> {
+  if (old.status !== "active") return;
+  await api.PATCH("/v1/contacts/{contactId}", { params: { path: { contactId: old.id } }, body: { version: old.version, status: "left" } }).catch(() => undefined);
 }
 
 /** A company chosen by name that has no LinkedIn page yet gets theirs, so the next move is found by it. */

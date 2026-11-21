@@ -103,6 +103,53 @@ describe("job form", () => {
     expect(get).toHaveBeenCalledWith("/v1/companies", { params: { query: { q: "maju foods", limit: 8 } } });
   });
 
+  it("keeps the company the first JD chose, and its contact, when the next JD names the same one", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
+      path === "/v1/settings/fields" ? ok(testFieldSettings())
+        : path === "/v1/companies" ? ok({ items: [{ id: "comp_maju", name: "Maju Foods Bhd", city: null }], nextCursor: null })
+          : path === "/v1/contacts" ? ok({ items: [{ id: "cont_ana", fullName: "Ana Lim", status: "active" }], nextCursor: null })
+            : ok({ items: [], nextCursor: null }))) as never);
+    const read = (id: string) => new Response(JSON.stringify({
+      id, jobId: null, fileName: `${id}.txt`, status: "read", error: null, createdAt: "2026-11-07T00:00:00Z",
+      details: { title: "Planner", location: null, country: null, workType: null, workArrangement: null, salaryText: null, closesOn: null,
+        description: "", companyName: "MAJU FOODS BERHAD", openings: null },
+    }), { status: 201 });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(read("jdf_1")).mockResolvedValueOnce(read("jdf_2"));
+    renderWithClient(<JobForm job={null} onDone={vi.fn()} />);
+    const drop = () => screen.getByLabelText(/Drop the client's JD/);
+    fireEvent.change(drop(), { target: { files: [new File(["a"], "a.txt", { type: "text/plain" })] } });
+    await screen.findByText("Maju Foods Bhd");
+    const contact = await screen.findByRole("option", { name: "Ana Lim" });
+    fireEvent.change(contact.closest("select") as HTMLSelectElement, { target: { value: "cont_ana" } });
+    fireEvent.change(drop(), { target: { files: [new File(["b"], "b.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(globalThis.fetch).toHaveBeenCalledTimes(2); });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText("Maju Foods Bhd")).toBeTruthy();
+    expect((contact.closest("select") as HTMLSelectElement).value).toBe("cont_ana");
+  });
+
+  it("ignores an earlier JD's company lookup that comes back after the next JD", async () => {
+    let answer: (v: unknown) => void = () => undefined;
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => path === "/v1/companies"
+      ? new Promise((r) => { answer = r; })
+      : Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);
+    const read = (id: string, companyName: string | null) => new Response(JSON.stringify({
+      id, jobId: null, fileName: `${id}.txt`, status: "read", error: null, createdAt: "2026-11-07T00:00:00Z",
+      details: { title: id, location: null, country: null, workType: null, workArrangement: null, salaryText: null, closesOn: null,
+        description: "", companyName, openings: null },
+    }), { status: 201 });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(read("jdf_1", "Maju Foods Berhad")).mockResolvedValueOnce(read("jdf_2", null));
+    renderWithClient(<JobForm job={null} onDone={vi.fn()} />);
+    const drop = () => screen.getByLabelText(/Drop the client's JD/);
+    fireEvent.change(drop(), { target: { files: [new File(["a"], "a.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Job title").value).toBe("jdf_1"); });
+    fireEvent.change(drop(), { target: { files: [new File(["b"], "b.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Job title").value).toBe("jdf_2"); });
+    answer(ok({ items: [{ id: "comp_maju", name: "Maju Foods Bhd", city: null }], nextCursor: null }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("Maju Foods Bhd")).toBeNull();
+  });
+
   it("names the JD's company when none on record has that name", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
       path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);

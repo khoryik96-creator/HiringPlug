@@ -39,7 +39,7 @@ func UpdateFrom(before Profile, history History, cv FromCV) (Profile, History) {
 		replace(&after.Industry, cv.Profile.Industry)
 		replace(&after.Location, cv.Profile.Location)
 		if len(cv.History.Work) > 0 && len(cv.History.Work) >= len(history.Work) {
-			history.Work = cv.History.Work
+			history.Work = withDescriptions(cv.History.Work, history.Work)
 		}
 		if len(cv.History.Education) > 0 && len(cv.History.Education) >= len(history.Education) {
 			history.Education = cv.History.Education
@@ -53,6 +53,30 @@ func UpdateFrom(before Profile, history History, cv FromCV) (Profile, History) {
 		}
 	}
 	return after, history
+}
+
+// withDescriptions is the CV's jobs, each keeping the description written on
+// the profile's same job (same employer, and the same title or start), which
+// a CV does not give.
+func withDescriptions(cv, profile []Job) []Job {
+	out := make([]Job, len(cv))
+	copy(out, cv)
+	used := make([]bool, len(profile))
+	for i := range out {
+		if out[i].Description != nil && strings.TrimSpace(*out[i].Description) != "" {
+			continue
+		}
+		for k, p := range profile {
+			if used[k] || p.Description == nil || !sameText(p.Company, out[i].Company) {
+				continue
+			}
+			if sameText(p.Title, out[i].Title) || (p.StartDate != nil && sameText(p.StartDate, out[i].StartDate)) {
+				out[i].Description, used[k] = p.Description, true
+				break
+			}
+		}
+	}
+	return out
 }
 
 func sameText(a, b *string) bool {
@@ -132,15 +156,16 @@ func (m *Module) UpdateFromCV(ctx context.Context, tx pgx.Tx, id, documentID str
 			return err
 		}
 	}
-	historyChanged := !sameJobs(newHistory.Work, history.Work) || !sameSlice(newHistory.Education, history.Education)
-	if historyChanged {
-		clean, errs := NormalizeHistory(newHistory)
-		if len(errs) == 0 {
-			if err := saveHistory(ctx, q, id, clean); err != nil {
+	if clean, changed := historyChange(newHistory, history); changed {
+		if err := saveHistory(ctx, q, id, clean); err != nil {
+			return err
+		}
+		if len(changes) == 0 { // the profile is as it was: the history's change still moves its version on (open editors check it)
+			if _, err := q.TouchCandidate(ctx, store.TouchCandidateParams{ID: id, ExpectedVersion: row.Version}); err != nil {
 				return err
 			}
-			changes["workHistory"] = map[string]any{"from": len(history.Work), "to": len(clean.Work)}
 		}
+		changes["workHistory"] = map[string]any{"from": len(history.Work), "to": len(clean.Work)}
 	}
 	if len(changes) == 0 {
 		return nil
@@ -149,6 +174,17 @@ func (m *Module) UpdateFromCV(ctx context.Context, tx pgx.Tx, id, documentID str
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "candidate.updated_from_cv", EntityType: "candidate", EntityID: id, Changes: changes,
 	})
+}
+
+// historyChange is the new history tidied as it is stored, and whether it
+// differs from the stored one: a CV saying the same again changes nothing. A
+// history the rules refuse is no change.
+func historyChange(next, stored History) (History, bool) {
+	clean, errs := NormalizeHistory(next)
+	if len(errs) > 0 {
+		return stored, false
+	}
+	return clean, !sameJobs(clean.Work, stored.Work) || !sameSlice(clean.Education, stored.Education)
 }
 
 // sameJobs: the same jobs, by title, company and dates.

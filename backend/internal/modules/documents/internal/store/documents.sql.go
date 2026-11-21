@@ -966,9 +966,9 @@ type SearchCVsRow struct {
 	Snippet     string
 }
 
-// Possible candidates for a job: those whose CVs share the most words with
-// the job's text (any of its words; each candidate's best CV), best first,
-// leaving out the given candidates. The snippet marks the shared words.
+// Possible candidates for a job: those whose CVs best match the job's
+// distinctive terms (weighted words and phrases; each candidate's best CV),
+// best first, leaving out the given candidates. The snippet marks the terms.
 // Each term counts its weight times how rare it is in the company's CVs (a
 // word nearly every CV has counts for almost nothing). A CV needs two terms,
 // or one of the job's own words or acronyms (weight 2.5 and up), to be a

@@ -13,7 +13,7 @@ afterEach(() => {
 const move = { companyUrl: "https://www.linkedin.com/company/acme-bhd/", companyName: "Acme Bhd", title: "Head of HR", since: "2025-09" };
 const ana = {
   id: "cont_ana", firstName: "Ana", lastName: "Lim", fullName: "Ana Lim", title: "HR Manager", companyName: "Maju Sdn Bhd",
-  linkedinUrl: "https://www.linkedin.com/in/ana-lim-example", role: "hr",
+  linkedinUrl: "https://www.linkedin.com/in/ana-lim-example", role: "hr", status: "active", version: 4,
 };
 
 describe("following a contact who left", () => {
@@ -53,6 +53,21 @@ describe("following a contact who left", () => {
     const lookup = (get.mock.calls as unknown[][]).find((c) => c[0] === "/v1/companies");
     expect(lookup?.[1]).toEqual({ params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } });
     expect(post.mock.calls.map((c) => c[0])).not.toContain("/v1/companies");
+    // Found by its page, so it has it: not fetched again to add it.
+    expect(get.mock.calls.map((c) => c[0])).not.toContain("/v1/companies/{companyId}");
+  });
+
+  it("marks their old record as left once they are added where they work now", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/companies" ? { items: [{ id: "comp_acme", name: "Acme Berhad" }], nextCursor: null }
+        : path === "/v1/contacts" ? { items: [], nextCursor: null } : ana,
+    ))) as never);
+    vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/contacts" ? { id: "cont_new", fullName: "Ana Lim", email: "ana@acme.example" } : {}))) as never);
+    const patch = vi.spyOn(api, "PATCH").mockImplementation((() => Promise.resolve(ok({}))) as never);
+    renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add at Acme Bhd" }));
+    await screen.findByRole("status");
+    expect(patch).toHaveBeenCalledWith("/v1/contacts/{contactId}", { params: { path: { contactId: "cont_ana" } }, body: { version: 4, status: "left" } });
   });
 
   it("offers the companies here with a matching name, and gives the one chosen its LinkedIn page", async () => {
@@ -77,7 +92,7 @@ describe("following a contact who left", () => {
     // The same name (legal suffixes aside) first, then similar ones, then a new company.
     expect(offered.map((b) => b.textContent)).toEqual(["Add at ACME Berhad (Penang)", "Add at Acme Express", "None of these: create Acme Bhd"]);
     expect((get.mock.calls as unknown[][]).filter((c) => c[0] === "/v1/companies").map((c) => c[1])).toEqual([
-      { params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } }, { params: { query: { q: "Acme", limit: 8 } } },
+      { params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } }, { params: { query: { q: "Acme", limit: 25 } } },
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Add at ACME Berhad (Penang)" }));
     expect((await screen.findByRole("status")).textContent).toContain("Added: Ana Lim at ACME Berhad (with a lead note)");

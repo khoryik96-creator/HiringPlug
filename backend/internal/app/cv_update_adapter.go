@@ -8,6 +8,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // profileFromNewestCV: once a candidate's CV is read, and it is their newest,
@@ -30,5 +31,15 @@ func (a profileFromNewestCV) ReadDone(ctx context.Context, tx pgx.Tx, _, documen
 	if err != nil || newest != documentID {
 		return err
 	}
-	return a.candidates.UpdateFromCV(ctx, tx, candidateID, documentID, cvFromParsed(*profile))
+	// In a savepoint: the CV's details are kept even when the profile cannot
+	// be updated from them (a value the rules refuse, a save at the same time).
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if err := a.candidates.UpdateFromCV(ctx, sp, candidateID, documentID, cvFromParsed(*profile)); err != nil {
+		logx.From(ctx).WarnContext(ctx, "profile not updated from its newest CV", "candidate_id", candidateID, "document_id", documentID, "error", err)
+		return sp.Rollback(ctx)
+	}
+	return sp.Commit(ctx)
 }

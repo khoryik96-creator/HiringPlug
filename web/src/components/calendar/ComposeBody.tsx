@@ -62,11 +62,11 @@ export function useMessage(initialHtml: string, isNew: boolean, enabled: boolean
 
 /** The formatted body, with the email editor's toolbar as icons. */
 export function ComposeBody({ html, resetKey, onChange }: { html: string; resetKey: number; onChange: (html: string) => void }) {
-  // The signature's banner shows as it is written; Outlook invitations carry text and links only.
-  const { banners, urls } = useBanners();
+  // The signature's banner shows as it is written; Outlook invitations carry text and links only, so none is offered to insert.
+  const { urls } = useBanners();
   return (
     <div className="compose-body">
-      <RichEditor compact iconTools html={html} resetKey={resetKey} onChange={onChange} banners={banners} bannerUrls={urls} />
+      <RichEditor compact iconTools html={html} resetKey={resetKey} onChange={onChange} bannerUrls={urls} />
       {/data-banner-id=/.test(html) && <small className="composer-hint" role="note">The banner shows here but is left out of the Outlook invitation, which carries text and links only.</small>}
     </div>
   );

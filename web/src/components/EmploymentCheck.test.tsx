@@ -49,8 +49,8 @@ describe("employment check", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add at Contoh Bank Berhad" }));
     expect(await screen.findByRole("button", { name: "Add at Contoh Bank" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "None of these: create Contoh Bank Berhad" })).toBeTruthy();
-    // No LinkedIn page to look up by: straight to the names.
-    expect((get.mock.calls as unknown[][]).filter((c) => c[0] === "/v1/companies").map((c) => c[1])).toEqual([{ params: { query: { q: "Contoh Bank", limit: 8 } } }]);
+    // No LinkedIn page to look up by: straight to the names (more fetched than offered, so the exact one is among them).
+    expect((get.mock.calls as unknown[][]).filter((c) => c[0] === "/v1/companies").map((c) => c[1])).toEqual([{ params: { query: { q: "Contoh Bank", limit: 25 } } }]);
   });
 
   it("warns when the profile may be someone else's", () => {
@@ -62,5 +62,16 @@ describe("employment check", () => {
     expect(monthYear("2026-04")).toBe("Apr 2026");
     expect(monthYear("2019")).toBe("2019");
     expect(monthYear(null)).toBe("");
+  });
+});
+
+describe("company suggestions", () => {
+  it("offers the company with exactly the name even when many share its first words", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ id: `comp_${String(i)}`, name: `Contoh Bank Branch ${String(i)}`, city: null, linkedinUrl: null }));
+    vi.spyOn(api, "GET").mockImplementation((() => Promise.resolve(ok({ items: [...many, { id: "comp_exact", name: "CONTOH BANK (M) BERHAD", city: null, linkedinUrl: null }], nextCursor: null }))) as never);
+    const { companiesNamed } = await import("./contactLinkedin");
+    const got = await companiesNamed("Contoh Bank Berhad");
+    expect(got).toHaveLength(8);
+    expect(got[0]?.id).toBe("comp_exact");
   });
 });

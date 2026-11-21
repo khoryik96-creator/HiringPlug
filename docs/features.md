@@ -262,11 +262,13 @@ once the candidate's newest CV is read, where it says they are now replaces
 what the profile had (job title, current employer, industry, location), empty
 fields are filled (contact details are only ever filled, never replaced; the
 name is kept), new skills are added, and its work history and education are
-taken when they are at least as long as the profile's. A CV older than the
+taken when they are at least as long as the profile's (keeping the
+descriptions written on the same jobs). A CV older than the
 profile's work history (an old CV found later) only fills empty fields, and
 reading an older CV again changes nothing. The change is audited
 (`candidate.updated_from_cv`, naming the CV) and the page shows it as soon as
-the CV is read. On the candidate's page, **Review details
+the CV is read. If the profile cannot be saved (someone saving it at the same
+moment), the CV's details are still kept for **Review details**. On the candidate's page, **Review details
 from this CV** lists each suggestion next to what the profile has now, with
 the CV's wording: empty profile fields are ticked, filled ones never are, and
 **Use ticked details** saves them (with the usual lost-update protection).
@@ -500,10 +502,12 @@ for each of their jobs, with **Score fit** / **Score again**.
 - **Possible candidates** on each job's page (folded under the pipeline): people not on the job whose CVs
   best match the job's distinctive terms (a keyword search of CVs, not the
   AI, so it works without one): the words every job description uses
-  (experience, proven, within, advanced, skills, strong, team...) are left
-  out; the title, acronyms (ACCA, SAP) and the description's two-word terms
-  count most, and each term counts less the more of the company's CVs have
-  it. A CV needs two terms, or one of the job's own words or acronyms; best first, with where their CV has
+  (experience, proven, within, advanced, skills, strong, team...), headings
+  and place names are left out; the title, acronyms (ACCA, SAP) and the
+  description's two-word terms count most, and each term counts less the more
+  of the company's CVs have it. A CV needs two terms, or one strong one (a
+  word of the title's field, an acronym, a two-word term): a role or
+  seniority word alone (manager, senior, executive) is never enough; best first, with where their CV has
   those words. Those who withdrew consent, and those the user may not see, are
   left out. **Add to job** puts them on it (and scores them). A job with no
   description or ad yet asks for one instead.
@@ -670,7 +674,8 @@ for each of their jobs, with **Score fit** / **Score again**.
   The one chosen gets the LinkedIn page if it had none, so the next move is
   found by it. The person is added there as a new contact (their old address
   is not copied: one is guessed from their new colleagues' and verified) and a
-  lead note is written on the company. The same **Add at ...** follows the
+  lead note is written on the company; the old record is marked as having
+  left, so nothing is sent there any more. The same **Add at ...** follows the
   current job read from a LinkedIn profile PDF (Employment check). The old
   company's open jobs that had them as contact are listed as needing a new
   contact.

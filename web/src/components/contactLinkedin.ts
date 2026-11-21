@@ -52,12 +52,14 @@ export const plainName = (name: string) => name.toLowerCase().replace(SUFFIX, " 
 export async function companiesNamed(name: string, page = ""): Promise<CompanyMatch[]> {
   // The first words of the name find "Maju Bank Berhad" from "Maju Bank".
   const q = name.replace(SUFFIX, " ").replace(/[^\p{L}\p{N}&' -]+/gu, " ").trim().split(/\s+/).slice(0, 2).join(" ");
-  const items = q ? unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: 8 } } })).items : [];
+  // More than are offered: the one with exactly this name is offered even when many share its first words.
+  const items = q ? unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: 25 } } })).items : [];
   const plain = plainName(name);
   const rank = (c: { name: string; linkedinUrl: string | null }) =>
     (page && companyPage(c.linkedinUrl ?? "") === page ? 2 : 0) + (plainName(c.name) === plain ? 1 : 0);
   return [...items]
     .sort((a, b) => rank(b) - rank(a))
+    .slice(0, 8)
     .map((c) => ({ id: c.id, name: c.name, detail: c.city, samePage: !!page && companyPage(c.linkedinUrl ?? "") === page }));
 }
 

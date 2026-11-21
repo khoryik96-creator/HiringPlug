@@ -224,4 +224,5 @@ it("shows the signature's banner as it is written, and says the invitation leave
   renderWithClient(<EventForm date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
   expect(await screen.findByText(/left out of the Outlook invitation/)).toBeTruthy();
   expect(document.querySelector(".rich-box img[data-banner-id]")).toBeTruthy();
+  expect(document.querySelector("select[aria-label=\"Insert banner\"]"), "no banner to insert into an invitation that drops it").toBeNull();
 });

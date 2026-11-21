@@ -78,9 +78,9 @@ LIMIT 1;
 SELECT id, source, file_name, status, extracted_text, created_at FROM document
 WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
 
--- Possible candidates for a job: those whose CVs share the most words with
--- the job's text (any of its words; each candidate's best CV), best first,
--- leaving out the given candidates. The snippet marks the shared words.
+-- Possible candidates for a job: those whose CVs best match the job's
+-- distinctive terms (weighted words and phrases; each candidate's best CV),
+-- best first, leaving out the given candidates. The snippet marks the terms.
 -- name: SearchCVs :many
 -- Each term counts its weight times how rare it is in the company's CVs (a
 -- word nearly every CV has counts for almost nothing). A CV needs two terms,

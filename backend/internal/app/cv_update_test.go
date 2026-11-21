@@ -104,6 +104,49 @@ func TestANewCVBringsTheProfileUpToDate(t *testing.T) {
 	})
 }
 
+func TestTheProfileUpdateNeverCostsTheCVsDetails(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	job := cvJob("Finance Manager", "XYZ Berhad", "Mar 2025 - Present", "2025-03", true)
+
+	t.Run("a profile that cannot be saved is left as it is", func(t *testing.T) {
+		c := a.createCandidate(token, map[string]any{"firstName": "Aina", "currentTitle": "Accountant"})
+		// Saving this candidate fails (as a save refused for any reason would).
+		_, err := testutil.Current.Admin.Exec(ctx, `CREATE FUNCTION refuse_`+c.Id+`() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused'; END $$;
+			CREATE TRIGGER refuse_`+c.Id+` BEFORE UPDATE ON candidate FOR EACH ROW WHEN (OLD.id = '`+c.Id+`') EXECUTE FUNCTION refuse_`+c.Id+`()`)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_, _ = testutil.Current.Admin.Exec(context.Background(), `DROP TRIGGER refuse_`+c.Id+` ON candidate; DROP FUNCTION refuse_`+c.Id+`()`)
+		})
+		res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.pdf", minimalPDF)
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var doc api.Document
+		res.JSON(&doc)
+		readNewCV(t, a, conn, doc.Id, "Finance Manager | XYZ Berhad | Mar 2025 - Present\n", cvProfile("Kuala Lumpur", job))
+		assert.Equal(t, api.DocumentParseStatusParsed, a.getDocument(token, doc.Id).ParseStatus.MustGet(), "the CV's details are kept")
+		assert.Equal(t, "Accountant", getCandidate(t, a, token, c.Id).CurrentTitle.MustGet())
+	})
+
+	t.Run("a new history alone still moves the version on", func(t *testing.T) {
+		c := a.createCandidate(token, map[string]any{"firstName": "Ben", "currentTitle": "Finance Manager", "currentCompany": "XYZ Berhad",
+			"location": "Kuala Lumpur", "skills": []string{"IFRS"}})
+		res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.pdf", append(append([]byte{}, minimalPDF...), "% ben\n"...))
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var doc api.Document
+		res.JSON(&doc)
+		readNewCV(t, a, conn, doc.Id, "Finance Manager | XYZ Berhad | Mar 2025 - Present\n", cvProfile("Kuala Lumpur", job))
+		got := getCandidate(t, a, token, c.Id)
+		require.Len(t, got.Experience, 1)
+		assert.Greater(t, got.Version, c.Version, "an editor opened before sees the history changed")
+	})
+}
+
 func getCandidate(t *testing.T, a *testApp, token, id string) api.Candidate {
 	t.Helper()
 	res := a.request(http.MethodGet, "/v1/candidates/"+id, token, nil)
