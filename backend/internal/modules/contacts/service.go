@@ -28,6 +28,7 @@ const (
 // Service holds the contacts use cases.
 type Service struct {
 	pool        *pgxpool.Pool
+	apollo      apolloClient
 	companies   Companies
 	roles       Roles
 	mail        MailServers

@@ -41,7 +41,7 @@ sql:
         <<: *go
         out: internal/modules/companies/internal/store
   - <<: *module
-    queries: db/queries/contacts.sql
+    queries: [db/queries/contacts.sql, db/queries/contacts_apollo.sql]
     gen:
       go:
         <<: *go

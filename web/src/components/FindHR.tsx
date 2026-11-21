@@ -10,6 +10,7 @@ import { api, ApiError, type Company, type Schemas, unwrap } from "../api/client
 import { companionAtLeast, companionCall, operationId, useCompanion } from "../companion";
 import { linkedinDates } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { ApolloConnectionDialog, ApolloLookupDialog, useHRApollo } from "./FindHRApollo";
 import { activeRuns, newRun, type Run, runScan, splitName, stopRun } from "./findHrRun";
 import { companyPage } from "./linkedinCompany";
 
@@ -24,13 +25,16 @@ const newer = (v: string | null) => companionAtLeast(v, NEEDS);
 
 export const hrScanKey = (companyId: string) => ["hr-scan", companyId] as const;
 
-export function FindHR({ company, canCreate }: { company: Company; canCreate: boolean }) {
+export function FindHR({ company, canCreate, canUseApollo }: { company: Company; canCreate: boolean; canUseApollo: boolean }) {
   const queryClient = useQueryClient();
   const companion = useCompanion();
   const key = hrScanKey(company.id);
   const scan = useQuery({ queryKey: key, queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}/hr-scan", { params: { path: { companyId: company.id } } })).scan });
   const [form, setForm] = useState({ country: "MY", keywords: DEFAULT_KEYWORDS, pages: 3 });
   const [editing, setEditing] = useState(false);
+  const apollo = useHRApollo(canUseApollo);
+  const [showApollo, setShowApollo] = useState(false);
+  const [apolloPerson, setApolloPerson] = useState<Person | null>(null);
   // A run goes on while another tab of the company is shown; shown again here, it is picked up.
   const [running, setRunning] = useState<Run | null>(() => activeRuns.get(company.id) ?? null);
   const [note, setNote] = useState(() => activeRuns.get(company.id)?.note ?? "");
@@ -65,7 +69,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
     try {
       const id = await companionCall<{ company_id: string; company_name: string }>("companyId", { operation_id: operationId(), company_url: page });
       const fresh = unwrap(await api.PUT("/v1/companies/{companyId}/hr-scan", { params: { path: { companyId: company.id } }, body: {
-        linkedinCompanyId: id.company_id, linkedinCompanyName: id.company_name || company.name, pages: form.pages,
+        linkedinCompanyId: id.company_id, linkedinCompanyName: id.company_name || company.name, linkedinCompanyUrl: page, pages: form.pages,
         keywords: form.keywords.split(",").map((k) => k.trim()).filter(Boolean),
         ...(form.country ? { country: form.country as Schemas["HrCountry"] } : {}),
       } }));
@@ -127,7 +131,10 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
     <section className="panel find-hr" aria-label="Find HR">
       <div className="row spread">
         <h3>Find HR <a className="muted small" href={page} target="_blank" rel="noreferrer">on LinkedIn ↗</a></h3>
-        {s && !settings && !running && canCreate && <button type="button" className="link" onClick={() => { setEditing(true); }}>New search</button>}
+        <div className="row">
+          {s && !settings && !running && canCreate && <button type="button" className="link" onClick={() => { setEditing(true); }}>New search</button>}
+          {canUseApollo && <button type="button" className="doc-btn" onClick={() => { setShowApollo(true); }}>Apollo</button>}
+        </div>
       </div>
       {companion.ready === false && <p className="warning">Install and connect the LinkedIn companion (Settings › LinkedIn companion) to search.</p>}
       {companion.ready && !newer(companion.version) && <p className="warning">Update the LinkedIn companion to {NEEDS} to search.</p>}
@@ -203,6 +210,9 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
                     {p.contactId ? <a className="hr-chip have" href={`#/contacts/${p.contactId}`} onClick={(e) => { e.stopPropagation(); }}>Contact</a>
                       : p.duplicateOf ? <a className="hr-chip dup" href={`#/contacts/${p.duplicateOf}`} onClick={(e) => { e.stopPropagation(); }}>Possible duplicate: {p.duplicateName}</a>
                         : <span className="hr-chip new">New</span>}
+                    {canUseApollo && apollo.data && apollo.data.state !== "disabled" && p.current !== false &&
+                      <button type="button" className="link small hr-email-action" aria-label={`Work email for ${p.name}`}
+                        onClick={(e) => { e.stopPropagation(); setApolloPerson(p); }}>Work email</button>}
                   </td>
                 </tr>
               ))}
@@ -215,6 +225,10 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
           </button>
         )}
       </>}
+      {showApollo ? <ApolloConnectionDialog connection={apollo} onClose={() => { setShowApollo(false); }} />
+        : apolloPerson && <ApolloLookupDialog key={apolloPerson.url} companyId={company.id} companyName={s?.linkedinCompanyName ?? company.name} person={apolloPerson}
+          onClose={() => { setApolloPerson(null); }}
+          openConnection={() => { setShowApollo(true); }} />}
       {s?.status === "done" && people.length === 0 && <p className="muted">LinkedIn showed no one with these job titles here.</p>}
     </section>
   );

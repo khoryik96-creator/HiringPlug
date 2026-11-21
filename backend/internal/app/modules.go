@@ -108,6 +108,7 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks, d.Files, d.Config.MaxUploadBytes, m.Identity)
 	m.Contacts = contacts.New(d.Pool, m.Companies, m.Settings, d.MailServers, d.Mailboxes, d.Files, d.Config.MaxUploadBytes)
+	m.Contacts.ConfigureApollo(d.Config.Apollo, nil)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
 	m.Jobs.UseTimeZone(d.Config.TimeZone) // intake dates and ad closing days are the agency's
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
@@ -383,7 +384,7 @@ func (m *Modules) Server() *Server {
 // and so run with no queue transaction open (see jobqueue.OutsideHandlers).
 func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
 	all := jobqueue.OutsideHandlers{}
-	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers(), m.Emails.OutsideJobHandlers(), m.Claims.OutsideJobHandlers()} {
+	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers(), m.Emails.OutsideJobHandlers(), m.Claims.OutsideJobHandlers(), m.Contacts.OutsideJobHandlers()} {
 		maps.Copy(all, handlers)
 	}
 	return all

@@ -973,6 +973,36 @@ type FolderShare struct {
 	CreatedAt time.Time
 }
 
+type HrApolloConnection struct {
+	TenantID     string
+	UserID       string
+	FlowID       string
+	BrokerOrigin string
+	ProofSealed  string
+	AuthorizeUrl string
+	AccountName  *string
+	ExpiresAt    time.Time
+}
+
+type HrApolloLookup struct {
+	TenantID            string
+	UserID              string
+	ID                  string
+	FlowID              string
+	CompanyID           string
+	LinkedinCompanyID   string
+	ProfileUrl          string
+	PersonName          string
+	LinkedinCompanyName string
+	LinkedinCompanyUrl  string
+	State               string
+	EmailSealed         *string
+	EmailStatus         *string
+	Reason              *string
+	UpdatedAt           time.Time
+	CreatedAt           time.Time
+}
+
 type HrScan struct {
 	TenantID            string
 	CompanyID           string
@@ -990,6 +1020,7 @@ type HrScan struct {
 	StartedBy           string
 	StartedAt           time.Time
 	UpdatedAt           time.Time
+	LinkedinCompanyUrl  *string
 }
 
 type Industry struct {

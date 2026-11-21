@@ -40,6 +40,10 @@ x-error-codes:
     module: aiproviders
     status: 409
     description: That provider has no API key yet; save one first.
+  APOLLO_BROKER_UNAVAILABLE:
+    module: contacts
+    status: 503
+    description: Apollo sign-in is currently unavailable through the configured broker.
   APPLICATIONS_OVERLAP:
     module: pipeline
     status: 409
@@ -2551,6 +2555,67 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
+  /v1/contacts/apollo:
+    get:
+      operationId: getApolloConnection
+      tags: [contacts]
+      summary: View the current recruiter's Apollo connection
+      x-permission: contacts.apollo:use
+      responses:
+        '200':
+          description: Apollo status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApolloConnection'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: updateApolloConnection
+      tags: [contacts]
+      summary: Start, check or disconnect the recruiter's Apollo sign-in
+      x-permission: contacts.apollo:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ApolloConnectionAction'}
+      responses:
+        '200':
+          description: Apollo status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApolloConnection'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '503':
+          description: The Apollo broker could not confirm sign-in
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/companies/{companyId}/hr-scan/apollo:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    post:
+      operationId: lookupApolloWorkEmail
+      tags: [contacts]
+      summary: Check a scanned person for a work email, confirm credit use, or recover a lookup
+      x-permission: contacts.apollo:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ApolloLookupRequest'}
+      responses:
+        '200':
+          description: Apollo status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApolloLookup'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/companies/{companyId}/hr-scan:
     parameters:
       - $ref: '#/components/parameters/CompanyIdPath'
@@ -8049,6 +8114,7 @@ components:
         - companies:create
         - companies:read
         - companies:update
+        - contacts.apollo:use
         - contacts.role:update
         - contacts:create
         - contacts:read
@@ -8115,6 +8181,7 @@ components:
       enum:
         - AI_KEYS_NOT_SET_UP
         - AI_PROVIDER_NO_KEY
+        - APOLLO_BROKER_UNAVAILABLE
         - APPLICATIONS_OVERLAP
         - APPLICATION_EXISTS
         - ASSISTANT_LIMIT_REACHED
@@ -8210,6 +8277,7 @@ components:
         - company.industried
         - company.industry
         - company.industry_ask
+        - contact.apollo_lookup
         - contact.check_mailbox
         - contact.linkedin_read
         - contact.read_linkedin
@@ -10497,6 +10565,54 @@ components:
         model: {type: string, nullable: true}
         inputTokens: {type: integer, minimum: 0}
         outputTokens: {type: integer, minimum: 0}
+    ApolloConnection:
+      type: object
+      required: [state]
+      properties:
+        state:
+          type: string
+          enum: [disabled, disconnected, pending, connected, expired, failed, disconnected_locally]
+        authorizationUrl: {type: string}
+        accountName: {type: string}
+    ApolloConnectionAction:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [start, poll, disconnect]
+    ApolloLookupRequest:
+      type: object
+      additionalProperties: false
+      required: [action, profileUrl]
+      properties:
+        action:
+          type: string
+          enum: [preview, unlock, check]
+        profileUrl: {type: string, minLength: 1, maxLength: 500}
+        confirmation: {type: string, pattern: '^[a-f0-9]{64}$', description: Required for unlock. Use the value from preview.}
+    ApolloLookup:
+      type: object
+      required: [state]
+      properties:
+        state:
+          type: string
+          enum: [existing, ready, ineligible, rescan, disabled, disconnected, busy, previous_connection, queued, sending, found, not_found, mismatch, pending, unconfirmed, auth_required, limited, cancelled]
+        email: {type: string}
+        confirmation: {type: string}
+        emailStatus:
+          type: string
+          enum: [verified, unverified, catch_all, unavailable, user_managed, unknown]
+        reason:
+          type: string
+          enum: [profile_not_found, email_not_returned, personal_email_only, email_redacted, email_unusable, contact_unconfirmed]
+    ContactApolloLookupJob:
+      type: object
+      additionalProperties: false
+      required: [lookupId]
+      properties:
+        lookupId: {type: string, pattern: '^[a-f0-9]{64}$'}
     HrCountry:
       type: string
       description: A country LinkedIn's people search is narrowed to (its two-letter code).
@@ -10508,6 +10624,10 @@ components:
       properties:
         linkedinCompanyId: {type: string, pattern: '^[0-9]{1,24}$', description: "LinkedIn's number for the company (the companion reads it)."}
         linkedinCompanyName: {type: string, minLength: 1, maxLength: 200, description: The company's name as LinkedIn shows it.}
+        linkedinCompanyUrl:
+          type: string
+          maxLength: 500
+          description: The company page the companion used to resolve the LinkedIn ID. Required for Apollo lookup.
         country:
           description: Only people in this country; none means anywhere.
           allOf: [{$ref: '#/components/schemas/HrCountry'}]
@@ -16172,6 +16292,11 @@ x-permissions:
     description: Edit companies.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  contacts.apollo:use:
+    module: contacts
+    description: Connect a personal Apollo account and confirm work-email lookups in Find HR.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   contacts.role:update:
     module: contacts
     description: Change a contact's role (hiring manager, HR…) on their card and form.
@@ -16611,6 +16736,12 @@ x-jobs:
     payload: CompanyIndustryAskJob
     priority: low
     description: Ask the AI to pick a new company's industry, if it still needs one and the AI is on (Go worker; keeps adding a company free of AI bookkeeping).
+  contact.apollo_lookup:
+    module: contacts
+    queue: core
+    payload: ContactApolloLookupJob
+    priority: normal
+    description: Look up one work email in Apollo after explicit credit confirmation.
   contact.check_mailbox:
     module: contacts
     queue: core

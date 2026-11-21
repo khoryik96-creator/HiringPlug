@@ -66,7 +66,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
     { id: "contacts", label: "Contacts", content:
       <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} canEmail={permissions.includes("emails:send")}
         canCheck={permissions.includes("contacts:update")} /> },
-    { id: "find-hr", label: "Find HR", content: <FindHR company={c} canCreate={permissions.includes("contacts:create")} /> },
+    { id: "find-hr", label: "Find HR", content: <FindHR company={c} canCreate={permissions.includes("contacts:create")} canUseApollo={permissions.includes("contacts.apollo:use")} /> },
     { id: "activity", label: "Activity", content: <Timeline compact subjectType="company" subjectId={c.id} permissions={permissions} /> },
   ];
 

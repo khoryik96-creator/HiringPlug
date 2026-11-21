@@ -1239,6 +1239,13 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .hr-chip.new { background: #e8f6ee; color: #15803d; }
 .hr-chip.dup { background: #fdf3e2; color: #b45309; }
 .hr-chip.have { background: var(--soft); color: var(--muted); }
+.hr-email-action { margin-inline-start: 0.5rem; white-space: nowrap; }
+dialog.hr-apollo-dialog { width: min(29rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); margin: auto; overflow: auto; color: var(--ink); }
+.hr-apollo-dialog::backdrop { background: rgb(24 17 40 / 40%); }
+.hr-apollo-dialog h3 { margin: 0; }
+.hr-apollo-person, .hr-apollo-address { overflow-wrap: anywhere; }
+.hr-apollo-actions { flex-wrap: wrap; }
+
 
 /* A new contact from their LinkedIn profile */
 .from-linkedin { display: grid; gap: 0.4rem; justify-items: start; }

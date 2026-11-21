@@ -76,6 +76,7 @@ type Config struct {
 	// host, emails are recorded but fail with "no mail server is set up".
 	SMTP            SMTP
 	MailConnections MailConnections
+	Apollo          Apollo
 	Dropbox         Dropbox
 	// AlertEmails are told when the server needs someone (a failed backup, a
 	// nearly full disk...): the worker emails them. None: only logged.
@@ -165,6 +166,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MicrosoftClientID: r.str("HP_MAIL_MICROSOFT_CLIENT_ID", ""), MicrosoftClientSecret: r.str("HP_MAIL_MICROSOFT_CLIENT_SECRET", ""),
 		GoogleClientID: r.str("HP_MAIL_GOOGLE_CLIENT_ID", ""), GoogleClientSecret: r.str("HP_MAIL_GOOGLE_CLIENT_SECRET", ""),
 	}
+	c.Apollo = r.apollo()
 	c.Dropbox = Dropbox{AppKey: r.str("HP_DROPBOX_APP_KEY", ""), AppSecret: r.str("HP_DROPBOX_APP_SECRET", "")}
 	if len(c.MailConnections.KeysSecret) == 0 && c.Env != EnvProduction {
 		c.MailConnections.KeysSecret = []byte(devSecret)

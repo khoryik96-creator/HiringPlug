@@ -72,9 +72,22 @@ func (s *Service) StartHRScan(ctx context.Context, p authz.Principal, companyID 
 			errs.Add("keywords", "add at least one job title to search for")
 			return errs.Err()
 		}
+		var observedURL *string
+		if in.LinkedinCompanyUrl != nil {
+			current, err := s.companies.LinkedinURL(ctx, tx, companyID)
+			if err != nil {
+				return err
+			}
+			page := apolloCompanyURL(*in.LinkedinCompanyUrl)
+			slug := strings.TrimSuffix(strings.TrimPrefix(page, "https://www.linkedin.com/company/"), "/")
+			if page == "" || page != apolloCompanyURL(current) || (linkedinCompanyIDRe.MatchString(slug) && slug != in.LinkedinCompanyId) {
+				return apperr.Validation(apperr.FieldErrors{{Field: "linkedinCompanyUrl", Message: "the company LinkedIn page changed or does not match this scan; reload and search again"}})
+			}
+			observedURL = &page
+		}
 		row, err := store.New(tx).StartHrScan(ctx, store.StartHrScanParams{
 			CompanyID: companyID, LinkedinCompanyID: in.LinkedinCompanyId, LinkedinCompanyName: strings.TrimSpace(in.LinkedinCompanyName),
-			Country: country, Keywords: keywords, Pages: int32(min(in.Pages, 10)), //nolint:gosec // 1-10 (the contract)
+			LinkedinCompanyUrl: observedURL, Country: country, Keywords: keywords, Pages: int32(min(in.Pages, 10)), //nolint:gosec // 1-10 (the contract)
 		})
 		if err != nil {
 			return err

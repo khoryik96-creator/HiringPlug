@@ -255,10 +255,11 @@ SELECT * FROM hr_scan WHERE company_id = @company_id;
 SELECT * FROM hr_scan WHERE company_id = @company_id FOR UPDATE;
 
 -- name: StartHrScan :one
-INSERT INTO hr_scan (tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, started_by)
-VALUES (app_current_tenant(), @company_id, @linkedin_company_id, @linkedin_company_name, sqlc.narg(country), @keywords, @pages, app_current_user())
+INSERT INTO hr_scan (tenant_id, company_id, linkedin_company_id, linkedin_company_name, linkedin_company_url, country, keywords, pages, started_by)
+VALUES (app_current_tenant(), @company_id, @linkedin_company_id, @linkedin_company_name, sqlc.narg(linkedin_company_url), sqlc.narg(country), @keywords, @pages, app_current_user())
 ON CONFLICT (tenant_id, company_id) DO UPDATE SET
   linkedin_company_id = EXCLUDED.linkedin_company_id, linkedin_company_name = EXCLUDED.linkedin_company_name,
+  linkedin_company_url = EXCLUDED.linkedin_company_url,
   country = EXCLUDED.country, keywords = EXCLUDED.keywords, pages = EXCLUDED.pages, status = 'running',
   next_query = 0, next_page = 1, pages_read = 0, error = NULL, people = '[]'::jsonb,
   started_by = EXCLUDED.started_by, started_at = now(), updated_at = now()

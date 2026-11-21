@@ -42,6 +42,7 @@ class Permission(StrEnum):
     companies_create = "companies:create"
     companies_read = "companies:read"
     companies_update = "companies:update"
+    contacts_apollo_use = "contacts.apollo:use"
     contacts_role_update = "contacts.role:update"
     contacts_create = "contacts:create"
     contacts_read = "contacts:read"
@@ -108,6 +109,7 @@ class Permission(StrEnum):
 class ErrorCode(StrEnum):
     AI_KEYS_NOT_SET_UP = "AI_KEYS_NOT_SET_UP"
     AI_PROVIDER_NO_KEY = "AI_PROVIDER_NO_KEY"
+    APOLLO_BROKER_UNAVAILABLE = "APOLLO_BROKER_UNAVAILABLE"
     APPLICATIONS_OVERLAP = "APPLICATIONS_OVERLAP"
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
     ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
@@ -203,6 +205,7 @@ class JobKind(StrEnum):
     company_industried = "company.industried"
     company_industry = "company.industry"
     company_industry_ask = "company.industry_ask"
+    contact_apollo_lookup = "contact.apollo_lookup"
     contact_check_mailbox = "contact.check_mailbox"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
@@ -1889,6 +1892,107 @@ class CompanyIndustryPickId(RootModel[str]):
     ]
 
 
+class State(StrEnum):
+    disabled = "disabled"
+    disconnected = "disconnected"
+    pending = "pending"
+    connected = "connected"
+    expired = "expired"
+    failed = "failed"
+    disconnected_locally = "disconnected_locally"
+
+
+class ApolloConnection(BaseModel):
+    state: State
+    authorizationUrl: str | None = None
+    accountName: str | None = None
+
+
+class Action(StrEnum):
+    start = "start"
+    poll = "poll"
+    disconnect = "disconnect"
+
+
+class ApolloConnectionAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    action: Action
+
+
+class Action1(StrEnum):
+    preview = "preview"
+    unlock = "unlock"
+    check = "check"
+
+
+class ApolloLookupRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    action: Action1
+    profileUrl: Annotated[str, Field(max_length=500, min_length=1)]
+    confirmation: Annotated[
+        str | None,
+        Field(description="Required for unlock. Use the value from preview.", pattern="^[a-f0-9]{64}$"),
+    ] = None
+
+
+class State1(StrEnum):
+    existing = "existing"
+    ready = "ready"
+    ineligible = "ineligible"
+    rescan = "rescan"
+    disabled = "disabled"
+    disconnected = "disconnected"
+    busy = "busy"
+    previous_connection = "previous_connection"
+    queued = "queued"
+    sending = "sending"
+    found = "found"
+    not_found = "not_found"
+    mismatch = "mismatch"
+    pending = "pending"
+    unconfirmed = "unconfirmed"
+    auth_required = "auth_required"
+    limited = "limited"
+    cancelled = "cancelled"
+
+
+class EmailStatus(StrEnum):
+    verified = "verified"
+    unverified = "unverified"
+    catch_all = "catch_all"
+    unavailable = "unavailable"
+    user_managed = "user_managed"
+    unknown = "unknown"
+
+
+class Reason1(StrEnum):
+    profile_not_found = "profile_not_found"
+    email_not_returned = "email_not_returned"
+    personal_email_only = "personal_email_only"
+    email_redacted = "email_redacted"
+    email_unusable = "email_unusable"
+    contact_unconfirmed = "contact_unconfirmed"
+
+
+class ApolloLookup(BaseModel):
+    state: State1
+    email: str | None = None
+    confirmation: str | None = None
+    emailStatus: EmailStatus | None = None
+    reason: Reason1 | None = None
+
+
+class ContactApolloLookupJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    lookupId: Annotated[str, Field(pattern="^[a-f0-9]{64}$")]
+
+
 class HrCountry(StrEnum):
     MY = "MY"
     SG = "SG"
@@ -1926,6 +2030,13 @@ class HrScanStart(BaseModel):
     linkedinCompanyName: Annotated[
         str, Field(description="The company's name as LinkedIn shows it.", max_length=200, min_length=1)
     ]
+    linkedinCompanyUrl: Annotated[
+        str | None,
+        Field(
+            description="The company page the companion used to resolve the LinkedIn ID. Required for Apollo lookup.",
+            max_length=500,
+        ),
+    ] = None
     country: Annotated[
         HrCountry | None, Field(description="Only people in this country; none means anywhere.")
     ] = None
@@ -2144,7 +2255,7 @@ class ContactLinkedinCheckRequest(BaseModel):
     profileUrl: Annotated[str, Field(description="https://www.linkedin.com/in/...")]
 
 
-class Reason1(StrEnum):
+class Reason2(StrEnum):
     no_profile = "no_profile"
     too_many = "too_many"
     recent = "recent"
@@ -2154,7 +2265,7 @@ class ContactLinkedinCheckSkipped(BaseModel):
     contactId: ContactId
     contactName: str
     reason: Annotated[
-        Reason1,
+        Reason2,
         Field(
             description="no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest); recent = checked in the last 90 days (with dueOnly)."
         ),
@@ -3144,7 +3255,7 @@ class EmailDraft(BaseModel):
     ]
 
 
-class EmailStatus(StrEnum):
+class EmailStatus1(StrEnum):
     queued = "queued"
     sent = "sent"
     failed = "failed"
@@ -7345,7 +7456,7 @@ class Email1(BaseModel):
             description="It shows salary (hidden from roles that may not see salaries, unless Settings say otherwise)."
         ),
     ]
-    status: EmailStatus
+    status: EmailStatus1
     error: Annotated[str | None, Field(...)]
     sentBy: UserId
     sentByName: str

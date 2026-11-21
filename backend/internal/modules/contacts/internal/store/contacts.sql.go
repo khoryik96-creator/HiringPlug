@@ -409,7 +409,7 @@ func (q *Queries) GetEmploymentCheck(ctx context.Context, id string) (ContactEmp
 }
 
 const getHrScan = `-- name: GetHrScan :one
-SELECT tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at FROM hr_scan WHERE company_id = $1
+SELECT tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at, linkedin_company_url FROM hr_scan WHERE company_id = $1
 `
 
 // Find HR: one LinkedIn people scan per company.
@@ -433,6 +433,7 @@ func (q *Queries) GetHrScan(ctx context.Context, companyID string) (HrScan, erro
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.UpdatedAt,
+		&i.LinkedinCompanyUrl,
 	)
 	return i, err
 }
@@ -827,7 +828,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 }
 
 const lockHrScan = `-- name: LockHrScan :one
-SELECT tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at FROM hr_scan WHERE company_id = $1 FOR UPDATE
+SELECT tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at, linkedin_company_url FROM hr_scan WHERE company_id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockHrScan(ctx context.Context, companyID string) (HrScan, error) {
@@ -850,6 +851,7 @@ func (q *Queries) LockHrScan(ctx context.Context, companyID string) (HrScan, err
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.UpdatedAt,
+		&i.LinkedinCompanyUrl,
 	)
 	return i, err
 }
@@ -1036,7 +1038,7 @@ const saveHrScan = `-- name: SaveHrScan :one
 UPDATE hr_scan SET status = $1, next_query = $2, next_page = $3, pages_read = $4,
   error = $5, people = $6, updated_at = now()
 WHERE company_id = $7
-RETURNING tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at
+RETURNING tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at, linkedin_company_url
 `
 
 type SaveHrScanParams struct {
@@ -1077,6 +1079,7 @@ func (q *Queries) SaveHrScan(ctx context.Context, arg SaveHrScanParams) (HrScan,
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.UpdatedAt,
+		&i.LinkedinCompanyUrl,
 	)
 	return i, err
 }
@@ -1250,20 +1253,22 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 }
 
 const startHrScan = `-- name: StartHrScan :one
-INSERT INTO hr_scan (tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, started_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, app_current_user())
+INSERT INTO hr_scan (tenant_id, company_id, linkedin_company_id, linkedin_company_name, linkedin_company_url, country, keywords, pages, started_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, app_current_user())
 ON CONFLICT (tenant_id, company_id) DO UPDATE SET
   linkedin_company_id = EXCLUDED.linkedin_company_id, linkedin_company_name = EXCLUDED.linkedin_company_name,
+  linkedin_company_url = EXCLUDED.linkedin_company_url,
   country = EXCLUDED.country, keywords = EXCLUDED.keywords, pages = EXCLUDED.pages, status = 'running',
   next_query = 0, next_page = 1, pages_read = 0, error = NULL, people = '[]'::jsonb,
   started_by = EXCLUDED.started_by, started_at = now(), updated_at = now()
-RETURNING tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at
+RETURNING tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at, linkedin_company_url
 `
 
 type StartHrScanParams struct {
 	CompanyID           string
 	LinkedinCompanyID   string
 	LinkedinCompanyName string
+	LinkedinCompanyUrl  *string
 	Country             *string
 	Keywords            []string
 	Pages               int32
@@ -1274,6 +1279,7 @@ func (q *Queries) StartHrScan(ctx context.Context, arg StartHrScanParams) (HrSca
 		arg.CompanyID,
 		arg.LinkedinCompanyID,
 		arg.LinkedinCompanyName,
+		arg.LinkedinCompanyUrl,
 		arg.Country,
 		arg.Keywords,
 		arg.Pages,
@@ -1296,6 +1302,7 @@ func (q *Queries) StartHrScan(ctx context.Context, arg StartHrScanParams) (HrSca
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.UpdatedAt,
+		&i.LinkedinCompanyUrl,
 	)
 	return i, err
 }

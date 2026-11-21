@@ -22,6 +22,7 @@ Read in this order. Each page is short and links to the next.
 - [Profit Planner](https://claude.ai/artifact/SXZUgNHU16BkqiUHX6uU2G) (source: [pricing-calculator.html](pricing-calculator.html)): prices, users, costs and tax in, margin, break-even and a forecast out.
 
 - [Industries and subindustries](industries.md): catalogue settings, employer recognition and legacy data.
+- [Apollo work email](apollo-hr.md) covers Find HR, broker setup and troubleshooting.
 - [JobAdder migration](jobadder-migration.md): external discovery tool, source preservation and remaining import architecture.
 
 ## How-to guides

@@ -38,7 +38,7 @@ function serve() {
 describe("Find HR", () => {
   it("lists who it found, best first, with who is a contact already or may be, and joining dates", async () => {
     serve();
-    renderWithClient(<FindHR company={company} canCreate />);
+    renderWithClient(<FindHR company={company} canCreate canUseApollo={false} />);
     expect((await screen.findByRole("status")).textContent).toContain("Done · 3 pages read · 5 found");
     const farah = screen.getByRole("link", { name: "Farah Aziz" });
     expect(farah.getAttribute("href")).toBe("https://www.linkedin.com/in/farah");
@@ -55,7 +55,7 @@ describe("Find HR", () => {
     serve();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "ct_9", version: 1 }));
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({}));
-    renderWithClient(<FindHR company={company} canCreate />);
+    renderWithClient(<FindHR company={company} canCreate canUseApollo={false} />);
     const daniel = (await screen.findByText("Daniel Lee")).closest("tr") as HTMLElement;
     fireEvent.click(screen.getByRole("link", { name: "Farah Aziz" }));
     expect(screen.queryByRole("button", { name: /Add \d+ as contacts/ })).toBeNull(); // a name opens LinkedIn, it does not choose
@@ -80,7 +80,7 @@ describe("Find HR", () => {
     const call = vi.spyOn(companion, "companionCall").mockImplementation(() =>
       signIn ? Promise.reject(new Error("LinkedIn asked to sign in")) : Promise.resolve({ joined: "2024-01", left: "", current: true }));
     vi.spyOn(api, "POST").mockResolvedValue(ok(scan)); // the scan as saved (Daniel still without dates)
-    renderWithClient(<FindHR company={company} canCreate />);
+    renderWithClient(<FindHR company={company} canCreate canUseApollo={false} />);
     await screen.findByText("Daniel Lee");
     fireEvent.click(screen.getByRole("button", { name: "All 3" })); // Farah and Aisha read already, Daniel not
     fireEvent.click(screen.getByRole("button", { name: "Joining dates (1)" }));
@@ -99,14 +99,14 @@ describe("Find HR", () => {
     const { activeRuns, newRun } = await import("./findHrRun");
     const run = newRun(vi.fn());
     activeRuns.set("comp_1", run);
-    renderWithClient(<FindHR company={company} canCreate />);
+    renderWithClient(<FindHR company={company} canCreate canUseApollo={false} />);
     expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
     activeRuns.delete("comp_1");
   });
 
   it("asks for the company's LinkedIn page first", () => {
     serve();
-    renderWithClient(<FindHR company={{ ...company, linkedinUrl: null }} canCreate />);
+    renderWithClient(<FindHR company={{ ...company, linkedinUrl: null }} canCreate canUseApollo={false} />);
     expect(screen.getByText(/Add the company's LinkedIn page/)).toBeTruthy();
   });
 });
