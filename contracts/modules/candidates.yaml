@@ -6,7 +6,7 @@ x-module:
   permissions:
     candidates:export:
       description: Export candidates (what a search finds) to Excel or CSV; salaries only with candidates.compensation:read.
-      roles: [owner, admin, recruiter]
+      roles: [owner, admin]
     candidates:read:
       description: View candidate profiles (salary details need candidates.compensation:read).
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]

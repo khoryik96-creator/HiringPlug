@@ -91,8 +91,8 @@ func column(rows [][]string, heading string) int {
 func TestCandidateExport(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter, api.RoleSourcer)
-	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter, api.RoleSourcer)
+	owner, admin, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleRecruiter].Token
 	siti := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "lastName": "Aminah", "email": "siti@example.com", "tags": []string{"finance"}})
 	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/candidates/"+siti.Id+"/compensation", owner, map[string]any{
 		"expectedVersion": 0, "currentSalary": map[string]any{"amount": "8500", "currency": "MYR", "period": "month"}, "expectedSalary": nil,
@@ -100,12 +100,12 @@ func TestCandidateExport(t *testing.T) {
 	a.createCandidate(recruiter, map[string]any{"firstName": "=HYPERLINK(\"http://x\")", "lastName": "Tan"})
 	a.createCandidate(recruiter, map[string]any{"firstName": "Wei", "lastName": "Ming"})
 
-	res := a.request(http.MethodPost, "/v1/candidates/export", recruiter, map[string]any{"format": "csv"})
+	res := a.request(http.MethodPost, "/v1/candidates/export", admin, map[string]any{"format": "csv"})
 	rows := csvRows(t, res)
 	assert.Contains(t, res.Header.Get("Content-Disposition"), `filename="Candidates `)
 	require.Len(t, rows, 4, "a heading and everyone")
 	name, salary := column(rows, "Name"), column(rows, "Current salary")
-	require.NotEqual(t, -1, salary, "a recruiter may see salaries")
+	require.NotEqual(t, -1, salary, "an admin may see salaries")
 	var names []string
 	for _, r := range rows[1:] {
 		names = append(names, r[name])
@@ -116,25 +116,27 @@ func TestCandidateExport(t *testing.T) {
 	}
 	assert.Contains(t, names, `'=HYPERLINK("http://x") Tan`, "a name that looks like a formula is written as text")
 
-	found := csvRows(t, a.request(http.MethodPost, "/v1/candidates/export", recruiter, map[string]any{"format": "csv", "search": map[string]any{"q": "Siti", "limit": 1}}))
+	found := csvRows(t, a.request(http.MethodPost, "/v1/candidates/export", admin, map[string]any{"format": "csv", "search": map[string]any{"q": "Siti", "limit": 1}}))
 	require.Len(t, found, 2, "only what the search finds (its limit ignored)")
 	assert.Equal(t, "siti@example.com", found[1][column(found, "Email")])
 
-	assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/candidates/export", tenant.Users[api.RoleSourcer].Token, map[string]any{"format": "csv"}).Status,
-		"sourcers cannot export")
+	for _, role := range []api.Role{api.RoleRecruiter, api.RoleSourcer} {
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/candidates/export", tenant.Users[role].Token, map[string]any{"format": "csv"}).Status,
+			"only owners and admins export candidates")
+	}
 
 	// A role that may export but not see salaries gets no salary columns.
 	var roles api.AccessSettings
 	a.request(http.MethodGet, "/v1/access", owner, nil).JSON(&roles)
 	var rec api.RoleAccess
 	for _, r := range roles.Roles {
-		if r.Role == "recruiter" {
+		if r.Role == "admin" {
 			rec = r
 		}
 	}
-	a.setRole(owner, "recruiter", map[string]any{"version": rec.Version, "permissions": without(rec.Permissions, api.PermissionCandidatesCompensationRead, api.PermissionCandidatesCompensationUpdate),
+	a.setRole(owner, "admin", map[string]any{"version": rec.Version, "permissions": without(rec.Permissions, api.PermissionCandidatesCompensationRead, api.PermissionCandidatesCompensationUpdate),
 		"candidateScope": "all", "jobCandidates": true}, http.StatusOK)
-	book := xlsxRows(t, a.request(http.MethodPost, "/v1/candidates/export", recruiter, map[string]any{"format": "xlsx"}))
+	book := xlsxRows(t, a.request(http.MethodPost, "/v1/candidates/export", admin, map[string]any{"format": "xlsx"}))
 	require.Len(t, book["Candidates"], 4)
 	assert.Equal(t, -1, column(book["Candidates"], "Current salary"))
 	assert.NotContains(t, strings.Join(book["Candidates"][0], ","), "salary")
@@ -149,8 +151,8 @@ func TestCandidateExport(t *testing.T) {
 func TestListExports(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleViewer)
-	recruiter := tenant.Users[api.RoleRecruiter].Token
+	tenant := testutil.Current.NewTenant(t, api.RoleAdmin, api.RoleRecruiter, api.RoleViewer)
+	admin, recruiter := tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleRecruiter].Token
 	acme := a.createCompany(recruiter, map[string]any{"name": "Acme Sdn Bhd", "city": "Petaling Jaya"})
 	a.createCompany(recruiter, map[string]any{"name": "Kenanga Logistics Sdn Bhd"})
 	a.createContact(recruiter, map[string]any{"companyId": acme.Id, "firstName": "Aisyah", "lastName": "Rahman", "email": "aisyah@acme.example", "role": "hr"})
@@ -160,12 +162,12 @@ func TestListExports(t *testing.T) {
 		"startDate": "2026-12-01", "money": map[string]any{"salary": map[string]any{"amount": "9000.00", "currency": "MYR", "period": "month"}, "feePercent": "20"},
 	}, http.StatusCreated)
 
-	companies := xlsxRows(t, a.request(http.MethodGet, "/v1/companies/export?format=xlsx&q=acme", recruiter, nil))["Companies"]
+	companies := xlsxRows(t, a.request(http.MethodGet, "/v1/companies/export?format=xlsx&q=acme", admin, nil))["Companies"]
 	require.Len(t, companies, 2, "the search is kept")
 	assert.Equal(t, "Acme Sdn Bhd", companies[1][0])
 	assert.Equal(t, "Client", companies[1][column(companies, "Type")])
 
-	contacts := csvRows(t, a.request(http.MethodGet, "/v1/contacts/export?format=csv&companyId="+acme.Id, recruiter, nil))
+	contacts := csvRows(t, a.request(http.MethodGet, "/v1/contacts/export?format=csv&companyId="+acme.Id, admin, nil))
 	require.Len(t, contacts, 2)
 	assert.Equal(t, []string{"Aisyah Rahman", "Acme Sdn Bhd", "HR", "aisyah@acme.example"},
 		[]string{contacts[1][0], contacts[1][column(contacts, "Company")], contacts[1][column(contacts, "Role")], contacts[1][column(contacts, "Email")]})
@@ -175,7 +177,7 @@ func TestListExports(t *testing.T) {
 	assert.Equal(t, "Finance Manager", jobs[1][0])
 	assert.Equal(t, "Acme Sdn Bhd", jobs[1][column(jobs, "Client")])
 
-	placements := xlsxRows(t, a.request(http.MethodGet, "/v1/placements/export?format=xlsx", recruiter, nil))["Placements"]
+	placements := xlsxRows(t, a.request(http.MethodGet, "/v1/placements/export?format=xlsx", admin, nil))["Placements"]
 	require.Len(t, placements, 2)
 	assert.Equal(t, "9000.00", placements[1][column(placements, "Salary")])
 	assert.Equal(t, "2026-12-01", placements[1][column(placements, "Start date")])
@@ -190,17 +192,20 @@ func TestListExports(t *testing.T) {
 	for _, path := range []string{"/v1/companies/export?format=csv", "/v1/contacts/export?format=csv", "/v1/jobs/export?format=csv", "/v1/placements/export?format=csv"} {
 		assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, path, viewer, nil).Status, path)
 	}
-	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/companies/export?format=pdf", recruiter, nil).Status)
+	for _, path := range []string{"/v1/companies/export?format=csv", "/v1/contacts/export?format=csv", "/v1/placements/export?format=csv"} {
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, path, recruiter, nil).Status, "owners and admins only: "+path)
+	}
+	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/companies/export?format=pdf", admin, nil).Status)
 }
 
 func TestExportsHoldAtMostTenThousandRows(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	tenant := testutil.Current.NewTenant(t, api.RoleAdmin)
 	_, err := testutil.Current.Admin.Exec(context.Background(), `INSERT INTO company (tenant_id, name, created_by)
-		SELECT $1, 'Company ' || n, $2 FROM generate_series(1, 10001) n`, tenant.ID, tenant.Users[api.RoleRecruiter].ID)
+		SELECT $1, 'Company ' || n, $2 FROM generate_series(1, 10001) n`, tenant.ID, tenant.Users[api.RoleAdmin].ID)
 	require.NoError(t, err)
-	res := a.request(http.MethodGet, "/v1/companies/export?format=csv", tenant.Users[api.RoleRecruiter].Token, nil)
+	res := a.request(http.MethodGet, "/v1/companies/export?format=csv", tenant.Users[api.RoleAdmin].Token, nil)
 	assert.Equal(t, http.StatusUnprocessableEntity, res.Status)
 	assert.Contains(t, string(res.Body), "EXPORT_TOO_LARGE")
 }

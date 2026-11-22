@@ -6,7 +6,7 @@ x-module:
   permissions:
     companies:export:
       description: Export the company list (what a search finds) to Excel or CSV.
-      roles: [owner, admin, recruiter]
+      roles: [owner, admin]
     companies:read:
       description: View companies.
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]

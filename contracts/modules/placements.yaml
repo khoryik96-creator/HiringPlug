@@ -13,7 +13,7 @@ x-module:
   permissions:
     placements:export:
       description: Export placements to Excel or CSV (fees in it need placements.fees:read).
-      roles: [owner, admin, recruiter]
+      roles: [owner, admin]
     placements:read:
       description: View placements (salary and fee need placements.fees:read).
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]

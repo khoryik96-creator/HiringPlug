@@ -559,8 +559,8 @@ for each of their jobs, with **Score fit** / **Score again**.
   at most 10,000 rows. The server builds the file, so salaries are in it only
   for roles that may see them (candidates.compensation:read; placement
   salaries and fees with placements.fees:read); exporting needs its own
-  permission (candidates:export, companies:export, contacts:export,
-  jobs:export, placements:export: owners, admins, recruiters by default);
+  permission (candidates:export, companies:export, contacts:export and
+  placements:export: owners and admins by default; jobs:export: recruiters too);
   every export is in the audit log (how many, never a salary). Text that
   would start a formula is written as text. Reports come one sheet each.
   **Import** reads Excel (.xlsx, its first sheet; dates as dates) as well as

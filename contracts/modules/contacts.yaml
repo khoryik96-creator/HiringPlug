@@ -6,7 +6,7 @@ x-module:
   permissions:
     contacts:export:
       description: Export the contact list (what a search finds) to Excel or CSV.
-      roles: [owner, admin, recruiter]
+      roles: [owner, admin]
     contacts:read:
       description: View contacts.
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]

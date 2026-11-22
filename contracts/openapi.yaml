@@ -17276,7 +17276,7 @@ x-permissions:
     module: candidates
     description: Export candidates (what a search finds) to Excel or CSV; salaries only with candidates.compensation:read.
     sensitive: false
-    roles: [owner, admin, recruiter]
+    roles: [owner, admin]
   candidates:merge:
     module: candidates
     description: Merge a duplicate candidate into another (needs to see salaries, so nothing is lost unseen).
@@ -17326,7 +17326,7 @@ x-permissions:
     module: companies
     description: Export the company list (what a search finds) to Excel or CSV.
     sensitive: false
-    roles: [owner, admin, recruiter]
+    roles: [owner, admin]
   companies:merge:
     module: companies
     description: Merge a duplicate company into another (its contacts, jobs, notes and documents move over).
@@ -17361,7 +17361,7 @@ x-permissions:
     module: contacts
     description: Export the contact list (what a search finds) to Excel or CSV.
     sensitive: false
-    roles: [owner, admin, recruiter]
+    roles: [owner, admin]
   contacts:merge:
     module: contacts
     description: Merge a duplicate contact into another (their emails, jobs, notes and checks move over).
@@ -17621,7 +17621,7 @@ x-permissions:
     module: placements
     description: Export placements to Excel or CSV (fees in it need placements.fees:read).
     sensitive: false
-    roles: [owner, admin, recruiter]
+    roles: [owner, admin]
   placements:manage:
     module: placements
     description: Record placements and change them (start date, guarantee, status, invoice).
