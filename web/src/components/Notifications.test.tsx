@@ -61,7 +61,7 @@ describe("NotificationSettings", () => {
     renderWithClient(<NotificationSettings permissions={["pipeline:read", "automations.tasks:read", "interviews:read"]} />);
     const tasks = await screen.findByRole("switch", { name: "Your tasks due today or overdue" });
     expect(screen.queryByRole("switch", { name: "Offers waiting for your approval" })).toBeNull(); // cannot approve offers
-    expect((tasks as HTMLInputElement).checked).toBe(true);
+    expect(tasks).toHaveProperty("checked", true);
 
     fireEvent.click(tasks);
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
@@ -74,7 +74,7 @@ describe("NotificationSettings", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(list({ mutedKinds: ["applicant"] })));
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ morningEmail: true, mutedKinds: ["applicant"] }));
     renderWithClient(<NotificationSettings permissions={["pipeline:read"]} />);
-    expect(((await screen.findByRole("switch", { name: "New applicants on jobs you own" })) as HTMLInputElement).checked).toBe(false);
+    expect(await screen.findByRole<HTMLInputElement>("switch", { name: "New applicants on jobs you own" })).toHaveProperty("checked", false);
     fireEvent.click(screen.getByRole("switch", { name: /Email me this list at 8:00/ }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect(sentBody(put)).toEqual({ morningEmail: true, mutedKinds: ["applicant"] });

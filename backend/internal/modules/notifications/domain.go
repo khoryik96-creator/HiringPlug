@@ -209,10 +209,11 @@ func later(a, b time.Time) time.Time {
 // today (midnight UTC of the agency's day).
 func dayWord(local, today time.Time) string {
 	y, m, d := local.Date()
-	switch time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Sub(today) {
-	case 0:
+	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	if day.Equal(today) {
 		return "today"
-	case 24 * time.Hour:
+	}
+	if day.Equal(today.AddDate(0, 0, 1)) {
 		return "tomorrow"
 	}
 	return local.Format("Mon 2 Jan")
