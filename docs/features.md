@@ -1721,6 +1721,15 @@ typed in, and keeps it on their timeline as a **WhatsApp** note. Numbers saved
 without a country code are read as `HP_DEFAULT_PHONE_REGION`'s. Nothing is
 sent by HiringPlug itself, so no WhatsApp Business account is needed.
 
+## On a phone ✅
+
+Below 700px wide the top bar is one row: HiringPlug, Outlook, Calendar,
+Settings and a **Menu** button, which opens the pages, your account and
+Sign out (it closes on going to a page). The candidate, company and contact
+lists become cards (the name, then what is filled in); the jobs grid keeps
+its job column in view while the stages scroll; a job's pipeline rows stack
+their actions under the name; tables in reports scroll inside their panel.
+
 ## Calendar and Outlook
 
 The Calendar icon opens the full calendar. The dock icon beside it opens the calendar

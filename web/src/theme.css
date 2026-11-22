@@ -110,13 +110,25 @@ dd { margin: 0; }
 .error { color: #b91c1c; }
 .email-recipients .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; margin-top: 0.5rem; }
 
-/* Keep navigation and account actions usable on narrow settings screens. */
+/* The Menu button shows only on phones. */
+.topbar .topbar-menu-button { display: none; border: 0; background: transparent; box-shadow: none; min-height: 0; color: var(--topbar-text); }
+.topbar .topbar-menu-button:hover, .topbar .topbar-menu-button[aria-expanded="true"] { background: rgba(255, 255, 255, 0.16); }
+
+/* Phones: one compact bar (brand, shortcuts, Menu); the pages, Settings and
+   the account open under it from the Menu button. */
 @media (max-width: 700px) {
-  .topbar { flex-wrap: wrap; gap: 0.5rem; padding: 0.65rem 1rem; }
-  .topbar nav { order: 3; flex-basis: 100%; width: 100%; flex-wrap: wrap; overflow: visible; row-gap: 0.25rem; }
-  .topbar nav a, .topbar nav .menu > summary.more-pages { padding: 0.35rem 0.65rem; } /* every page shows, on two lines if need be */
-  .topbar .who { margin-left: auto; }
-  .topbar .who .name { display: none; }
+  .topbar { flex-wrap: wrap; gap: 0.25rem 0.5rem; padding: 0.45rem 0.75rem; }
+  .topbar .brand { font-size: 1.35rem; }
+  .topbar .app-version { margin-bottom: 0.4rem; }
+  .topbar-tools { margin-left: auto; }
+  .topbar .topbar-menu-button { display: inline-flex; }
+  .topbar .settings-link:not(.topbar-shortcut) { width: 34px; height: 34px; padding: 0; justify-content: center; }
+  .topbar .settings-label, .topbar .calendar-dock-toggle { display: none; }
+  .topbar nav, .topbar .who { display: none; }
+  .topbar.menu-open nav { display: flex; order: 3; flex-basis: 100%; flex-direction: column; gap: 0.15rem; overflow: visible; padding: 0.35rem 0 0.25rem; border-top: 1px solid rgba(255, 255, 255, 0.2); }
+  .topbar.menu-open nav a, .topbar.menu-open nav .menu > summary.more-pages { padding: 0.6rem 0.75rem; border-radius: 10px; }
+  .topbar.menu-open nav .menu-list { position: static; box-shadow: none; }
+  .topbar.menu-open .who { display: flex; order: 4; flex-basis: 100%; justify-content: space-between; padding: 0.5rem 0.25rem 0.35rem; border-top: 1px solid rgba(255, 255, 255, 0.2); }
 }
 
 /* The top bar's "More" list (Leads, Reports, Import): looks like the other pages on the bar. */

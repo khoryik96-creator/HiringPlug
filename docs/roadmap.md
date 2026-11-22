@@ -52,7 +52,7 @@ five are being built now; the rest are queued in this order.
 | | Item | Why |
 |---|---|---|
 | ✅ 1.30.0 | **WhatsApp**: a chat link on every phone number, filled-in message templates, the chat logged as activity | Malaysian candidates and clients answer WhatsApp first |
-| 🔜 | **Phones**: a compact top bar and lists that fit a phone screen | The top bar overflows at phone width; wide lists scroll sideways |
+| ✅ 1.31.0 | **Phones**: a compact top bar and lists that fit a phone screen | The top bar overflows at phone width; wide lists scroll sideways |
 | 🔜 | **Notifications**: a bell for new applicants, tasks, offers to approve and tomorrow's interviews, and an optional morning email | Today these are found only by opening the dashboard |
 | ✅ 1.29.0 | **Two-step sign-in** with an authenticator app, recovery codes, owners able to require it | Email and password alone; needed before selling it as a service |
 | 🔜 | **Merge duplicate companies and contacts**, with a list of possible duplicates | Only candidates can be merged |

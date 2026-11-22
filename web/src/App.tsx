@@ -50,6 +50,8 @@ const calendarOverlaysPage = () => typeof window.matchMedia === "function" && wi
 function Shell({ onSignOut }: { onSignOut: () => void }) {
   const hash = useHash();
   const [calendarDocked, setCalendarDocked] = useState(false);
+  // On a phone the pages are under a Menu button; opened at a page, it closes on going to another.
+  const [menuOpenAt, setMenuOpenAt] = useState<string | null>(null);
   const calendarOverlay = useSyncExternalStore(watchCalendarWidth, calendarOverlaysPage);
   const calendarDockButton = useRef<HTMLButtonElement>(null);
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
@@ -77,9 +79,10 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       requestAnimationFrame(() => { calendarDockButton.current?.focus(); });
     } else calendarDockButton.current?.focus();
   };
+  const menuOpen = menuOpenAt === hash;
   return (
     <div className={showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
-      <header className="topbar" inert={calendarModal}>
+      <header className={menuOpen ? "topbar menu-open" : "topbar"} inert={calendarModal}>
         <span className="brand">Hiring<span>Plug</span></span>
         <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>
         <MainMenu routes={menu("main", permissions)} current={route.section} />
@@ -102,8 +105,12 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
             </svg>
-            Settings
+            <span className="settings-label">Settings</span>
           </a>
+          <button type="button" className="settings-link topbar-shortcut topbar-menu-button" aria-expanded={menuOpen} aria-controls="topbar-menu"
+            aria-label={menuOpen ? "Close menu" : "Menu"} onClick={() => { setMenuOpenAt(menuOpen ? null : hash); }}>
+            {menuOpen ? <CloseIcon /> : <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>}
+          </button>
         </div>
         <div className="who">
           <a href="#/account" aria-label={`Your account: ${me.data.user.name}`} aria-current={route.section === "account" ? "page" : undefined}>
@@ -217,7 +224,7 @@ function MainMenu({ routes, current }: { routes: Route[]; current: string }) {
   const more = routes.filter((r) => r.menu?.more);
   const open = more.find((r) => r.section === current);
   return (
-    <nav aria-label="Main">
+    <nav id="topbar-menu" aria-label="Main">
       {routes.filter((r) => !r.menu?.more).map((r) => link(r))}
       {more.length > 0 && (
         <Menu label={<>{open?.menu?.label ?? "More"} <span aria-hidden="true">▾</span></>} ariaLabel="More pages"

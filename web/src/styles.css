@@ -1439,3 +1439,30 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .whatsapp-fields .chip { border: 0; cursor: pointer; font-family: var(--mono, monospace); font-weight: 500; }
 .whatsapp-template h3 { margin: 0; }
 .whatsapp-bubble { white-space: pre-wrap; background: #e7f8ee; border-radius: 0.75rem 0.75rem 0.75rem 0.2rem; padding: 0.6rem 0.8rem; margin: 0.5rem 0 0; max-width: 40rem; }
+
+/* Phones: the candidate, company and contact lists as cards (name first,
+   then what is filled in), and the jobs grid with its job column pinned. */
+@media (max-width: 700px) {
+  .table-scroll.pinned-scroll { overflow: visible; }
+  .table-scroll.pinned-scroll + .sticky-scrollbar, .sticky-scrollbar { display: none; }
+  table.pick-table thead { display: none; }
+  table.pick-table, table.pick-table tbody { display: block; width: 100%; }
+  table.pick-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.7rem; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--line); }
+  table.pick-table tbody tr:last-child { border-bottom: 0; }
+  table.pick-table td { display: block; position: static; padding: 0; border: 0; font-size: 0.86rem; color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+  table.pick-table td:first-child { flex-basis: 100%; font-size: 1rem; color: var(--ink); }
+  table.pick-table td:empty, table.pick-table td:has(> :is(span, div):only-child:empty) { display: none; }
+  .heat-table th:first-child, .heat-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 9.5rem; max-width: 11rem; box-shadow: 1px 0 0 var(--line); }
+  .heat-table th:first-child { background: var(--soft); }
+  .heat-table td:first-child { white-space: normal; overflow-wrap: anywhere; }
+  table.pick-table tr.bounces { background: #fef2f2; box-shadow: inset 3px 0 0 #dc2626; }
+  table.pick-table tr.bounces td { background: transparent; box-shadow: none; }
+  .topbar .app-version { margin-left: 0; }
+  .panel { padding: 1rem; }
+  .funnel { grid-template-columns: 56px repeat(var(--cols, 6), minmax(100px, 1fr)); scrollbar-width: none; } /* scrolls sideways; each stage keeps its name */
+  .step-row { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 0.35rem 0.6rem; }
+  .step-row .step-info { grid-column: 2 / -1; }
+  .step-row .step-info:empty { display: none; }
+  .step-row .step-actions { grid-column: 2 / -1; justify-content: flex-start; }
+  .panel:has(> table) { overflow-x: auto; }
+}

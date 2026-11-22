@@ -184,6 +184,23 @@ describe("top bar", () => {
     expect(within(list).getByRole("link", { name: "Reports" }).getAttribute("aria-current")).toBe("page");
   });
 
+  it("opens the pages from the Menu button (phones), and closes it on going to one", async () => {
+    signedIn(RECRUITER, "#/candidates");
+    const button = await screen.findByRole("button", { name: "Menu" });
+    const bar = button.closest("header") as HTMLElement;
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.getAttribute("aria-controls")).toBe(screen.getByRole("navigation", { name: "Main" }).id);
+    fireEvent.click(button);
+    expect(bar.classList.contains("menu-open")).toBe(true);
+    expect(screen.getByRole("button", { name: "Close menu" }).getAttribute("aria-expanded")).toBe("true");
+    act(() => {
+      window.location.hash = "#/jobs";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() => { expect(bar.classList.contains("menu-open")).toBe(false); });
+    expect(screen.getByRole("button", { name: "Menu" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("does not open a part the user may not change", async () => {
     signedIn(RECRUITER, "#/team");
     await screen.findByRole("navigation", { name: "Main" });

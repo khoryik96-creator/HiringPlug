@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -108,7 +109,9 @@ func TestAPIKeysKeepToTheirRolesAccess(t *testing.T) {
 // would hold a database connection and the queue's slot for its 10 seconds).
 func TestAWebhookIsPostedWithNoTransactionOpen(t *testing.T) {
 	t.Parallel()
-	a := newTestApp(t)
+	// Only this app's connections count: tests running alongside post webhooks too.
+	name := "webhook-no-tx-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	a := newTestApp(t, map[string]string{"HP_DATABASE_URL": withApplicationName(testutil.Current.AppURL, name)})
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
 	owner := tenant.Users[api.RoleOwner].Token
 	var open atomic.Int32
@@ -116,7 +119,7 @@ func TestAWebhookIsPostedWithNoTransactionOpen(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		var n int32
 		_ = testutil.Current.Admin.QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity
-			WHERE state LIKE 'idle in transaction%' AND query LIKE '%GetDeliveryToSend%'`).Scan(&n)
+			WHERE application_name = $1 AND state LIKE 'idle in transaction%' AND query LIKE '%GetDeliveryToSend%'`, name).Scan(&n)
 		open.Store(n)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -126,6 +129,18 @@ func TestAWebhookIsPostedWithNoTransactionOpen(t *testing.T) {
 	a.createCandidate(owner, map[string]any{"firstName": "Siti"})
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	assert.Zero(t, open.Load(), "posted, with no transaction waiting on it")
+}
+
+// withApplicationName names a database URL's connections (pg_stat_activity.application_name).
+func withApplicationName(dbURL, name string) string {
+	u, err := url.Parse(dbURL)
+	if err != nil {
+		panic(err)
+	}
+	q := u.Query()
+	q.Set("application_name", name)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // receiver is a webhook receiver for tests.
