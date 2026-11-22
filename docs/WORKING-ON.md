@@ -20,10 +20,11 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Notifications: a bell for new applicants, tasks, offers to approve and tomorrow's interviews; an optional morning email
+### Exports and Excel import: CSV/Excel from every list and report; .xlsx imports
 - Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v
-- Touches: a new notifications module (migration 00165), small read functions in jobs, pipeline, automations, offers, interviews; the top bar (web/src/App*), Settings › Your account
+- Touches: list pages (candidates, companies, contacts, jobs, placements), reports, the import page; export endpoints in those modules
 - Started: 22 Nov 2026    Last update: 22 Nov 2026
-- State: ready to merge (1.33.0: backend, bell, Settings switches, tests, screenshots)
-- Next: the owner says merge; then remove this entry
+- State: in progress
+- Next: design (roadmap "Product pipeline" item 6)
+
