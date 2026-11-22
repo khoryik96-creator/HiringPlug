@@ -63,15 +63,25 @@ function dateStyles(styles: Document | null): Set<number> {
   all(xfs, "xf").forEach((xf, i) => {
     const id = Number(xf.getAttribute("numFmtId") ?? "0");
     const code = (custom.get(id) ?? "").replace(/"[^"]*"|\[[^\]]*\]/g, "").toLowerCase();
-    if ((id >= 14 && id <= 17) || id === 22 || (/[dy]/.test(code) && !/^[hms:. ]*$/.test(code))) out.add(i);
+    // Built-in date formats: 14-17 and 22, and the East Asian ones (27-36, 50-58).
+    if ((id >= 14 && id <= 17) || id === 22 || (id >= 27 && id <= 36) || (id >= 50 && id <= 58) || (/[dy]/.test(code) && !/^[hms:. ]*$/.test(code))) out.add(i);
   });
   return out;
 }
 
 /** An Excel day number (days since 30 Dec 1899) as 2026-11-22. */
-export function excelDay(serial: number): string {
-  const d = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * 86_400_000));
-  return d.toISOString().slice(0, 10);
+export function excelDay(serial: number, date1904 = false): string {
+  // 1900 system: day 1 is 1 Jan 1900, and Excel counts a 29 Feb 1900 that
+  // never was (day 60), so from day 61 on the days start a day earlier.
+  // 1904 system (older Mac workbooks): day 0 is 1 Jan 1904.
+  const start = date1904 ? Date.UTC(1904, 0, 1) : serial < 61 ? Date.UTC(1899, 11, 31) : Date.UTC(1899, 11, 30);
+  const d = new Date(start + Math.round(serial * 86_400_000));
+  return Number.isNaN(d.getTime()) || serial < 0 ? String(serial) : d.toISOString().slice(0, 10);
+}
+
+/** A string item's text: its own text and its runs', not phonetic readings (rPh). */
+function textOf(item: Element): string {
+  return all(item, "t").filter((t) => t.parentElement?.localName !== "rPh").map((t) => t.textContent).join("");
 }
 
 /** The column index of a cell reference: A1 is 0, AA7 is 26. */
@@ -99,7 +109,8 @@ export async function readXlsx(buffer: ArrayBuffer): Promise<string[][]> {
   const sheet = await read(sheetPath);
   if (!sheet) throw new Error("no worksheet");
   const shared = (await read("xl/sharedStrings.xml"));
-  const strings = shared ? all(shared, "si").map((si) => all(si, "t").map((t) => t.textContent).join("")) : [];
+  const strings = shared ? all(shared, "si").map(textOf) : [];
+  const date1904 = workbook ? all(workbook, "workbookPr").some((p) => ["1", "true"].includes(p.getAttribute("date1904") ?? "")) : false;
   const dates = dateStyles(await read("xl/styles.xml"));
 
   const rows: string[][] = [];
@@ -114,9 +125,9 @@ export async function readXlsx(buffer: ArrayBuffer): Promise<string[][]> {
       const v = all(c, "v")[0]?.textContent ?? "";
       let text: string;
       if (type === "s") text = strings[Number(v)] ?? "";
-      else if (type === "inlineStr") text = all(c, "t").map((t) => t.textContent).join("");
+      else if (type === "inlineStr") text = all(c, "is").map(textOf).join("");
       else if (type === "b") text = v === "1" ? "TRUE" : "FALSE";
-      else if (type === "n" && v !== "" && dates.has(Number(c.getAttribute("s") ?? "-1"))) text = excelDay(Number(v));
+      else if (type === "n" && v !== "" && dates.has(Number(c.getAttribute("s") ?? "-1"))) text = excelDay(Number(v), date1904);
       else text = v;
       while (cells.length < col) cells.push("");
       cells[col] = text;

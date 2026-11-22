@@ -29,13 +29,25 @@ var workAuthLabel = map[string]string{
 	"rp_t": "Residence Pass-Talent (RP-T)", "permanent_resident": "Permanent resident", "spouse_visa": "Spouse visa", "other": "Other pass",
 }
 
+// exportPage is how many an export reads at a time (more than a screen's
+// page: each read runs the whole search again).
+const exportPage = 1000
+
 // Export returns everyone the search finds as a file.
 func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter, format string) (sheet.File, error) {
+	f.NoSnippets = true
 	var found []Summary
+	var labels map[string]map[string]string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		if s.labels != nil {
+			if labels, err = s.labels.Labels(ctx, tx); err != nil {
+				return err
+			}
+		}
 		var cursor *string
 		for {
-			page, err := s.searchTx(ctx, tx, p, f, cursor, 100)
+			page, err := s.searchTx(ctx, tx, p, f, cursor, exportPage)
 			if err != nil {
 				return err
 			}
@@ -54,18 +66,19 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter,
 			}
 		}
 		return audit.Record(ctx, tx, audit.Entry{
-			Action: "candidate.exported", EntityType: "candidate", EntityID: p.UserID,
+			Action: "candidate.exported", EntityType: "user", EntityID: p.UserID,
 			Changes: map[string]any{"count": len(found), "format": format, "salaries": canSeeSalary(p)},
 		})
 	})
 	if err != nil {
 		return sheet.File{}, err
 	}
-	return sheet.Write(format, "Candidates "+time.Now().Format("2 Jan 2006"), CandidateTable(found, canSeeSalary(p)))
+	return sheet.Write(format, sheet.Dated("Candidates", time.Now(), s.zone), CandidateTable(found, canSeeSalary(p), labels["candidate_source"], s.zone))
 }
 
-// CandidateTable is the export's sheet: the salary columns only when shown.
-func CandidateTable(found []Summary, salaries bool) sheet.Table {
+// CandidateTable is the export's sheet: the salary columns only when shown,
+// sources in words, the day updated in the agency's time zone.
+func CandidateTable(found []Summary, salaries bool, sources map[string]string, loc *time.Location) sheet.Table {
 	cols := []sheet.Column{
 		{Heading: "Name"}, {Heading: "Email"}, {Heading: "Phone"}, {Heading: "Current title"}, {Heading: "Current company"},
 		{Heading: "Location"}, {Heading: "Nationality"}, {Heading: "Country of residence"}, {Heading: "Work authorization"},
@@ -87,12 +100,12 @@ func CandidateTable(found []Summary, salaries bool) sheet.Table {
 		row := []string{
 			c.FullName, str(c.Email), str(c.Phone), str(c.CurrentTitle), str(c.CurrentCompany), str(c.Location),
 			str(c.Nationality), str(c.ResidenceCountry), auth, label(availabilityLabel, c.Availability), noticeText(c.NoticePeriod),
-			str(c.Source), str(c.Industry), strings.Join(c.Tags, ", "),
+			sheet.Label(sources, c.Source), str(c.Industry), strings.Join(c.Tags, ", "),
 		}
 		if salaries {
 			row = append(row, salaryCells(c.Compensation)...)
 		}
-		t.Rows = append(t.Rows, append(row, c.UpdatedAt.Format("2006-01-02")))
+		t.Rows = append(t.Rows, append(row, sheet.DayIn(c.UpdatedAt, loc)))
 	}
 	return t
 }

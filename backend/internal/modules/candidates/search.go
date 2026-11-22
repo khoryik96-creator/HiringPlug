@@ -38,6 +38,7 @@ type SearchFilter struct {
 	Owner                                           *string // a user id
 	Folder                                          *string // only the candidates in this folder
 	Order                                           Order
+	NoSnippets                                      bool // an export: no CV snippets (they are not shown)
 }
 
 // SearchHit is a candidate found, with where the boolean matched.
@@ -151,7 +152,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		return page, err
 	}
 	snippets := map[string]string{}
-	if len(matched) > 0 && s.cvs != nil {
+	if len(matched) > 0 && s.cvs != nil && !f.NoSnippets {
 		if snippets, err = s.cvs.CVSnippets(ctx, tx, *ts, matched); err != nil {
 			return page, err
 		}

@@ -100,7 +100,11 @@ describe("readXlsx", () => {
   });
 
   it("turns Excel day numbers into dates", () => {
-    expect(excelDay(1)).toBe("1899-12-31");
+    expect(excelDay(1)).toBe("1900-01-01");
+    expect(excelDay(59)).toBe("1900-02-28");
+    expect(excelDay(61)).toBe("1900-03-01");
+    expect(excelDay(46348 - 1462, true)).toBe("2026-11-22"); // an older Mac workbook (1904 system)
+    expect(excelDay(1e12)).toBe("1000000000000"); // not a real date: the number, and the import goes on
     expect(excelDay(46348)).toBe("2026-11-22");
   });
 });
@@ -115,5 +119,17 @@ describe("a workbook saved by a spreadsheet program", () => {
       ["Nurul Aisyah", "Rahman", "nurul@example.com", "2026-11-22", "8500"],
       ["Tan", "Wei Ming", "", "2027-01-04", "12000.5"],
     ]);
+  });
+});
+
+describe("workbooks from elsewhere", () => {
+  it("leaves out phonetic readings and reads the 1904 date system", async () => {
+    const book = workbook();
+    book["xl/workbook.xml"] = (book["xl/workbook.xml"] ?? "").replace("<sheets>", '<workbookPr date1904="1"/><sheets>');
+    book["xl/sharedStrings.xml"] = (book["xl/sharedStrings.xml"] ?? "").replace("<si><t>Tan &amp; Co</t></si>",
+      "<si><t>山田</t><rPh sb=\"0\" eb=\"2\"><t>やまだ</t></rPh><phoneticPr fontId=\"1\"/></si>");
+    const rows = await readXlsx(await zip(book));
+    expect(rows[1]?.[1]).toBe("山田");
+    expect(rows[1]?.[2]).toBe("2030-11-23"); // 46348 days after 1 Jan 1904
   });
 });

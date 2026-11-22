@@ -21,11 +21,14 @@ import (
 
 var statusLabel = map[string]string{"active": "Active", "left": "Left the company"}
 
-// roleText writes a role key from Settings for people: hr is HR, other keys
-// (hiring_manager, or one the agency added) read as words.
-func roleText(role *string) string {
+// roleText writes a role for people: its words in Settings, else (a role
+// no longer listed) hr as HR and other keys read as words.
+func roleText(role *string, labels map[string]string) string {
 	if role == nil {
 		return ""
+	}
+	if l, ok := labels[*role]; ok && l != "" {
+		return l
 	}
 	if *role == "hr" {
 		return "HR"
@@ -38,17 +41,23 @@ func roleText(role *string) string {
 func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, format string) (sheet.File, error) {
 	f.Similar = false // likeness has one page: an export is the plain list
 	var found []Summary
+	var labels map[string]map[string]string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
+		if s.roles != nil {
+			if labels, err = s.roles.Labels(ctx, tx); err != nil {
+				return err
+			}
+		}
 		found, err = sheet.Collect(func(cursor *string) ([]Summary, *string, error) {
-			page, err := s.listTx(ctx, tx, p, f, cursor, 100)
+			page, err := s.listTx(ctx, tx, p, f, cursor, 1000)
 			return page.Items, page.NextCursor, err
 		})
 		if err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{
-			Action: "contact.exported", EntityType: "contact", EntityID: p.UserID,
+			Action: "contact.exported", EntityType: "user", EntityID: p.UserID,
 			Changes: map[string]any{"count": len(found), "format": format},
 		})
 	})
@@ -64,10 +73,10 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, forma
 		if status == "" {
 			status = r.Status
 		}
-		t.Rows = append(t.Rows, []string{FullName(r.FirstName, r.LastName), sheet.Str(r.Title), r.CompanyName, roleText(r.Role),
-			sheet.Str(r.Email), sheet.Str(r.Phone), sheet.Str(r.Mobile), status, sheet.Day(r.UpdatedAt)})
+		t.Rows = append(t.Rows, []string{FullName(r.FirstName, r.LastName), sheet.Str(r.Title), r.CompanyName, roleText(r.Role, labels["contact_role"]),
+			sheet.Str(r.Email), sheet.Str(r.Phone), sheet.Str(r.Mobile), status, sheet.DayIn(r.UpdatedAt, s.zone)})
 	}
-	return sheet.Write(format, sheet.Dated("Contacts", time.Now()), t)
+	return sheet.Write(format, sheet.Dated("Contacts", time.Now(), s.zone), t)
 }
 
 // ExportContacts handles GET /v1/contacts/export.

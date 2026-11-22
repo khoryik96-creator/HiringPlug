@@ -82,6 +82,7 @@ export function JobList({ canCreate, canExport = false }: { canCreate: boolean; 
             if (q.trim()) query.set("q", q.trim());
             if (status) query.set("status", status);
             if (mine) query.set("mine", "true");
+            if (view === "attention") for (const j of shown) query.append("ids", j.id); // only those needing attention
             return downloadExport(`/v1/jobs/export?${query.toString()}`);
           }} />}
           {canCreate && !adding && <IconButton label="Add job" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}

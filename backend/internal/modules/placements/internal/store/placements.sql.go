@@ -198,15 +198,17 @@ func (q *Queries) DeleteRetainerStages(ctx context.Context, jobOrderID string) e
 
 const exportPlacements = `-- name: ExportPlacements :many
 SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date FROM placement
-WHERE ($1::text IS NULL OR status = $1)
-  AND ($2::text IS NULL OR invoice_status = $2)
-  AND ($3::date IS NULL OR start_date >= $3)
-  AND ($4::date IS NULL OR start_date <= $4)
+WHERE ($1::text[] IS NULL OR id = ANY($1::text[]))
+  AND ($2::text IS NULL OR status = $2)
+  AND ($3::text IS NULL OR invoice_status = $3)
+  AND ($4::date IS NULL OR start_date >= $4)
+  AND ($5::date IS NULL OR start_date <= $5)
 ORDER BY start_date DESC, id DESC
 LIMIT 10001
 `
 
 type ExportPlacementsParams struct {
+	Ids           []string
 	Status        *string
 	InvoiceStatus *string
 	StartFrom     *time.Time
@@ -217,6 +219,7 @@ type ExportPlacementsParams struct {
 // than an export holds (so too many can be told).
 func (q *Queries) ExportPlacements(ctx context.Context, arg ExportPlacementsParams) ([]Placement, error) {
 	rows, err := q.db.Query(ctx, exportPlacements,
+		arg.Ids,
 		arg.Status,
 		arg.InvoiceStatus,
 		arg.StartFrom,

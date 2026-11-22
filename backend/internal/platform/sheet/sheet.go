@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,9 +52,8 @@ type Table struct {
 
 // File is a written file.
 type File struct {
-	Data        []byte
-	ContentType string
-	Name        string // the file name, with the extension
+	Data []byte
+	Name string // the file name, with the extension
 }
 
 // Write writes the tables in a format (csv or xlsx) as name.<ext>. A CSV
@@ -62,26 +62,30 @@ func Write(format, name string, tables ...Table) (File, error) {
 	switch format {
 	case CSV:
 		data, err := writeCSV(tables)
-		return File{Data: data, ContentType: "text/csv; charset=utf-8", Name: name + ".csv"}, err
+		return File{Data: data, Name: name + ".csv"}, err
 	case XLSX:
 		data, err := writeXLSX(tables)
-		return File{Data: data, ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Name: name + ".xlsx"}, err
+		return File{Data: data, Name: name + ".xlsx"}, err
 	}
 	return File{}, fmt.Errorf("sheet: unknown format %q", format)
 }
 
 // SafeCell keeps a spreadsheet from reading a cell as a formula (=, +, -,
 // @ at the start can run commands when a CSV is opened): such text gets a
-// leading apostrophe, which Excel shows as plain text.
+// leading apostrophe, which Excel shows as plain text. A number, or a phone
+// number (+60 12-345 6789: digits, spaces, dashes, brackets), is left as it
+// is: it can run nothing, and an apostrophe would stay in it.
 func SafeCell(s string) string {
 	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
-		if _, err := strconv.ParseFloat(s, 64); err == nil {
-			return s // a negative number is a number
+		if _, err := strconv.ParseFloat(s, 64); err == nil || phoneLike.MatchString(s) {
+			return s
 		}
 		return "'" + s
 	}
 	return s
 }
+
+var phoneLike = regexp.MustCompile(`^\+[0-9][0-9 ()-]*$`)
 
 func writeCSV(tables []Table) ([]byte, error) {
 	var b bytes.Buffer
@@ -312,8 +316,34 @@ func Str(s *string) string {
 	return *s
 }
 
-// Day writes a date as 2026-11-22 (Excel and Sheets read it as a date).
+// Day writes a day (a date with no time, e.g. a start date) as 2026-11-22
+// (Excel and Sheets read it as a date).
 func Day(t time.Time) string { return t.Format("2006-01-02") }
 
-// Dated is a file name with today's date: "Companies 22 Nov 2026".
-func Dated(what string, now time.Time) string { return what + " " + now.Format("2 Jan 2006") }
+// DayIn writes the day of a moment (e.g. when a record was updated) in the
+// agency's time zone.
+func DayIn(t time.Time, loc *time.Location) string { return Day(t.In(zone(loc))) }
+
+// Dated is a file name with today's date in the agency's time zone:
+// "Companies 22 Nov 2026".
+func Dated(what string, now time.Time, loc *time.Location) string {
+	return what + " " + now.In(zone(loc)).Format("2 Jan 2006")
+}
+
+func zone(loc *time.Location) *time.Location {
+	if loc == nil {
+		return time.UTC
+	}
+	return loc
+}
+
+// Label is a list key's words (Settings' dropdowns), or the key itself.
+func Label(labels map[string]string, key *string) string {
+	if key == nil {
+		return ""
+	}
+	if l, ok := labels[*key]; ok && l != "" {
+		return l
+	}
+	return *key
+}

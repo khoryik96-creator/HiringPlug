@@ -15,6 +15,7 @@ package contacts
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
@@ -38,6 +39,8 @@ type Companies interface {
 // Roles checks a role against Settings' contact roles (settings module).
 type Roles interface {
 	HasOption(ctx context.Context, tx pgx.Tx, list, key string) (bool, error)
+	// Labels gives the words for the company's lists (exports show a role's words).
+	Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error)
 }
 
 // MailServers looks up where a domain receives mail. *net.Resolver does;
@@ -102,3 +105,6 @@ func (m *Module) LockInvoiceRecipient(ctx context.Context, tx pgx.Tx, id, compan
 	}
 	return err == nil, err
 }
+
+// UseTimeZone sets the agency's time zone (dates in exports).
+func (m *Module) UseTimeZone(loc *time.Location) { m.service.zone = loc }

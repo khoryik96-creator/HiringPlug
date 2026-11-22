@@ -50,6 +50,8 @@ x-error-codes:
   PAYLOAD_TOO_LARGE: { status: 413, description: The request body or uploaded file is too large. }
   UNSUPPORTED_MEDIA_TYPE: { status: 415, description: The content type or file type is not supported. }
   INTERNAL: { status: 500, description: Something went wrong on our side. Quote the requestId when reporting it. }
+  # Shared here, not in a module: every list export (candidates, companies,
+  # contacts, jobs, placements) answers with it, through platform/sheet.
   EXPORT_TOO_LARGE: { status: 422, description: "An export holds at most 10,000 rows: narrow the search. `details.limit` is the most." }
   SERVICE_UNAVAILABLE: { status: 503, description: A dependency is temporarily unavailable. Retry later. }
 

@@ -556,13 +556,14 @@ for each of their jobs, with **Score fit** / **Score again**.
 - **Exports and Excel import** ✅ (1.34.0): **Export** (Excel .xlsx or CSV)
   on Candidates, Companies, Contacts, Jobs, Placements and Reports gives what
   the page's search and filters find (candidates: the advanced search too),
-  at most 10,000 rows. The server builds the file, so salaries are in it only
+  at most 10,000 rows (on Jobs and Placements, the rows the page shows after
+  its filters). The server builds the file, so salaries are in it only
   for roles that may see them (candidates.compensation:read; placement
   salaries and fees with placements.fees:read); exporting needs its own
   permission (candidates:export, companies:export, contacts:export and
   placements:export: owners and admins by default; jobs:export: recruiters too);
-  every export is in the audit log (how many, never a salary). Text that
-  would start a formula is written as text. Reports come one sheet each.
+  every list export is in the audit log, against the person (how many, never a salary); reports, which are counts and totals, are not. Text that
+  would start a formula is written as text (phone numbers are left as they are); dates are the agency's, and list keys are shown as Settings' words. Reports come one sheet each.
   **Import** reads Excel (.xlsx, its first sheet; dates as dates) as well as
   CSV; an old .xls is asked to be saved as .xlsx.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,

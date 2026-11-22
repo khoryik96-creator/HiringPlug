@@ -24,6 +24,8 @@ const nameUniqueIndex = "company_tenant_name_uq"
 
 // Service holds the companies use cases.
 type Service struct {
+	labels       Labeler        // the words for the company's lists (exports)
+	zone         *time.Location // the agency's time zone: dates in exports (UseTimeZone)
 	industries   IndustryCatalogue
 	ai           AI // the industry pick (UseAI)
 	pool         *pgxpool.Pool

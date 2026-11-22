@@ -15,7 +15,6 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements/internal/store"
-	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -29,11 +28,13 @@ var (
 )
 
 // Export returns the placements the filter finds as a file.
-func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, format string) (sheet.File, error) {
+// When ids is not nil only those placements are kept (what the dashboard
+// shows after its search, filters and card).
+func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, ids []string, format string) (sheet.File, error) {
 	var views []View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ExportPlacements(ctx, store.ExportPlacementsParams{
-			Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
+			Ids: ids, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
 		})
 		if err != nil {
 			return err
@@ -45,14 +46,14 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, forma
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{
-			Action: "placement.exported", EntityType: "placement", EntityID: p.UserID,
+			Action: "placement.exported", EntityType: "user", EntityID: p.UserID,
 			Changes: map[string]any{"count": len(views), "format": format, "fees": p.Can(api.PermissionPlacementsFeesRead)},
 		})
 	})
 	if err != nil {
 		return sheet.File{}, err
 	}
-	return sheet.Write(format, sheet.Dated("Placements", time.Now()), PlacementTable(views, p.Can(api.PermissionPlacementsFeesRead)))
+	return sheet.Write(format, sheet.Dated("Placements", time.Now(), s.inv.TimeZone), PlacementTable(views, p.Can(api.PermissionPlacementsFeesRead)))
 }
 
 // PlacementTable is the export's sheet: the salary and fee columns only when shown.
@@ -105,10 +106,12 @@ func exportDay(t *time.Time) string {
 
 // ExportPlacements handles GET /v1/placements/export.
 func (h *HTTP) ExportPlacements(ctx context.Context, req api.ExportPlacementsRequestObject) (api.ExportPlacementsResponseObject, error) {
-	q := req.Params
-	file, err := h.svc.Export(ctx, authz.MustFromContext(ctx), Filter{
-		Status: c.Convert[string](q.Status), InvoiceStatus: c.Convert[string](q.InvoiceStatus), StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo),
-	}, string(q.Format))
+	b := req.Body
+	var ids []string
+	if b.Ids != nil {
+		ids = append([]string{}, *b.Ids...) // empty: nothing shown, nothing exported
+	}
+	file, err := h.svc.Export(ctx, authz.MustFromContext(ctx), Filter{StartFrom: dayPtr(b.StartFrom), StartTo: dayPtr(b.StartTo)}, ids, string(b.Format))
 	if err != nil {
 		return nil, err
 	}

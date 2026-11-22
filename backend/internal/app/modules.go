@@ -106,7 +106,6 @@ func NewModules(d Deps) *Modules {
 	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
-	m.Candidates.UseTimeZone(d.Config.TimeZone) // a call's date is the agency's day
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks, d.Files, d.Config.MaxUploadBytes, m.Identity)
@@ -114,7 +113,7 @@ func NewModules(d Deps) *Modules {
 	m.Contacts.ConfigureApollo(d.Config.Apollo, nil)
 	m.Contacts.CheckApolloUsersWith(m.Identity) // a paid lookup re-checks the recruiter's access
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
-	m.Jobs.UseTimeZone(d.Config.TimeZone) // intake dates and ad closing days are the agency's
+	m.useAgencyTime(d.Config.TimeZone)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
 	m.Pipeline.NameUsersWith(m.Identity)
 	m.Notes = notes.New(d.Pool, notes.Subjects{

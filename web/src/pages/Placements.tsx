@@ -69,10 +69,8 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
             </>
           )}
           {permissions.includes("placements:export") && customReady && <ExportButton what="placements" run={(format) => {
-            const query = new URLSearchParams({ format });
-            if (dates.from) query.set("startFrom", dates.from);
-            if (dates.to) query.set("startTo", dates.to);
-            return downloadExport(`/v1/placements/export?${query.toString()}`);
+            // The rows shown: the dates, the search, the filters and the chosen card.
+            return downloadExport("/v1/placements/export", { format, ids: rows.map((p) => p.id) });
           }} />}
         </div>
       </div>

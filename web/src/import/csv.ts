@@ -36,3 +36,18 @@ export function toCsv(rows: string[][]): string {
   const quote = (c: string) => (/[",\n\r]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c);
   return rows.map((r) => r.map(quote).join(",")).join("\r\n") + "\r\n";
 }
+
+/**
+ * The rows to fix, with a Problem column: each row padded to the heading
+ * (a row from Excel stops at its last filled cell), so its problem sits
+ * under Problem. line is the row's line in the file (2 = the first row).
+ */
+export function rowsToFix(header: string[], rows: string[][], problems: { line: number; message: string }[]): string[][] {
+  const padded = (cells: string[]) => [...cells, ...Array<string>(Math.max(0, header.length - cells.length)).fill("")];
+  return [[...header, "Problem"], ...problems.map((p) => [...padded(rows[p.line - 2] ?? []), p.message])];
+}
+
+/** The rows-to-fix file's name: always a CSV ("Candidates.xlsx" gives "to-fix-Candidates.csv"). */
+export function toFixName(fileName: string): string {
+  return `to-fix-${fileName.replace(/\.[^.]+$/, "")}.csv`;
+}

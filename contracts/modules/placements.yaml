@@ -38,17 +38,16 @@ x-module:
 
 paths:
   /v1/placements/export:
-    get:
+    post:
       operationId: exportPlacements
       tags: [placements]
-      summary: Placements matching the filters, as Excel or CSV; fees only with placements.fees:read
+      summary: Placements as Excel or CSV (the rows the dashboard shows); fees only with placements.fees:read
       x-permission: placements:export
-      parameters:
-        - { name: format, in: query, required: true, schema: { $ref: '#/components/schemas/ExportFormat' } }
-        - { name: status, in: query, required: false, schema: { $ref: '#/components/schemas/PlacementStatus' } }
-        - { name: invoiceStatus, in: query, required: false, schema: { $ref: '#/components/schemas/InvoiceStatus' } }
-        - { name: startFrom, in: query, required: false, description: Started on or after this day., schema: { type: string, format: date } }
-        - { name: startTo, in: query, required: false, description: Started on or before this day., schema: { type: string, format: date } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlacementExport' }
       responses:
         '200':
           description: The file (an Excel workbook or a CSV)
@@ -538,6 +537,19 @@ components:
       type: string
       pattern: '^plc_[0-9a-hjkmnp-tv-z]{26}$'
       example: plc_01jbz6w0m0k8q9x2r3s4t5v6w7
+    PlacementExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: { $ref: '#/components/schemas/ExportFormat' }
+        ids:
+          type: array
+          maxItems: 10000
+          description: The placements to export (what the dashboard shows after its search, filters and card); none for every placement in the dates.
+          items: { $ref: '#/components/schemas/PlacementId' }
+        startFrom: { type: string, format: date, description: Started on or after this day. }
+        startTo: { type: string, format: date, description: Started on or before this day. }
     PlacementStatus:
       type: string
       description: >

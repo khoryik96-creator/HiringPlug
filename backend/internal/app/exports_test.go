@@ -143,7 +143,8 @@ func TestCandidateExport(t *testing.T) {
 
 	var changes string
 	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(),
-		`SELECT changes::text FROM audit_log WHERE tenant_id = $1 AND action = 'candidate.exported' ORDER BY created_at LIMIT 1`, tenant.ID).Scan(&changes))
+		`SELECT changes::text FROM audit_log WHERE tenant_id = $1 AND action = 'candidate.exported' AND entity_type = 'user' ORDER BY created_at LIMIT 1`, tenant.ID).Scan(&changes),
+		"logged against the person who exported")
 	assert.Contains(t, changes, `"count": 3`)
 	assert.NotContains(t, changes, "8500", "never a salary in the audit log")
 }
@@ -153,32 +154,41 @@ func TestListExports(t *testing.T) {
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleAdmin, api.RoleRecruiter, api.RoleViewer)
 	admin, recruiter := tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleRecruiter].Token
-	acme := a.createCompany(recruiter, map[string]any{"name": "Acme Sdn Bhd", "city": "Petaling Jaya"})
+	acme := a.createCompany(recruiter, map[string]any{"name": "Acme Sdn Bhd", "city": "Petaling Jaya", "category": "signed_client"})
 	a.createCompany(recruiter, map[string]any{"name": "Kenanga Logistics Sdn Bhd"})
-	a.createContact(recruiter, map[string]any{"companyId": acme.Id, "firstName": "Aisyah", "lastName": "Rahman", "email": "aisyah@acme.example", "role": "hr"})
+	a.createContact(recruiter, map[string]any{"companyId": acme.Id, "firstName": "Aisyah", "lastName": "Rahman", "email": "aisyah@acme.example", "role": "hr", "mobile": "+60 12-345 6789"})
 	job := a.createJob(recruiter, map[string]any{"companyId": acme.Id, "title": "Finance Manager"})
 	app := a.addToJob(recruiter, job.Id, a.createCandidate(recruiter, map[string]any{"firstName": "Siti"}).Id)
-	a.placement(http.MethodPost, "/v1/applications/"+app.Id+"/placement", recruiter, map[string]any{
+	shown := a.placement(http.MethodPost, "/v1/applications/"+app.Id+"/placement", recruiter, map[string]any{
 		"startDate": "2026-12-01", "money": map[string]any{"salary": map[string]any{"amount": "9000.00", "currency": "MYR", "period": "month"}, "feePercent": "20"},
 	}, http.StatusCreated)
+	other := a.createJob(recruiter, map[string]any{"companyId": acme.Id, "title": "Clerk"})
+	a.placement(http.MethodPost, "/v1/applications/"+a.addToJob(recruiter, other.Id, a.createCandidate(recruiter, map[string]any{"firstName": "Wei"}).Id).Id+"/placement",
+		recruiter, map[string]any{"startDate": "2026-12-02"}, http.StatusCreated)
 
 	companies := xlsxRows(t, a.request(http.MethodGet, "/v1/companies/export?format=xlsx&q=acme", admin, nil))["Companies"]
 	require.Len(t, companies, 2, "the search is kept")
 	assert.Equal(t, "Acme Sdn Bhd", companies[1][0])
 	assert.Equal(t, "Client", companies[1][column(companies, "Type")])
+	assert.Equal(t, "Signed client", companies[1][column(companies, "Category")], "the category's words, not its key")
 
 	contacts := csvRows(t, a.request(http.MethodGet, "/v1/contacts/export?format=csv&companyId="+acme.Id, admin, nil))
 	require.Len(t, contacts, 2)
+	assert.Equal(t, "+60 12-345 6789", contacts[1][column(contacts, "Mobile")], "a phone number is left as it is")
 	assert.Equal(t, []string{"Aisyah Rahman", "Acme Sdn Bhd", "HR", "aisyah@acme.example"},
 		[]string{contacts[1][0], contacts[1][column(contacts, "Company")], contacts[1][column(contacts, "Role")], contacts[1][column(contacts, "Email")]})
 
 	jobs := csvRows(t, a.request(http.MethodGet, "/v1/jobs/export?format=csv&status=open", recruiter, nil))
-	require.Len(t, jobs, 2)
+	require.Len(t, jobs, 3)
+	jobs = csvRows(t, a.request(http.MethodGet, "/v1/jobs/export?format=csv&ids="+job.Id, recruiter, nil))
+	require.Len(t, jobs, 2, "only the jobs the list shows (needs attention)")
 	assert.Equal(t, "Finance Manager", jobs[1][0])
 	assert.Equal(t, "Acme Sdn Bhd", jobs[1][column(jobs, "Client")])
 
-	placements := xlsxRows(t, a.request(http.MethodGet, "/v1/placements/export?format=xlsx", admin, nil))["Placements"]
-	require.Len(t, placements, 2)
+	placements := xlsxRows(t, a.request(http.MethodPost, "/v1/placements/export", admin, map[string]any{"format": "xlsx", "ids": []string{shown.Id}}))["Placements"]
+	require.Len(t, placements, 2, "only the placements the dashboard shows")
+	assert.Len(t, xlsxRows(t, a.request(http.MethodPost, "/v1/placements/export", admin, map[string]any{"format": "xlsx"}))["Placements"], 3, "no rows chosen: all of them")
+	assert.Len(t, csvRows(t, a.request(http.MethodPost, "/v1/placements/export", admin, map[string]any{"format": "csv", "ids": []string{}})), 1, "none shown: the headings only")
 	assert.Equal(t, "9000.00", placements[1][column(placements, "Salary")])
 	assert.Equal(t, "2026-12-01", placements[1][column(placements, "Start date")])
 
@@ -189,11 +199,14 @@ func TestListExports(t *testing.T) {
 	assert.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/reports/summary/export?format=csv", recruiter, nil).Status)
 
 	viewer := tenant.Users[api.RoleViewer].Token
-	for _, path := range []string{"/v1/companies/export?format=csv", "/v1/contacts/export?format=csv", "/v1/jobs/export?format=csv", "/v1/placements/export?format=csv"} {
+	for _, path := range []string{"/v1/companies/export?format=csv", "/v1/contacts/export?format=csv", "/v1/jobs/export?format=csv"} {
 		assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, path, viewer, nil).Status, path)
 	}
-	for _, path := range []string{"/v1/companies/export?format=csv", "/v1/contacts/export?format=csv", "/v1/placements/export?format=csv"} {
+	for _, path := range []string{"/v1/companies/export?format=csv", "/v1/contacts/export?format=csv"} {
 		assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, path, recruiter, nil).Status, "owners and admins only: "+path)
+	}
+	for _, token := range []string{viewer, recruiter} {
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/placements/export", token, map[string]any{"format": "csv"}).Status)
 	}
 	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/companies/export?format=pdf", admin, nil).Status)
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,4 +110,21 @@ func TestNames(t *testing.T) {
 	assert.Equal(t, "ab", escape("a\x00b"), "characters XML cannot hold are left out")
 	assert.Equal(t, "'@SUM(A1)", SafeCell("@SUM(A1)"))
 	assert.Equal(t, "Plain", SafeCell("Plain"))
+}
+
+func TestPhonesDatesAndLabels(t *testing.T) {
+	assert.Equal(t, "+60 12-345 6789", SafeCell("+60 12-345 6789"), "a phone number is left as it is")
+	assert.Equal(t, "+60123456789", SafeCell("+60123456789"))
+	assert.Equal(t, "'+SUM(1)", SafeCell("+SUM(1)"))
+	kl, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	require.NoError(t, err)
+	early := time.Date(2026, 11, 21, 23, 30, 0, 0, time.UTC) // 07:30 on the 22nd in Kuala Lumpur
+	assert.Equal(t, "2026-11-22", DayIn(early, kl), "the agency's day")
+	assert.Equal(t, "Companies 22 Nov 2026", Dated("Companies", early, kl))
+	assert.Equal(t, "2026-11-21", DayIn(early, nil))
+	key, unknown := "signed_client", "gone"
+	labels := map[string]string{"signed_client": "Signed client"}
+	assert.Equal(t, "Signed client", Label(labels, &key))
+	assert.Equal(t, "gone", Label(labels, &unknown), "a key no longer listed is shown as it is")
+	assert.Empty(t, Label(labels, nil))
 }

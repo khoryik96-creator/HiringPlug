@@ -22,17 +22,24 @@ var typeLabel = map[string]string{"client": "Client", "prospect": "Prospect", "i
 // Export returns the companies the filter finds as a file.
 func (s *Service) Export(ctx context.Context, p authz.Principal, f ListFilter, format string) (sheet.File, error) {
 	var found []Summary
+	var labels map[string]map[string]string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
+		if s.labels != nil {
+			if labels, err = s.labels.Labels(ctx, tx); err != nil {
+				return err
+			}
+		}
+		// Large pages: few reads, so the industry list is locked briefly.
 		found, err = sheet.Collect(func(cursor *string) ([]Summary, *string, error) {
-			page, err := s.listTx(ctx, tx, p, f, cursor, 100)
+			page, err := s.listTx(ctx, tx, p, f, cursor, 1000)
 			return page.Items, page.NextCursor, err
 		})
 		if err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{
-			Action: "company.exported", EntityType: "company", EntityID: p.UserID,
+			Action: "company.exported", EntityType: "user", EntityID: p.UserID,
 			Changes: map[string]any{"count": len(found), "format": format},
 		})
 	})
@@ -48,10 +55,10 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f ListFilter, f
 		if kind == "" {
 			kind = c.Type
 		}
-		t.Rows = append(t.Rows, []string{c.Name, kind, sheet.Str(c.Category), sheet.Str(c.Industry), sheet.Str(c.City),
-			sheet.Str(c.Website), sheet.Str(c.LinkedinURL), sheet.Day(c.UpdatedAt)})
+		t.Rows = append(t.Rows, []string{c.Name, kind, sheet.Label(labels["company_category"], c.Category), sheet.Str(c.Industry), sheet.Str(c.City),
+			sheet.Str(c.Website), sheet.Str(c.LinkedinURL), sheet.DayIn(c.UpdatedAt, s.zone)})
 	}
-	return sheet.Write(format, sheet.Dated("Companies", time.Now()), t)
+	return sheet.Write(format, sheet.Dated("Companies", time.Now(), s.zone), t)
 }
 
 // ExportCompanies handles GET /v1/companies/export.

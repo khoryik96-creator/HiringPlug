@@ -5,7 +5,7 @@ import type { Permission } from "../api/client";
 import { CvImports } from "../components/CvImports";
 import { OutlookCvImport } from "../components/outlook/OutlookCvImport";
 import { hashParam } from "../hashQuery";
-import { parseCsv, toCsv } from "../import/csv";
+import { parseCsv, rowsToFix, toCsv, toFixName } from "../import/csv";
 import { readXlsx } from "../import/xlsx";
 import { autoMap, FIELDS, type ImportKind, mappingProblems } from "../import/mapping";
 import { type RowResult, runImport } from "../import/runImport";
@@ -98,9 +98,9 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
   const downloadToFix = () => {
     if (!report) return;
     const source = report.source;
-    const rows = [[...source.header, "Problem"], ...toFix.map((r) => [...(source.rows[r.line - 2] ?? []), r.message])];
+    const rows = rowsToFix(source.header, source.rows, toFix);
     const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: `to-fix-${source.name}` });
+    const a = Object.assign(document.createElement("a"), { href: url, download: toFixName(source.name) });
     a.click();
     URL.revokeObjectURL(url);
   };

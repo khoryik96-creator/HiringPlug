@@ -26,6 +26,7 @@ const (
 
 // Service holds the contacts use cases.
 type Service struct {
+	zone        *time.Location // the agency's time zone: dates in exports (UseTimeZone)
 	pool        *pgxpool.Pool
 	apollo      apolloClient
 	apolloUsers ApolloUsers

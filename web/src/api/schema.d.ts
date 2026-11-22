@@ -4769,10 +4769,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Placements matching the filters, as Excel or CSV; fees only with placements.fees:read */
-        get: operations["exportPlacements"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Placements as Excel or CSV (the rows the dashboard shows); fees only with placements.fees:read */
+        post: operations["exportPlacements"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10633,6 +10633,21 @@ export interface components {
         };
         /** @example plc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         PlacementId: string;
+        PlacementExport: {
+            format: components["schemas"]["ExportFormat"];
+            /** @description The placements to export (what the dashboard shows after its search, filters and card); none for every placement in the dates. */
+            ids?: components["schemas"]["PlacementId"][];
+            /**
+             * Format: date
+             * @description Started on or after this day.
+             */
+            startFrom?: string;
+            /**
+             * Format: date
+             * @description Started on or before this day.
+             */
+            startTo?: string;
+        };
         /**
          * @description active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start; backed_out = the candidate or the client pulled out after it was recorded (the sheet stays, its fee no longer counts). Moving a placed application back to offer or to withdrawn backs its placement out; recording the placement again makes it active.
          * @enum {string}
@@ -19306,6 +19321,8 @@ export interface operations {
         parameters: {
             query: {
                 format: components["schemas"]["ExportFormat"];
+                /** @description Only these jobs (e.g. the ones that need attention), as the list shows them. */
+                ids?: components["schemas"]["JobOrderId"][];
                 /** @description Every word must appear in the title, location or client company's name (ignoring case and accents). */
                 q?: string;
                 status?: components["schemas"]["JobStatus"];
@@ -21107,20 +21124,16 @@ export interface operations {
     };
     exportPlacements: {
         parameters: {
-            query: {
-                format: components["schemas"]["ExportFormat"];
-                status?: components["schemas"]["PlacementStatus"];
-                invoiceStatus?: components["schemas"]["InvoiceStatus"];
-                /** @description Started on or after this day. */
-                startFrom?: string;
-                /** @description Started on or before this day. */
-                startTo?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlacementExport"];
+            };
+        };
         responses: {
             /** @description The file (an Excel workbook or a CSV) */
             200: {

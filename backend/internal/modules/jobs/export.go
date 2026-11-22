@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"mime"
+	"slices"
 	"strconv"
 	"time"
 
@@ -22,19 +23,23 @@ import (
 var jobStatusLabel = map[string]string{"open": "Open", "on_hold": "On hold", "filled": "Filled", "closed": "Closed"}
 
 // Export returns the jobs the filters find as a file.
-func (s *Service) Export(ctx context.Context, p authz.Principal, query, status, companyID, contactID, ownerID *string, format string) (sheet.File, error) {
+// When ids is not nil only those jobs are kept (the list's "needs attention" view).
+func (s *Service) Export(ctx context.Context, p authz.Principal, query, status, companyID, contactID, ownerID *string, ids []string, format string) (sheet.File, error) {
 	var found []Summary
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
 		found, err = sheet.Collect(func(cursor *string) ([]Summary, *string, error) {
-			page, err := s.listTx(ctx, tx, query, status, companyID, contactID, ownerID, cursor, 100)
+			page, err := s.listTx(ctx, tx, query, status, companyID, contactID, ownerID, cursor, 1000)
 			return page.Items, page.NextCursor, err
 		})
 		if err != nil {
 			return err
 		}
+		if ids != nil {
+			found = slices.DeleteFunc(found, func(j Summary) bool { return !slices.Contains(ids, j.ID) })
+		}
 		return audit.Record(ctx, tx, audit.Entry{
-			Action: "job.exported", EntityType: "job_order", EntityID: p.UserID,
+			Action: "job.exported", EntityType: "user", EntityID: p.UserID,
 			Changes: map[string]any{"count": len(found), "format": format},
 		})
 	})
@@ -51,9 +56,9 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, query, status, 
 			status = j.Status
 		}
 		t.Rows = append(t.Rows, []string{j.Title, j.CompanyName, status, sheet.Str(j.Location), strconv.Itoa(j.Openings),
-			sheet.Str(j.OwnerName), sheet.Day(j.CreatedAt), sheet.Day(j.UpdatedAt)})
+			sheet.Str(j.OwnerName), sheet.DayIn(j.CreatedAt, s.zone), sheet.DayIn(j.UpdatedAt, s.zone)})
 	}
-	return sheet.Write(format, sheet.Dated("Jobs", time.Now()), t)
+	return sheet.Write(format, sheet.Dated("Jobs", time.Now(), s.zone), t)
 }
 
 // ExportJobs handles GET /v1/jobs/export.
@@ -64,7 +69,11 @@ func (h *HTTP) ExportJobs(ctx context.Context, req api.ExportJobsRequestObject) 
 	if q.Mine != nil && *q.Mine {
 		owner = &p.UserID
 	}
-	file, err := h.svc.Export(ctx, p, q.Q, c.Convert[string](q.Status), q.CompanyId, q.ContactId, owner, string(q.Format))
+	var ids []string
+	if q.Ids != nil {
+		ids = *q.Ids
+	}
+	file, err := h.svc.Export(ctx, p, q.Q, c.Convert[string](q.Status), q.CompanyId, q.ContactId, owner, ids, string(q.Format))
 	if err != nil {
 		return nil, err
 	}

@@ -79,6 +79,12 @@ paths:
       x-permission: jobs:export
       parameters:
         - { name: format, in: query, required: true, schema: { $ref: '#/components/schemas/ExportFormat' } }
+        - name: ids
+          in: query
+          description: Only these jobs (e.g. the ones that need attention), as the list shows them.
+          style: form
+          explode: true
+          schema: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/JobOrderId' } }
         - name: q
           in: query
           description: "Every word must appear in the title, location or client company's name (ignoring case and accents)."

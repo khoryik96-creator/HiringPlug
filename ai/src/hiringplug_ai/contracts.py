@@ -5964,6 +5964,22 @@ class PlacementId(RootModel[str]):
     ]
 
 
+class PlacementExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    ids: Annotated[
+        list[PlacementId] | None,
+        Field(
+            description="The placements to export (what the dashboard shows after its search, filters and card); none for every placement in the dates.",
+            max_length=10000,
+        ),
+    ] = None
+    startFrom: Annotated[date | None, Field(description="Started on or after this day.")] = None
+    startTo: Annotated[date | None, Field(description="Started on or before this day.")] = None
+
+
 class PlacementStatus(StrEnum):
     active = "active"
     fell_through = "fell_through"
