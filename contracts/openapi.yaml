@@ -5346,7 +5346,7 @@ paths:
     get:
       operationId: getMyPreferences
       tags: [identity]
-      summary: Your own settings, such as the columns of your candidate list and your dashboard's order
+      summary: Your own settings, such as the columns of your candidate list, your dashboard's order and its getting-started checklist
       x-permission: authenticated
       responses:
         '200':
@@ -13755,6 +13755,9 @@ components:
           description: "The candidate list's columns, in order, after the name (null: the default ones)."
           items: {$ref: '#/components/schemas/CandidateColumn'}
         favourites: {$ref: '#/components/schemas/Favourites'}
+        guideDismissed:
+          type: boolean
+          description: "You hid the dashboard's getting-started checklist (false: it shows while a step you can do is left)."
     Favourites:
       type: object
       additionalProperties: false

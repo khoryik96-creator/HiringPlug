@@ -1696,6 +1696,7 @@ type UserPreference struct {
 	UpdatedAt        time.Time
 	DashboardBlocks  []string
 	Favourites       []byte
+	GuideDismissed   bool
 }
 
 type UserTwoStep struct {

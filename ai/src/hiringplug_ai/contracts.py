@@ -8780,6 +8780,12 @@ class Preferences(BaseModel):
         ),
     ] = None
     favourites: Favourites | None = None
+    guideDismissed: Annotated[
+        bool | None,
+        Field(
+            description="You hid the dashboard's getting-started checklist (false: it shows while a step you can do is left)."
+        ),
+    ] = None
 
 
 class JdFile(BaseModel):

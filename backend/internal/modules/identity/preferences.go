@@ -1,6 +1,7 @@
 package identity
 
-// Each person's own settings, such as the columns of their candidate list.
+// Each person's own settings, such as the columns of their candidate list
+// and whether they hid the dashboard's getting-started checklist.
 // The database lets a person see and change only their own.
 
 import (
@@ -101,6 +102,12 @@ func (m *Module) SetPreferences(ctx context.Context, p authz.Principal, in api.P
 			}
 			changes["favourites"] = fav
 		}
+		if in.GuideDismissed != nil {
+			if err := q.SetGuideDismissed(ctx, *in.GuideDismissed); err != nil {
+				return err
+			}
+			changes["guideDismissed"] = *in.GuideDismissed
+		}
 		row, err := q.GetPreferences(ctx)
 		if err != nil && !database.IsNoRows(err) {
 			return err
@@ -121,6 +128,8 @@ func preferencesOf(row store.GetPreferencesRow) api.Preferences {
 	}
 	fav := favouritesOf(row.Favourites)
 	out.Favourites = &fav
+	dismissed := row.GuideDismissed
+	out.GuideDismissed = &dismissed
 	if row.CandidateColumns != nil {
 		cols := make([]api.CandidateColumn, 0, len(row.CandidateColumns))
 		for _, c := range row.CandidateColumns {
