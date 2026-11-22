@@ -25,6 +25,6 @@ How to write an entry (newest at the top, one per task):
 - Branch: claude/relaxed-hopper-ex7y3v
 - Touches: list pages (candidates, companies, contacts, jobs, placements), reports, the import page; export endpoints in those modules
 - Started: 22 Nov 2026    Last update: 22 Nov 2026
-- State: in progress
-- Next: design (roadmap "Product pipeline" item 6)
+- State: ready to merge (1.34.0: exports, Excel import, tests, screenshots)
+- Next: the owner says merge; then remove this entry
 

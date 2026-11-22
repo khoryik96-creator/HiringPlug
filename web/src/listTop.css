@@ -60,3 +60,18 @@ select.search-pill.on { background: var(--accent-soft); }
 /* Dropping CVs anywhere on the candidates page. */
 .page-drop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(109, 74, 230, 0.12); border: 3px dashed var(--accent); pointer-events: none; }
 .page-drop span { background: #fff; color: var(--accent-dark, #5b3fd0); font-weight: 700; padding: 1rem 1.5rem; border-radius: 14px; box-shadow: 0 12px 30px rgba(40, 20, 90, 0.18); }
+
+/* Export: a small menu, Excel or CSV (components/ExportButton.tsx). */
+.export { position: relative; display: inline-flex; align-items: center; gap: 0.4rem; }
+.export-menu { position: relative; }
+.export-menu > summary { list-style: none; }
+.export-menu > summary::-webkit-details-marker { display: none; }
+.export-menu > summary svg { width: 15px; height: 15px; }
+.export-options {
+  position: absolute; z-index: 40; top: calc(100% + 4px); right: 0; min-width: 10rem; padding: 0.3rem;
+  background: var(--surface, #fff); border: 1px solid var(--line, #ded8eb); border-radius: 10px; box-shadow: 0 8px 22px rgba(29, 21, 48, 0.14);
+  display: grid; gap: 0.1rem;
+}
+.export-options button { all: unset; box-sizing: border-box; padding: 0.45rem 0.6rem; border-radius: 7px; font-size: 0.85rem; cursor: pointer; }
+.export-options button:hover, .export-options button:focus-visible { background: var(--soft); }
+.export .error, .export [role="alert"] { position: absolute; top: calc(100% + 4px); right: 0; z-index: 41; width: max-content; max-width: 22rem; }

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey } from "../api/keys";
+import { downloadExport } from "../api/files";
+import { ExportButton } from "../components/ExportButton";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { PlacementForm } from "../components/PlacementForm";
 import { PlacementInvoice } from "../components/PlacementInvoicing";
@@ -66,6 +68,12 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
               <input type="date" aria-label="Started until" value={view.to} onChange={(e) => { change({ to: e.target.value }); }} />
             </>
           )}
+          {permissions.includes("placements:export") && customReady && <ExportButton what="placements" run={(format) => {
+            const query = new URLSearchParams({ format });
+            if (dates.from) query.set("startFrom", dates.from);
+            if (dates.to) query.set("startTo", dates.to);
+            return downloadExport(`/v1/placements/export?${query.toString()}`);
+          }} />}
         </div>
       </div>
       {!customReady && <p className="warning" role="alert">The first date is after the second.</p>}

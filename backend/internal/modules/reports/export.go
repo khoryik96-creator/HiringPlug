@@ -91,4 +91,3 @@ func (h *HTTP) ExportReport(ctx context.Context, req api.ExportReportRequestObje
 		Headers: api.ExportReport200ResponseHeaders{ContentDisposition: &disposition},
 	}, nil
 }
-

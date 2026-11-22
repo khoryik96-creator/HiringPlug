@@ -3,6 +3,8 @@ import { useState } from "react";
 
 import { api, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { downloadExport } from "../api/files";
+import { ExportButton } from "../components/ExportButton";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { formatDay, formatMoney, STAGE } from "../labels";
 
@@ -48,6 +50,12 @@ export function Reports() {
               <input type="date" aria-label="To" value={period.to} onChange={(e) => { setPeriod({ ...period, to: e.target.value }); }} />
             </>
           )}
+          <ExportButton what="reports" run={(format) => {
+            const query = new URLSearchParams({ format });
+            if (period.from) query.set("from", period.from);
+            if (period.to) query.set("to", period.to);
+            return downloadExport(`/v1/reports/summary/export?${query.toString()}`);
+          }} />
         </div>
       </div>
       {r && <p className="muted">{formatDay(r.from)} to {formatDay(r.to)}</p>}

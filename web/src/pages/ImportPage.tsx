@@ -6,6 +6,7 @@ import { CvImports } from "../components/CvImports";
 import { OutlookCvImport } from "../components/outlook/OutlookCvImport";
 import { hashParam } from "../hashQuery";
 import { parseCsv, toCsv } from "../import/csv";
+import { readXlsx } from "../import/xlsx";
 import { autoMap, FIELDS, type ImportKind, mappingProblems } from "../import/mapping";
 import { type RowResult, runImport } from "../import/runImport";
 
@@ -63,13 +64,18 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
     setReport(null);
     setError("");
     try {
-      const [header = [], ...rows] = parseCsv(await picked.text());
+      const name = picked.name.toLowerCase();
+      if (name.endsWith(".xls")) {
+        setError("That is an old Excel file (.xls). Open it in Excel and save it as .xlsx or CSV, then choose it again.");
+        return;
+      }
+      const [header = [], ...rows] = name.endsWith(".xlsx") ? await readXlsx(await picked.arrayBuffer()) : parseCsv(await picked.text());
       if (reading.current !== id) return;
       const f = { name: picked.name, header, rows };
       setFile(f);
       choose(kindRef.current, f);
     } catch {
-      if (reading.current === id) setError("Could not read the CSV file.");
+      if (reading.current === id) setError(`Could not read ${picked.name}. Save it as .xlsx or CSV and try again.`);
     }
   };
   const problems = file ? mappingProblems(kind, mapping) : [];
@@ -101,14 +107,14 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
 
   return (
     <>
-      <section className="panel" aria-label="CSV import">
+      <section className="panel" aria-label="Spreadsheet import">
         <h3>From a spreadsheet</h3>
-        <p className="muted small">CSV, with column names in the first row.</p>
+        <p className="muted small">Excel (.xlsx) or CSV, with column names in the first row (from Excel, its first sheet).</p>
         <div className="row">
           <label className="row">What: <select disabled={progress !== null} value={kind} onChange={(e) => { choose(e.target.value as ImportKind); }}>
             {allowed.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
           </select></label>
-          <input disabled={progress !== null} type="file" accept=".csv,text/csv" aria-label="CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); }} />
+          <input disabled={progress !== null} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Spreadsheet file" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); }} />
         </div>
       </section>
 

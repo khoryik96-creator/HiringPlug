@@ -3,6 +3,8 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { contactsKey } from "../api/keys";
+import { ExportButton } from "../components/ExportButton";
+import { downloadExport } from "../api/files";
 import { IconButton, PlusIcon } from "../components/ActionIcons";
 import { ContactForm } from "../components/ContactForm";
 import { ContactTable } from "../components/ContactTable";
@@ -18,7 +20,7 @@ import { hashParam } from "../hashQuery";
 const NOT_SET = "-";
 
 /** Search and add contacts across all companies; filter by role and whether they still work there. */
-export function ContactList({ canCreate, canEmail = false, canFolders = false, meId = "" }: { canCreate: boolean; canEmail?: boolean; canFolders?: boolean; meId?: string }) {
+export function ContactList({ canCreate, canExport = false, canEmail = false, canFolders = false, meId = "" }: { canCreate: boolean; canExport?: boolean; canEmail?: boolean; canFolders?: boolean; meId?: string }) {
   const fs = useFieldSettings();
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [role, setRole] = useState("");
@@ -65,6 +67,15 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
           </select>
         </BooleanSearchBox>
         <a className="dupes-link" href="#/contacts/duplicates">Possible duplicates</a>
+        {canExport && <ExportButton what="contacts" run={(format) => {
+          const query = new URLSearchParams({ format });
+          if (typed.trim()) query.set(looksBoolean(typed) ? "boolean" : "q", typed.trim());
+          if (role === NOT_SET) query.set("roleNotSet", "true");
+          else if (role) query.set("role", role);
+          if (status) query.set("status", status);
+          if (folder) query.set("folder", folder);
+          return downloadExport(`/v1/contacts/export?${query.toString()}`);
+        }} />}
         {canCreate && !adding && <IconButton label="Add contact" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (

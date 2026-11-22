@@ -3,6 +3,8 @@ import { Fragment, useCallback, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
+import { ExportButton } from "../components/ExportButton";
+import { downloadExport } from "../api/files";
 import { CvImports } from "../components/CvImports";
 import { CV_TYPES } from "../components/DropZone";
 import { DropHint, usePageDrop } from "../components/PageDrop";
@@ -25,10 +27,11 @@ import { type ColumnWidths, useColumnWidths } from "../components/useColumnWidth
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, meId = "" }: {
+export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, canExport = false, meId = "" }: {
   canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean;
   /** May add candidates from CVs (the drop box). */
   canImport?: boolean;
+  canExport?: boolean;
   meId?: string;
 }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
@@ -166,6 +169,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
       <WithFolders view={folders} tools={<>
         {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
         <OpenAsSwitch compact value={openAs} onChange={setOpenAs} />
+        {canExport && <ExportButton what="candidates" run={(format) => downloadExport("/v1/candidates/export", { format, search: toBody(effective, plainQ, mine, undefined, sortBy, folder) })} />}
       </>}>
       <div className="list-meta">
         <span role="status">

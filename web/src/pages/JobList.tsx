@@ -4,6 +4,8 @@ import { IconButton, PlusIcon } from "../components/ActionIcons";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { jobsKey } from "../api/keys";
+import { downloadExport } from "../api/files";
+import { ExportButton } from "../components/ExportButton";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { JobForm } from "../components/JobForm";
 import { Change } from "../components/heat";
@@ -43,7 +45,7 @@ function JobNumbers({ jobs, progress }: { jobs: Schemas["JobOrderSummary"][]; pr
 }
 
 /** Search, filter and add jobs. Shows open jobs first by default, with their numbers on top. */
-export function JobList({ canCreate }: { canCreate: boolean }) {
+export function JobList({ canCreate, canExport = false }: { canCreate: boolean; canExport?: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [status, setStatus] = useState<StatusFilter>(() => (hashParam("q") ? "" : "open")); // a search looks at every job
   const [adding, setAdding] = useState(false);
@@ -75,6 +77,13 @@ export function JobList({ canCreate }: { canCreate: boolean }) {
             <option value="">All statuses</option>
             {keysOf(JOB_STATUS).map((s) => <option key={s} value={s}>{JOB_STATUS[s]}</option>)}
           </select>
+          {canExport && <ExportButton what="jobs" run={(format) => {
+            const query = new URLSearchParams({ format });
+            if (q.trim()) query.set("q", q.trim());
+            if (status) query.set("status", status);
+            if (mine) query.set("mine", "true");
+            return downloadExport(`/v1/jobs/export?${query.toString()}`);
+          }} />}
           {canCreate && !adding && <IconButton label="Add job" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
         </div>
       </div>

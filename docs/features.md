@@ -553,6 +553,18 @@ for each of their jobs, with **Score fit** / **Score again**.
   **morning email**: at 8:00 agency time (HP_TIME_ZONE) the same list by
   email, only on mornings when there is something (applicants since the last
   email). It goes on while you are away and comes back with you.
+- **Exports and Excel import** ✅ (1.34.0): **Export** (Excel .xlsx or CSV)
+  on Candidates, Companies, Contacts, Jobs, Placements and Reports gives what
+  the page's search and filters find (candidates: the advanced search too),
+  at most 10,000 rows. The server builds the file, so salaries are in it only
+  for roles that may see them (candidates.compensation:read; placement
+  salaries and fees with placements.fees:read); exporting needs its own
+  permission (candidates:export, companies:export, contacts:export,
+  jobs:export, placements:export: owners, admins, recruiters by default);
+  every export is in the audit log (how many, never a salary). Text that
+  would start a formula is written as text. Reports come one sheet each.
+  **Import** reads Excel (.xlsx, its first sheet; dates as dates) as well as
+  CSV; an old .xls is asked to be saved as .xlsx.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,
   what it offers and what it checks before an offer, recorded from the
   agency's template (Hyppies' Benefits & Pre-Offer Process to start with:

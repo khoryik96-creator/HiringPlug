@@ -56,7 +56,7 @@ five are being built now; the rest are queued in this order.
 | ✅ 1.33.0 | **Notifications**: a bell for new applicants, tasks, offers to approve and tomorrow's interviews, each kind switchable in Settings, and an optional morning email | Today these are found only by opening the dashboard |
 | ✅ 1.29.0 | **Two-step sign-in** with an authenticator app, recovery codes, owners able to require it | Email and password alone; needed before selling it as a service |
 | ✅ 1.32.0 | **Merge duplicate companies and contacts**, with a list of possible duplicates | Only candidates could be merged |
-| ⬜ 6 | **Exports and Excel import**: CSV/Excel from every list and report; .xlsx imports | No list or report can be exported |
+| ✅ 1.34.0 | **Exports and Excel import**: CSV/Excel from every list and report; .xlsx imports | No list or report can be exported |
 | ⬜ 7 | **Client shortlist link**: the client sees the shortlist (blind or formatted CVs), approves or rejects with a comment; the stage moves and the answer is logged | Client feedback comes back by email and is typed in |
 | ⬜ 8 | **Activity targets and revenue forecast**: calls, CVs sent, interviews arranged per recruiter against targets; fees expected from the pipeline, weighted by stage | Reports cover outcomes, not activity or what is coming |
 | ⬜ 9 | **Search by meaning** (embeddings) beside the keyword search for possible candidates | "Talent acquisition" and "recruitment" are different words today |

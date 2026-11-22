@@ -71,7 +71,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
 
     const get = reads([]);
     renderWithClient(<ImportPage permissions={["companies:create"]} />);
-    expect(screen.getByRole("region", { name: "CSV import" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Spreadsheet import" })).toBeTruthy();
     expect(get).not.toHaveBeenCalledWith("/v1/cv-imports");
     cleanup();
 
@@ -210,7 +210,7 @@ it("keeps the latest CSV selection and downloads retry rows from that import", a
     finishPost = () => { resolve(failure("VALIDATION_FAILED", "Check this row")); };
   }));
   renderWithClient(<ImportPage permissions={["candidates:create", "companies:create"]} />);
-  const input = screen.getByLabelText<HTMLInputElement>("CSV file");
+  const input = screen.getByLabelText<HTMLInputElement>("Spreadsheet file");
   fireEvent.change(input, { target: { files: [first] } });
   fireEvent.change(input, { target: { files: [second] } });
   await screen.findByText(/current.csv: 1 rows/);
@@ -235,4 +235,20 @@ it("keeps the latest CSV selection and downloads retry rows from that import", a
   });
   expect(text).toContain("Nadia,Example");
   expect(text).not.toContain("Old,Record");
+});
+
+describe("importing from Excel", () => {
+  it("reads an .xlsx like a CSV, and explains an old .xls", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const data = await readFile(`${process.cwd()}/src/import/fixtures/libreoffice-sample.xlsx`);
+    const book = { name: "Candidates.xlsx", arrayBuffer: () => Promise.resolve(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)) };
+    renderWithClient(<ImportPage permissions={["candidates:create"]} />);
+    const input = screen.getByLabelText<HTMLInputElement>("Spreadsheet file");
+    fireEvent.change(input, { target: { files: [{ name: "Old.XLS", text: () => Promise.resolve("") }] } });
+    expect((await screen.findByRole("alert")).textContent).toMatch(/old Excel file \(\.xls\).*save it as \.xlsx or CSV/);
+    fireEvent.change(input, { target: { files: [book] } });
+    expect(await screen.findByText(/Candidates.xlsx: 2 rows/)).toBeTruthy();
+    expect(screen.getAllByText(/Nurul Aisyah/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
