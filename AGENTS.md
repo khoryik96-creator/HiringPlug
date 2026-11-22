@@ -79,12 +79,35 @@ web/src/                     the React app
 13. **No secrets in code or logs.** Settings come from `HP_*` variables, all
     listed in `.env.example` (checked by a test).
 
+## Working alongside other helpers
+
+Several AI helpers work on HiringPlug at once, on different accounts, and
+cannot see each other except through GitHub. So:
+
+- **Before starting**, `git fetch` and read
+  [docs/WORKING-ON.md](docs/WORKING-ON.md) on `origin/main`, and glance at the
+  newest branches (`git branch -r --sort=-committerdate | head`). If your task
+  touches what an entry lists, tell the owner and wait, instead of editing the
+  same module or screen.
+- **Add your entry** to `docs/WORKING-ON.md` as a commit to `main` that changes
+  only that file (rebase on the newest `main` first; never force-push). If you
+  cannot push to `main`, put it in your branch's first commit and tell the
+  owner.
+- **Push your branch often**, not only at the end: work that is not pushed
+  cannot be picked up by anyone else.
+- **Keep the entry current.** When you stop for any reason (a usage limit, the
+  owner's call, a blocker), push, then set *State* and write *Next* so another
+  helper can finish the job.
+- **Taking over:** read the entry, check out its branch, read its recent
+  commits, finish it under these same rules, and change *Who* to yourself.
+- **When it is merged**, remove the entry (a commit changing only that file).
+
 ## Definition of done
 
 `task verify` passes; the change has tests; changed screens were checked in a
 screenshot against their design (rule 12); docs in `docs/` are updated if the
 architecture, a module's purpose or a workflow changed; the PR checklist is
-filled in.
+filled in; your `docs/WORKING-ON.md` entry is removed.
 
 More: [docs/README.md](docs/README.md) (reading order) and
 [docs/playbooks/](docs/playbooks) (step-by-step guides).
