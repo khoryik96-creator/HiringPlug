@@ -8,7 +8,8 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { reasonsText } from "../components/SimilarRecords";
 
 type Row = { id: string; name: string; detail: string };
-type Group = { reasons: string[]; rows: Row[] };
+/** apart: contacts at different companies, which are not merged (they may have changed jobs). */
+type Group = { reasons: string[]; rows: Row[]; apart?: boolean };
 
 export function Duplicates({ kind }: { kind: "companies" | "contacts" }) {
   const groups = useQuery({
@@ -19,7 +20,8 @@ export function Duplicates({ kind }: { kind: "companies" | "contacts" }) {
         return res.items.map((g) => ({ reasons: g.reasons, rows: g.companies.map((c) => ({ id: c.id, name: c.name, detail: [c.website, c.city, c.industry].filter(Boolean).join(" · ") })) }));
       }
       const res = unwrap(await api.GET("/v1/contacts/duplicates"));
-      return res.items.map((g) => ({ reasons: g.reasons, rows: g.contacts.map((c) => ({ id: c.id, name: c.fullName, detail: [c.title, c.companyName, c.email].filter(Boolean).join(" · ") })) }));
+      return res.items.map((g) => ({ reasons: g.reasons, apart: new Set(g.contacts.map((c) => c.companyId)).size > 1,
+        rows: g.contacts.map((c) => ({ id: c.id, name: c.fullName, detail: [c.title, c.companyName, c.email].filter(Boolean).join(" · ") })) }));
     },
   });
   const noun = kind === "companies" ? "companies" : "contacts";
@@ -46,6 +48,7 @@ export function Duplicates({ kind }: { kind: "companies" | "contacts" }) {
                   <li key={r.id}><a href={`#/${kind}/${r.id}`}>{r.name}</a>{r.detail && <span className="muted"> · {r.detail}</span>}</li>
                 ))}
               </ul>
+              {g.apart && <p className="muted small">At different companies: they may have changed jobs. If it is one person, change their company first, then merge.</p>}
             </li>
           ))}
         </ul>

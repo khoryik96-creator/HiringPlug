@@ -76,3 +76,8 @@ SELECT EXISTS(
 
 -- name: DeleteCancelledApolloLookup :exec
 DELETE FROM hr_apollo_lookup WHERE id = $1 AND state = 'cancelled';
+
+-- Merging duplicate companies: everyone's Apollo lookups for the duplicate go
+-- to the company kept (app_move_company_apollo_lookups, 00164).
+-- name: MoveCompanyApolloLookups :exec
+SELECT app_move_company_apollo_lookups(@from_id::text, @to_id::text);

@@ -2465,7 +2465,7 @@ paths:
     get:
       operationId: listSimilarContacts
       tags: [contacts]
-      summary: Possible duplicates of a contact (same LinkedIn profile, name or phone, or a name much alike at the same company)
+      summary: Possible duplicates of a contact (same LinkedIn profile, name or mobile, or a name much alike at the same company)
       x-permission: contacts:read
       responses:
         '200':

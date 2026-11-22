@@ -252,13 +252,9 @@ func (m *Module) InvoicePDF(ctx context.Context, tx pgx.Tx, emailID string) ([]b
 	return nil, apperr.NotFound("invoice PDF")
 }
 
-// MoveContact moves the emails to contact fromID, and the Outlook threads
-// linked to them, to contact toID, inside the transaction merging two
+// MoveContact moves the emails to contact fromID, and everyone's Outlook
+// threads linked to them (those the merger may not see too), to contact toID, inside the transaction merging two
 // duplicate contacts.
 func (m *Module) MoveContact(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
-	q := store.New(tx)
-	if _, err := q.MoveEmailsToContact(ctx, store.MoveEmailsToContactParams{FromID: &fromID, ToID: &toID}); err != nil {
-		return err
-	}
-	return q.MoveOutlookLinksToContact(ctx, store.MoveOutlookLinksToContactParams{FromID: &fromID, ToID: &toID})
+	return store.New(tx).MoveContactEmails(ctx, store.MoveContactEmailsParams{FromID: fromID, ToID: toID})
 }

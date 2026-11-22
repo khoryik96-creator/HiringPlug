@@ -23,3 +23,12 @@ it("says when there are none", async () => {
   renderWithClient(<Duplicates kind="contacts" />);
   expect(await screen.findByText("No possible duplicates among your contacts.")).toBeTruthy();
 });
+
+it("says when contacts found alike are at different companies (they are not merged)", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{ reasons: ["same_linkedin"], contacts: [
+    { id: "cont_2", companyId: "comp_b", companyName: "New Co", fullName: "Aisyah Rahman", title: null, email: null, reasons: [] },
+    { id: "cont_1", companyId: "comp_a", companyName: "Old Co", fullName: "Aisyah Rahman", title: null, email: null, reasons: [] },
+  ] }] }));
+  renderWithClient(<Duplicates kind="contacts" />);
+  expect(await screen.findByText(/At different companies/)).toBeTruthy();
+});

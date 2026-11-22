@@ -272,3 +272,8 @@ DELETE FROM company WHERE id = @id;
 -- The companies of the Possible duplicates list.
 -- name: CompanyLookalikes :many
 SELECT id, name, city, website, industry FROM company WHERE id = ANY(@ids::text[]);
+
+-- Merging: what is in the Bin moves too (a binned job or contact of the
+-- duplicate would otherwise block deleting it).
+-- name: ShowBinnedForMerge :exec
+SELECT set_config('app.show_binned', 'on', true);

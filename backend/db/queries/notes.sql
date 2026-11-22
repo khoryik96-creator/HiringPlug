@@ -26,6 +26,7 @@ UPDATE note SET subject_id = @to_id WHERE subject_type = 'candidate' AND subject
 -- name: DeleteSubjectNotes :exec
 DELETE FROM note WHERE subject_type = @subject_type AND subject_id = ANY(@subject_ids::text[]);
 
--- Merging duplicate companies or contacts: the duplicate's notes go to the record kept.
--- name: MoveSubjectNotes :execrows
-UPDATE note SET subject_id = @to_id WHERE subject_type = @subject_type AND subject_id = @from_id;
+-- Merging duplicate companies or contacts: the duplicate's notes go to the
+-- record kept, sensitive ones too (app_move_subject_notes, 00164).
+-- name: MoveSubjectNotes :exec
+SELECT app_move_subject_notes(@subject_type::text, @from_id::text, @to_id::text);

@@ -393,6 +393,22 @@ func (q *Queries) MarkApolloRevoking(ctx context.Context, flowID string) error {
 	return err
 }
 
+const moveCompanyApolloLookups = `-- name: MoveCompanyApolloLookups :exec
+SELECT app_move_company_apollo_lookups($1::text, $2::text)
+`
+
+type MoveCompanyApolloLookupsParams struct {
+	FromID string
+	ToID   string
+}
+
+// Merging duplicate companies: everyone's Apollo lookups for the duplicate go
+// to the company kept (app_move_company_apollo_lookups, 00164).
+func (q *Queries) MoveCompanyApolloLookups(ctx context.Context, arg MoveCompanyApolloLookupsParams) error {
+	_, err := q.db.Exec(ctx, moveCompanyApolloLookups, arg.FromID, arg.ToID)
+	return err
+}
+
 const setApolloFlow = `-- name: SetApolloFlow :exec
 INSERT INTO hr_apollo_connection (flow_id, broker_origin, proof_sealed, authorize_url, expires_at)
 VALUES ($1, $2, $3, $4, now() + interval '10 minutes')

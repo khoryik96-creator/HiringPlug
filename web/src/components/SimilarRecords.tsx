@@ -11,7 +11,7 @@ export const DUPLICATE_REASON: Record<string, string> = {
   same_linkedin: "same LinkedIn",
   similar_name: "similar name",
   same_name: "same name",
-  same_phone: "same phone",
+  same_phone: "same mobile",
 };
 export const reasonsText = (reasons: readonly string[]) => reasons.map((r) => DUPLICATE_REASON[r] ?? r).join(", ");
 

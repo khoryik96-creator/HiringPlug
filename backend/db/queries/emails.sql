@@ -213,6 +213,7 @@ RETURNING *;
 -- name: DeleteWhatsAppTemplate :execrows
 DELETE FROM whatsapp_template WHERE id = @id;
 
--- Merging duplicate contacts: emails to the duplicate go to the contact kept.
--- name: MoveEmailsToContact :execrows
-UPDATE email SET contact_id = @to_id WHERE contact_id = @from_id;
+-- Merging duplicate contacts: emails to the duplicate, and everyone's Outlook
+-- threads linked to them, go to the contact kept (app_move_contact_emails, 00164).
+-- name: MoveContactEmails :exec
+SELECT app_move_contact_emails(@from_id::text, @to_id::text);

@@ -937,6 +937,22 @@ func (q *Queries) MarkEmail(ctx context.Context, arg MarkEmailParams) error {
 	return err
 }
 
+const moveContactEmails = `-- name: MoveContactEmails :exec
+SELECT app_move_contact_emails($1::text, $2::text)
+`
+
+type MoveContactEmailsParams struct {
+	FromID string
+	ToID   string
+}
+
+// Merging duplicate contacts: emails to the duplicate, and everyone's Outlook
+// threads linked to them, go to the contact kept (app_move_contact_emails, 00164).
+func (q *Queries) MoveContactEmails(ctx context.Context, arg MoveContactEmailsParams) error {
+	_, err := q.db.Exec(ctx, moveContactEmails, arg.FromID, arg.ToID)
+	return err
+}
+
 const moveEmailsToCandidate = `-- name: MoveEmailsToCandidate :execrows
 UPDATE email SET candidate_id = $1 WHERE candidate_id = $2
 `
@@ -949,24 +965,6 @@ type MoveEmailsToCandidateParams struct {
 // Merging candidates: the duplicate's emails follow them.
 func (q *Queries) MoveEmailsToCandidate(ctx context.Context, arg MoveEmailsToCandidateParams) (int64, error) {
 	result, err := q.db.Exec(ctx, moveEmailsToCandidate, arg.ToID, arg.FromID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const moveEmailsToContact = `-- name: MoveEmailsToContact :execrows
-UPDATE email SET contact_id = $1 WHERE contact_id = $2
-`
-
-type MoveEmailsToContactParams struct {
-	ToID   *string
-	FromID *string
-}
-
-// Merging duplicate contacts: emails to the duplicate go to the contact kept.
-func (q *Queries) MoveEmailsToContact(ctx context.Context, arg MoveEmailsToContactParams) (int64, error) {
-	result, err := q.db.Exec(ctx, moveEmailsToContact, arg.ToID, arg.FromID)
 	if err != nil {
 		return 0, err
 	}

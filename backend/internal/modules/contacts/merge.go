@@ -9,6 +9,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
@@ -21,6 +22,9 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/dupgroups"
 )
 
+// maxNotes is the longest a contact's notes may be (the contract's and the table's limit).
+const maxNotes = 4000
+
 // RecordMover moves another module's records about a contact (emails, jobs,
 // invoices, notes...) when two duplicates are merged, inside the merge's
 // transaction.
@@ -32,8 +36,8 @@ type RecordMover interface {
 // internal/app once every module exists.
 func (m *Module) MoveRecordsWith(movers ...RecordMover) { m.service.movers = movers }
 
-// MoveCompany moves company fromID's contacts, LinkedIn checks and HR
-// searches to company toID, inside the transaction merging two companies.
+// MoveCompany moves company fromID's contacts (those in the Bin too),
+// LinkedIn checks, HR searches and Apollo lookups to company toID, inside the transaction merging two companies.
 func (m *Module) MoveCompany(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
 	q := store.New(tx)
 	if _, err := q.MoveCompanyContacts(ctx, store.MoveCompanyContactsParams{FromID: fromID, ToID: toID}); err != nil {
@@ -42,7 +46,10 @@ func (m *Module) MoveCompany(ctx context.Context, tx pgx.Tx, fromID, toID string
 	if err := q.MoveCompanyLinkedinChecks(ctx, store.MoveCompanyLinkedinChecksParams{FromID: fromID, ToID: toID}); err != nil {
 		return err
 	}
-	return q.MoveCompanyHRScans(ctx, store.MoveCompanyHRScansParams{FromID: fromID, ToID: toID})
+	if err := q.MoveCompanyHRScans(ctx, store.MoveCompanyHRScansParams{FromID: fromID, ToID: toID}); err != nil {
+		return err
+	}
+	return q.MoveCompanyApolloLookups(ctx, store.MoveCompanyApolloLookupsParams{FromID: fromID, ToID: toID}) // everyone's, paid for
 }
 
 // FillFrom returns keep with each empty field taken from dup, and the names
@@ -226,6 +233,17 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 			errs.Add("duplicateId", "works at another company: if it is the same person, change their company first")
 			return errs.Err()
 		}
+		keep, dup := fromRow(keepRow), fromRow(dupRow)
+		after, filled := FillFrom(keep.Details, dup.Details)
+		if after.Notes != nil && utf8.RuneCountInString(*after.Notes) > maxNotes {
+			var errs apperr.FieldErrors
+			errs.Add("duplicateId", "their notes and these together are over 4,000 characters: shorten one first")
+			return errs.Err()
+		}
+		// From here the Bin's records are seen too, so they move with the rest.
+		if err := q.ShowBinnedForMerge(ctx); err != nil {
+			return err
+		}
 		for _, m := range s.movers {
 			if err := m.MoveContact(ctx, tx, dupID, keepID); err != nil {
 				return err
@@ -241,8 +259,6 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		if err := q.MoveMailboxChecks(ctx, store.MoveMailboxChecksParams(move)); err != nil {
 			return err
 		}
-		keep, dup := fromRow(keepRow), fromRow(dupRow)
-		after, filled := FillFrom(keep.Details, dup.Details)
 		check := keep.EmailCheck
 		if keep.Details.Email == nil && dup.Details.Email != nil {
 			check = dup.EmailCheck // the email comes with its result
@@ -265,6 +281,9 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 			params.EmailCheckStatus, params.EmailCheckReasons, params.EmailCheckedAt = &check.Status, check.Reasons, &check.CheckedAt
 		}
 		row, err := q.UpdateContact(ctx, params)
+		if database.IsNoRows(err) {
+			return apperr.StaleVersion("contact") // saved by someone else meanwhile
+		}
 		if err != nil {
 			return err
 		}

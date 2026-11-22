@@ -179,6 +179,10 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		if err != nil {
 			return err
 		}
+		// From here the Bin's records are seen too, so they move with the rest.
+		if err := q.ShowBinnedForMerge(ctx); err != nil {
+			return err
+		}
 		for _, m := range s.movers {
 			if err := m.MoveCompany(ctx, tx, dupID, keepID); err != nil {
 				return err
@@ -204,7 +208,7 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		after, filled := FillFrom(fromRow(keepRow).Details, fromRow(dupRow).Details)
 		if _, err := q.DeleteMergedCompany(ctx, dupID); database.IsForeignKeyViolation(err) {
 			var errs apperr.FieldErrors
-			errs.Add("duplicateId", "has jobs or contacts you cannot see: ask someone who sees them all to merge")
+			errs.Add("duplicateId", "has jobs or contacts you cannot see (a team's jobs): ask someone who sees them all to merge")
 			return errs.Err()
 		} else if err != nil {
 			return err
@@ -215,6 +219,9 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 			Phone: after.Phone, Address: after.Address, City: after.City, Country: after.Country,
 			RegistrationNumber: after.RegistrationNumber, About: after.About,
 		})
+		if database.IsNoRows(err) {
+			return apperr.StaleVersion("company") // saved by someone else meanwhile
+		}
 		if err != nil {
 			return err
 		}

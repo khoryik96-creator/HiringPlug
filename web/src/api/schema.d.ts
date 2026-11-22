@@ -1462,7 +1462,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Possible duplicates of a contact (same LinkedIn profile, name or phone, or a name much alike at the same company) */
+        /** Possible duplicates of a contact (same LinkedIn profile, name or mobile, or a name much alike at the same company) */
         get: operations["listSimilarContacts"];
         put?: never;
         post?: never;

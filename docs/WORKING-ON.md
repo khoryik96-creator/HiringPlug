@@ -20,10 +20,10 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Merge duplicate companies and contacts, with a list of possible duplicates
-- Who: Claude (account A), session "Hiring Plug" (took over from Claude on account B)
+### Notifications: a bell for new applicants, tasks, offers to approve and tomorrow's interviews; an optional morning email
+- Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v
-- Touches: companies and contacts modules (merge, possible duplicates), their pages and lists; candidate merge left as it is
+- Touches: a new notifications module, the top bar (web/src/App*), Settings › Your account; reads jobs, pipeline, tasks, offers, interviews through their modules
 - Started: 22 Nov 2026    Last update: 22 Nov 2026
-- State: built and tested (1.32.0), waiting for the owner to merge
-- Next: after the merge, remove this entry; then Notifications (item 5) as a new entry
+- State: in progress
+- Next: design and build (roadmap "Product pipeline", Notifications)

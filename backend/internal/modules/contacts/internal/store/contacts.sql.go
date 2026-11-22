@@ -1484,19 +1484,31 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 	return i, err
 }
 
+const showBinnedForMerge = `-- name: ShowBinnedForMerge :exec
+SELECT set_config('app.show_binned', 'on', true)
+`
+
+// Merging: what is in the Bin moves too (a binned job or contact of the
+// duplicate would otherwise block deleting it).
+func (q *Queries) ShowBinnedForMerge(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, showBinnedForMerge)
+	return err
+}
+
 const similarContacts = `-- name: SimilarContacts :many
 SELECT c.id, c.company_id, c.first_name, c.last_name, c.title, c.email,
        coalesce(lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/')), false)::boolean AS same_linkedin,
        (cardinality(me.name_words) >= 2 AND c.name_words = me.name_words)::boolean AS same_name,
-       (string_to_array(c.phone_digits, ' ') && me.phones)::boolean AS same_phone,
+       (me.mobile <> '' AND regexp_replace(coalesce(c.mobile, ''), '[^0-9]', '', 'g') = me.mobile)::boolean AS same_phone,
        (c.company_id = me.company_id AND similarity(c.name_text, me.name_text) >= 0.6)::boolean AS similar_name
 FROM contact c, (SELECT x.company_id, x.linkedin_url, x.name_words, x.name_text,
-                         ARRAY(SELECT p FROM unnest(string_to_array(x.phone_digits, ' ')) AS p WHERE length(p) >= 9) AS phones
+                         CASE WHEN length(regexp_replace(coalesce(x.mobile, ''), '[^0-9]', '', 'g')) >= 9
+                              THEN regexp_replace(x.mobile, '[^0-9]', '', 'g') ELSE '' END AS mobile
                   FROM contact x WHERE x.id = $1) me
 WHERE c.id <> $1
   AND (lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/'))
        OR (cardinality(me.name_words) >= 2 AND c.name_words = me.name_words)
-       OR string_to_array(c.phone_digits, ' ') && me.phones
+       OR (me.mobile <> '' AND regexp_replace(coalesce(c.mobile, ''), '[^0-9]', '', 'g') = me.mobile)
        OR (c.company_id = me.company_id AND similarity(c.name_text, me.name_text) >= 0.6))
 ORDER BY c.id DESC
 LIMIT 20
@@ -1516,7 +1528,8 @@ type SimilarContactsRow struct {
 }
 
 // Possible duplicates of a contact: the same LinkedIn profile, the same name
-// words (any order, titles aside), the same phone (9 digits or more), or a name much like it at
+// words (any order, titles aside), the same mobile (9 digits or more: an
+// office line is shared by colleagues), or a name much like it at
 // the same company. Newest first.
 func (q *Queries) SimilarContacts(ctx context.Context, id string) ([]SimilarContactsRow, error) {
 	rows, err := q.db.Query(ctx, similarContacts, id)

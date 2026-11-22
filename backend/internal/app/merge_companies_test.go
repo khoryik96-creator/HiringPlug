@@ -33,6 +33,13 @@ func TestCompanyMergeMovesEverythingToTheCompanyKept(t *testing.T) {
 	require.Len(t, groups.Items, 1, "one group, found by two reasons")
 	assert.Len(t, groups.Items[0].Companies, 2)
 
+	catalogue := industryCatalogue(t, a, token)
+	bank := industryNamed(t, catalogue, "FSI – Banking")
+	res := a.request(http.MethodPatch, "/v1/companies/"+dup.Id, token, map[string]any{"version": dup.Version,
+		"industrySelections": map[string]any{"catalogueVersion": catalogue.Version, "ids": []string{bank.Id}, "primaryId": bank.Id}})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	f := a.folder(http.MethodPost, "/v1/folders", token, map[string]any{"kind": "company", "name": "Targets"}, http.StatusCreated)
+	a.folder(http.MethodPost, "/v1/folders/"+f.Id+"/items", token, map[string]any{"itemIds": []string{dup.Id}}, http.StatusOK)
 	hr := a.createContact(token, map[string]any{"companyId": dup.Id, "firstName": "Aisyah", "lastName": "Rahman"})
 	job := a.createJob(token, map[string]any{"companyId": dup.Id, "contactId": hr.Id, "title": "Finance Manager"})
 	require.Equal(t, http.StatusCreated, a.request(http.MethodPost, "/v1/notes", token, map[string]any{"subjectType": "company", "subjectId": dup.Id, "body": "Met their CFO."}).Status)
@@ -47,12 +54,19 @@ func TestCompanyMergeMovesEverythingToTheCompanyKept(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, merge(token, keep.Id, dup.Id, keep.Version+1).Status, "a stale version is refused")
 	assert.Equal(t, []string{"duplicateId"}, fieldNames(t, merge(token, keep.Id, keep.Id, keep.Version).Error()))
 
-	res := merge(token, keep.Id, dup.Id, keep.Version)
+	res = merge(token, keep.Id, dup.Id, keep.Version)
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	var merged api.Company
 	res.JSON(&merged)
 	assert.Equal(t, "Acme Sdn Bhd", merged.Name, "the name kept")
 	assert.Equal(t, "Penang", merged.City.MustGet(), "an empty field filled from the duplicate")
+	require.NotNil(t, merged.IndustrySelections)
+	assert.Equal(t, []string{bank.Id}, merged.IndustrySelections.Ids, "the industry moved")
+	assert.Equal(t, "Financial Services", merged.Industry.MustGet(), "and the summary with it")
+	var inFolder api.CompanyPage
+	a.request(http.MethodGet, "/v1/companies?folder="+f.Id, token, nil).JSON(&inFolder)
+	require.Len(t, inFolder.Items, 1)
+	assert.Equal(t, keep.Id, inFolder.Items[0].Id, "the folder place moved")
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/companies/"+dup.Id, token, nil).Status, "the duplicate is gone")
 
 	var c api.Contact
@@ -75,4 +89,24 @@ func TestCompanyMergeMovesEverythingToTheCompanyKept(t *testing.T) {
 	a.request(http.MethodGet, "/v1/activity?entityType=company&entityId="+keep.Id, token, nil).JSON(&activity)
 	require.NotEmpty(t, activity.Items)
 	assert.Equal(t, "company.merged", activity.Items[0].Action)
+}
+
+// A website on a shared host is the page, not the host: two companies with
+// their own Facebook pages are not "the same website".
+func TestCompanyDuplicatesTellPagesOnSharedHostsApart(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	one := a.createCompany(token, map[string]any{"name": "Kedai Satu", "website": "https://www.facebook.com/kedaisatu"})
+	a.createCompany(token, map[string]any{"name": "Kedai Dua", "website": "https://www.facebook.com/kedaidua"})
+	again := a.createCompany(token, map[string]any{"name": "Satu Online Store", "website": "facebook.com/kedaisatu/about"})
+	var groups api.CompanyDuplicateGroups
+	a.request(http.MethodGet, "/v1/companies/duplicates", token, nil).JSON(&groups)
+	require.Len(t, groups.Items, 1, "only the same page")
+	ids := []string{}
+	for _, c := range groups.Items[0].Companies {
+		ids = append(ids, c.Id)
+	}
+	assert.ElementsMatch(t, []string{one.Id, again.Id}, ids)
+	assert.Equal(t, []api.CompanyDuplicateReason{api.CompanyDuplicateReasonSameWebsite}, groups.Items[0].Reasons)
 }

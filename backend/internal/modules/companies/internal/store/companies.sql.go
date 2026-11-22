@@ -1124,6 +1124,17 @@ func (q *Queries) SetIndustryTerms(ctx context.Context, arg SetIndustryTermsPara
 	return err
 }
 
+const showBinnedForMerge = `-- name: ShowBinnedForMerge :exec
+SELECT set_config('app.show_binned', 'on', true)
+`
+
+// Merging: what is in the Bin moves too (a binned job or contact of the
+// duplicate would otherwise block deleting it).
+func (q *Queries) ShowBinnedForMerge(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, showBinnedForMerge)
+	return err
+}
+
 const similarCompanies = `-- name: SimilarCompanies :many
 SELECT c.id, c.name, c.city, c.website, c.industry,
        coalesce(c.site_key = me.site_key, false)::boolean AS same_website,
