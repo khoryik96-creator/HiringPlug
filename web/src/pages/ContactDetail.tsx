@@ -1,3 +1,4 @@
+import { SimilarContacts } from "../components/SimilarRecords";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { EditIcon, IconActions, IconButton, IconSeparator, MailCheckIcon, MailIcon, RefreshIcon, TrashIcon } from "../components/ActionIcons";
@@ -127,6 +128,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
       )}
       <ErrorMessage error={verify.error} />
       <ContactBanner contact={c} canEdit={canEdit && !editing} canEditRole={permissions.includes("contacts.role:update")} />
+      <SimilarContacts contact={c} canMerge={permissions.includes("contacts:merge")} />
       {c.status === "left" && <JobsNeedingContact contactId={c.id} />}
       {c.status === "active" && <EmailSuggestion contact={c} canEdit={canEdit && !editing} />}
       <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />

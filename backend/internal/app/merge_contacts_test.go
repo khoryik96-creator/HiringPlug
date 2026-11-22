@@ -33,6 +33,7 @@ func TestContactMergeMovesEverythingToTheContactKept(t *testing.T) {
 	for _, s := range similar.Items {
 		ids = append(ids, s.Id)
 		assert.Contains(t, s.Reasons, api.ContactDuplicateReasonSameName)
+		assert.NotContains(t, s.Reasons, api.ContactDuplicateReasonSimilarName, "the same name is not also a similar one")
 	}
 	assert.ElementsMatch(t, []string{dup.Id, moved.Id}, ids, "the same name, here and at another company")
 	var groups api.ContactDuplicateGroups

@@ -1,3 +1,4 @@
+import { SimilarCompanies } from "../components/SimilarRecords";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { EditIcon, IconActions, IconButton, IconSeparator, TrashIcon } from "../components/ActionIcons";
@@ -88,6 +89,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
       )}
       {/* While the edit form is open the card is read-only: a change there would make the form's save stale. */}
       <CompanyBanner company={c} canEdit={canEdit && !editing} permissions={permissions} />
+      <SimilarCompanies company={c} canMerge={permissions.includes("companies:merge")} />
       <SectionTabs name="company" label="Company sections" sections={sections} active={active} onChange={setActive} />
     </main>
   );

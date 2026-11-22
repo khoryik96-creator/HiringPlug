@@ -1466,3 +1466,10 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
   .step-row .step-actions { grid-column: 2 / -1; justify-content: flex-start; }
   .panel:has(> table) { overflow-x: auto; }
 }
+
+/* Possible duplicates lists (pages/Duplicates.tsx) */
+.dupe-groups { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: 0.6rem; }
+.dupe-group { padding: 0.7rem 1rem; }
+.dupe-group ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+.dupe-why { display: inline-block; font-size: 0.78rem; font-weight: 700; color: #93500a; background: #fff1cc; border-radius: 999px; padding: 0.1rem 0.6rem; }
+.list-top .dupes-link { white-space: nowrap; font-size: 0.85rem; }

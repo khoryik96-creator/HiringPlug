@@ -95,7 +95,7 @@ func (s *Service) Similar(ctx context.Context, p authz.Principal, id string) ([]
 			l := Lookalike{ID: r.ID, CompanyID: r.CompanyID, FullName: strings.TrimSpace(r.FirstName + " " + r.LastName), Title: r.Title, Email: r.Email}
 			for reason, on := range map[api.ContactDuplicateReason]bool{
 				api.ContactDuplicateReasonSameLinkedin: r.SameLinkedin, api.ContactDuplicateReasonSameName: r.SameName,
-				api.ContactDuplicateReasonSamePhone: r.SamePhone, api.ContactDuplicateReasonSimilarName: r.SimilarName,
+				api.ContactDuplicateReasonSamePhone: r.SamePhone, api.ContactDuplicateReasonSimilarName: r.SimilarName && !r.SameName, // the same name says it already
 			} {
 				if on {
 					l.Reasons = append(l.Reasons, reason)

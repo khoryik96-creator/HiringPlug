@@ -96,6 +96,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
             {fs.options("company_category").filter((o) => o.key !== UNKNOWN_CATEGORY).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
         </BooleanSearchBox>
+        <a className="dupes-link" href="#/companies/duplicates">Possible duplicates</a>
         {canCreate && !adding && <IconButton label="Add company" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (

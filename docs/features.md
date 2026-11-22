@@ -522,6 +522,21 @@ for each of their jobs, with **Score fit** / **Score again**.
   website (ignoring case and accents), filter by type. Names are unique per
   company (`Nestlé Malaysia` and `nestle malaysia` are the same), and edits use
   the same lost-update protection as candidates.
+- **Duplicate companies and contacts** ✅ (1.32.0): a company's page warns
+  about possible duplicates (the same website or LinkedIn page, or the same
+  name without Sdn Bhd, Berhad and the like, or a name much alike); a
+  contact's about the same LinkedIn profile, the same name in any order
+  (titles such as Dato' aside), the same phone, or a name much alike at the
+  same company. **Merge into this one** (companies:merge, contacts:merge:
+  owners, admins, recruiters) moves everything to the record kept: a
+  company's contacts, jobs, notes, documents, leads, automations, industries
+  and folder places (its terms and benefits only if the kept one has none); a
+  contact's emails and Outlook threads, jobs, invoices, notes, folder places
+  and checks. Empty fields are filled from the duplicate (a contact's notes
+  are joined), the duplicate is deleted, and both records' activity says so.
+  Contacts at two companies are not merged (they may have changed jobs).
+  **Possible duplicates** beside each list's search shows every group across
+  the agency.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,
   what it offers and what it checks before an offer, recorded from the
   agency's template (Hyppies' Benefits & Pre-Offer Process to start with:

@@ -25,5 +25,5 @@ How to write an entry (newest at the top, one per task):
 - Branch: claude/relaxed-hopper-ex7y3v
 - Touches: companies and contacts modules (merge, possible duplicates), their pages and lists; candidate merge left as it is
 - Started: 22 Nov 2026    Last update: 22 Nov 2026
-- State: in progress
-- Next: design and build (roadmap "Product pipeline" item 4); then Notifications (item 5)
+- State: built and tested (1.32.0), waiting for the owner to merge
+- Next: after the merge, remove this entry; then Notifications (item 5) as a new entry

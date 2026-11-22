@@ -64,6 +64,7 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
             <option value="left">Has left</option>
           </select>
         </BooleanSearchBox>
+        <a className="dupes-link" href="#/contacts/duplicates">Possible duplicates</a>
         {canCreate && !adding && <IconButton label="Add contact" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (

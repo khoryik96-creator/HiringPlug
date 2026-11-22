@@ -29,6 +29,7 @@ const CandidateList = page(() => import("./pages/CandidateList"), "CandidateList
 const ChangePassword = page(() => import("./pages/Team"), "ChangePassword");
 const CompanyDetail = page(() => import("./pages/CompanyDetail"), "CompanyDetail");
 const CompanyList = page(() => import("./pages/CompanyList"), "CompanyList");
+const Duplicates = page(() => import("./pages/Duplicates"), "Duplicates");
 const AiSearch = page(() => import("./pages/AiSearch"), "AiSearch");
 const CompareCvs = page(() => import("./pages/CompareCvs"), "CompareCvs");
 const ContactDetail = page(() => import("./pages/ContactDetail"), "ContactDetail");
@@ -102,10 +103,12 @@ export const ROUTES: Route[] = [
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates/, menu: { in: "main", label: "Candidates", href: "#/candidates" },
     render: (c) => <CandidateList canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} canAddToJob={can(c, "pipeline:update")} canFolders={can(c, "folders:use")} canImport={can(c, "intake:create")} meId={c.me.user.id} /> },
+  { section: "companies", path: /^#\/companies\/duplicates$/, render: () => <Duplicates kind="companies" /> },
   { section: "companies", path: /^#\/companies\/(comp_[0-9a-z]+)$/,
     render: (c) => <CompanyDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "companies", path: /^#\/companies/, menu: { in: "main", label: "Companies", href: "#/companies" },
     render: (c) => <CompanyList canCreate={can(c, "companies:create")} canFolders={can(c, "folders:use")} meId={c.me.user.id} /> },
+  { section: "contacts", path: /^#\/contacts\/duplicates$/, render: () => <Duplicates kind="contacts" /> },
   { section: "contacts", path: /^#\/contacts\/(cont_[0-9a-z]+)$/,
     render: (c) => <ContactDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "contacts", path: /^#\/contacts/, menu: { in: "main", label: "Contacts", href: "#/contacts" },
