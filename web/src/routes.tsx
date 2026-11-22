@@ -63,6 +63,7 @@ const Industries = page(() => import("./pages/Industries"), "Industries");
 const Settings = page(() => import("./pages/Settings"), "Settings");
 const SalarySettings = page(() => import("./pages/Settings"), "SalarySettings");
 const ListSettings = page(() => import("./pages/Settings"), "ListSettings");
+const TargetSettings = page(() => import("./pages/TargetSettings"), "TargetSettings");
 const System = page(() => import("./pages/System"), "System");
 const BackupsPage = page(() => import("./pages/Backups"), "BackupsPage");
 const Team = page(() => import("./pages/Team"), "Team");
@@ -89,7 +90,7 @@ const can = (c: PageContext, p: Permission) => c.permissions.includes(p);
 export const ROUTES: Route[] = [
   // The top bar, in order.
   { section: "dashboard", path: /^(#\/?)?$/, permission: "pipeline:read", menu: { in: "main", label: "Dashboard", href: "#/" },
-    render: (c) => <Dashboard permissions={c.permissions} /> },
+    render: (c) => <Dashboard permissions={c.permissions} meId={c.me.user.id} /> },
   { section: "jobs", path: /^#\/jobs\/(jo_[0-9a-z]+)$/, render: (c) => <JobDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "jobs", path: /^#\/jobs/, menu: { in: "main", label: "Jobs", href: "#/jobs" },
     render: (c) => <JobList canCreate={can(c, "jobs:create")} canExport={can(c, "jobs:export")} /> },
@@ -119,7 +120,7 @@ export const ROUTES: Route[] = [
   { section: "leads", path: /^#\/leads/, permission: "leads:read", menu: { in: "main", label: "Leads", href: "#/leads", more: true },
     render: (c) => <Leads permissions={c.permissions} /> },
   { section: "reports", path: /^#\/reports/, permission: "reports:read", menu: { in: "main", label: "Reports", href: "#/reports", more: true },
-    render: () => <Reports /> },
+    render: (c) => <Reports permissions={c.permissions} /> },
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
@@ -141,6 +142,8 @@ export const ROUTES: Route[] = [
     render: () => <SalarySettings /> },
   { section: "settings-lists", path: /^#\/settings\/lists/, permission: "settings:manage", menu: { in: "settings", label: "Dropdowns & categories", href: "#/settings/lists" },
     render: () => <ListSettings /> },
+  { section: "settings-targets", path: /^#\/settings\/targets/, permission: "reports.settings:manage",
+    menu: { in: "settings", label: "Targets & forecast", href: "#/settings/targets" }, render: () => <TargetSettings /> },
   { section: "settings-stages", path: /^#\/settings\/stages/, permission: "pipeline.templates:manage", menu: { in: "settings", label: "Pipeline stages", href: "#/settings/stages" },
     render: () => <StageTemplates /> },
   { section: "settings-claims-storage", path: /^#\/settings\/claims-storage/, permission: "claims.storage:manage",

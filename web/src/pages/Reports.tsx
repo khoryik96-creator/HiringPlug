@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, unwrap } from "../api/client";
+import { api, type Permission, unwrap } from "../api/client";
+import { ActivityProgress } from "../components/ActivityProgress";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { downloadExport } from "../api/files";
 import { ExportButton } from "../components/ExportButton";
+import { RevenueForecast } from "../components/RevenueForecast";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { formatDay, formatMoney, STAGE } from "../labels";
 
@@ -22,8 +24,13 @@ export function presetDates(p: Preset, today: Date): { from: string; to: string 
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${String(Math.round((part * 100) / whole))}%` : "–");
 
-/** How the business is doing over a period (the last 90 days unless chosen). */
-export function Reports() {
+/**
+ * How the business is doing over a period (the last 90 days unless chosen),
+ * activity against targets, and (for those who may see fees) the revenue
+ * forecast.
+ */
+export function Reports({ permissions = [] }: { permissions?: Permission[] }) {
+  const forecast = permissions.includes("reports.forecast:read") && permissions.includes("placements.fees:read");
   const [preset, setPreset] = useState<Preset>("recent");
   const [period, setPeriod] = useState({ from: "", to: "" });
   const fs = useFieldSettings();
@@ -39,6 +46,17 @@ export function Reports() {
     <main>
       <div className="row spread">
         <h2>Reports</h2>
+        <ExportButton what="reports" run={(format) => {
+          const query = new URLSearchParams({ format });
+          if (period.from) query.set("from", period.from);
+          if (period.to) query.set("to", period.to);
+          return downloadExport(`/v1/reports/summary/export?${query.toString()}`);
+        }} />
+      </div>
+      <ActivityProgress />
+      {forecast && <RevenueForecast />}
+      <div className="row spread report-period">
+        <h3>Pipeline and placements</h3>
         <div className="row" role="group" aria-label="Period">
           {PRESETS.map(([key, label]) => (
             <button key={key} type="button" className="choice-pill" aria-pressed={preset === key}
@@ -50,12 +68,6 @@ export function Reports() {
               <input type="date" aria-label="To" value={period.to} onChange={(e) => { setPeriod({ ...period, to: e.target.value }); }} />
             </>
           )}
-          <ExportButton what="reports" run={(format) => {
-            const query = new URLSearchParams({ format });
-            if (period.from) query.set("from", period.from);
-            if (period.to) query.set("to", period.to);
-            return downloadExport(`/v1/reports/summary/export?${query.toString()}`);
-          }} />
         </div>
       </div>
       {r && <p className="muted">{formatDay(r.from)} to {formatDay(r.to)}</p>}

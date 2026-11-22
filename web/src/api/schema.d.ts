@@ -8726,7 +8726,7 @@ export interface components {
          * @description A block of the dashboard that can be moved.
          * @enum {string}
          */
-        DashboardBlock: "numbers" | "needsYou" | "import" | "tasks" | "offersToApprove" | "interviews" | "openJobs";
+        DashboardBlock: "numbers" | "needsYou" | "import" | "tasks" | "offersToApprove" | "interviews" | "activity" | "openJobs";
         /**
          * @description A column the candidate list can show.
          * @enum {string}

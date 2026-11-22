@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
+import { ActivityProgress } from "../components/ActivityProgress";
 import { CvImports } from "../components/CvImports";
 import { DashboardBlocks } from "../components/DashboardBlocks";
 import { Change, Heat, HeatLegend, lastActivity } from "../components/heat";
@@ -20,7 +21,7 @@ type Counts = Schemas["StageCounts"];
 const active = (c: Counts) => c.applied + c.screening + c.submitted + c.interview + c.offer;
 
 /** The home page: search, what needs you today, importing CVs, open jobs and their pipelines. */
-export function Dashboard({ permissions }: { permissions: Permission[] }) {
+export function Dashboard({ permissions, meId }: { permissions: Permission[]; meId?: string }) {
   const summary = useQuery({
     queryKey: summaryKey,
     queryFn: async () => unwrap(await api.GET("/v1/pipeline/summary")),
@@ -51,6 +52,8 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
           ? [{ id: "offersToApprove" as const, label: "Offers to approve", node: <OffersToApprove permissions={permissions} /> }] : []),
         ...(permissions.includes("interviews:read")
           ? [{ id: "interviews" as const, label: "My upcoming interviews", node: <MyInterviews permissions={permissions} /> }] : []),
+        ...(permissions.includes("reports:read") && meId
+          ? [{ id: "activity" as const, label: "Your activity", node: <ActivityProgress onlyUser={meId} title="Your activity" /> }] : []),
         { id: "openJobs", label: "Open jobs", node: (
       <section className="panel" aria-label="Open jobs">
         <h3>Open jobs</h3>

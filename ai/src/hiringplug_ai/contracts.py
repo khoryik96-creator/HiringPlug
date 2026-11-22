@@ -3657,6 +3657,7 @@ class DashboardBlock(StrEnum):
     tasks = "tasks"
     offersToApprove = "offersToApprove"
     interviews = "interviews"
+    activity = "activity"
     openJobs = "openJobs"
 
 
