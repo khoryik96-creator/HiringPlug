@@ -78,3 +78,12 @@ SELECT id FROM interview WHERE id = ANY(@ids::text[]) AND status <> 'cancelled';
 -- The interviews on some applications (deleted with them for good: the Bin).
 -- name: InterviewIDsOnApplications :many
 SELECT id FROM interview WHERE application_id = ANY (@application_ids::text[]) ORDER BY id;
+
+-- A user's scheduled interviews (they interview, or they arranged it)
+-- starting in a time range, soonest first (notifications).
+-- name: UpcomingFor :many
+SELECT id, application_id, title, starts_at, created_at FROM interview
+WHERE status = 'scheduled' AND starts_at >= @from_time AND starts_at < @to_time
+  AND (@user_id::text = ANY(interviewer_ids) OR created_by = @user_id::text)
+ORDER BY starts_at, id
+LIMIT 50;

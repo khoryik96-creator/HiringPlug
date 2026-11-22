@@ -1,0 +1,120 @@
+# Module contract: notifications (the bell in the top bar and the morning email).
+# See contracts/README.md for the format.
+x-module:
+  name: notifications
+  description: >
+    What needs you, in one place: new applicants on your jobs, your tasks due
+    today or overdue, offers waiting for your approval, and your interviews
+    today and tomorrow. Worked out from the records when asked (nothing is
+    copied); each user's "seen up to" time marks what is new. An optional
+    morning email sends the same list at 8:00 agency time.
+  permissions:
+    notifications:read:
+      description: See your own notifications and choose whether to get the morning email.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  errorCodes: {}
+  jobs:
+    notifications.digest:
+      queue: core
+      payload: NotificationDigestJob
+      description: The morning email for one user (Go worker). Sends their notifications if there are any, then queues the next morning's. Does nothing once the email is turned off.
+
+paths:
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: Your notifications, newest first, with how many are new since you last looked
+      x-permission: notifications:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/notifications/seen:
+    post:
+      operationId: markNotificationsSeen
+      tags: [notifications]
+      summary: Mark everything up to now as seen (the bell's count goes to zero)
+      x-permission: notifications:read
+      responses:
+        '204': { description: Marked }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/notifications/settings:
+    put:
+      operationId: putNotificationSettings
+      tags: [notifications]
+      summary: Choose which notifications you get, and whether to get the morning email
+      x-permission: notifications:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationSettings' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSettings' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  schemas:
+    NotificationKind:
+      type: string
+      enum: [applicant, task, offer_approval, interview]
+      description: >
+        applicant: someone applied to a job you own (last 7 days);
+        task: a task of yours due today or overdue;
+        offer_approval: an offer waiting for your approval;
+        interview: an interview of yours today or tomorrow.
+    Notification:
+      type: object
+      required: [id, kind, title, detail, href, at, new]
+      properties:
+        id: { type: string, description: "The kind and record it is about, e.g. task:tsk_..., stable while it shows." }
+        kind: { $ref: '#/components/schemas/NotificationKind' }
+        title: { type: string }
+        detail: { type: string, description: "The job and company, the due day, or the time." }
+        href: { type: string, description: "Where it opens in the app, e.g. #/candidates/cand_..." }
+        at: { type: string, format: date-time, description: When it became a notification (it is new if after you last looked). }
+        new: { type: boolean }
+    NotificationList:
+      type: object
+      required: [items, unseen, morningEmail, mutedKinds]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Notification' }
+        unseen: { type: integer, minimum: 0, description: How many items are new since you last looked. }
+        morningEmail: { type: boolean }
+        mutedKinds:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationKind' }
+    NotificationSettings:
+      type: object
+      additionalProperties: false
+      required: [morningEmail, mutedKinds]
+      properties:
+        morningEmail: { type: boolean, description: "Email me this list at 8:00 each morning (only on mornings when there is something)." }
+        mutedKinds:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          description: The kinds you turned off. They show neither in the bell nor in the morning email.
+          items: { $ref: '#/components/schemas/NotificationKind' }
+    NotificationDigestJob:
+      type: object
+      additionalProperties: false
+      required: [userId, chain]
+      properties:
+        userId: { $ref: '#/components/schemas/UserId' }
+        chain: { type: integer, minimum: 0, description: "Which turning-on this job belongs to; a job from an earlier one does nothing." }

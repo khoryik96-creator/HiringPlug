@@ -23,7 +23,7 @@ How to write an entry (newest at the top, one per task):
 ### Notifications: a bell for new applicants, tasks, offers to approve and tomorrow's interviews; an optional morning email
 - Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v
-- Touches: a new notifications module, the top bar (web/src/App*), Settings › Your account; reads jobs, pipeline, tasks, offers, interviews through their modules
+- Touches: a new notifications module (migration 00165), small read functions in jobs, pipeline, automations, offers, interviews; the top bar (web/src/App*), Settings › Your account
 - Started: 22 Nov 2026    Last update: 22 Nov 2026
-- State: in progress
-- Next: design and build (roadmap "Product pipeline", Notifications)
+- State: in progress (backend done and tested; web next)
+- Next: web: bell with unseen count in the top bar (GET /v1/notifications, POST /v1/notifications/seen); Settings › Your account "Notifications" section with a switch per kind and the morning email (PUT /v1/notifications/settings); web tests, screenshots, docs, VERSION 1.33.0, task verify

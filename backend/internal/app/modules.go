@@ -44,6 +44,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/market"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notifications"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements"
@@ -89,6 +90,7 @@ type Modules struct {
 	Calendars     *calendars.Module
 	Claims        *claims.Module
 	InterviewPrep *interviewprep.Module
+	Notifications *notifications.Module
 	// scaffold:fields
 }
 
@@ -238,6 +240,7 @@ func NewModules(d Deps) *Modules {
 			ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 		},
 	}, d.Config.TimeZone)
+	m.Notifications = notifications.New(d.Pool, notificationSources{m}, m.Identity, notificationMailer{m}, notifications.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims)
@@ -304,6 +307,7 @@ type (
 	calendarsHTTP     = calendars.HTTP
 	claimsHTTP        = claims.HTTP
 	interviewprepHTTP = interviewprep.HTTP
+	notificationsHTTP = notifications.HTTP
 	// scaffold:aliases
 )
 
@@ -343,6 +347,7 @@ type Server struct {
 	*calendarsHTTP
 	*claimsHTTP
 	*interviewprepHTTP
+	*notificationsHTTP
 	// scaffold:embeds
 }
 
@@ -383,6 +388,7 @@ func (m *Modules) Server() *Server {
 		calendarsHTTP:     m.Calendars.HTTP,
 		claimsHTTP:        m.Claims.HTTP,
 		interviewprepHTTP: m.InterviewPrep.HTTP,
+		notificationsHTTP: m.Notifications.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -429,6 +435,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Bin.JobHandlers(),
 		m.Claims.JobHandlers(),
 		m.InterviewPrep.JobHandlers(),
+		m.Notifications.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

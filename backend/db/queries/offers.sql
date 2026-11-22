@@ -41,3 +41,11 @@ ON CONFLICT (offer_id) DO UPDATE SET amount = EXCLUDED.amount, currency = EXCLUD
 
 -- name: DeleteOfferSalary :exec
 DELETE FROM offer_salary WHERE offer_id = @offer_id;
+
+-- Offers waiting for approval that someone other than this user asked for
+-- (no one approves their own; notifications).
+-- name: AwaitingApproval :many
+SELECT id, application_id, updated_at FROM offer
+WHERE status = 'pending_approval' AND requested_by IS DISTINCT FROM @user_id::text
+ORDER BY updated_at DESC, id DESC
+LIMIT 50;

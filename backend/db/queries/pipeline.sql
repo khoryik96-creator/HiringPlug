@@ -196,3 +196,11 @@ SELECT stage, step, count(*)::int AS n,
   count(*) FILTER (WHERE stage <> 'placed' AND stage_changed_at <= now() - interval '7 days')::int AS waiting
 FROM application WHERE job_order_id = @job_order_id
 GROUP BY stage, step;
+
+-- People who applied (a careers page, a job board, a referral: not added by
+-- a recruiter) to these jobs since a time, newest first (notifications).
+-- name: ApplicantsSince :many
+SELECT id, created_at FROM application
+WHERE job_order_id = ANY(@job_ids::text[]) AND channel IS NOT NULL AND created_at > @since
+ORDER BY created_at DESC, id DESC
+LIMIT 50;

@@ -7062,6 +7062,50 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: Your notifications, newest first, with how many are new since you last looked
+      x-permission: notifications:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/notifications/seen:
+    post:
+      operationId: markNotificationsSeen
+      tags: [notifications]
+      summary: Mark everything up to now as seen (the bell's count goes to zero)
+      x-permission: notifications:read
+      responses:
+        '204': {description: Marked}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/notifications/settings:
+    put:
+      operationId: putNotificationSettings
+      tags: [notifications]
+      summary: Choose which notifications you get, and whether to get the morning email
+      x-permission: notifications:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationSettings'}
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationSettings'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/offers:
     get:
       operationId: listOffers
@@ -8569,6 +8613,7 @@ components:
         - notes:create
         - notes:manage
         - notes:read
+        - notifications:read
         - offers.salary:read
         - offers.salary:update
         - offers:approve
@@ -8723,6 +8768,7 @@ components:
         - lead_source.check
         - match.score
         - match.scored
+        - notifications.digest
         - placement.invoice
         - scheduling.refresh_calendar
         - talent.rank
@@ -15354,6 +15400,55 @@ components:
         items:
           type: array
           items: {$ref: '#/components/schemas/ActivityEntry'}
+    NotificationKind:
+      type: string
+      enum: [applicant, task, offer_approval, interview]
+      description: >
+        applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow.
+
+    Notification:
+      type: object
+      required: [id, kind, title, detail, href, at, new]
+      properties:
+        id: {type: string, description: "The kind and record it is about, e.g. task:tsk_..., stable while it shows."}
+        kind: {$ref: '#/components/schemas/NotificationKind'}
+        title: {type: string}
+        detail: {type: string, description: "The job and company, the due day, or the time."}
+        href: {type: string, description: "Where it opens in the app, e.g. #/candidates/cand_..."}
+        at: {type: string, format: date-time, description: When it became a notification (it is new if after you last looked).}
+        new: {type: boolean}
+    NotificationList:
+      type: object
+      required: [items, unseen, morningEmail, mutedKinds]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Notification'}
+        unseen: {type: integer, minimum: 0, description: How many items are new since you last looked.}
+        morningEmail: {type: boolean}
+        mutedKinds:
+          type: array
+          items: {$ref: '#/components/schemas/NotificationKind'}
+    NotificationSettings:
+      type: object
+      additionalProperties: false
+      required: [morningEmail, mutedKinds]
+      properties:
+        morningEmail: {type: boolean, description: "Email me this list at 8:00 each morning (only on mornings when there is something)."}
+        mutedKinds:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          description: The kinds you turned off. They show neither in the bell nor in the morning email.
+          items: {$ref: '#/components/schemas/NotificationKind'}
+    NotificationDigestJob:
+      type: object
+      additionalProperties: false
+      required: [userId, chain]
+      properties:
+        userId: {$ref: '#/components/schemas/UserId'}
+        chain: {type: integer, minimum: 0, description: "Which turning-on this job belongs to; a job from an earlier one does nothing."}
     OfferId:
       type: string
       pattern: '^ofr_[0-9a-hjkmnp-tv-z]{26}$'
@@ -17174,6 +17269,11 @@ x-permissions:
     description: Read notes (sensitive ones need notes.sensitive:read).
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  notifications:read:
+    module: notifications
+    description: See your own notifications and choose whether to get the morning email.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
   offers.salary:read:
     module: offers
     description: See the salary offered.
@@ -17587,6 +17687,12 @@ x-jobs:
     payload: MatchScoredJob
     priority: normal
     description: Check the AI's quotes against the texts it was sent, work out the score and save it (Go worker).
+  notifications.digest:
+    module: notifications
+    queue: core
+    payload: NotificationDigestJob
+    priority: normal
+    description: The morning email for one user (Go worker). Sends their notifications if there are any, then queues the next morning's. Does nothing once the email is turned off.
   placement.invoice:
     module: placements
     queue: core
@@ -17668,6 +17774,8 @@ x-modules:
     description: CV vs job match. Go sends the job's text and the candidate's CV text (without names, contact details or salary) to the Python AI worker, which asks the AI provider for the job's requirements, whether the CV meets each, and a quote from both for every one. Go keeps a requirement only if its quote is in the job's text and counts it as met only if its evidence is in the CV, then works out the score from what is left. It suggests; the recruiter decides. Off until an AI provider is set up; it uses the company's monthly AI allowance, shared with the assistant.
   - name: notes
     description: Notes on records, and what changed on them (activity).
+  - name: notifications
+    description: 'What needs you, in one place: new applicants on your jobs, your tasks due today or overdue, offers waiting for your approval, and your interviews today and tomorrow. Worked out from the records when asked (nothing is copied); each user''s "seen up to" time marks what is new. An optional morning email sends the same list at 8:00 agency time.'
   - name: offers
     description: 'An offer on an application: salary, start date, when it expires and other terms. Those who may approve offers send them straight away; others ask for approval first, and someone else approves (or sends it back). Then the offer is sent and the candidate accepts or declines. Making an offer moves the application to the offer stage.'
   - name: pipeline

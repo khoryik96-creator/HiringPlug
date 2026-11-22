@@ -22,6 +22,50 @@ func (q *Queries) DeleteAutomation(ctx context.Context, id string) (int64, error
 	return result.RowsAffected(), nil
 }
 
+const dueTasks = `-- name: DueTasks :many
+SELECT id, tenant_id, user_id, title, due_on, application_id, run_id, automation_name, done_at, created_at FROM recruiter_task
+WHERE user_id = $1 AND done_at IS NULL AND due_on <= $2::date
+ORDER BY due_on, id
+LIMIT 50
+`
+
+type DueTasksParams struct {
+	UserID string
+	Day    time.Time
+}
+
+// A user's open tasks due on or before a day (notifications), soonest first.
+func (q *Queries) DueTasks(ctx context.Context, arg DueTasksParams) ([]RecruiterTask, error) {
+	rows, err := q.db.Query(ctx, dueTasks, arg.UserID, arg.Day)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecruiterTask
+	for rows.Next() {
+		var i RecruiterTask
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.UserID,
+			&i.Title,
+			&i.DueOn,
+			&i.ApplicationID,
+			&i.RunID,
+			&i.AutomationName,
+			&i.DoneAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const enabledAutomations = `-- name: EnabledAutomations :many
 SELECT id, tenant_id, version, name, enabled, trigger, stage, offset_days, company_id, actions, send_mode, preset, created_by, created_at, updated_at FROM automation WHERE enabled ORDER BY id
 `

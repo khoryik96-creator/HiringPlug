@@ -498,6 +498,56 @@ func (q *Queries) StandingInterviewIDs(ctx context.Context, ids []string) ([]str
 	return items, nil
 }
 
+const upcomingFor = `-- name: UpcomingFor :many
+SELECT id, application_id, title, starts_at, created_at FROM interview
+WHERE status = 'scheduled' AND starts_at >= $1 AND starts_at < $2
+  AND ($3::text = ANY(interviewer_ids) OR created_by = $3::text)
+ORDER BY starts_at, id
+LIMIT 50
+`
+
+type UpcomingForParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+	UserID   string
+}
+
+type UpcomingForRow struct {
+	ID            string
+	ApplicationID string
+	Title         string
+	StartsAt      time.Time
+	CreatedAt     time.Time
+}
+
+// A user's scheduled interviews (they interview, or they arranged it)
+// starting in a time range, soonest first (notifications).
+func (q *Queries) UpcomingFor(ctx context.Context, arg UpcomingForParams) ([]UpcomingForRow, error) {
+	rows, err := q.db.Query(ctx, upcomingFor, arg.FromTime, arg.ToTime, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UpcomingForRow
+	for rows.Next() {
+		var i UpcomingForRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.Title,
+			&i.StartsAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateInterview = `-- name: UpdateInterview :one
 UPDATE interview SET
   title = $1, starts_at = $2, duration_minutes = $3,

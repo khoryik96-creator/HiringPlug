@@ -225,3 +225,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/interviewprep/internal/store
+  - <<: *module
+    queries: db/queries/notifications.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/notifications/internal/store

@@ -264,3 +264,7 @@ UPDATE job_order SET company_id = @to_id WHERE company_id = @from_id;
 
 -- name: MoveContactJobs :execrows
 UPDATE job_order SET contact_id = @to_id WHERE contact_id = @from_id;
+
+-- The jobs a recruiter owns (notifications: new applicants on them).
+-- name: JobOrderIDsOwnedBy :many
+SELECT id FROM job_order WHERE owner_id = @owner_id ORDER BY id DESC LIMIT 1000;

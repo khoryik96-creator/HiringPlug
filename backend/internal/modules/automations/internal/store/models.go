@@ -1380,6 +1380,17 @@ type Note struct {
 	CreatedAt   time.Time
 }
 
+type NotificationState struct {
+	TenantID     string
+	UserID       string
+	SeenAt       *time.Time
+	MorningEmail bool
+	MutedKinds   []string
+	DigestChain  int32
+	EmailedOn    *time.Time
+	UpdatedAt    time.Time
+}
+
 type Offer struct {
 	ID            string
 	TenantID      string

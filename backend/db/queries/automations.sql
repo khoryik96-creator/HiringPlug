@@ -96,3 +96,10 @@ WHERE automation_id = @automation_id AND subject_id = @subject_id AND status = '
 -- Merging duplicate companies: automations about the duplicate follow the one kept.
 -- name: MoveCompanyAutomations :execrows
 UPDATE automation SET company_id = @to_id WHERE company_id = @from_id;
+
+-- A user's open tasks due on or before a day (notifications), soonest first.
+-- name: DueTasks :many
+SELECT * FROM recruiter_task
+WHERE user_id = @user_id AND done_at IS NULL AND due_on <= @day::date
+ORDER BY due_on, id
+LIMIT 50;

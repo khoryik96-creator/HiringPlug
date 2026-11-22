@@ -10,6 +10,45 @@ import (
 	"time"
 )
 
+const applicantsSince = `-- name: ApplicantsSince :many
+SELECT id, created_at FROM application
+WHERE job_order_id = ANY($1::text[]) AND channel IS NOT NULL AND created_at > $2
+ORDER BY created_at DESC, id DESC
+LIMIT 50
+`
+
+type ApplicantsSinceParams struct {
+	JobIds []string
+	Since  time.Time
+}
+
+type ApplicantsSinceRow struct {
+	ID        string
+	CreatedAt time.Time
+}
+
+// People who applied (a careers page, a job board, a referral: not added by
+// a recruiter) to these jobs since a time, newest first (notifications).
+func (q *Queries) ApplicantsSince(ctx context.Context, arg ApplicantsSinceParams) ([]ApplicantsSinceRow, error) {
+	rows, err := q.db.Query(ctx, applicantsSince, arg.JobIds, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApplicantsSinceRow
+	for rows.Next() {
+		var i ApplicantsSinceRow
+		if err := rows.Scan(&i.ID, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const applicationFacts = `-- name: ApplicationFacts :many
 SELECT a.id, a.job_order_id, a.candidate_id, a.channel, a.created_at,
   array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages

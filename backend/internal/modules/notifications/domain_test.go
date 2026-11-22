@@ -1,0 +1,101 @@
+package notifications
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func kl(t *testing.T) *time.Location {
+	t.Helper()
+	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	require.NoError(t, err)
+	return loc
+}
+
+func TestNextMorning(t *testing.T) {
+	loc := kl(t)
+	at := func(h, m int) time.Time { return time.Date(2026, 11, 22, h, m, 0, 0, loc) }
+	assert.Equal(t, at(8, 0), NextMorning(at(7, 59), loc), "before 8: this morning")
+	assert.Equal(t, at(8, 0).AddDate(0, 0, 1), NextMorning(at(8, 0), loc), "at 8: tomorrow (strictly after)")
+	assert.Equal(t, at(8, 0).AddDate(0, 0, 1), NextMorning(at(23, 30), loc))
+	assert.Equal(t, at(8, 0), NextMorning(time.Date(2026, 11, 21, 23, 0, 0, 0, time.UTC), loc), "23:00 UTC is 7:00 in Kuala Lumpur")
+}
+
+func TestBuild(t *testing.T) {
+	loc := kl(t)
+	now := time.Date(2026, 11, 22, 9, 0, 0, 0, loc)
+	w := WindowAt(now, loc)
+	assert.Equal(t, time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC), w.Today)
+	assert.Equal(t, time.Date(2026, 11, 24, 0, 0, 0, 0, loc), w.To, "to the end of tomorrow")
+
+	appID := "app_1"
+	in := Inputs{
+		Apps:       map[string]Application{appID: {CandidateID: "cand_1", CandidateName: "Siti", JobTitle: "Accountant", CompanyName: "Contoh"}},
+		Applicants: []Record{{ID: appID, ApplicationID: appID, At: now.Add(-time.Hour)}, {ID: "gone", ApplicationID: "gone", At: now}},
+		Tasks: []Task{
+			{ID: "t1", Title: "Call back", DueOn: time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC), ApplicationID: &appID, CreatedAt: now.AddDate(0, 0, -5)},
+			{ID: "t2", Title: "Send CVs", DueOn: w.Today, CreatedAt: now.AddDate(0, 0, -1)},
+		},
+		Interviews: []Interview{{ID: "i1", ApplicationID: appID, Title: "First", StartsAt: time.Date(2026, 11, 23, 14, 30, 0, 0, loc), CreatedAt: now.AddDate(0, 0, -3)}},
+	}
+	seen := now.Add(-30 * time.Minute)
+	items, unseen := Build(in, &seen, w)
+	require.Len(t, items, 4, "the applicant whose application is hidden is left out")
+	var ids []string
+	for _, it := range items {
+		ids = append(ids, it.ID)
+	}
+	assert.Equal(t, []string{"applicant:app_1", "interview:i1", "task:t2", "task:t1"}, ids,
+		"newest first: an interview counts from the day before, a task from its due day")
+	assert.Equal(t, "Overdue, due Fri 20 Nov · Siti, Accountant", find(items, "task:t1").Detail)
+	assert.Equal(t, "#/candidates/cand_1", find(items, "task:t1").Href)
+	assert.Equal(t, "Due today", find(items, "task:t2").Detail)
+	assert.Equal(t, "#/", find(items, "task:t2").Href, "a task without a candidate opens the dashboard")
+	assert.Equal(t, "Interview tomorrow, 2:30 PM: Siti", find(items, "interview:i1").Title)
+	assert.Equal(t, "First · Accountant, Contoh", find(items, "interview:i1").Detail)
+	assert.Zero(t, unseen, "all before seen")
+
+	_, unseen = Build(in, nil, w)
+	assert.Equal(t, 4, unseen, "never looked: all new")
+}
+
+func find(items []Item, id string) Item {
+	for _, it := range items {
+		if it.ID == id {
+			return it
+		}
+	}
+	return Item{}
+}
+
+func TestDigest(t *testing.T) {
+	now := time.Date(2026, 11, 22, 8, 0, 0, 0, time.UTC)
+	items := []Item{
+		{Kind: KindApplicant, Title: "Nur applied", Detail: "Clerk", Href: "#/candidates/c1", At: now.Add(-2 * time.Hour)},
+		{Kind: KindApplicant, Title: "Old applied", Detail: "Clerk", Href: "#/candidates/c2", At: now.Add(-48 * time.Hour)},
+		{Kind: KindTask, Title: "Call back", Detail: "Due today", Href: "#/"},
+		{Kind: KindTask, Title: "Send CVs", Detail: "Due today", Href: "#/"},
+	}
+	picked := DigestFor(items, now)
+	assert.Len(t, picked, 3, "applicants already in yesterday's email are left out")
+	subject, body, ok := DigestText(picked, "https://hp.example/")
+	require.True(t, ok)
+	assert.Equal(t, "Today: 2 tasks due, 1 new applicant", subject)
+	assert.Contains(t, body, "- Nur applied (Clerk)\n  https://hp.example/#/candidates/c1")
+	assert.Less(t, strings.Index(body, "Tasks due"), strings.Index(body, "New applicants"), "tasks before applicants")
+	_, _, ok = DigestText(nil, "https://hp.example")
+	assert.False(t, ok, "nothing to say: no email")
+}
+
+func TestNormalizeMuted(t *testing.T) {
+	got, errs := NormalizeMuted([]string{KindInterview, KindApplicant})
+	assert.NoError(t, errs.Err())
+	assert.Equal(t, []string{KindApplicant, KindInterview}, got)
+	_, errs = NormalizeMuted([]string{"birthdays"})
+	assert.Error(t, errs.Err())
+	assert.Equal(t, []string{}, NormalizeMutedSilently(nil), "never null")
+}

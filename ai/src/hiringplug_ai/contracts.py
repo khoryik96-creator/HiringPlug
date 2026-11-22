@@ -85,6 +85,7 @@ class Permission(StrEnum):
     notes_create = "notes:create"
     notes_manage = "notes:manage"
     notes_read = "notes:read"
+    notifications_read = "notifications:read"
     offers_salary_read = "offers.salary:read"
     offers_salary_update = "offers.salary:update"
     offers_approve = "offers:approve"
@@ -239,6 +240,7 @@ class JobKind(StrEnum):
     lead_source_check = "lead_source.check"
     match_score = "match.score"
     match_scored = "match.scored"
+    notifications_digest = "notifications.digest"
     placement_invoice = "placement.invoice"
     scheduling_refresh_calendar = "scheduling.refresh_calendar"
     talent_rank = "talent.rank"
@@ -5406,6 +5408,67 @@ class ActivityEntry(BaseModel):
 
 class ActivityList(BaseModel):
     items: list[ActivityEntry]
+
+
+class NotificationKind(StrEnum):
+    applicant = "applicant"
+    task = "task"
+    offer_approval = "offer_approval"
+    interview = "interview"
+
+
+class Notification(BaseModel):
+    id: Annotated[
+        str, Field(description="The kind and record it is about, e.g. task:tsk_..., stable while it shows.")
+    ]
+    kind: NotificationKind
+    title: str
+    detail: Annotated[str, Field(description="The job and company, the due day, or the time.")]
+    href: Annotated[str, Field(description="Where it opens in the app, e.g. #/candidates/cand_...")]
+    at: Annotated[
+        AwareDatetime,
+        Field(description="When it became a notification (it is new if after you last looked)."),
+    ]
+    new: bool
+
+
+class NotificationList(BaseModel):
+    items: Annotated[list[Notification], Field(max_length=100)]
+    unseen: Annotated[int, Field(description="How many items are new since you last looked.", ge=0)]
+    morningEmail: bool
+    mutedKinds: list[NotificationKind]
+
+
+class NotificationSettings(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    morningEmail: Annotated[
+        bool,
+        Field(
+            description="Email me this list at 8:00 each morning (only on mornings when there is something)."
+        ),
+    ]
+    mutedKinds: Annotated[
+        list[NotificationKind],
+        Field(
+            description="The kinds you turned off. They show neither in the bell nor in the morning email.",
+            max_length=4,
+        ),
+    ]
+
+
+class NotificationDigestJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    userId: UserId
+    chain: Annotated[
+        int,
+        Field(
+            description="Which turning-on this job belongs to; a job from an earlier one does nothing.", ge=0
+        ),
+    ]
 
 
 class OfferId(RootModel[str]):

@@ -729,6 +729,31 @@ func (q *Queries) JobOrderIDsOfCompany(ctx context.Context, companyID string) ([
 	return items, nil
 }
 
+const jobOrderIDsOwnedBy = `-- name: JobOrderIDsOwnedBy :many
+SELECT id FROM job_order WHERE owner_id = $1 ORDER BY id DESC LIMIT 1000
+`
+
+// The jobs a recruiter owns (notifications: new applicants on them).
+func (q *Queries) JobOrderIDsOwnedBy(ctx context.Context, ownerID *string) ([]string, error) {
+	rows, err := q.db.Query(ctx, jobOrderIDsOwnedBy, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const jobOrderTitles = `-- name: JobOrderTitles :many
 SELECT id, title, company_id, contact_id, work_type, owner_id, created_at FROM job_order WHERE id = ANY($1::text[])
 `

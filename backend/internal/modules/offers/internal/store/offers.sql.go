@@ -37,6 +37,41 @@ func (q *Queries) ApplicationsWithOffers(ctx context.Context, ids []string) ([]s
 	return items, nil
 }
 
+const awaitingApproval = `-- name: AwaitingApproval :many
+SELECT id, application_id, updated_at FROM offer
+WHERE status = 'pending_approval' AND requested_by IS DISTINCT FROM $1::text
+ORDER BY updated_at DESC, id DESC
+LIMIT 50
+`
+
+type AwaitingApprovalRow struct {
+	ID            string
+	ApplicationID string
+	UpdatedAt     time.Time
+}
+
+// Offers waiting for approval that someone other than this user asked for
+// (no one approves their own; notifications).
+func (q *Queries) AwaitingApproval(ctx context.Context, userID string) ([]AwaitingApprovalRow, error) {
+	rows, err := q.db.Query(ctx, awaitingApproval, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AwaitingApprovalRow
+	for rows.Next() {
+		var i AwaitingApprovalRow
+		if err := rows.Scan(&i.ID, &i.ApplicationID, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteOfferSalary = `-- name: DeleteOfferSalary :exec
 DELETE FROM offer_salary WHERE offer_id = $1
 `
