@@ -85,6 +85,11 @@ func (s *Service) existingHRWorkEmail(ctx context.Context, q *store.Queries, com
 }
 
 func (s *Service) lookupApollo(ctx context.Context, p authz.Principal, companyID string, in api.ApolloLookupRequest) (api.ApolloLookup, error) {
+	// The answer shows the Find HR scan and contacts' saved addresses, which
+	// a role given Apollo without contacts:read may not see.
+	if !p.Can(api.PermissionContactsRead) {
+		return api.ApolloLookup{}, apperr.New(api.ErrorCodeFORBIDDEN, "Apollo lookup shows Find HR results and contacts' emails, which you may not see.")
+	}
 	profile := apolloIdentity(in.ProfileUrl)
 	if profile == "" || !in.Action.Valid() {
 		return api.ApolloLookup{}, apperr.Validation(apperr.FieldErrors{{Field: "profileUrl", Message: "choose a LinkedIn profile from this scan"}})

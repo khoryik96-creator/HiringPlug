@@ -51,10 +51,22 @@ test("a conflicting or absent employer link cannot be overridden by its name", (
   );
 });
 
+test("a company saved by its LinkedIn number is matched by Apollo's number for it", () => {
+  const numbered = { ...person, company_url: "https://www.linkedin.com/company/123/" };
+  const named = { linkedin_url: "http://www.linkedin.com/company/example-bhd", name: person.company };
+  assert.equal(emailResult(record({ ...named, linkedin_uid: "123" }), numbered).email, contact.email);
+  assert.equal(emailResult(record({ ...named, linkedin_uid: 123 }), numbered).email, contact.email);
+  for (const linkedin_uid of [undefined, null, "", "456", "12 3", 456]) {
+    assert.equal(emailResult(record({ ...named, linkedin_uid }), numbered).state, "mismatch", String(linkedin_uid));
+  }
+  assert.equal(emailResult(record({ linkedin_url: null, linkedin_uid: "123" }), person).email, contact.email, "the number alone");
+});
+
 function fixture() {
   const sql = new DatabaseSync(":memory:");
   sql.exec("PRAGMA foreign_keys=ON");
   sql.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
+  let failing = null; // a statement that fails once, as D1 sometimes does
   const env = {
     PUBLIC_ORIGIN: "https://apollo.test.workers.dev",
     APOLLO_CLIENT_ID: "test-client",
@@ -62,6 +74,10 @@ function fixture() {
     TOKEN_KEY: "01".repeat(32),
     DB: {
       prepare(query) {
+        if (failing && query.includes(failing)) {
+          failing = null;
+          throw Error("storage");
+        }
         return {
           bind(...args) {
             const run = () => sql.prepare(query).run(...args);
@@ -100,7 +116,7 @@ function fixture() {
     paid++;
     return Response.json(record({ linkedin_url: person.company_url }), { status: matchStatus });
   }
-  function post(route, body, proof = secret) {
+  function post(route, body, proof = secret, now = 100) {
     return handle(
       new Request(env.PUBLIC_ORIGIN + route, {
         method: "POST",
@@ -109,7 +125,7 @@ function fixture() {
       }),
       env,
       fetcher,
-      100,
+      now,
     );
   }
   const op = (digit) => ({ operation_id: digit.repeat(64), confirmed: true, person });
@@ -122,6 +138,9 @@ function fixture() {
     paid: () => paid,
     setMatchStatus: (next) => {
       matchStatus = next;
+    },
+    failOnce: (statement) => {
+      failing = statement;
     },
   };
 }
@@ -167,4 +186,29 @@ test("revocation uses the proof even when an OAuth flow has expired", async (t) 
     not_dispatched: true,
   });
   assert.equal(f.paid(), 0);
+});
+
+test("a lookup that never released the connection stops blocking it when its lease ends", async (t) => {
+  const f = fixture();
+  t.after(() => f.sql.close());
+  await f.connect();
+  f.sql.prepare("UPDATE connections SET busy=100").run(); // claimed at 100, then cancelled
+  const held = await (await f.post("/reveal-v2", f.op("a"), undefined, 150)).json();
+  assert.deepEqual(held, { state: "limited", not_dispatched: true });
+  const found = await (await f.post("/reveal-v2", f.op("b"), undefined, 300)).json();
+  assert.equal(found.email, contact.email);
+  assert.equal(f.sql.prepare("SELECT busy FROM connections").get().busy, 0);
+  assert.equal(f.paid(), 1);
+});
+
+test("a storage failure before Apollo is called can be confirmed again", async (t) => {
+  const f = fixture();
+  t.after(() => f.sql.close());
+  await f.connect();
+  f.failOnce("SET busy=?");
+  const failed = await (await f.post("/reveal-v2", f.op("a"))).json();
+  assert.deepEqual(failed, { state: "limited", not_dispatched: true }, "not a reconnect");
+  assert.deepEqual(await (await f.post("/lookup-status-v2", f.op("a"))).json(), failed);
+  assert.equal(f.paid(), 0);
+  assert.equal((await (await f.post("/reveal-v2", f.op("b"))).json()).email, contact.email);
 });

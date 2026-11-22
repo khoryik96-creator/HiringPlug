@@ -221,6 +221,12 @@ async function callback(request, env, now, fetcher) {
     return page(false);
   }
 }
+const BUSY_LEASE = 120; // seconds: more than a token refresh plus People Match
+const finishOperation = async (env, connection, id, result) =>
+  statement(env, "UPDATE operations SET state='done',cipher=? WHERE connection_id=? AND id=?",
+    await seal(env, result, connection.id + ":" + id), connection.id, id).run();
+const release = async (env, id, claimedAt) =>
+  statement(env, "UPDATE connections SET busy=0 WHERE id=? AND busy=?", id, claimedAt).run();
 async function reveal(env, data, connection, now, fetcher) {
   if (!HEX.test(data.operation_id || "") || !validPerson(data.person) || data.confirmed !== true)
     return json({ error: "Confirm a valid person lookup." }, 400);
@@ -251,10 +257,14 @@ async function reveal(env, data, connection, now, fetcher) {
   let claimed = false,
     matchDispatched = false;
   try {
+    // busy holds the claim time: a run cancelled before its release (a client
+    // disconnect, a failed write) frees the connection when the lease ends.
     const active = await statement(
       env,
-      "UPDATE connections SET busy=1 WHERE id=? AND busy=0 AND reauth=0 AND expires>? RETURNING *",
+      "UPDATE connections SET busy=? WHERE id=? AND (busy=0 OR busy<?) AND reauth=0 AND expires>? RETURNING *",
+      now,
       connection.id,
+      now - BUSY_LEASE,
       now,
     ).first();
     if (!active) {
@@ -314,17 +324,17 @@ async function reveal(env, data, connection, now, fetcher) {
       if (reply.status === 401)
         await statement(env, "UPDATE connections SET reauth=1 WHERE id=?", connection.id).run();
     }
-    await statement(
-      env,
-      "UPDATE operations SET state='done',cipher=? WHERE connection_id=? AND id=?",
-      await seal(env, result, connection.id + ":" + data.operation_id),
-      connection.id,
-      data.operation_id,
-    ).run();
+    await finishOperation(env, connection, data.operation_id, result);
   } catch {
-    result = matchDispatched ? { state: "unconfirmed" } : { state: "auth_required", not_dispatched: true };
+    // Nothing reached Apollo before the match: a failed claim (storage) can be confirmed
+    // again; a failed sign-in or refresh needs a reconnect. A status check says the same.
+    if (matchDispatched) result = { state: "unconfirmed" };
+    else {
+      if (!result.not_dispatched) result = { state: claimed ? "auth_required" : "limited", not_dispatched: true };
+      await finishOperation(env, connection, data.operation_id, result).catch(() => {});
+    }
   } finally {
-    if (claimed) await statement(env, "UPDATE connections SET busy=0 WHERE id=?", connection.id).run();
+    if (claimed) await release(env, connection.id, now).catch(() => {});
   }
   return json(result);
 }

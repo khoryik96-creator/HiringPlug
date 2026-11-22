@@ -119,6 +119,7 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
     }),
   );
   const [polling, setPolling] = useState(true);
+  const [confirmed, setConfirmed] = useState(0); // each confirmation is watched for its own 75 seconds
   const lookup = useQuery({
     queryKey: key, queryFn: ({ signal }) => send("preview", undefined, signal), gcTime: 0,
     refetchInterval: (query) => polling && (query.state.data?.state === "queued" || query.state.data?.state === "sending") ? 2500 : false,
@@ -126,11 +127,20 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
   useEffect(() => {
     const stop = window.setTimeout(() => { setPolling(false); }, 75_000);
     return () => { window.clearTimeout(stop); };
-  }, []);
+  }, [confirmed]);
   const change = useMutation({
     mutationFn: ({ action, confirmation }: { action: LookupAction; confirmation?: string }) => send(action, confirmation),
     onMutate: async () => { await cache.cancelQueries({ queryKey: key }); },
-    onSuccess: (next) => { cache.setQueryData(key, next); },
+    onSuccess: (next, { action }) => {
+      cache.setQueryData(key, next);
+      if (action === "unlock") {
+        setPolling(true);
+        setConfirmed((n) => n + 1);
+      } else if ((next.state === "cancelled" || next.state === "ready") && !next.confirmation && next.reason !== "reconnect_required") {
+        // A status check found the lookup never reached Apollo: preview again so it can be confirmed.
+        void cache.invalidateQueries({ queryKey: key });
+      }
+    },
   });
   const result = lookup.data;
   return <ApolloDialog title="Work email" onClose={onClose}>

@@ -18,7 +18,9 @@ Schedule the Worker's cleanup handler for expired flows, accounts, and
 lookup records. HiringPlug's server settings are in the
 [setup guide](../../docs/apollo-hr.md).
 
-Run the broker tests with Node 22 or newer.
+Run the broker tests with Node 22.13 or newer (they use the built-in
+`node:sqlite`, which older Node 22 releases keep behind
+`--experimental-sqlite`).
 
 ```sh
 node --test tools/apollo-broker/worker.test.mjs

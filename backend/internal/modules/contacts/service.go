@@ -29,6 +29,7 @@ const (
 type Service struct {
 	pool        *pgxpool.Pool
 	apollo      apolloClient
+	apolloUsers ApolloUsers
 	companies   Companies
 	roles       Roles
 	mail        MailServers

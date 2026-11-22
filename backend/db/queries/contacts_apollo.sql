@@ -65,9 +65,6 @@ SELECT * FROM hr_apollo_connection WHERE user_id = $1 FOR SHARE;
 -- name: GetApolloLookup :one
 SELECT * FROM hr_apollo_lookup WHERE id = $1;
 
--- name: ApolloUserActive :one
-SELECT EXISTS (SELECT 1 FROM app_user WHERE id = $1 AND active)::boolean;
-
 -- name: ApolloLookupInProgress :one
 SELECT EXISTS(
   SELECT 1 FROM hr_apollo_lookup

@@ -3,6 +3,7 @@ package contacts
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -42,8 +43,8 @@ func (s *Service) runApolloLookup(ctx context.Context, job jobqueue.Job) error {
 			return err
 		}
 		work.lookup = row
-		active, err := q.ApolloUserActive(ctx, row.UserID)
-		if err != nil || !active || time.Since(row.CreatedAt) > 15*time.Minute {
+		allowed, err := s.apolloUserAllowed(ctx, tx, row.UserID)
+		if err != nil || !allowed || time.Since(row.CreatedAt) > 15*time.Minute {
 			return err
 		}
 		work.connection, err = q.LockApolloConnectionForLookup(ctx, row.UserID)
@@ -91,6 +92,21 @@ func (s *Service) runApolloLookup(ctx context.Context, job jobqueue.Job) error {
 	defer cancel()
 	_, _, err = s.saveApolloResult(saveCtx, p, work, result)
 	return err
+}
+
+// apolloUserAllowed reports whether the recruiter who confirmed a lookup is
+// still active and may still use Apollo: a role changed after the
+// confirmation stops the paid call.
+func (s *Service) apolloUserAllowed(ctx context.Context, tx pgx.Tx, user string) (bool, error) {
+	if s.apolloUsers == nil {
+		return false, nil
+	}
+	active, err := s.apolloUsers.ActiveUsers(ctx, tx, []string{user})
+	if err != nil {
+		return false, err
+	}
+	perms, ok := active[user]
+	return ok && slices.Contains(perms, api.PermissionContactsApolloUse), nil
 }
 
 func normalizeApolloReply(reply apolloReply, status int) api.ApolloLookup {

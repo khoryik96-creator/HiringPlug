@@ -43,14 +43,23 @@ function sameCompanyName(a, b) {
     second = nameWords(b);
   return !!first && first === second;
 }
+// Apollo's LinkedIn number for the employer (linkedin_uid), when it gives one.
+const linkedinNumber = (org) => {
+  const uid = typeof org?.linkedin_uid === "number" ? String(org.linkedin_uid) : org?.linkedin_uid;
+  return typeof uid === "string" && /^[0-9]{1,24}$/.test(uid.trim()) ? uid.trim() : "";
+};
 function companyMatches(org, expected) {
   const company = linkedinHandle(org?.linkedin_url, "company");
-  if (company) {
-    return /^[0-9]+$/.test(company)
+  if (
+    company &&
+    (/^[0-9]+$/.test(company)
       ? company === expected.company_id
-      : company === linkedinHandle(expected.company_url, "company");
-  }
-  return false;
+      : company === linkedinHandle(expected.company_url, "company"))
+  )
+    return true;
+  // A company saved by its number (/company/123456/) has no page name to
+  // compare with Apollo's: LinkedIn's own number for it is the same evidence.
+  return linkedinNumber(org) !== "" && linkedinNumber(org) === expected.company_id;
 }
 const object = (value) => value && typeof value === "object" && !Array.isArray(value);
 // Exact mailbox domains only: sharing a provider's brand prefix is not evidence.

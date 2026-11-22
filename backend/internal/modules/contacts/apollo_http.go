@@ -36,7 +36,7 @@ func (h *HTTP) UpdateApolloConnection(ctx context.Context, req api.UpdateApolloC
 	if err != nil {
 		return nil, err
 	}
-	return api.UpdateApolloConnection200JSONResponse(out), nil
+	return noStoreApolloUpdate{api.UpdateApolloConnection200JSONResponse(out)}, nil
 }
 
 func (h *HTTP) LookupApolloWorkEmail(ctx context.Context, req api.LookupApolloWorkEmailRequestObject) (api.LookupApolloWorkEmailResponseObject, error) {
@@ -55,4 +55,14 @@ type noStoreApolloConnection struct {
 func (r noStoreApolloConnection) VisitGetApolloConnectionResponse(w http.ResponseWriter) error {
 	w.Header().Set("Cache-Control", "no-store")
 	return r.GetApolloConnection200JSONResponse.VisitGetApolloConnectionResponse(w)
+}
+
+// Starting a sign-in answers with the same authorization URL.
+type noStoreApolloUpdate struct {
+	api.UpdateApolloConnection200JSONResponse
+}
+
+func (r noStoreApolloUpdate) VisitUpdateApolloConnectionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", "no-store")
+	return r.UpdateApolloConnection200JSONResponse.VisitUpdateApolloConnectionResponse(w)
 }

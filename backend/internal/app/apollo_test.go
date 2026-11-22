@@ -17,6 +17,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/app"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
@@ -153,6 +154,7 @@ func TestFindHRApolloChecksExistingAndRecoversWithoutRepeatingThePaidCall(t *tes
 	start := a.request(http.MethodPost, connection, recruiter, map[string]string{"action": "start"})
 	require.Equal(t, http.StatusOK, start.Status, "%s", start.Body)
 	require.NotContains(t, string(start.Body), proofHash)
+	assert.Equal(t, "no-store", start.Header.Get("Cache-Control"), "the sign-in link is not cached")
 	assert.Equal(t, http.StatusOK, a.request(http.MethodPost, connection, recruiter, map[string]string{"action": "start"}).Status)
 	assert.EqualValues(t, 1, started.Load(), "the second tab reuses the pending login")
 	poll := a.request(http.MethodPost, connection, recruiter, map[string]string{"action": "poll"})
@@ -240,4 +242,83 @@ func TestFindHRApolloChecksExistingAndRecoversWithoutRepeatingThePaidCall(t *tes
 	assert.Equal(t, "disconnected", a.request(http.MethodPost, connection, recruiter, disconnect).Map()["state"])
 	assert.EqualValues(t, 2, disconnected.Load())
 	assert.Equal(t, api.ApolloLookupStatePreviousConnection, state(recruiter, "preview", "farah", nil).State)
+}
+
+func TestApolloLookupFollowsTheRecruitersCurrentAccess(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, map[string]string{"HP_APOLLO_BROKER_URL": apolloTestOrigin, "HP_APOLLO_KEYS_SECRET": strings.Repeat("0123456789abcdef", 4)})
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	var revealed atomic.Int32
+	a.modules.Contacts.ConfigureApollo(a.deps.Config.Apollo, mockApolloTransport(func(req *http.Request) (*http.Response, error) {
+		defer func() { _ = req.Body.Close() }()
+		reply := map[string]any{}
+		switch req.URL.Path {
+		case "/start":
+			query := url.Values{"client_id": {"test-only"}, "redirect_uri": {apolloTestOrigin + "/callback"},
+				"response_type": {"code"}, "scope": {"read_user_profile people_match app_scopes"}, "state": {apolloTestFlow}}
+			reply = map[string]any{"protocol": 2, "flow_id": apolloTestFlow, "authorization_url": "https://app.apollo.io/#/oauth/authorize?" + query.Encode()}
+		case "/poll":
+			reply = map[string]any{"state": "connected", "name": "Test Recruiter", "connection_id": apolloTestFlow}
+		case "/reveal-v2":
+			revealed.Add(1)
+			reply = map[string]any{"state": "found", "email": "farah@maju.example", "identity_checked": true}
+		default:
+			t.Errorf("unexpected Apollo action %s", req.URL.Path)
+		}
+		body, err := json.Marshal(reply)
+		assert.NoError(t, err)
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body))}, nil
+	}))
+
+	bank := a.createCompany(recruiter, map[string]any{"name": "Maju Bank", "linkedinUrl": "https://www.linkedin.com/company/maju-bank/"})
+	scan := "/v1/companies/" + bank.Id + "/hr-scan"
+	a.hrScan(http.MethodPut, scan, recruiter, map[string]any{"linkedinCompanyId": "123456", "linkedinCompanyName": "Maju Bank",
+		"linkedinCompanyUrl": "https://www.linkedin.com/company/maju-bank/", "keywords": []string{"HR manager"}, "pages": 1}, http.StatusOK)
+	a.hrScan(http.MethodPost, scan+"/pages", recruiter, map[string]any{"query": 0, "page": 1, "people": []any{
+		person("farah", "Farah Aziz", "Talent Acquisition Lead"),
+	}}, http.StatusOK)
+	for _, action := range []string{"start", "poll"} {
+		require.Equal(t, http.StatusOK, a.request(http.MethodPost, "/v1/contacts/apollo", recruiter, map[string]string{"action": action}).Status)
+	}
+	lookup := func(action string, confirmation *string) (int, api.ApolloLookup) {
+		t.Helper()
+		res := a.request(http.MethodPost, scan+"/apollo", recruiter, api.ApolloLookupRequest{Action: api.ApolloLookupRequestAction(action),
+			ProfileUrl: "https://www.linkedin.com/in/farah", Confirmation: confirmation})
+		var out api.ApolloLookup
+		if res.Status == http.StatusOK {
+			res.JSON(&out)
+		}
+		return res.Status, out
+	}
+	_, preview := lookup("preview", nil)
+	require.Equal(t, api.ApolloLookupStateReady, preview.State)
+	_, queued := lookup("unlock", preview.Confirmation)
+	require.Equal(t, api.ApolloLookupStateQueued, queued.State)
+
+	// The owner takes Apollo away before the worker reaches the confirmed lookup.
+	defaults := authz.PermissionsForRole(api.RoleRecruiter)
+	a.setRole(owner, "recruiter", map[string]any{"version": 0, "permissions": without(defaults, api.PermissionContactsApolloUse),
+		"candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+	worker, err := app.NewWorker(a.deps, a.modules)
+	require.NoError(t, err)
+	worker.Tenant = tenant.ID
+	for range 16 {
+		worked, runErr := worker.RunOnce(t.Context())
+		require.NoError(t, runErr)
+		if !worked {
+			break
+		}
+	}
+	assert.Zero(t, revealed.Load(), "a recruiter who lost Apollo access spends no credit")
+	var state string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT state FROM hr_apollo_lookup WHERE tenant_id=$1 AND profile_url='https://www.linkedin.com/in/farah'", tenant.ID).Scan(&state))
+	assert.Equal(t, "cancelled", state)
+
+	// Apollo without contacts:read does not show the scan or saved addresses.
+	a.setRole(owner, "recruiter", map[string]any{"version": 1, "permissions": without(defaults, api.PermissionContactsRead),
+		"candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+	status, _ := lookup("preview", nil)
+	assert.Equal(t, http.StatusForbidden, status)
 }

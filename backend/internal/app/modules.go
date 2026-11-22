@@ -109,6 +109,7 @@ func NewModules(d Deps) *Modules {
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks, d.Files, d.Config.MaxUploadBytes, m.Identity)
 	m.Contacts = contacts.New(d.Pool, m.Companies, m.Settings, d.MailServers, d.Mailboxes, d.Files, d.Config.MaxUploadBytes)
 	m.Contacts.ConfigureApollo(d.Config.Apollo, nil)
+	m.Contacts.CheckApolloUsersWith(m.Identity) // a paid lookup re-checks the recruiter's access
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
 	m.Jobs.UseTimeZone(d.Config.TimeZone) // intake dates and ad closing days are the agency's
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)

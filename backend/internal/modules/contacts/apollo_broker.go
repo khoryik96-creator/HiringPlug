@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
@@ -56,6 +58,13 @@ type apolloPerson struct {
 
 var apolloHexID = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
+// ApolloUsers tells the worker, just before a paid lookup, whether the
+// recruiter who confirmed it is still active and what their role may do now
+// (identity's ActiveUsers), in the worker's transaction.
+type ApolloUsers interface {
+	ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]api.Permission, error)
+}
+
 // ConfigureApollo enables Apollo for Find HR. The broker origin is deployment
 // configuration. Recruiters supply neither an API key nor a server address.
 func (m *Module) ConfigureApollo(settings config.Apollo, transport http.RoundTripper) {
@@ -65,6 +74,10 @@ func (m *Module) ConfigureApollo(settings config.Apollo, transport http.RoundTri
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}}
 }
+
+// CheckApolloUsersWith gives the worker the users' current access. Without
+// it, no queued lookup is sent.
+func (m *Module) CheckApolloUsersWith(users ApolloUsers) { m.service.apolloUsers = users }
 
 func (c apolloClient) enabled() bool { return c.BrokerOrigin != "" && len(c.KeysSecret) >= 32 }
 

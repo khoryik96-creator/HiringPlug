@@ -26,17 +26,6 @@ func (q *Queries) ApolloLookupInProgress(ctx context.Context, flowID string) (bo
 	return column_1, err
 }
 
-const apolloUserActive = `-- name: ApolloUserActive :one
-SELECT EXISTS (SELECT 1 FROM app_user WHERE id = $1 AND active)::boolean
-`
-
-func (q *Queries) ApolloUserActive(ctx context.Context, id string) (bool, error) {
-	row := q.db.QueryRow(ctx, apolloUserActive, id)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const claimApolloLookup = `-- name: ClaimApolloLookup :one
 UPDATE hr_apollo_lookup SET state = 'sending', updated_at = now()
 WHERE id = $1 AND state = 'queued' AND created_at > now() - interval '15 minutes'

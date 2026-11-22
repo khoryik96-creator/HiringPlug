@@ -23,7 +23,10 @@ approved Apollo partner OAuth client, and exact HTTPS
 `/callback` redirect registered in Apollo. The broker needs
 `read_user_profile`, `people_match`, and `app_scopes`. The broker must verify
 both the LinkedIn profile and its employer before revealing an address.
-The employer name alone cannot establish a match. HiringPlug uses the Worker's
+The employer name alone cannot establish a match: the employer's LinkedIn page
+name must match the scanned company page, or LinkedIn's company number must
+(Apollo's `linkedin_uid`, which also covers companies saved by their number,
+`/company/123456/`). HiringPlug uses the Worker's
 versioned lookup routes and requires identity verification on a found result.
 
 Set both variables on the API and the Go worker. Docker Compose passes these
@@ -59,7 +62,10 @@ search so HiringPlug can bind the company page used in that scan.
   personal address, a redacted address or a mismatched profile/employer.
   Broker errors and missing addresses are insufficient to establish credit use.
 
-The `contacts.apollo:use` permission controls access. Connection proofs and
+The `contacts.apollo:use` permission controls access; a lookup also needs
+`contacts:read`, because it shows the Find HR scan and saved addresses. The
+worker checks the recruiter's access again just before the paid call, so a
+role changed after the confirmation sends nothing. Connection proofs and
 returned addresses are encrypted in PostgreSQL and scoped to the recruiter
 and tenant. An explicit confirmation creates a lookup record and Go worker
 job together. The worker commits a claim before dispatch; duplicate clicks
