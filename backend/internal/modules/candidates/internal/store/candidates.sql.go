@@ -1282,6 +1282,70 @@ func (q *Queries) RestoreCandidate(ctx context.Context, id string) (int64, error
 	return result.RowsAffected(), nil
 }
 
+const screeningCallNoteIDs = `-- name: ScreeningCallNoteIDs :many
+SELECT note_id::text FROM screening_call WHERE note_id = ANY($1::text[])
+`
+
+// Which of some notes were written with a screening call (reports: such a
+// note is the call, not another one).
+func (q *Queries) ScreeningCallNoteIDs(ctx context.Context, noteIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, screeningCallNoteIDs, noteIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var note_id string
+		if err := rows.Scan(&note_id); err != nil {
+			return nil, err
+		}
+		items = append(items, note_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const screeningCallsBetween = `-- name: ScreeningCallsBetween :many
+SELECT called_by, called_on, note_id FROM screening_call
+WHERE called_on >= $1 AND called_on <= $2
+LIMIT 50000
+`
+
+type ScreeningCallsBetweenParams struct {
+	FromDay pgtype.Date
+	ToDay   pgtype.Date
+}
+
+type ScreeningCallsBetweenRow struct {
+	CalledBy string
+	CalledOn pgtype.Date
+	NoteID   *string
+}
+
+// Screening calls made between two days (reports: each user's activity).
+func (q *Queries) ScreeningCallsBetween(ctx context.Context, arg ScreeningCallsBetweenParams) ([]ScreeningCallsBetweenRow, error) {
+	rows, err := q.db.Query(ctx, screeningCallsBetween, arg.FromDay, arg.ToDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScreeningCallsBetweenRow
+	for rows.Next() {
+		var i ScreeningCallsBetweenRow
+		if err := rows.Scan(&i.CalledBy, &i.CalledOn, &i.NoteID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const screeningSalarySnapshots = `-- name: ScreeningSalarySnapshots :many
 SELECT call_id, tenant_id, snapshot FROM screening_call_salary WHERE call_id=ANY($1::text[])
 `

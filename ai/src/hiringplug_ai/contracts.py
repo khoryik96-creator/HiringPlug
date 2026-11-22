@@ -106,6 +106,9 @@ class Permission(StrEnum):
     privacy_manage = "privacy:manage"
     privacy_read = "privacy:read"
     privacy_record = "privacy:record"
+    reports_forecast_read = "reports.forecast:read"
+    reports_settings_manage = "reports.settings:manage"
+    reports_team_read = "reports.team:read"
     reports_read = "reports:read"
     scheduling_team_read = "scheduling.team:read"
     scheduling_use = "scheduling:use"
@@ -6241,6 +6244,191 @@ class JobFill(BaseModel):
         int, Field(description="From the job being opened to its first placement in the period.")
     ]
     placements: int
+
+
+class ActivityPeriod(StrEnum):
+    week = "week"
+    month = "month"
+
+
+class ActivityCounts(BaseModel):
+    calls: Annotated[
+        int, Field(description="Calls logged: screening calls, reference checks and notes of a call.")
+    ]
+    cvsSent: Annotated[
+        int,
+        Field(
+            description="CVs sent to clients: applications moved to submitted, and CVs attached to an email to anyone but the candidate (the same candidate on the same day counts once)."
+        ),
+    ]
+    interviews: Annotated[int, Field(description="Interviews arranged (scheduled by the user).")]
+    placements: Annotated[
+        int, Field(description="Placements recorded and credited to the user (not cancelled).")
+    ]
+
+
+class ActivityGoal(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    calls: Annotated[int | None, Field(ge=0, le=100000)]
+    cvsSent: Annotated[int | None, Field(ge=0, le=100000)]
+    interviews: Annotated[int | None, Field(ge=0, le=100000)]
+    placements: Annotated[int | None, Field(ge=0, le=100000)]
+
+
+class ActivityRow(BaseModel):
+    userId: UserId
+    userName: str
+    done: ActivityCounts
+    target: Annotated[
+        ActivityGoal | None,
+        Field(
+            description="The user's own target for the period, else the one for everyone; null when neither is set."
+        ),
+    ]
+
+
+class ActivityReport(BaseModel):
+    period: ActivityPeriod
+    from_: Annotated[date, Field(alias="from")]
+    to: Annotated[date, Field(description="The last day of the week or month.")]
+    team: Annotated[
+        bool, Field(description="Every active user is listed (reports.team:read); else only you.")
+    ]
+    rows: Annotated[list[ActivityRow], Field(description="By name.")]
+
+
+class ActivityTarget(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    userId: Annotated[
+        UserId | None, Field(description="The user it is for; null for everyone without their own.")
+    ]
+    period: ActivityPeriod
+    goal: ActivityGoal
+
+
+class ForecastStage(StrEnum):
+    submitted = "submitted"
+    interview = "interview"
+    offer = "offer"
+    placed = "placed"
+
+
+class StageWeight(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    stage: ForecastStage
+    percent: Annotated[
+        int,
+        Field(
+            description="How likely an application at this stage is to be placed (and the fee paid).",
+            ge=0,
+            le=100,
+        ),
+    ]
+    monthsAhead: Annotated[
+        int,
+        Field(
+            description="The month its fee is expected in: this month (0), next month (1), ... Placements go by their start date.",
+            ge=0,
+            le=12,
+        ),
+    ]
+
+
+class ReportSettings(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    targets: Annotated[
+        list[ActivityTarget],
+        Field(description="At most one per user (or everyone) and period.", max_length=500),
+    ]
+    stageWeights: Annotated[
+        list[StageWeight],
+        Field(description="One for each forecast stage (stages left out keep their weight).", max_length=4),
+    ]
+
+
+class ForecastTotal(BaseModel):
+    currency: CurrencyCode
+    expected: DecimalAmount
+    full: Annotated[DecimalAmount, Field(description="The fees before weighting.")]
+
+
+class ForecastMonth(BaseModel):
+    month: Annotated[str, Field(examples=["2026-11"], pattern="^[0-9]{4}-[0-9]{2}$")]
+    totals: list[ForecastTotal]
+
+
+class ForecastRecruiter(BaseModel):
+    recruiterId: Annotated[UserId | None, Field(...)]
+    recruiterName: Annotated[
+        str | None, Field(description="null when no recruiter is credited and the job has no owner.")
+    ]
+    totals: list[ForecastTotal]
+
+
+class FeeFrom(StrEnum):
+    placement = "placement"
+    terms = "terms"
+
+
+class ForecastLine(BaseModel):
+    applicationId: ApplicationId
+    candidateName: str
+    jobTitle: str
+    companyName: str
+    stage: ForecastStage
+    recruiterId: Annotated[UserId | None, Field(...)]
+    recruiterName: Annotated[str | None, Field(...)]
+    month: Annotated[str, Field(pattern="^[0-9]{4}-[0-9]{2}$")]
+    currency: CurrencyCode
+    fee: DecimalAmount
+    percent: int
+    expected: DecimalAmount
+    feeFrom: Annotated[
+        FeeFrom,
+        Field(
+            description="placement: the fee recorded on the placement; terms: the client's rate applied to the job's salary budget."
+        ),
+    ]
+
+
+class Reason3(StrEnum):
+    no_salary_budget = "no_salary_budget"
+    no_terms = "no_terms"
+    no_rate = "no_rate"
+
+
+class ForecastGap(BaseModel):
+    applicationId: ApplicationId
+    candidateName: str
+    jobTitle: str
+    stage: ForecastStage
+    reason: Annotated[
+        Reason3,
+        Field(
+            description="no_salary_budget: the job has none (or one per hour or day); no_terms: the client has no terms of business; no_rate: none of the client's rates fits the salary."
+        ),
+    ]
+
+
+class Forecast(BaseModel):
+    months: Annotated[list[ForecastMonth], Field(description="From this month on, in order.")]
+    recruiters: Annotated[list[ForecastRecruiter], Field(description="Most expected first.")]
+    lines: Annotated[
+        list[ForecastLine], Field(description="Each application counted, most expected first (at most 2000).")
+    ]
+    gaps: Annotated[
+        list[ForecastGap],
+        Field(description="Applications whose fee could not be worked out, so not counted (at most 500)."),
+    ]
+    stageWeights: list[StageWeight]
 
 
 class BookingLinkId(RootModel[str]):

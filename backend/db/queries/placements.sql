@@ -257,3 +257,20 @@ WHERE (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status))
   AND (sqlc.narg(start_to)::date IS NULL OR start_date <= sqlc.narg(start_to))
 ORDER BY start_date DESC, id DESC
 LIMIT 10001;
+
+-- Placements recorded in a period that still stand or fell through later
+-- (not cancelled or backed out), and who they are credited to: the
+-- recruiter, else who recorded them (reports: each user's activity).
+-- name: RecordedBetween :many
+SELECT coalesce(recruiter_id, created_by)::text AS credited_to, created_at FROM placement
+WHERE status IN ('active', 'fell_through') AND created_at >= @from_time AND created_at < @to_time
+LIMIT 50000;
+
+-- Placements that stand and are not yet invoiced, with their fee (none
+-- without placements.fees:read): the revenue forecast.
+-- name: PlacementsToInvoice :many
+SELECT p.id, p.application_id, p.recruiter_id, p.start_date, m.fee_amount, m.fee_currency
+FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.status = 'active' AND p.invoice_status = 'not_invoiced'
+ORDER BY p.start_date, p.id
+LIMIT 5000;

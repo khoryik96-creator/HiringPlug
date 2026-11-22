@@ -994,6 +994,52 @@ func (q *Queries) PlacementOfApplication(ctx context.Context, applicationID stri
 	return i, err
 }
 
+const placementsToInvoice = `-- name: PlacementsToInvoice :many
+SELECT p.id, p.application_id, p.recruiter_id, p.start_date, m.fee_amount, m.fee_currency
+FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.status = 'active' AND p.invoice_status = 'not_invoiced'
+ORDER BY p.start_date, p.id
+LIMIT 5000
+`
+
+type PlacementsToInvoiceRow struct {
+	ID            string
+	ApplicationID string
+	RecruiterID   *string
+	StartDate     time.Time
+	FeeAmount     pgtype.Numeric
+	FeeCurrency   *string
+}
+
+// Placements that stand and are not yet invoiced, with their fee (none
+// without placements.fees:read): the revenue forecast.
+func (q *Queries) PlacementsToInvoice(ctx context.Context) ([]PlacementsToInvoiceRow, error) {
+	rows, err := q.db.Query(ctx, placementsToInvoice)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlacementsToInvoiceRow
+	for rows.Next() {
+		var i PlacementsToInvoiceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.RecruiterID,
+			&i.StartDate,
+			&i.FeeAmount,
+			&i.FeeCurrency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const putInvoiceCopy = `-- name: PutInvoiceCopy :exec
 INSERT INTO placement_invoice_copy (tenant_id, placement_id, docx, pdf) VALUES (app_current_tenant(), $1, $2, $3)
 ON CONFLICT (tenant_id, placement_id) DO UPDATE SET docx = EXCLUDED.docx, pdf = EXCLUDED.pdf
@@ -1096,6 +1142,45 @@ func (q *Queries) QueueInvoiceDelivery(ctx context.Context, arg QueueInvoiceDeli
 		arg.PlacementID,
 	)
 	return err
+}
+
+const recordedBetween = `-- name: RecordedBetween :many
+SELECT coalesce(recruiter_id, created_by)::text AS credited_to, created_at FROM placement
+WHERE status IN ('active', 'fell_through') AND created_at >= $1 AND created_at < $2
+LIMIT 50000
+`
+
+type RecordedBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type RecordedBetweenRow struct {
+	CreditedTo string
+	CreatedAt  time.Time
+}
+
+// Placements recorded in a period that still stand or fell through later
+// (not cancelled or backed out), and who they are credited to: the
+// recruiter, else who recorded them (reports: each user's activity).
+func (q *Queries) RecordedBetween(ctx context.Context, arg RecordedBetweenParams) ([]RecordedBetweenRow, error) {
+	rows, err := q.db.Query(ctx, recordedBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecordedBetweenRow
+	for rows.Next() {
+		var i RecordedBetweenRow
+		if err := rows.Scan(&i.CreditedTo, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const retainerJobs = `-- name: RetainerJobs :many

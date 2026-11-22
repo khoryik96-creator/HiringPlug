@@ -76,12 +76,21 @@ func sourceText(s string) string {
 
 // ExportReport handles GET /v1/reports/summary/export.
 func (h *HTTP) ExportReport(ctx context.Context, req api.ExportReportRequestObject) (api.ExportReportResponseObject, error) {
-	r, err := h.svc.Report(ctx, authz.MustFromContext(ctx), day(req.Params.From), day(req.Params.To))
+	p := authz.MustFromContext(ctx)
+	r, err := h.svc.Report(ctx, p, day(req.Params.From), day(req.Params.To))
 	if err != nil {
 		return nil, err
 	}
+	activity, forecast, err := h.svc.Extras(ctx, p, r.From, r.To)
+	if err != nil {
+		return nil, err
+	}
+	tables := append(Tables(r), ActivityTable(activity))
+	if forecast != nil {
+		tables = append(tables, ForecastTables(*forecast)...)
+	}
 	name := "Reports " + r.From.Format("2 Jan 2006") + " to " + r.To.Format("2 Jan 2006")
-	file, err := sheet.Write(string(req.Params.Format), name, Tables(r)...)
+	file, err := sheet.Write(string(req.Params.Format), name, tables...)
 	if err != nil {
 		return nil, err
 	}

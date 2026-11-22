@@ -217,3 +217,14 @@ DELETE FROM whatsapp_template WHERE id = @id;
 -- threads linked to them, go to the contact kept (app_move_contact_emails, 00164).
 -- name: MoveContactEmails :exec
 SELECT app_move_contact_emails(@from_id::text, @to_id::text);
+
+-- Whose CVs the email carries to someone other than that candidate.
+-- name: SetEmailCVCandidates :exec
+UPDATE email SET cv_candidate_ids = @candidate_ids::text[] WHERE id = @id;
+
+-- CVs emailed in a period, by whom (reports: each user's activity); failed
+-- emails are left out.
+-- name: CVsEmailedBetween :many
+SELECT sent_by, created_at, cv_candidate_ids FROM email
+WHERE cardinality(cv_candidate_ids) > 0 AND status <> 'failed' AND created_at >= @from_time AND created_at < @to_time
+LIMIT 20000;

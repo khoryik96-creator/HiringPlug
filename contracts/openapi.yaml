@@ -8125,11 +8125,80 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/reports/activity:
+    get:
+      operationId: getActivity
+      tags: [reports]
+      summary: Activity per user in a week or month, against their targets (your own only, unless you may see the team's)
+      x-permission: reports:read
+      parameters:
+        - {name: period, in: query, required: false, description: week (Monday to Sunday) or month; week unless given., schema: {$ref: '#/components/schemas/ActivityPeriod'}}
+        - {name: day, in: query, required: false, description: Any day in the week or month (today unless given)., schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ActivityReport'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/reports/settings:
+    get:
+      operationId: getReportSettings
+      tags: [reports]
+      summary: The activity targets and the forecast's stage weights
+      x-permission: reports.settings:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSettings'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: putReportSettings
+      tags: [reports]
+      summary: Replace the activity targets and the forecast's stage weights
+      x-permission: reports.settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReportSettings'}
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSettings'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/reports/forecast:
+    get:
+      operationId: getForecast
+      tags: [reports]
+      summary: Fees expected from the open pipeline and placements not yet invoiced, weighted by stage, per month and per recruiter
+      description: Needs placements.fees:read as well as reports.forecast:read.
+      x-permission: reports.forecast:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Forecast'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/reports/summary/export:
     get:
       operationId: exportReport
       tags: [reports]
       summary: The reports for a period as Excel (a sheet each) or CSV
+      description: >
+        With the activity in the period per user (your own only, unless you may see the team's) and, with reports.forecast:read and placements.fees:read, today's revenue forecast.
+
       x-permission: reports:read
       parameters:
         - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
@@ -8881,6 +8950,9 @@ components:
         - privacy:manage
         - privacy:read
         - privacy:record
+        - reports.forecast:read
+        - reports.settings:manage
+        - reports.team:read
         - reports:read
         - scheduling.team:read
         - scheduling:use
@@ -16713,6 +16785,164 @@ components:
         jobTitle: {type: string}
         daysToFill: {type: integer, description: From the job being opened to its first placement in the period.}
         placements: {type: integer}
+    ActivityPeriod:
+      type: string
+      enum: [week, month]
+    ActivityCounts:
+      type: object
+      required: [calls, cvsSent, interviews, placements]
+      properties:
+        calls: {type: integer, description: "Calls logged: screening calls, reference checks and notes of a call."}
+        cvsSent: {type: integer, description: "CVs sent to clients: applications moved to submitted, and CVs attached to an email to anyone but the candidate (the same candidate on the same day counts once)."}
+        interviews: {type: integer, description: Interviews arranged (scheduled by the user).}
+        placements: {type: integer, description: Placements recorded and credited to the user (not cancelled).}
+    ActivityGoal:
+      type: object
+      additionalProperties: false
+      description: A target for each activity; null when none is set for it.
+      required: [calls, cvsSent, interviews, placements]
+      properties:
+        calls: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+        cvsSent: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+        interviews: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+        placements: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+    ActivityRow:
+      type: object
+      required: [userId, userName, done, target]
+      properties:
+        userId: {$ref: '#/components/schemas/UserId'}
+        userName: {type: string}
+        done: {$ref: '#/components/schemas/ActivityCounts'}
+        target:
+          description: The user's own target for the period, else the one for everyone; null when neither is set.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/ActivityGoal'}]
+    ActivityReport:
+      type: object
+      required: [period, from, to, team, rows]
+      properties:
+        period: {$ref: '#/components/schemas/ActivityPeriod'}
+        from: {type: string, format: date}
+        to: {type: string, format: date, description: The last day of the week or month.}
+        team: {type: boolean, description: 'Every active user is listed (reports.team:read); else only you.'}
+        rows:
+          type: array
+          description: By name.
+          items: {$ref: '#/components/schemas/ActivityRow'}
+    ActivityTarget:
+      type: object
+      additionalProperties: false
+      required: [userId, period, goal]
+      properties:
+        userId:
+          description: The user it is for; null for everyone without their own.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        period: {$ref: '#/components/schemas/ActivityPeriod'}
+        goal: {$ref: '#/components/schemas/ActivityGoal'}
+    ForecastStage:
+      type: string
+      enum: [submitted, interview, offer, placed]
+    StageWeight:
+      type: object
+      additionalProperties: false
+      required: [stage, percent, monthsAhead]
+      properties:
+        stage: {$ref: '#/components/schemas/ForecastStage'}
+        percent: {type: integer, minimum: 0, maximum: 100, description: How likely an application at this stage is to be placed (and the fee paid).}
+        monthsAhead: {type: integer, minimum: 0, maximum: 12, description: "The month its fee is expected in: this month (0), next month (1), ... Placements go by their start date."}
+    ReportSettings:
+      type: object
+      additionalProperties: false
+      required: [targets, stageWeights]
+      properties:
+        targets:
+          type: array
+          maxItems: 500
+          description: At most one per user (or everyone) and period.
+          items: {$ref: '#/components/schemas/ActivityTarget'}
+        stageWeights:
+          type: array
+          description: One for each forecast stage (stages left out keep their weight).
+          maxItems: 4
+          items: {$ref: '#/components/schemas/StageWeight'}
+    ForecastTotal:
+      type: object
+      required: [currency, expected, full]
+      properties:
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        expected: {$ref: '#/components/schemas/DecimalAmount'}
+        full: {allOf: [{$ref: '#/components/schemas/DecimalAmount'}], description: The fees before weighting.}
+    ForecastMonth:
+      type: object
+      required: [month, totals]
+      properties:
+        month: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$', example: '2026-11'}
+        totals: {type: array, items: {$ref: '#/components/schemas/ForecastTotal'}}
+    ForecastRecruiter:
+      type: object
+      required: [recruiterId, recruiterName, totals]
+      properties:
+        recruiterId:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        recruiterName: {type: string, nullable: true, description: null when no recruiter is credited and the job has no owner.}
+        totals: {type: array, items: {$ref: '#/components/schemas/ForecastTotal'}}
+    ForecastLine:
+      type: object
+      required: [applicationId, candidateName, jobTitle, companyName, stage, recruiterId, recruiterName, month, currency, fee, percent, expected, feeFrom]
+      properties:
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        candidateName: {type: string}
+        jobTitle: {type: string}
+        companyName: {type: string}
+        stage: {$ref: '#/components/schemas/ForecastStage'}
+        recruiterId:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        recruiterName: {type: string, nullable: true}
+        month: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$'}
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        fee: {$ref: '#/components/schemas/DecimalAmount'}
+        percent: {type: integer}
+        expected: {$ref: '#/components/schemas/DecimalAmount'}
+        feeFrom:
+          type: string
+          enum: [placement, terms]
+          description: "placement: the fee recorded on the placement; terms: the client's rate applied to the job's salary budget."
+    ForecastGap:
+      type: object
+      required: [applicationId, candidateName, jobTitle, stage, reason]
+      properties:
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        candidateName: {type: string}
+        jobTitle: {type: string}
+        stage: {$ref: '#/components/schemas/ForecastStage'}
+        reason:
+          type: string
+          enum: [no_salary_budget, no_terms, no_rate]
+          description: "no_salary_budget: the job has none (or one per hour or day); no_terms: the client has no terms of business; no_rate: none of the client's rates fits the salary."
+    Forecast:
+      type: object
+      required: [months, recruiters, lines, gaps, stageWeights]
+      properties:
+        months:
+          type: array
+          description: From this month on, in order.
+          items: {$ref: '#/components/schemas/ForecastMonth'}
+        recruiters:
+          type: array
+          description: Most expected first.
+          items: {$ref: '#/components/schemas/ForecastRecruiter'}
+        lines:
+          type: array
+          description: Each application counted, most expected first (at most 2000).
+          items: {$ref: '#/components/schemas/ForecastLine'}
+        gaps:
+          type: array
+          description: Applications whose fee could not be worked out, so not counted (at most 500).
+          items: {$ref: '#/components/schemas/ForecastGap'}
+        stageWeights: {type: array, items: {$ref: '#/components/schemas/StageWeight'}}
     BookingLinkId:
       type: string
       pattern: '^bkl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -17647,9 +17877,24 @@ x-permissions:
     description: Record a candidate's consent (given or withdrawn) and log a request they made.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  reports.forecast:read:
+    module: reports
+    description: See the revenue forecast (fees expected from the pipeline); it also needs placements.fees:read.
+    sensitive: true
+    roles: [owner, admin]
+  reports.settings:manage:
+    module: reports
+    description: Set activity targets (per user, or one for everyone) and the forecast's weight for each stage.
+    sensitive: false
+    roles: [owner, admin]
+  reports.team:read:
+    module: reports
+    description: See every user's activity against their targets, not only your own.
+    sensitive: false
+    roles: [owner, admin]
   reports:read:
     module: reports
-    description: See the reports (fees in them need placements.fees:read).
+    description: See the reports and your own activity against your targets (fees in them need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter]
   scheduling.team:read:
@@ -18083,7 +18328,7 @@ x-modules:
   - name: privacy
     description: 'Data protection (Malaysia''s PDPA). Each candidate''s consent (given on the careers form, or recorded by a recruiter; withdrawn means do not contact, and emails to them are refused), the requests candidates make about their data with how long each has been open, and a copy of everything held about a candidate for access requests. Nothing is ever deleted or anonymised by the app: people decide each request and record what they did.'
   - name: reports
-    description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill. Reports keep no data of their own: they read other modules'' records.'
+    description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill; each recruiter''s activity (calls, CVs sent, interviews arranged, placements) against the targets set for them; and the fees expected from the open pipeline, weighted by stage. Reports read other modules'' records; they keep only the targets and the forecast''s stage weights.'
   - name: scheduling
     description: Booking links. Each user sets when they take calls (weekly hours in their time zone) and may give the private calendar address Google Calendar or Outlook offers, so their own meetings count as busy. A booking link, inserted into an email to a candidate, opens a public page with the free times; the candidate picks one, and both get a calendar invitation (an .ics invite that Gmail and Outlook add to the calendar), which blocks the time. Interviews the user is on and their other bookings count as busy too. The candidate can move the time with the same link; the user can cancel it.
   - name: settings

@@ -87,3 +87,9 @@ WHERE status = 'scheduled' AND starts_at >= @from_time AND starts_at < @to_time
   AND (@user_id::text = ANY(interviewer_ids) OR created_by = @user_id::text)
 ORDER BY starts_at, id
 LIMIT 50;
+
+-- Interviews arranged in a period, by whom (reports: each user's activity).
+-- name: ArrangedBetween :many
+SELECT created_by, created_at FROM interview
+WHERE created_at >= @from_time AND created_at < @to_time
+LIMIT 50000;

@@ -360,6 +360,9 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err := s.keepShortlist(ctx, tx, row.ID, r.Candidates, filled.To); err != nil {
 			return err
 		}
+		if err := s.recordCVsSent(ctx, tx, row.ID, cvs, filled.To, filled.Cc, filled.Bcc); err != nil {
+			return err
+		}
 		consentID := r.RecipientCandidateID
 		if len(r.Candidates) == 0 {
 			consentID = candidateID

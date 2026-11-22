@@ -10,6 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ActivityTarget struct {
+	ID         string
+	TenantID   string
+	UserID     *string
+	Period     string
+	Calls      *int32
+	CvsSent    *int32
+	Interviews *int32
+	Placements *int32
+	UpdatedBy  string
+	UpdatedAt  time.Time
+}
+
 type AiProvider struct {
 	TenantID     string
 	Provider     string
@@ -760,6 +773,7 @@ type Email struct {
 	BouncedTo           []string
 	BouncedAt           *time.Time
 	DeliveryAttemptedAt *time.Time
+	CvCandidateIds      []string
 }
 
 type EmailAttachment struct {
@@ -974,6 +988,15 @@ type FolderShare struct {
 	TenantID  string
 	UserID    string
 	CreatedAt time.Time
+}
+
+type ForecastStageWeight struct {
+	TenantID    string
+	Stage       string
+	Percent     int32
+	MonthsAhead int32
+	UpdatedBy   string
+	UpdatedAt   time.Time
 }
 
 type HrApolloConnection struct {
