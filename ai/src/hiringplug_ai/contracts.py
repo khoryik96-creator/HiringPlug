@@ -40,11 +40,13 @@ class Permission(StrEnum):
     companies_category_update = "companies.category:update"
     companies_documents_delete = "companies.documents:delete"
     companies_create = "companies:create"
+    companies_merge = "companies:merge"
     companies_read = "companies:read"
     companies_update = "companies:update"
     contacts_apollo_use = "contacts.apollo:use"
     contacts_role_update = "contacts.role:update"
     contacts_create = "contacts:create"
+    contacts_merge = "contacts:merge"
     contacts_read = "contacts:read"
     contacts_update = "contacts:update"
     cvformats_templates_manage = "cvformats.templates:manage"
@@ -1803,6 +1805,45 @@ class CompanySize(StrEnum):
     enterprise = "enterprise"
 
 
+class CompanyMerge(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    duplicateId: Annotated[CompanyId, Field(description="The company to merge in (and delete).")]
+    version: Annotated[int, Field(description="The version of the company you keep.", ge=1)]
+
+
+class CompanyDuplicateReason(StrEnum):
+    same_website = "same_website"
+    same_linkedin = "same_linkedin"
+    similar_name = "similar_name"
+
+
+class CompanyLookalike(BaseModel):
+    id: CompanyId
+    name: str
+    city: Annotated[str | None, Field(...)]
+    website: Annotated[str | None, Field(...)]
+    industry: Annotated[str | None, Field(...)]
+    reasons: list[CompanyDuplicateReason]
+
+
+class SimilarCompanies(BaseModel):
+    items: list[CompanyLookalike]
+
+
+class CompanyDuplicateGroup(BaseModel):
+    reasons: list[CompanyDuplicateReason]
+    companies: Annotated[
+        list[CompanyLookalike],
+        Field(description="Newest first; `reasons` on each is empty (the group's say why)."),
+    ]
+
+
+class CompanyDuplicateGroups(BaseModel):
+    items: list[CompanyDuplicateGroup]
+
+
 class CompanySummary(BaseModel):
     id: CompanyId
     name: str
@@ -2157,6 +2198,47 @@ class ContactUpdate(BaseModel):
         Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
     ] = None
     notes: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class ContactMerge(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    duplicateId: Annotated[ContactId, Field(description="The contact to merge in (and delete).")]
+    version: Annotated[int, Field(description="The version of the contact you keep.", ge=1)]
+
+
+class ContactDuplicateReason(StrEnum):
+    same_linkedin = "same_linkedin"
+    same_name = "same_name"
+    same_phone = "same_phone"
+    similar_name = "similar_name"
+
+
+class ContactLookalike(BaseModel):
+    id: ContactId
+    companyId: str
+    companyName: Annotated[str | None, Field(...)]
+    fullName: str
+    title: Annotated[str | None, Field(...)]
+    email: Annotated[str | None, Field(...)]
+    reasons: list[ContactDuplicateReason]
+
+
+class SimilarContacts(BaseModel):
+    items: list[ContactLookalike]
+
+
+class ContactDuplicateGroup(BaseModel):
+    reasons: list[ContactDuplicateReason]
+    contacts: Annotated[
+        list[ContactLookalike],
+        Field(description="Newest first; `reasons` on each is empty (the group's say why)."),
+    ]
+
+
+class ContactDuplicateGroups(BaseModel):
+    items: list[ContactDuplicateGroup]
 
 
 class MailboxCheckStatus(StrEnum):

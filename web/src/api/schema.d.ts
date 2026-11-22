@@ -1485,7 +1485,7 @@ export interface paths {
         put?: never;
         /**
          * Merge a duplicate into this contact
-         * @description The duplicate's emails (and Outlook threads), jobs, invoices, notes, folder places and checks move to this contact; this contact's empty fields are filled from the duplicate's (its email only if this contact has none); then the duplicate is deleted. This contact keeps its company. `version` is this contact's.
+         * @description The duplicate's emails (and Outlook threads), jobs, invoices, notes, folder places and checks move to this contact; this contact's empty fields are filled from the duplicate's (its email only if this contact has none); then the duplicate is deleted. Both must be at the same company (someone at another company may have changed jobs). `version` is this contact's.
          */
         post: operations["mergeContact"];
         delete?: never;

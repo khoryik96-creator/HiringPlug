@@ -220,6 +220,12 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		if err != nil {
 			return err
 		}
+		if dupRow.CompanyID != keepRow.CompanyID {
+			// Their jobs are at their own company, and it may be someone who changed jobs.
+			var errs apperr.FieldErrors
+			errs.Add("duplicateId", "works at another company: if it is the same person, change their company first")
+			return errs.Err()
+		}
 		for _, m := range s.movers {
 			if err := m.MoveContact(ctx, tx, dupID, keepID); err != nil {
 				return err
