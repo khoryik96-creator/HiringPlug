@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
+import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
 
 type Kind = Schemas["NotificationKind"];
@@ -46,7 +47,12 @@ export function NotificationBell() {
   // What was new when it was opened stays marked while it is open.
   const [shown, setShown] = useState<List | null>(null);
   const seen = useMutation({
-    mutationFn: async () => { unwrap(await api.POST("/v1/notifications/seen")); },
+    // Up to the list shown (asOf): what came after it stays new. A refresh
+    // already on its way would bring the old count back: it is cancelled.
+    mutationFn: async (upTo: string) => {
+      await queryClient.cancelQueries({ queryKey: notificationsKey });
+      unwrap(await api.POST("/v1/notifications/seen", { body: { upTo } }));
+    },
     onSuccess: () => {
       queryClient.setQueryData<List>(notificationsKey, (old) => old && { ...old, unseen: 0, items: old.items.map((i) => ({ ...i, new: false })) });
     },
@@ -68,7 +74,7 @@ export function NotificationBell() {
     <details ref={menu} className="bell" onToggle={(e) => {
       if (e.currentTarget.open) {
         setShown(data);
-        if (unseen > 0) seen.mutate();
+        if (unseen > 0) seen.mutate(data.asOf);
       } else {
         setShown(null);
         void queryClient.invalidateQueries({ queryKey: notificationsKey });
@@ -117,7 +123,15 @@ export function NotificationSettings({ permissions }: { permissions: Permission[
     },
   });
   const data = list.data;
-  if (!data) return null;
+  if (!data) {
+    return list.isError ? (
+      <section className="panel notification-settings" aria-label="Notifications">
+        <h3>Notifications</h3>
+        <ErrorMessage error={list.error} />
+        <button type="button" className="link" onClick={() => { void list.refetch(); }}>Try again</button>
+      </section>
+    ) : null;
+  }
   const kinds = KINDS.filter((k) => permissions.includes(k.permission));
   const put = (change: Partial<Schemas["NotificationSettings"]>) => {
     setSaved(false);

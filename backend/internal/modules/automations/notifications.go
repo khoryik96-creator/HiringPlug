@@ -17,7 +17,7 @@ type DueTask struct {
 	CreatedAt     time.Time
 }
 
-// DueTasks returns a user's open tasks due on or before day, soonest first
+// DueTasks returns a user's open tasks due on or before day, most recently due first
 // (at most 50), in the caller's transaction.
 func (m *Module) DueTasks(ctx context.Context, tx pgx.Tx, userID string, day time.Time) ([]DueTask, error) {
 	rows, err := store.New(tx).DueTasks(ctx, store.DueTasksParams{UserID: userID, Day: day})

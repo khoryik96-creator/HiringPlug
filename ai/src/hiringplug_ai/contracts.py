@@ -5433,10 +5433,20 @@ class Notification(BaseModel):
 
 
 class NotificationList(BaseModel):
+    asOf: Annotated[
+        AwareDatetime, Field(description="When the list was worked out; send it back to mark it seen.")
+    ]
     items: Annotated[list[Notification], Field(max_length=100)]
     unseen: Annotated[int, Field(description="How many items are new since you last looked.", ge=0)]
     morningEmail: bool
     mutedKinds: list[NotificationKind]
+
+
+class NotificationsSeen(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    upTo: Annotated[AwareDatetime, Field(description="The asOf of the list shown: what is newer stays new.")]
 
 
 class NotificationSettings(BaseModel):

@@ -7080,10 +7080,16 @@ paths:
     post:
       operationId: markNotificationsSeen
       tags: [notifications]
-      summary: Mark everything up to now as seen (the bell's count goes to zero)
+      summary: Mark as seen what the bell showed (up to the list's asOf); what came after stays new
       x-permission: notifications:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationsSeen'}
       responses:
         '204': {description: Marked}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
   /v1/notifications/settings:
@@ -15419,8 +15425,9 @@ components:
         new: {type: boolean}
     NotificationList:
       type: object
-      required: [items, unseen, morningEmail, mutedKinds]
+      required: [items, unseen, morningEmail, mutedKinds, asOf]
       properties:
+        asOf: {type: string, format: date-time, description: When the list was worked out; send it back to mark it seen.}
         items:
           type: array
           maxItems: 100
@@ -15430,6 +15437,12 @@ components:
         mutedKinds:
           type: array
           items: {$ref: '#/components/schemas/NotificationKind'}
+    NotificationsSeen:
+      type: object
+      additionalProperties: false
+      required: [upTo]
+      properties:
+        upTo: {type: string, format: date-time, description: "The asOf of the list shown: what is newer stays new."}
     NotificationSettings:
       type: object
       additionalProperties: false

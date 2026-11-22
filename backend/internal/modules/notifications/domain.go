@@ -117,10 +117,9 @@ func WindowAt(now time.Time, loc *time.Location) Window {
 	}
 }
 
-// Build makes the notifications, newest first (at most MaxItems), marking
-// as new those after seen (all of them when the user never looked), and
-// returns how many are new.
-func Build(in Inputs, seen *time.Time, w Window) ([]Item, int) {
+// Build makes the notifications, newest first, marking as new those after
+// seen (all of them when the user never looked).
+func Build(in Inputs, seen *time.Time, w Window) []Item {
 	loc := w.zone
 	if loc == nil {
 		loc = time.UTC
@@ -172,17 +171,25 @@ func Build(in Inputs, seen *time.Time, w Window) ([]Item, int) {
 			Detail: iv.Title + " · " + jobText(a), Href: "#/candidates/" + a.CandidateID})
 	}
 	slices.SortStableFunc(out, func(a, b Item) int { return cmp.Or(b.At.Compare(a.At), strings.Compare(a.ID, b.ID)) })
-	if len(out) > MaxItems {
-		out = out[:MaxItems]
-	}
-	unseen := 0
 	for i := range out {
 		out[i].New = seen == nil || out[i].At.After(*seen)
-		if out[i].New {
+	}
+	return out
+}
+
+// Shown is what the bell shows: the newest MaxItems, and how many of them
+// are new. (The morning email picks from all of them: DigestFor.)
+func Shown(items []Item) ([]Item, int) {
+	if len(items) > MaxItems {
+		items = items[:MaxItems]
+	}
+	unseen := 0
+	for _, it := range items {
+		if it.New {
 			unseen++
 		}
 	}
-	return out, unseen
+	return items, unseen
 }
 
 func jobText(a Application) string {
@@ -230,17 +237,37 @@ func NextMorning(now time.Time, loc *time.Location) time.Time {
 	return at
 }
 
-// DigestFor picks what the morning email lists: everything in the bell
-// except applicants older than a day (yesterday's email had them).
-func DigestFor(items []Item, now time.Time) []Item {
+// DigestFor picks what the morning email lists: everything, except
+// applicants from before since (the last email's morning: that email had
+// them).
+func DigestFor(items []Item, since time.Time) []Item {
 	var out []Item
 	for _, it := range items {
-		if it.Kind == KindApplicant && it.At.Before(now.Add(-24*time.Hour)) {
+		if it.Kind == KindApplicant && it.At.Before(since) {
 			continue
 		}
 		out = append(out, it)
 	}
 	return out
+}
+
+// DigestSince is when the applicants in a morning email start: the morning
+// of the last email (emailedOn, a day; zero when there was none), or a day
+// before now for the first.
+func DigestSince(emailedOn time.Time, now time.Time, loc *time.Location) time.Time {
+	if emailedOn.IsZero() {
+		return now.Add(-24 * time.Hour)
+	}
+	y, m, d := emailedOn.Date()
+	return time.Date(y, m, d, MorningHour, 0, 0, 0, loc)
+}
+
+// NextDayMorning is MorningHour o'clock on the agency's day after now's: a
+// morning's job queues the next from its own day, so a worker whose clock
+// is a little behind the database's never queues the same morning again.
+func NextDayMorning(now time.Time, loc *time.Location) time.Time {
+	y, m, d := now.In(loc).Date()
+	return time.Date(y, m, d+1, MorningHour, 0, 0, 0, loc)
 }
 
 var digestSections = []struct{ kind, heading string }{

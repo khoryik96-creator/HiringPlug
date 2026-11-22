@@ -1389,6 +1389,7 @@ type NotificationState struct {
 	DigestChain  int32
 	EmailedOn    pgtype.Date
 	UpdatedAt    time.Time
+	DigestDueAt  *time.Time
 }
 
 type Offer struct {

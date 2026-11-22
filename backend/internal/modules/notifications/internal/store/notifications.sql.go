@@ -7,13 +7,32 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const digestRan = `-- name: DigestRan :exec
+UPDATE notification_state
+SET digest_due_at = $1, emailed_on = coalesce($2::date, emailed_on), updated_at = now()
+WHERE user_id = $3
+`
+
+type DigestRanParams struct {
+	DueAt   *time.Time
+	Emailed pgtype.Date
+	UserID  string
+}
+
+// A morning's job ran: the next is due at due_at; emailed is the day emailed (if one was).
+func (q *Queries) DigestRan(ctx context.Context, arg DigestRanParams) error {
+	_, err := q.db.Exec(ctx, digestRan, arg.DueAt, arg.Emailed, arg.UserID)
+	return err
+}
+
 const getState = `-- name: GetState :one
 
-SELECT tenant_id, user_id, seen_at, morning_email, muted_kinds, digest_chain, emailed_on, updated_at FROM notification_state WHERE user_id = $1
+SELECT tenant_id, user_id, seen_at, morning_email, muted_kinds, digest_chain, emailed_on, updated_at, digest_due_at FROM notification_state WHERE user_id = $1
 `
 
 // Queries owned by the notifications module. Run inside a tenant-scoped transaction.
@@ -30,16 +49,17 @@ func (q *Queries) GetState(ctx context.Context, userID string) (NotificationStat
 		&i.DigestChain,
 		&i.EmailedOn,
 		&i.UpdatedAt,
+		&i.DigestDueAt,
 	)
 	return i, err
 }
 
 const lockState = `-- name: LockState :one
-SELECT tenant_id, user_id, seen_at, morning_email, muted_kinds, digest_chain, emailed_on, updated_at FROM notification_state WHERE user_id = $1 FOR UPDATE
+SELECT tenant_id, user_id, seen_at, morning_email, muted_kinds, digest_chain, emailed_on, updated_at, digest_due_at FROM notification_state WHERE user_id = $1 FOR UPDATE
 `
 
-// The morning email's job takes the row first, so two runs of one day's
-// job (a retry) wait for each other.
+// The row, locked: settings saved at once, or two runs of one day's job (a
+// retry), wait for each other.
 func (q *Queries) LockState(ctx context.Context, userID string) (NotificationState, error) {
 	row := q.db.QueryRow(ctx, lockState, userID)
 	var i NotificationState
@@ -52,57 +72,61 @@ func (q *Queries) LockState(ctx context.Context, userID string) (NotificationSta
 		&i.DigestChain,
 		&i.EmailedOn,
 		&i.UpdatedAt,
+		&i.DigestDueAt,
 	)
 	return i, err
 }
 
-const markEmailed = `-- name: MarkEmailed :exec
-UPDATE notification_state SET emailed_on = $1::date, updated_at = now() WHERE user_id = $2
-`
-
-type MarkEmailedParams struct {
-	Day    pgtype.Date
-	UserID string
-}
-
-func (q *Queries) MarkEmailed(ctx context.Context, arg MarkEmailedParams) error {
-	_, err := q.db.Exec(ctx, markEmailed, arg.Day, arg.UserID)
-	return err
-}
-
 const markSeen = `-- name: MarkSeen :exec
 INSERT INTO notification_state (tenant_id, user_id, seen_at)
-VALUES (app_current_tenant(), $1, now())
-ON CONFLICT (tenant_id, user_id) DO UPDATE SET seen_at = now(), updated_at = now()
+VALUES (app_current_tenant(), $1, least(now(), $2::timestamptz))
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET
+  seen_at = greatest(coalesce(notification_state.seen_at, '-infinity'), EXCLUDED.seen_at), updated_at = now()
 `
 
-func (q *Queries) MarkSeen(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, markSeen, userID)
+type MarkSeenParams struct {
+	UserID string
+	UpTo   time.Time
+}
+
+// Seen up to the time of the list the user was shown (not later: what came
+// after it stays new), never moving back.
+func (q *Queries) MarkSeen(ctx context.Context, arg MarkSeenParams) error {
+	_, err := q.db.Exec(ctx, markSeen, arg.UserID, arg.UpTo)
 	return err
 }
 
 const putSettings = `-- name: PutSettings :one
-INSERT INTO notification_state (tenant_id, user_id, morning_email, muted_kinds, digest_chain)
-VALUES (app_current_tenant(), $1, $2, $3::text[], CASE WHEN $2::boolean THEN 1 ELSE 0 END)
+INSERT INTO notification_state (tenant_id, user_id, morning_email, muted_kinds, digest_chain, digest_due_at)
+VALUES (app_current_tenant(), $1, $2, $3::text[],
+        CASE WHEN $4::boolean THEN 1 ELSE 0 END, $5)
 ON CONFLICT (tenant_id, user_id) DO UPDATE SET
   morning_email = EXCLUDED.morning_email,
   muted_kinds = EXCLUDED.muted_kinds,
-  digest_chain = notification_state.digest_chain
-    + CASE WHEN EXCLUDED.morning_email AND NOT notification_state.morning_email THEN 1 ELSE 0 END,
+  digest_chain = notification_state.digest_chain + CASE WHEN $4::boolean THEN 1 ELSE 0 END,
+  digest_due_at = CASE WHEN $4::boolean THEN EXCLUDED.digest_due_at ELSE notification_state.digest_due_at END,
   updated_at = now()
-RETURNING tenant_id, user_id, seen_at, morning_email, muted_kinds, digest_chain, emailed_on, updated_at
+RETURNING tenant_id, user_id, seen_at, morning_email, muted_kinds, digest_chain, emailed_on, updated_at, digest_due_at
 `
 
 type PutSettingsParams struct {
 	UserID       string
 	MorningEmail bool
 	MutedKinds   []string
+	Restart      bool
+	DueAt        *time.Time
 }
 
-// Turning the morning email on starts a new chain (so a job still waiting
-// from an earlier one does nothing); turning it off keeps the chain number.
+// Restarting the morning email starts a new chain (so a job still waiting
+// from an earlier one does nothing) due at due_at.
 func (q *Queries) PutSettings(ctx context.Context, arg PutSettingsParams) (NotificationState, error) {
-	row := q.db.QueryRow(ctx, putSettings, arg.UserID, arg.MorningEmail, arg.MutedKinds)
+	row := q.db.QueryRow(ctx, putSettings,
+		arg.UserID,
+		arg.MorningEmail,
+		arg.MutedKinds,
+		arg.Restart,
+		arg.DueAt,
+	)
 	var i NotificationState
 	err := row.Scan(
 		&i.TenantID,
@@ -113,6 +137,7 @@ func (q *Queries) PutSettings(ctx context.Context, arg PutSettingsParams) (Notif
 		&i.DigestChain,
 		&i.EmailedOn,
 		&i.UpdatedAt,
+		&i.DigestDueAt,
 	)
 	return i, err
 }

@@ -25,7 +25,7 @@ func (q *Queries) DeleteAutomation(ctx context.Context, id string) (int64, error
 const dueTasks = `-- name: DueTasks :many
 SELECT id, tenant_id, user_id, title, due_on, application_id, run_id, automation_name, done_at, created_at FROM recruiter_task
 WHERE user_id = $1 AND done_at IS NULL AND due_on <= $2::date
-ORDER BY due_on, id
+ORDER BY due_on DESC, id DESC
 LIMIT 50
 `
 
@@ -34,7 +34,8 @@ type DueTasksParams struct {
 	Day    time.Time
 }
 
-// A user's open tasks due on or before a day (notifications), soonest first.
+// A user's open tasks due on or before a day (notifications), the most
+// recently due first (today's are never cut off by many old overdue ones).
 func (q *Queries) DueTasks(ctx context.Context, arg DueTasksParams) ([]RecruiterTask, error) {
 	rows, err := q.db.Query(ctx, dueTasks, arg.UserID, arg.Day)
 	if err != nil {

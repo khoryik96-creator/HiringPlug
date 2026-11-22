@@ -1,6 +1,7 @@
 package notifications
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestBuild(t *testing.T) {
 		Interviews: []Interview{{ID: "i1", ApplicationID: appID, Title: "First", StartsAt: time.Date(2026, 11, 23, 14, 30, 0, 0, loc), CreatedAt: now.AddDate(0, 0, -3)}},
 	}
 	seen := now.Add(-30 * time.Minute)
-	items, unseen := Build(in, &seen, w)
+	items, unseen := Shown(Build(in, &seen, w))
 	require.Len(t, items, 4, "the applicant whose application is hidden is left out")
 	var ids []string
 	for _, it := range items {
@@ -59,7 +60,7 @@ func TestBuild(t *testing.T) {
 	assert.Equal(t, "First · Accountant, Contoh", find(items, "interview:i1").Detail)
 	assert.Zero(t, unseen, "all before seen")
 
-	_, unseen = Build(in, nil, w)
+	_, unseen = Shown(Build(in, nil, w))
 	assert.Equal(t, 4, unseen, "never looked: all new")
 }
 
@@ -80,7 +81,7 @@ func TestDigest(t *testing.T) {
 		{Kind: KindTask, Title: "Call back", Detail: "Due today", Href: "#/"},
 		{Kind: KindTask, Title: "Send CVs", Detail: "Due today", Href: "#/"},
 	}
-	picked := DigestFor(items, now)
+	picked := DigestFor(items, DigestSince(time.Time{}, now, time.UTC))
 	assert.Len(t, picked, 3, "applicants already in yesterday's email are left out")
 	subject, body, ok := DigestText(picked, "https://hp.example/")
 	require.True(t, ok)
@@ -98,4 +99,31 @@ func TestNormalizeMuted(t *testing.T) {
 	_, errs = NormalizeMuted([]string{"birthdays"})
 	assert.Error(t, errs.Err())
 	assert.Equal(t, []string{}, NormalizeMutedSilently(nil), "never null")
+}
+
+func TestDigestSince(t *testing.T) {
+	loc := kl(t)
+	now := time.Date(2026, 11, 24, 8, 0, 0, 0, loc)
+	assert.Equal(t, now.Add(-24*time.Hour), DigestSince(time.Time{}, now, loc), "the first email: the last day")
+	assert.Equal(t, time.Date(2026, 11, 22, 8, 0, 0, 0, loc), DigestSince(time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC), now, loc),
+		"since the last email's morning: a missed morning loses no applicant")
+}
+
+func TestNextDayMorning(t *testing.T) {
+	loc := kl(t)
+	assert.Equal(t, time.Date(2026, 11, 23, 8, 0, 0, 0, loc), NextDayMorning(time.Date(2026, 11, 22, 7, 59, 58, 0, loc), loc),
+		"a clock a little behind 8:00 still queues tomorrow, not this morning again")
+}
+
+func TestShownCapsTheBellNotTheEmail(t *testing.T) {
+	now := time.Date(2026, 11, 22, 8, 0, 0, 0, time.UTC)
+	var items []Item
+	for i := range MaxItems + 5 {
+		items = append(items, Item{ID: fmt.Sprint(i), Kind: KindApplicant, At: now.Add(-time.Duration(i) * time.Minute), New: true})
+	}
+	items = append(items, Item{ID: "iv", Kind: KindInterview, At: now.Add(-48 * time.Hour)})
+	shown, unseen := Shown(items)
+	assert.Len(t, shown, MaxItems)
+	assert.Equal(t, MaxItems, unseen)
+	assert.Equal(t, "iv", DigestFor(items, now.Add(-24*time.Hour))[MaxItems+5].ID, "the email is picked from all, so the interview is in it")
 }

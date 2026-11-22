@@ -16,7 +16,7 @@ func (h *HTTP) ListNotifications(ctx context.Context, _ api.ListNotificationsReq
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListNotifications200JSONResponse{Items: make([]api.Notification, len(list.Items)), Unseen: list.Unseen,
+	out := api.ListNotifications200JSONResponse{Items: make([]api.Notification, len(list.Items)), Unseen: list.Unseen, AsOf: list.AsOf,
 		MorningEmail: list.MorningEmail, MutedKinds: kindsAPI(list.Muted)}
 	for i, it := range list.Items {
 		out.Items[i] = api.Notification{Id: it.ID, Kind: api.NotificationKind(it.Kind), Title: it.Title, Detail: it.Detail, Href: it.Href, At: it.At, New: it.New}
@@ -25,8 +25,8 @@ func (h *HTTP) ListNotifications(ctx context.Context, _ api.ListNotificationsReq
 }
 
 // MarkNotificationsSeen handles POST /v1/notifications/seen.
-func (h *HTTP) MarkNotificationsSeen(ctx context.Context, _ api.MarkNotificationsSeenRequestObject) (api.MarkNotificationsSeenResponseObject, error) {
-	if err := h.svc.MarkSeen(ctx, authz.MustFromContext(ctx)); err != nil {
+func (h *HTTP) MarkNotificationsSeen(ctx context.Context, req api.MarkNotificationsSeenRequestObject) (api.MarkNotificationsSeenResponseObject, error) {
+	if err := h.svc.MarkSeen(ctx, authz.MustFromContext(ctx), req.Body.UpTo); err != nil {
 		return nil, err
 	}
 	return api.MarkNotificationsSeen204Response{}, nil

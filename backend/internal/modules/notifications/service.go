@@ -30,6 +30,7 @@ type Service struct {
 type List struct {
 	Items  []Item
 	Unseen int
+	AsOf   time.Time // when it was worked out (marking seen goes up to here)
 	Prefs
 }
 
@@ -47,24 +48,36 @@ func (s *Service) List(ctx context.Context, p authz.Principal) (List, error) {
 		if err != nil {
 			return err
 		}
-		items, unseen, err := s.items(ctx, tx, p, state, s.now())
-		out = List{Items: items, Unseen: unseen, Prefs: Prefs{MorningEmail: state.MorningEmail, Muted: state.MutedKinds}}
+		now := s.now()
+		all, err := s.items(ctx, tx, p, state, now)
+		items, unseen := Shown(all)
+		out = List{Items: items, Unseen: unseen, AsOf: now, Prefs: Prefs{MorningEmail: state.MorningEmail, Muted: state.MutedKinds}}
 		return err
 	})
 	return out, err
 }
 
-// MarkSeen marks everything up to now as seen. Not audited: it records
-// that the user looked, not a change to the company's data.
-func (s *Service) MarkSeen(ctx context.Context, p authz.Principal) error {
+// MarkSeen marks as seen what the user was shown: everything up to upTo
+// (the list's AsOf; never later than now), so what came after stays new.
+func (s *Service) MarkSeen(ctx context.Context, p authz.Principal, upTo time.Time) error {
 	return database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		return store.New(tx).MarkSeen(ctx, p.UserID)
+		if err := store.New(tx).MarkSeen(ctx, store.MarkSeenParams{UserID: p.UserID, UpTo: upTo}); err != nil {
+			return err
+		}
+		return audit.Record(ctx, tx, audit.Entry{
+			Action: "notification.seen", EntityType: "user", EntityID: p.UserID, Changes: map[string]any{"upTo": upTo},
+		})
 	})
 }
 
+// Stalled is how long past its time a morning email's job may be waiting
+// (retrying) before saving the settings starts a new chain.
+const Stalled = 2 * time.Hour
+
 // PutPrefs saves what the user chose. Turning the morning email on queues
 // the next morning's email (a new chain: any job still waiting from before
-// does nothing).
+// does nothing); so does saving while it is on but its chain has stopped
+// (its job failed for good).
 func (s *Service) PutPrefs(ctx context.Context, p authz.Principal, in Prefs) (Prefs, error) {
 	muted, errs := NormalizeMuted(in.Muted)
 	if err := errs.Err(); err != nil {
@@ -73,21 +86,29 @@ func (s *Service) PutPrefs(ctx context.Context, p authz.Principal, in Prefs) (Pr
 	var out Prefs
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		before, err := s.state(ctx, tx, p.UserID)
+		// Locked, so settings saved twice at once start one chain, not two.
+		before, err := q.LockState(ctx, p.UserID)
+		if database.IsNoRows(err) {
+			before, err = store.NotificationState{UserID: p.UserID, MutedKinds: []string{}}, nil
+		}
 		if err != nil {
 			return err
 		}
-		row, err := q.PutSettings(ctx, store.PutSettingsParams{UserID: p.UserID, MorningEmail: in.MorningEmail, MutedKinds: muted})
+		now := s.now()
+		stalled := before.MorningEmail && (before.DigestDueAt == nil || before.DigestDueAt.Before(now.Add(-Stalled)))
+		restart := in.MorningEmail && (!before.MorningEmail || stalled)
+		due := NextMorning(now, s.cfg.TimeZone)
+		row, err := q.PutSettings(ctx, store.PutSettingsParams{UserID: p.UserID, MorningEmail: in.MorningEmail, MutedKinds: muted, Restart: restart, DueAt: &due})
 		if err != nil {
 			return err
 		}
 		out = Prefs{MorningEmail: row.MorningEmail, Muted: row.MutedKinds}
-		if before.MorningEmail == in.MorningEmail && slices.Equal(NormalizeMutedSilently(before.MutedKinds), muted) {
+		if !restart && before.MorningEmail == in.MorningEmail && slices.Equal(NormalizeMutedSilently(before.MutedKinds), muted) {
 			return nil
 		}
-		if in.MorningEmail && !before.MorningEmail {
+		if restart {
 			if _, err := jobqueue.EnqueueAt(ctx, tx, p.TenantID, api.JobKindNotificationsDigest,
-				api.NotificationDigestJob{UserId: p.UserID, Chain: int(row.DigestChain)}, NextMorning(s.now(), s.cfg.TimeZone)); err != nil {
+				api.NotificationDigestJob{UserId: p.UserID, Chain: int(row.DigestChain)}, due); err != nil {
 				return err
 			}
 		}
@@ -109,8 +130,8 @@ func (s *Service) state(ctx context.Context, tx pgx.Tx, userID string) (store.No
 }
 
 // items gathers the records the user may see (in tx, scoped to them) and
-// makes their notifications, leaving out the kinds they turned off.
-func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state store.NotificationState, now time.Time) ([]Item, int, error) {
+// makes all their notifications, leaving out the kinds they turned off.
+func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state store.NotificationState, now time.Time) ([]Item, error) {
 	w := WindowAt(now, s.cfg.TimeZone)
 	wants := func(kind string) bool { return !slices.Contains(state.MutedKinds, kind) }
 	var in Inputs
@@ -118,25 +139,25 @@ func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state
 	if p.Can(api.PermissionPipelineRead) && wants(KindApplicant) {
 		jobs, err := s.src.OwnedJobs(ctx, tx, p.UserID)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		if in.Applicants, err = s.src.Applicants(ctx, tx, jobs, w.ApplicantsSince); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 	}
 	if p.Can(api.PermissionAutomationsTasksRead) && wants(KindTask) {
 		if in.Tasks, err = s.src.DueTasks(ctx, tx, p.UserID, w.Today); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 	}
 	if p.Can(api.PermissionOffersApprove) && wants(KindOfferApproval) {
 		if in.Offers, err = s.src.OffersToApprove(ctx, tx, p.UserID); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 	}
 	if p.Can(api.PermissionInterviewsRead) && wants(KindInterview) {
 		if in.Interviews, err = s.src.Interviews(ctx, tx, p.UserID, w.From, w.To); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 	}
 	var ids []string
@@ -156,9 +177,8 @@ func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state
 	}
 	if len(ids) > 0 {
 		if in.Apps, err = s.src.Applications(ctx, tx, ids); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 	}
-	items, unseen := Build(in, state.SeenAt, w)
-	return items, unseen, nil
+	return Build(in, state.SeenAt, w), nil
 }

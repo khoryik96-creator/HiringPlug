@@ -125,8 +125,20 @@ func TestNotificationsSeenMarksWhatIsNew(t *testing.T) {
 	recruiter := s.tenant.Users[api.RoleRecruiter]
 	ctx := context.Background()
 
-	require.Equal(t, http.StatusNoContent, a.request(http.MethodPost, "/v1/notifications/seen", recruiter.Token, nil).Status)
+	shown := a.notifications(recruiter.Token)
+	// Someone applies after the list was worked out, before it is marked seen.
+	time.Sleep(10 * time.Millisecond)
+	meanwhile := a.addToJob(recruiter.Token, s.job.Id, a.createCandidate(recruiter.Token, map[string]any{"firstName": "Aina"}).Id)
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE application SET channel = 'linkedin', created_at = now() WHERE id = $1`, meanwhile.Id)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNoContent, a.request(http.MethodPost, "/v1/notifications/seen", recruiter.Token, map[string]any{"upTo": shown.AsOf}).Status)
 	list := a.notifications(recruiter.Token)
+	assert.Equal(t, 1, list.Unseen, "what came after the list shown stays new")
+	assert.Equal(t, "Aina applied", list.Items[0].Title)
+	require.Equal(t, http.StatusNoContent, a.request(http.MethodPost, "/v1/notifications/seen", recruiter.Token, map[string]any{"upTo": list.AsOf}).Status)
+	require.Equal(t, http.StatusNoContent, a.request(http.MethodPost, "/v1/notifications/seen", recruiter.Token, map[string]any{"upTo": shown.AsOf}).Status,
+		"an older tab marking seen later")
+	list = a.notifications(recruiter.Token)
 	assert.Zero(t, list.Unseen)
 	require.NotEmpty(t, list.Items, "seen ones stay in the list")
 	for _, it := range list.Items {
@@ -137,7 +149,7 @@ func TestNotificationsSeenMarksWhatIsNew(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 	later := a.addToJob(recruiter.Token, s.job.Id, a.createCandidate(recruiter.Token, map[string]any{"firstName": "Nur"}).Id)
-	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE application SET channel = 'careers_page', created_at = now() WHERE id = $1`, later.Id)
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE application SET channel = 'careers_page', created_at = now() WHERE id = $1`, later.Id)
 	require.NoError(t, err)
 	list = a.notifications(recruiter.Token)
 	assert.Equal(t, 1, list.Unseen, "someone applied since")
@@ -147,6 +159,23 @@ func TestNotificationsSeenMarksWhatIsNew(t *testing.T) {
 	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE application SET binned = true WHERE id = $1`, later.Id)
 	require.NoError(t, err)
 	assert.Zero(t, a.notifications(recruiter.Token).Unseen, "an application in the Bin is not shown")
+
+	var audited int
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE tenant_id = $1 AND action = 'notification.seen'`, s.tenant.ID).Scan(&audited))
+	assert.Positive(t, audited, "marking seen is audited")
+}
+
+func TestTodaysTasksAreNotCutOffByOldOnes(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	s := newNotifySetup(t, a)
+	_, err := testutil.Current.Admin.Exec(context.Background(), `INSERT INTO recruiter_task (tenant_id, user_id, title, due_on)
+		SELECT $1, $2, 'Old task ' || n, current_date - 30 - n FROM generate_series(1, 60) n`, s.tenant.ID, s.recruiterID)
+	require.NoError(t, err)
+	_, err = testutil.Current.Admin.Exec(context.Background(), `INSERT INTO recruiter_task (tenant_id, user_id, title, due_on)
+		VALUES ($1, $2, 'Call Siti back', (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)`, s.tenant.ID, s.recruiterID)
+	require.NoError(t, err)
+	assert.Contains(t, kinds(a.notifications(s.tenant.Users[api.RoleRecruiter].Token))[api.NotificationKindTask], "Call Siti back | Due today")
 }
 
 func digestJobs(t *testing.T, tenantID string) (pending int, runAfter time.Time) {
@@ -256,4 +285,54 @@ func TestNotificationKindsCanBeTurnedOff(t *testing.T) {
 	assert.Len(t, kinds(a.notifications(recruiter.Token))[api.NotificationKindTask], 1, "turned back on")
 	n, _ := digestJobs(t, s.tenant.ID)
 	assert.Equal(t, 1, n, "changing the kinds while the email stays on queues no second email")
+}
+
+func TestMorningEmailWaitsOutAnInactiveUserAndRestartsAStoppedChain(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	s := newNotifySetup(t, a)
+	ctx := context.Background()
+	recruiter, owner := s.tenant.Users[api.RoleRecruiter], s.tenant.Users[api.RoleOwner]
+	email := "recruiter." + s.tenant.ID + "@test.local"
+	put := func(body map[string]any) {
+		t.Helper()
+		res := a.request(http.MethodPut, "/v1/notifications/settings", recruiter.Token, body)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+	put(map[string]any{"morningEmail": true, "mutedKinds": []string{}})
+
+	// Deactivated for a while: mornings pass without an email, the chain goes on.
+	require.Equal(t, http.StatusOK, a.request(http.MethodPatch, "/v1/team/"+recruiter.ID, owner.Token, map[string]any{"active": false}).Status)
+	digestDueNow(t, a, s.tenant.ID)
+	assert.Empty(t, mailServer.To(email))
+	n, _ := digestJobs(t, s.tenant.ID)
+	require.Equal(t, 1, n, "the next morning is still queued")
+	require.Equal(t, http.StatusOK, a.request(http.MethodPatch, "/v1/team/"+recruiter.ID, owner.Token, map[string]any{"active": true}).Status)
+	digestDueNow(t, a, s.tenant.ID)
+	assert.Len(t, mailServer.To(email), 1, "back: the email comes back with them")
+
+	// The chain's job failed for good: saving the settings starts a new one.
+	// (The owner's: deactivating signed the recruiter out.)
+	set := func(body map[string]any) {
+		t.Helper()
+		res := a.request(http.MethodPut, "/v1/notifications/settings", owner.Token, body)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+	pending := func() int {
+		t.Helper()
+		var n int
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(*) FROM job WHERE tenant_id = $1 AND kind = 'notifications.digest'
+			AND status = 'pending' AND payload->>'userId' = $2`, s.tenant.ID, owner.ID).Scan(&n))
+		return n
+	}
+	set(map[string]any{"morningEmail": true, "mutedKinds": []string{}})
+	require.Equal(t, 1, pending())
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET status = 'dead' WHERE tenant_id = $1 AND kind = 'notifications.digest' AND status = 'pending'`, s.tenant.ID)
+	require.NoError(t, err)
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE notification_state SET digest_due_at = now() - interval '1 day' WHERE user_id = $1`, owner.ID)
+	require.NoError(t, err)
+	set(map[string]any{"morningEmail": true, "mutedKinds": []string{"applicant"}})
+	assert.Equal(t, 1, pending(), "a stopped chain starts again")
+	set(map[string]any{"morningEmail": true, "mutedKinds": []string{}})
+	assert.Equal(t, 1, pending(), "a running chain is not started twice")
 }

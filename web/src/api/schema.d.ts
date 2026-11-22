@@ -4385,7 +4385,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark everything up to now as seen (the bell's count goes to zero) */
+        /** Mark as seen what the bell showed (up to the list's asOf); what came after stays new */
         post: operations["markNotificationsSeen"];
         delete?: never;
         options?: never;
@@ -10023,11 +10023,23 @@ export interface components {
             new: boolean;
         };
         NotificationList: {
+            /**
+             * Format: date-time
+             * @description When the list was worked out; send it back to mark it seen.
+             */
+            asOf: string;
             items: components["schemas"]["Notification"][];
             /** @description How many items are new since you last looked. */
             unseen: number;
             morningEmail: boolean;
             mutedKinds: components["schemas"]["NotificationKind"][];
+        };
+        NotificationsSeen: {
+            /**
+             * Format: date-time
+             * @description The asOf of the list shown: what is newer stays new.
+             */
+            upTo: string;
         };
         NotificationSettings: {
             /** @description Email me this list at 8:00 each morning (only on mornings when there is something). */
@@ -20235,7 +20247,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationsSeen"];
+            };
+        };
         responses: {
             /** @description Marked */
             204: {
@@ -20244,6 +20260,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

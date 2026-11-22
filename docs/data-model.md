@@ -100,7 +100,7 @@ candidate belonging to the same company.
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | possible candidates by meaning (embeddings) | later |
 | `interviewprep` | questions asked at a job's interviews (`interview_question`), the AI's interview prep (`interview_prep`) | ✅ |
-| `notifications` | per user (`notification_state`): when they last opened the bell, the kinds they turned off, the morning email on/off and its last day; the notifications themselves are worked out from other modules' records; row-level security: each user's own row | ✅ |
+| `notifications` | per user (`notification_state`): when they last opened the bell, the kinds they turned off, the morning email on/off, its last day and when its next job is due; the notifications themselves are worked out from other modules' records; row-level security: each user's own row | ✅ |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |
 | `leads` | licensed job-data providers; contacts found for a lead's company | later |
 | `integrations` | API key, webhook subscription and delivery | M6 |

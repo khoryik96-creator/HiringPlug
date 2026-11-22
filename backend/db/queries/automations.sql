@@ -97,9 +97,10 @@ WHERE automation_id = @automation_id AND subject_id = @subject_id AND status = '
 -- name: MoveCompanyAutomations :execrows
 UPDATE automation SET company_id = @to_id WHERE company_id = @from_id;
 
--- A user's open tasks due on or before a day (notifications), soonest first.
+-- A user's open tasks due on or before a day (notifications), the most
+-- recently due first (today's are never cut off by many old overdue ones).
 -- name: DueTasks :many
 SELECT * FROM recruiter_task
 WHERE user_id = @user_id AND done_at IS NULL AND due_on <= @day::date
-ORDER BY due_on, id
+ORDER BY due_on DESC, id DESC
 LIMIT 50;

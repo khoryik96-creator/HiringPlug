@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
-import { ok, renderWithClient, sentBody } from "../test-utils";
+import { failure, ok, renderWithClient, sentBody } from "../test-utils";
 import { NotificationBell, NotificationSettings } from "./Notifications";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -11,7 +11,7 @@ const noContent = () => ({ data: undefined, error: undefined, response: new Resp
 
 function list(over: Partial<Schemas["NotificationList"]> = {}): Schemas["NotificationList"] {
   return {
-    unseen: 1, morningEmail: false, mutedKinds: [],
+    unseen: 1, morningEmail: false, mutedKinds: [], asOf: "2026-11-22T02:00:00Z",
     items: [
       { id: "applicant:app_1", kind: "applicant", title: "Siti Aminah applied", detail: "Accountant, Contoh Berhad", href: "#/candidates/cand_1", at: "2026-11-22T01:00:00Z", new: true },
       { id: "task:tsk_1", kind: "task", title: "Call Wei back", detail: "Overdue, due Fri 20 Nov", href: "#/", at: "2026-11-20T00:00:00Z", new: false },
@@ -31,6 +31,7 @@ describe("NotificationBell", () => {
     fireEvent.click(bell);
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/notifications/seen");
+    expect(sentBody(post)).toEqual({ upTo: "2026-11-22T02:00:00Z" }); // the list shown, not later
     const menu = screen.getByRole("dialog", { name: "Notifications" });
     const applicant = within(menu).getByText("Siti Aminah applied").closest("li");
     expect(applicant?.className).toContain("new"); // still marked while open
@@ -78,5 +79,11 @@ describe("NotificationSettings", () => {
     fireEvent.click(screen.getByRole("switch", { name: /Email me this list at 8:00/ }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect(sentBody(put)).toEqual({ morningEmail: true, mutedKinds: ["applicant"] });
+  });
+
+  it("says when the settings cannot be loaded, instead of vanishing", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(failure("INTERNAL", "Something went wrong.", undefined, 500));
+    renderWithClient(<NotificationSettings permissions={["pipeline:read"]} />);
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
   });
 });

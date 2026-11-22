@@ -535,6 +535,12 @@ for each of their jobs, with **Score fit** / **Score again**.
   and checks. Empty fields are filled from the duplicate (a contact's notes
   are joined), the duplicate is deleted, and both records' activity says so.
   Contacts at two companies are not merged (they may have changed jobs).
+  Everything moves, also what the person merging cannot see (records in the
+  Bin, sensitive notes, colleagues' Outlook threads and Apollo lookups),
+  without being shown to them. A website on a shared host (facebook.com/…,
+  linktr.ee/…) counts as its page, not the host.
+  **Possible duplicates** beside each list's search shows every group across
+  the agency.
 - **Notifications** ✅ (1.33.0): a bell in the top bar lists what needs you,
   newest first, with a red count of what is new since you last opened it: new
   applicants on jobs you own (careers page, job boards, referrals; the last 7
@@ -545,14 +551,8 @@ for each of their jobs, with **Score fit** / **Score again**.
   you, so it shows only what you may see, and never a salary. **Settings ›
   Your account › Notifications** has a switch for each kind and for the
   **morning email**: at 8:00 agency time (HP_TIME_ZONE) the same list by
-  email, only on mornings when there is something (applicants only from the
-  last day).
-  Everything moves, also what the person merging cannot see (records in the
-  Bin, sensitive notes, colleagues' Outlook threads and Apollo lookups),
-  without being shown to them. A website on a shared host (facebook.com/…,
-  linktr.ee/…) counts as its page, not the host.
-  **Possible duplicates** beside each list's search shows every group across
-  the agency.
+  email, only on mornings when there is something (applicants since the last
+  email). It goes on while you are away and comes back with you.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,
   what it offers and what it checks before an offer, recorded from the
   agency's template (Hyppies' Benefits & Pre-Offer Process to start with:
