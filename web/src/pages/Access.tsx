@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { accessKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { RequireTwoStep } from "../components/TwoStep";
 import { CANDIDATE_SCOPE, keysOf, MODULE, ROLE } from "../labels";
 
 type RoleAccess = Schemas["RoleAccess"];
@@ -27,6 +28,7 @@ export function Access() {
   return (
     <main>
       <h2>Roles and access</h2>
+      <RequireTwoStep />
       <ErrorMessage error={settings.error} />
       {s?.roles.map((r) => <RoleCard key={`${r.role}-${String(r.version)}`} access={r} catalog={s.permissions} />)}
     </main>

@@ -15,6 +15,21 @@ time. An email with accounts at several companies chooses one. Changing or
 resetting a password, or being deactivated, ends every earlier session
 (tokens issued before it are refused).
 
+**Two-step sign-in** (✅): anyone can add an authenticator app under Your
+account (scan a QR code or type the key, then enter its first code); after
+that, a correct password gives a signed 10-minute challenge instead of a
+token, and the 6-digit code (RFC 6238: 30-second steps, one step of clock
+drift either way, each code once) or one of ten single-use recovery codes
+finishes signing in (`POST /v1/auth/two-step`). The secret is sealed with
+AES-GCM under a key derived from `HP_AUTH_JWT_SECRET`; recovery codes are kept
+as SHA-256 hashes. Codes are rate-limited per address and per person. A reset
+or invitation link sets the password but still asks for the code. Turning it
+off needs the password. Owners can **require** it for everyone (Roles and
+access, once their own is on): people without it are signed out and set it up
+at their next sign-in, before any token is issued. Owners and admins can reset
+someone's two-step (a lost phone; only owners reset owners), which signs them
+out; the Team page shows who has it on.
+
 **Invitations and resets.** Owners and admins invite people (email, name,
 role); the invitation is emailed and its link is also shown, to pass on if
 email is not set up. "Forgot your password?" emails a reset link and says the

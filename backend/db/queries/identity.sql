@@ -168,3 +168,49 @@ UPDATE user_preference SET candidate_columns = NULL, updated_at = now() WHERE us
 -- name: RenameTenant :one
 UPDATE tenant SET name = @name WHERE id = app_current_tenant()
 RETURNING id, name, careers_slug::text AS careers_slug;
+
+-- Two-step sign-in -----------------------------------------------------------
+
+-- name: GetTwoStep :one
+SELECT * FROM user_two_step WHERE user_id = @user_id;
+
+-- A new authenticator secret being added (an enabled one stays until confirmed).
+-- name: SetTwoStepPending :exec
+INSERT INTO user_two_step (tenant_id, user_id, pending_sealed) VALUES (app_current_tenant(), @user_id, @pending_sealed)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET pending_sealed = EXCLUDED.pending_sealed, updated_at = now();
+
+-- name: EnableTwoStep :execrows
+UPDATE user_two_step SET secret_sealed = pending_sealed, pending_sealed = NULL, enabled_at = now(), last_step = @last_step,
+  recovery_hashes = @recovery_hashes, updated_at = now()
+WHERE user_id = @user_id AND pending_sealed IS NOT NULL;
+
+-- A code is accepted once: only for a step after the last one used.
+-- name: UseTwoStepStep :execrows
+UPDATE user_two_step SET last_step = @step, updated_at = now() WHERE user_id = @user_id AND enabled_at IS NOT NULL AND last_step < @step;
+
+-- name: UseRecoveryCode :execrows
+UPDATE user_two_step SET recovery_hashes = array_remove(recovery_hashes, @hash::text), updated_at = now()
+WHERE user_id = @user_id AND enabled_at IS NOT NULL AND @hash::text = ANY (recovery_hashes);
+
+-- name: SetRecoveryCodes :exec
+UPDATE user_two_step SET recovery_hashes = @recovery_hashes, updated_at = now() WHERE user_id = @user_id AND enabled_at IS NOT NULL;
+
+-- name: DisableTwoStep :execrows
+DELETE FROM user_two_step WHERE user_id = @user_id;
+
+-- name: TwoStepUsers :many
+SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL;
+
+-- name: TwoStepRequired :one
+SELECT two_step_required FROM tenant WHERE id = app_current_tenant();
+
+-- name: SetTwoStepRequired :exec
+UPDATE tenant SET two_step_required = @required WHERE id = app_current_tenant();
+
+-- Requiring two-step sign-in signs out everyone who has not set it up.
+-- name: EndSessionsWithoutTwoStep :exec
+UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second'
+WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL);
+
+-- name: EndUserSessions :exec
+UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second' WHERE id = @id;

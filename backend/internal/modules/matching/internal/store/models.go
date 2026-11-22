@@ -1650,10 +1650,11 @@ type TeamGroup struct {
 }
 
 type Tenant struct {
-	ID          string
-	Name        string
-	CreatedAt   time.Time
-	CareersSlug *string
+	ID              string
+	Name            string
+	CreatedAt       time.Time
+	CareersSlug     *string
+	TwoStepRequired bool
 }
 
 type TenantPolicy struct {
@@ -1681,6 +1682,17 @@ type UserPreference struct {
 	UpdatedAt        time.Time
 	DashboardBlocks  []string
 	Favourites       []byte
+}
+
+type UserTwoStep struct {
+	TenantID       string
+	UserID         string
+	PendingSealed  *string
+	SecretSealed   *string
+	EnabledAt      *time.Time
+	LastStep       int64
+	RecoveryHashes []string
+	UpdatedAt      time.Time
 }
 
 type Webhook struct {

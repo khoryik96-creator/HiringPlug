@@ -177,6 +177,9 @@ class ErrorCode(StrEnum):
     STUDIO_CV_SOURCE = "STUDIO_CV_SOURCE"
     TEAM_CHANGE_NOT_ALLOWED = "TEAM_CHANGE_NOT_ALLOWED"
     TOO_MANY_ATTEMPTS = "TOO_MANY_ATTEMPTS"
+    TWO_STEP_NOT_ENABLED = "TWO_STEP_NOT_ENABLED"
+    TWO_STEP_REQUIRED = "TWO_STEP_REQUIRED"
+    TWO_STEP_SETUP_REQUIRED = "TWO_STEP_SETUP_REQUIRED"
     UNAUTHENTICATED = "UNAUTHENTICATED"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
     VALIDATION_FAILED = "VALIDATION_FAILED"
@@ -3560,6 +3563,79 @@ class Session(BaseModel):
     expiresAt: AwareDatetime
 
 
+class TwoStepChallenge(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    challenge: Annotated[
+        str,
+        Field(
+            description="From the sign-in answer's details.challenge (valid 10 minutes).",
+            max_length=1000,
+            min_length=1,
+        ),
+    ]
+
+
+class TwoStepSignIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    challenge: Annotated[str, Field(max_length=1000, min_length=1)]
+    code: Annotated[
+        str,
+        Field(
+            description="The app's 6-digit code, or a recovery code (abcde-fghjk).",
+            max_length=20,
+            min_length=1,
+        ),
+    ]
+
+
+class TwoStepCode(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    code: Annotated[str, Field(max_length=20, min_length=1)]
+
+
+class TwoStepDisable(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    password: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class TwoStepSetup(BaseModel):
+    secret: Annotated[str, Field(description="The key to type into the app if it cannot scan.")]
+    uri: Annotated[str, Field(description="otpauth:// address, shown as a QR code to scan.")]
+
+
+class TwoStepRecoveryCodes(BaseModel):
+    recoveryCodes: Annotated[
+        list[str], Field(description="Each signs in once instead of a code; shown only now.")
+    ]
+
+
+class TwoStepEnabled(BaseModel):
+    session: Session
+    recoveryCodes: list[str]
+
+
+class TwoStepStatus(BaseModel):
+    enabled: bool
+    enabledAt: Annotated[AwareDatetime | None, Field(...)]
+    recoveryCodesLeft: int
+    required: Annotated[bool, Field(description="The company requires two-step sign-in of everyone.")]
+
+
+class TwoStepPolicy(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    required: bool
+
+
 class PasswordResetRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3605,6 +3681,7 @@ class TeamStatus(StrEnum):
 
 
 class TeamMember(BaseModel):
+    twoStep: Annotated[bool, Field(description="Signs in with a code from an authenticator app too.")]
     id: UserId
     name: str
     email: str

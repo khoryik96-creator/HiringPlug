@@ -26,6 +26,15 @@ x-module:
     LINK_NOT_VALID:
       status: 410
       description: The invitation or password reset link was used, replaced or has expired.
+    TWO_STEP_REQUIRED:
+      status: 401
+      description: The password was right; send the authenticator app's code (or a recovery code) with `details.challenge` to /v1/auth/two-step.
+    TWO_STEP_SETUP_REQUIRED:
+      status: 401
+      description: The company requires two-step sign-in and this person has not set it up; add an authenticator app with `details.challenge` (/v1/auth/two-step/setup).
+    TWO_STEP_NOT_ENABLED:
+      status: 422
+      description: Set up two-step sign-in for yourself before requiring it of everyone.
     TEAM_CHANGE_NOT_ALLOWED:
       status: 422
       description: The change would break a team rule (your own role, the last owner, owners changed only by owners). The message says why.
@@ -106,6 +115,197 @@ paths:
         '409': { $ref: '#/components/responses/ChooseCompany' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
+  /v1/auth/two-step:
+    post:
+      operationId: signInTwoStep
+      tags: [identity]
+      summary: Finish signing in with the authenticator app's code, or a recovery code (each works once)
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepSignIn' }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/SignInFailed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/auth/two-step/setup:
+    post:
+      operationId: startTwoStepAtSignIn
+      tags: [identity]
+      summary: Add an authenticator app while signing in, when the company requires two-step sign-in
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepChallenge' }
+      responses:
+        '200':
+          description: The app's secret, to scan or type in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepSetup' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/SignInFailed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/auth/two-step/setup/confirm:
+    post:
+      operationId: confirmTwoStepAtSignIn
+      tags: [identity]
+      summary: Confirm the app with its first code; signs in and gives the recovery codes (shown once)
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepSignIn' }
+      responses:
+        '200':
+          description: Set up and signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepEnabled' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/SignInFailed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/me/two-step:
+    get:
+      operationId: getMyTwoStep
+      tags: [identity]
+      summary: Whether your two-step sign-in is on, recovery codes left, and whether your company requires it
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /v1/me/two-step/setup:
+    post:
+      operationId: startMyTwoStep
+      tags: [identity]
+      summary: Start adding an authenticator app (a new secret; an app added before keeps working until the new one is confirmed)
+      x-permission: authenticated
+      responses:
+        '200':
+          description: The app's secret, to scan or type in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepSetup' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /v1/me/two-step/confirm:
+    post:
+      operationId: confirmMyTwoStep
+      tags: [identity]
+      summary: Confirm the app with its first code; turns two-step sign-in on and gives the recovery codes (shown once)
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepCode' }
+      responses:
+        '200':
+          description: On
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepRecoveryCodes' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/me/two-step/recovery-codes:
+    post:
+      operationId: newRecoveryCodes
+      tags: [identity]
+      summary: New recovery codes (the old ones stop working), with a code from the app
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepCode' }
+      responses:
+        '200':
+          description: The new codes (shown once)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepRecoveryCodes' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/me/two-step/disable:
+    post:
+      operationId: disableMyTwoStep
+      tags: [identity]
+      summary: Turn your two-step sign-in off, with your password (not while your company requires it)
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepDisable' }
+      responses:
+        '200':
+          description: Off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepStatus' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/team/{userId}/two-step:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: '#/components/schemas/UserId' } }
+    delete:
+      operationId: resetTwoStep
+      tags: [identity]
+      summary: Reset someone's two-step sign-in (a lost phone); they set it up again at their next sign-in if the company requires it
+      x-permission: identity.team:manage
+      responses:
+        '204': { description: Reset }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+
+  /v1/agency/two-step:
+    put:
+      operationId: setTwoStepRequired
+      tags: [identity]
+      summary: Require two-step sign-in of everyone at the company (those without it are signed out and set it up at their next sign-in)
+      x-permission: identity.roles:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoStepPolicy' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoStepPolicy' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/TwoStepNotEnabled' }
+
   /v1/auth/sign-out:
     post:
       operationId: signOut
@@ -166,6 +366,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Session' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/SignInFailed' }
         '410': { $ref: '#/components/responses/LinkNotValid' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
@@ -448,12 +649,17 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     SignInFailed:
-      description: Wrong email or password (SIGN_IN_FAILED).
+      description: Wrong email, password or code (SIGN_IN_FAILED), or a code is needed next (TWO_STEP_REQUIRED, TWO_STEP_SETUP_REQUIRED).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     ChooseCompany:
       description: Choose the company (SIGN_IN_CHOOSE_COMPANY).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TwoStepNotEnabled:
+      description: Set up two-step sign-in for yourself first (TWO_STEP_NOT_ENABLED).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -677,6 +883,67 @@ components:
       properties:
         token: { type: string, description: "Send it as Authorization: Bearer <token>." }
         expiresAt: { type: string, format: date-time }
+    TwoStepChallenge:
+      type: object
+      additionalProperties: false
+      required: [challenge]
+      properties:
+        challenge: { type: string, minLength: 1, maxLength: 1000, description: "From the sign-in answer's details.challenge (valid 10 minutes)." }
+    TwoStepSignIn:
+      type: object
+      additionalProperties: false
+      required: [challenge, code]
+      properties:
+        challenge: { type: string, minLength: 1, maxLength: 1000 }
+        code: { type: string, minLength: 1, maxLength: 20, description: "The app's 6-digit code, or a recovery code (abcde-fghjk)." }
+    TwoStepCode:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 20 }
+    TwoStepDisable:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties:
+        password: { type: string, minLength: 1, maxLength: 200 }
+    TwoStepSetup:
+      type: object
+      required: [secret, uri]
+      properties:
+        secret: { type: string, description: The key to type into the app if it cannot scan. }
+        uri: { type: string, description: "otpauth:// address, shown as a QR code to scan." }
+    TwoStepRecoveryCodes:
+      type: object
+      required: [recoveryCodes]
+      properties:
+        recoveryCodes:
+          type: array
+          items: { type: string }
+          description: Each signs in once instead of a code; shown only now.
+    TwoStepEnabled:
+      type: object
+      required: [session, recoveryCodes]
+      properties:
+        session: { $ref: '#/components/schemas/Session' }
+        recoveryCodes:
+          type: array
+          items: { type: string }
+    TwoStepStatus:
+      type: object
+      required: [enabled, enabledAt, recoveryCodesLeft, required]
+      properties:
+        enabled: { type: boolean }
+        enabledAt: { type: string, format: date-time, nullable: true }
+        recoveryCodesLeft: { type: integer }
+        required: { type: boolean, description: The company requires two-step sign-in of everyone. }
+    TwoStepPolicy:
+      type: object
+      additionalProperties: false
+      required: [required]
+      properties:
+        required: { type: boolean }
     PasswordResetRequest:
       type: object
       additionalProperties: false
@@ -711,8 +978,9 @@ components:
       enum: [invited, active, deactivated]
     TeamMember:
       type: object
-      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt]
+      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep]
       properties:
+        twoStep: { type: boolean, description: Signs in with a code from an authenticator app too. }
         id: { $ref: '#/components/schemas/UserId' }
         name: { type: string }
         email: { type: string }

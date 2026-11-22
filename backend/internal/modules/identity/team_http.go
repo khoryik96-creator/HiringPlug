@@ -60,13 +60,19 @@ func (h *HTTP) ChangePassword(ctx context.Context, req api.ChangePasswordRequest
 
 // ListTeam handles GET /v1/team.
 func (h *HTTP) ListTeam(ctx context.Context, _ api.ListTeamRequestObject) (api.ListTeamResponseObject, error) {
-	rows, err := h.m.Team(ctx, authz.MustFromContext(ctx))
+	p := authz.MustFromContext(ctx)
+	rows, err := h.m.Team(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	twoStep, err := h.m.TwoStepUsers(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	out := api.ListTeam200JSONResponse{Items: make([]api.TeamMember, len(rows))}
 	for i, r := range rows {
 		out.Items[i] = memberToAPI(r)
+		out.Items[i].TwoStep = twoStep[r.ID]
 	}
 	return out, nil
 }

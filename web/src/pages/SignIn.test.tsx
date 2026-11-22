@@ -28,6 +28,22 @@ describe("signing in", () => {
     expect(getToken()).toBe("tok_1");
   });
 
+  it("asks for the code from the app when two-step sign-in is on", async () => {
+    const post = vi.spyOn(api, "POST")
+      .mockResolvedValueOnce(failure("TWO_STEP_REQUIRED", "Enter the code.", { challenge: "c1" }, 401))
+      .mockResolvedValueOnce(ok({ token: "tok_4", expiresAt: "2026-11-04T00:00:00Z" }));
+    const onSignedIn = vi.fn();
+    renderWithClient(<SignIn onSignedIn={onSignedIn} />);
+    fill("Email", "siti@contoh.my");
+    fill("Password", "purple-gecko-41");
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.change(await screen.findByLabelText("Code from the app, or a recovery code"), { target: { value: "287082" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => { expect(onSignedIn).toHaveBeenCalled(); });
+    expect(sentBody(post, 1)).toEqual({ challenge: "c1", code: "287082" });
+    expect(getToken()).toBe("tok_4");
+  });
+
   it("asks which company when the account is at several", async () => {
     const post = vi.spyOn(api, "POST")
       .mockResolvedValueOnce(failure("SIGN_IN_CHOOSE_COMPANY", "Choose one.", { companies: [{ slug: "alpha", name: "Alpha" }, { slug: "beta", name: "Beta" }] }, 409))

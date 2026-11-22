@@ -98,6 +98,7 @@ type Modules struct {
 func NewModules(d Deps) *Modules {
 	m := &Modules{}
 	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
+	m.Identity.UseTwoStepKey(d.Config.AuthJWTSecret)
 	m.Settings = settings.New(d.Pool)
 	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant})
 	m.Industries = industries.New(d.Pool)

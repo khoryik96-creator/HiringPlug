@@ -180,6 +180,38 @@ func (q *Queries) DeleteTeamGroup(ctx context.Context, id string) (int64, error)
 	return result.RowsAffected(), nil
 }
 
+const disableTwoStep = `-- name: DisableTwoStep :execrows
+DELETE FROM user_two_step WHERE user_id = $1
+`
+
+func (q *Queries) DisableTwoStep(ctx context.Context, userID string) (int64, error) {
+	result, err := q.db.Exec(ctx, disableTwoStep, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const enableTwoStep = `-- name: EnableTwoStep :execrows
+UPDATE user_two_step SET secret_sealed = pending_sealed, pending_sealed = NULL, enabled_at = now(), last_step = $1,
+  recovery_hashes = $2, updated_at = now()
+WHERE user_id = $3 AND pending_sealed IS NOT NULL
+`
+
+type EnableTwoStepParams struct {
+	LastStep       int64
+	RecoveryHashes []string
+	UserID         string
+}
+
+func (q *Queries) EnableTwoStep(ctx context.Context, arg EnableTwoStepParams) (int64, error) {
+	result, err := q.db.Exec(ctx, enableTwoStep, arg.LastStep, arg.RecoveryHashes, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const endLinks = `-- name: EndLinks :exec
 UPDATE user_link SET used_at = now() WHERE user_id = $1 AND kind = $2 AND used_at IS NULL
 `
@@ -192,6 +224,26 @@ type EndLinksParams struct {
 // Using a link, or replacing it with a new one, ends it.
 func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 	_, err := q.db.Exec(ctx, endLinks, arg.UserID, arg.Kind)
+	return err
+}
+
+const endSessionsWithoutTwoStep = `-- name: EndSessionsWithoutTwoStep :exec
+UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second'
+WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL)
+`
+
+// Requiring two-step sign-in signs out everyone who has not set it up.
+func (q *Queries) EndSessionsWithoutTwoStep(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, endSessionsWithoutTwoStep)
+	return err
+}
+
+const endUserSessions = `-- name: EndUserSessions :exec
+UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second' WHERE id = $1
+`
+
+func (q *Queries) EndUserSessions(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, endUserSessions, id)
 	return err
 }
 
@@ -266,6 +318,28 @@ func (q *Queries) GetTenant(ctx context.Context, id string) (GetTenantRow, error
 	row := q.db.QueryRow(ctx, getTenant, id)
 	var i GetTenantRow
 	err := row.Scan(&i.ID, &i.Name, &i.CareersSlug)
+	return i, err
+}
+
+const getTwoStep = `-- name: GetTwoStep :one
+
+SELECT tenant_id, user_id, pending_sealed, secret_sealed, enabled_at, last_step, recovery_hashes, updated_at FROM user_two_step WHERE user_id = $1
+`
+
+// Two-step sign-in -----------------------------------------------------------
+func (q *Queries) GetTwoStep(ctx context.Context, userID string) (UserTwoStep, error) {
+	row := q.db.QueryRow(ctx, getTwoStep, userID)
+	var i UserTwoStep
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.PendingSealed,
+		&i.SecretSealed,
+		&i.EnabledAt,
+		&i.LastStep,
+		&i.RecoveryHashes,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
@@ -739,6 +813,45 @@ func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error 
 	return err
 }
 
+const setRecoveryCodes = `-- name: SetRecoveryCodes :exec
+UPDATE user_two_step SET recovery_hashes = $1, updated_at = now() WHERE user_id = $2 AND enabled_at IS NOT NULL
+`
+
+type SetRecoveryCodesParams struct {
+	RecoveryHashes []string
+	UserID         string
+}
+
+func (q *Queries) SetRecoveryCodes(ctx context.Context, arg SetRecoveryCodesParams) error {
+	_, err := q.db.Exec(ctx, setRecoveryCodes, arg.RecoveryHashes, arg.UserID)
+	return err
+}
+
+const setTwoStepPending = `-- name: SetTwoStepPending :exec
+INSERT INTO user_two_step (tenant_id, user_id, pending_sealed) VALUES (app_current_tenant(), $1, $2)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET pending_sealed = EXCLUDED.pending_sealed, updated_at = now()
+`
+
+type SetTwoStepPendingParams struct {
+	UserID        string
+	PendingSealed *string
+}
+
+// A new authenticator secret being added (an enabled one stays until confirmed).
+func (q *Queries) SetTwoStepPending(ctx context.Context, arg SetTwoStepPendingParams) error {
+	_, err := q.db.Exec(ctx, setTwoStepPending, arg.UserID, arg.PendingSealed)
+	return err
+}
+
+const setTwoStepRequired = `-- name: SetTwoStepRequired :exec
+UPDATE tenant SET two_step_required = $1 WHERE id = app_current_tenant()
+`
+
+func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) error {
+	_, err := q.db.Exec(ctx, setTwoStepRequired, required)
+	return err
+}
+
 const signedIn = `-- name: SignedIn :exec
 UPDATE app_user SET last_sign_in_at = now() WHERE id = $1
 `
@@ -799,6 +912,41 @@ func (q *Queries) TeamUserIDs(ctx context.Context, teamID *string) ([]string, er
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const twoStepRequired = `-- name: TwoStepRequired :one
+SELECT two_step_required FROM tenant WHERE id = app_current_tenant()
+`
+
+func (q *Queries) TwoStepRequired(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, twoStepRequired)
+	var two_step_required bool
+	err := row.Scan(&two_step_required)
+	return two_step_required, err
+}
+
+const twoStepUsers = `-- name: TwoStepUsers :many
+SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL
+`
+
+func (q *Queries) TwoStepUsers(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, twoStepUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -896,6 +1044,42 @@ func (q *Queries) UpdateRoleSetting(ctx context.Context, arg UpdateRoleSettingPa
 		&i.KnownPermissions,
 	)
 	return i, err
+}
+
+const useRecoveryCode = `-- name: UseRecoveryCode :execrows
+UPDATE user_two_step SET recovery_hashes = array_remove(recovery_hashes, $1::text), updated_at = now()
+WHERE user_id = $2 AND enabled_at IS NOT NULL AND $1::text = ANY (recovery_hashes)
+`
+
+type UseRecoveryCodeParams struct {
+	Hash   string
+	UserID string
+}
+
+func (q *Queries) UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, useRecoveryCode, arg.Hash, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const useTwoStepStep = `-- name: UseTwoStepStep :execrows
+UPDATE user_two_step SET last_step = $1, updated_at = now() WHERE user_id = $2 AND enabled_at IS NOT NULL AND last_step < $1
+`
+
+type UseTwoStepStepParams struct {
+	Step   int64
+	UserID string
+}
+
+// A code is accepted once: only for a step after the last one used.
+func (q *Queries) UseTwoStepStep(ctx context.Context, arg UseTwoStepStepParams) (int64, error) {
+	result, err := q.db.Exec(ctx, useTwoStepStep, arg.Step, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const userAuth = `-- name: UserAuth :one

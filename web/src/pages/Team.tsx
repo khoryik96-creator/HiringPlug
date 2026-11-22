@@ -54,6 +54,10 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
     mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })),
     onSuccess: (inv) => { setLink(inv.link); },
   });
+  const resetTwoStep = useMutation({
+    mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/two-step", { params: { path: { userId: m.id } } })); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+  });
   const cancel = useMutation({
     mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })); },
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
@@ -78,13 +82,19 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
       </td>
-      <td><span className={`badge ${m.status === "active" ? "accepted" : m.status === "invited" ? "draft" : "withdrawn"}`}>{TEAM_STATUS[m.status]}</span></td>
+      <td><span className={`badge ${m.status === "active" ? "accepted" : m.status === "invited" ? "draft" : "withdrawn"}`}>{TEAM_STATUS[m.status]}</span>
+        {m.twoStep && <span className="badge two-step-badge" title="Signs in with a code from an authenticator app too">2-step</span>}</td>
       <td className="muted">{m.lastSignInAt ? formatWhen(m.lastSignInAt) : "Never"}</td>
       <td>
         {!locked && m.status === "active" && (
           <button type="button" className="link" onClick={() => { if (window.confirm(`Deactivate ${m.name}? They are signed out and cannot sign in.`)) update.mutate({ active: false }); }}>Deactivate</button>
         )}
         {!locked && m.status === "deactivated" && <button type="button" className="link" onClick={() => { update.mutate({ active: true }); }}>Reactivate</button>}
+        {m.twoStep && !me && (myRole === "owner" || m.role !== "owner") && (
+          <button type="button" className="link" disabled={resetTwoStep.isPending} onClick={() => {
+            if (window.confirm(`Reset ${m.name}'s two-step sign-in (a lost phone)? They are signed out and add their app again.`)) resetTwoStep.mutate();
+          }}>Reset two-step</button>
+        )}
         {m.status === "invited" && <button type="button" className="link" disabled={resend.isPending} onClick={() => { resend.mutate(); }}>Send new invitation</button>}
         {m.status === "invited" && !locked && (
           <button type="button" className="link danger" disabled={cancel.isPending} onClick={() => {
@@ -92,7 +102,7 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
           }}>Cancel invitation</button>
         )}
         {link && <div className="secret">{link}</div>}
-        <ErrorMessage error={update.error ?? resend.error ?? cancel.error} />
+        <ErrorMessage error={update.error ?? resend.error ?? cancel.error ?? resetTwoStep.error} />
       </td>
     </tr>
   );

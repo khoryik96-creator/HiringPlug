@@ -1677,7 +1677,10 @@ Roles have permissions per area: **view** (`:read`), **write** (`:create`),
 contract. ✅ People sign in with email and password; owners and admins invite
 them, change roles and deactivate them on the **Team** page; "Forgot your
 password?" emails a reset link; everyone changes their password under their
-name. ✅ **Roles and access** (owners): each company chooses what each role may
+name. ✅ **Two-step sign-in**: a code from an authenticator app after the
+password (set up under Your account with a QR code, ten recovery codes);
+owners can require it for everyone, and owners and admins reset it for
+someone who lost their phone. ✅ **Roles and access** (owners): each company chooses what each role may
 do and which candidates it sees (all, its team's or its own, plus those on
 the jobs it owns); teams of people on the Team page; an owner on every
 candidate and job, changeable on their pages; a "Mine" filter on the candidate

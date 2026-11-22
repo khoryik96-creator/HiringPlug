@@ -44,6 +44,33 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Settings: each company's dropdown options (sources, notice periods, industries, work types) and mandatory fields |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
+## Product pipeline (review of 22 Nov 2026)
+
+A review of the whole product ranked what would help agencies most. The first
+five are being built now; the rest are queued in this order.
+
+| | Item | Why |
+|---|---|---|
+| 🔜 | **WhatsApp**: a chat link on every phone number, filled-in message templates, the chat logged as activity | Malaysian candidates and clients answer WhatsApp first |
+| 🔜 | **Phones**: a compact top bar and lists that fit a phone screen | The top bar overflows at phone width; wide lists scroll sideways |
+| 🔜 | **Notifications**: a bell for new applicants, tasks, offers to approve and tomorrow's interviews, and an optional morning email | Today these are found only by opening the dashboard |
+| ✅ 1.29.0 | **Two-step sign-in** with an authenticator app, recovery codes, owners able to require it | Email and password alone; needed before selling it as a service |
+| 🔜 | **Merge duplicate companies and contacts**, with a list of possible duplicates | Only candidates can be merged |
+| ⬜ 6 | **Exports and Excel import**: CSV/Excel from every list and report; .xlsx imports | No list or report can be exported |
+| ⬜ 7 | **Client shortlist link**: the client sees the shortlist (blind or formatted CVs), approves or rejects with a comment; the stage moves and the answer is logged | Client feedback comes back by email and is typed in |
+| ⬜ 8 | **Activity targets and revenue forecast**: calls, CVs sent, interviews arranged per recruiter against targets; fees expected from the pipeline, weighted by stage | Reports cover outcomes, not activity or what is coming |
+| ⬜ 9 | **Search by meaning** (embeddings) beside the keyword search for possible candidates | "Talent acquisition" and "recruitment" are different words today |
+| ⬜ 10 | **Housekeeping**: in-app help and a first-run guide, a refreshed handover, old branches tidied (the Leads workspace merged or closed) | The feature list is 1,800 lines; some notes are out of date |
+| ⬜ | Batch CV formatting | One CV at a time today |
+| ⬜ | Find HR for a lead not yet linked to a company | A lead must be linked first |
+| ⬜ | Gmail replies and bounces read back (needs Google's restricted scope) | Gmail can only send |
+| ⬜ | AI usage and cost per month, with a limit | Tokens are counted, not shown |
+| ⬜ | An audit-log page for admins and a "who viewed salary" log | The audit trail has no screen |
+| ⬜ | Single sign-on (Microsoft, Google) | After two-step sign-in |
+| ⬜ | Cloud readiness: files in object storage, sign-in limits in PostgreSQL, key rotation, metrics and alerts (Phase 7) | Needed to host many agencies |
+| ⬜ | Accessibility and visual checks in the browser tests | Screens are checked by hand |
+| ⬜ | Stale-record sweep (contacts and companies untouched for a year) | Data goes out of date quietly |
+
 ## The plan
 
 ### Phase 1: the daily recruiting loop 🔜

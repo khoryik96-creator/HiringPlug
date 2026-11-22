@@ -44,6 +44,7 @@ type Module struct {
 	mailer    Mailer
 	publicURL string
 	limits    limits
+	twoStep   twoStepKeys
 	HTTP      *HTTP
 }
 

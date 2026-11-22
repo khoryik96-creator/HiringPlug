@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, ApiError, unwrap } from "../api/client";
 import { setToken } from "../auth";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { nextStepOf, TwoStepAtSignIn } from "../components/TwoStep";
 
 type Company = { slug: string; name: string };
 
@@ -26,6 +27,15 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   });
   const companies = signIn.error instanceof ApiError && signIn.error.code === "SIGN_IN_CHOOSE_COMPANY"
     ? (signIn.error.details.companies as Company[]) : null;
+  const next = nextStepOf(signIn.error); // the password was right: a code next
+  if (next) {
+    return (
+      <main className="narrow">
+        <h1>HiringPlug</h1>
+        <TwoStepAtSignIn next={next} onSignedIn={onSignedIn} onCancel={() => { signIn.reset(); setForm({ ...form, password: "" }); }} />
+      </main>
+    );
+  }
 
   if (mode === "sent") {
     return (

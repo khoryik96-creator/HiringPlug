@@ -31,6 +31,7 @@ const (
 // limits slow down guessing: per client address, and per email or user.
 type limits struct {
 	signInAddr, signInPair, signInEmail, resetAddr, resetEmail, links, change *ratelimit.Limiter
+	twoStep, twoStepUser                                                      *ratelimit.Limiter // codes, per address and per person
 }
 
 // signIn reports whether another sign-in attempt for email from addr is
@@ -50,6 +51,7 @@ func newLimits(now func() time.Time) limits {
 		signInAddr: l(30, 15*time.Minute, 300), signInPair: l(10, 15*time.Minute, 50), signInEmail: l(200, 15*time.Minute, 2000),
 		resetAddr: l(10, 15*time.Minute, 50), resetEmail: l(3, time.Hour, 10),
 		links: l(30, 15*time.Minute, 200), change: l(10, 15*time.Minute, 50),
+		twoStep: l(30, 15*time.Minute, 300), twoStepUser: l(10, 15*time.Minute, 50),
 	}
 }
 
@@ -114,14 +116,23 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 	}
 	a := matches[0]
 	now := time.Now().Truncate(time.Second)
+	var next *apperr.Error // a code is needed first
 	err = database.InTx(ctx, m.pool, authz.NewPrincipal(a.TenantID, a.UserID, email, a.UserName, ""), func(tx pgx.Tx) error {
-		if err := store.New(tx).SignedIn(ctx, a.UserID); err != nil {
+		q := store.New(tx)
+		var err error
+		if next, err = m.nextStep(ctx, q, a.TenantID, a.UserID); err != nil || next != nil {
+			return err
+		}
+		if err := q.SignedIn(ctx, a.UserID); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.signed_in", EntityType: "user", EntityID: a.UserID})
 	})
 	if err != nil {
 		return Session{}, err
+	}
+	if next != nil {
+		return Session{}, next
 	}
 	return m.session(a.TenantID, a.UserID, now)
 }
@@ -244,6 +255,7 @@ func (m *Module) Link(ctx context.Context, clientAddr, token string) (LinkInfo, 
 // sessions, and signs them in.
 func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string, name *string) (Session, error) {
 	var out Session
+	var next *apperr.Error // the password is saved; two-step sign-in still asks for its code
 	err := m.lookupLink(ctx, clientAddr, token, func(tx pgx.Tx, q *store.Queries, l store.LinkByHashRow, u store.UserAuthRow) error {
 		if l.Kind != "invite" {
 			name = nil
@@ -275,9 +287,15 @@ func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string
 		if err := audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "user", EntityID: u.ID}); err != nil {
 			return err
 		}
+		if next, err = m.nextStep(ctx, q, l.TenantID, u.ID); err != nil || next != nil {
+			return err
+		}
 		out, err = m.session(l.TenantID, u.ID, now)
 		return err
 	})
+	if err == nil && next != nil {
+		return Session{}, next
+	}
 	return out, err
 }
 

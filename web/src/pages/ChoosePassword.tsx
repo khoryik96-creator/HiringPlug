@@ -5,6 +5,7 @@ import { api, unwrap } from "../api/client";
 import { setToken } from "../auth";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
+import { nextStepOf, TwoStepAtSignIn } from "../components/TwoStep";
 
 /** Choose a password with an invitation or password reset link, then sign in. */
 export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedIn: () => void }) {
@@ -27,6 +28,17 @@ export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedI
     },
   });
   const l = link.data;
+  const next = nextStepOf(save.error); // the password is saved; two-step sign-in asks for its code
+  const signedIn = () => { window.location.hash = "#/"; onSignedIn(); };
+  if (next) {
+    return (
+      <main className="narrow">
+        <h1>HiringPlug</h1>
+        <p role="status">Password saved.</p>
+        <TwoStepAtSignIn next={next} onSignedIn={signedIn} onCancel={() => { window.location.hash = "#/"; }} />
+      </main>
+    );
+  }
   return (
     <main className="narrow">
       <h1>HiringPlug</h1>
