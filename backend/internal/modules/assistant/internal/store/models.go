@@ -482,6 +482,38 @@ type ClaimStorageState struct {
 	ExpiresAt      time.Time
 }
 
+type ClientShortlist struct {
+	ID           string
+	TenantID     string
+	TokenHash    string
+	JobID        string
+	Message      *string
+	ExpiresAt    time.Time
+	RevokedAt    *time.Time
+	RevokedBy    *string
+	OpenedAt     *time.Time
+	LastOpenedAt *time.Time
+	EmailedTo    *string
+	CreatedBy    string
+	CreatedAt    time.Time
+}
+
+type ClientShortlistCandidate struct {
+	ID            string
+	TenantID      string
+	ShortlistID   string
+	Position      int16
+	ApplicationID string
+	CandidateID   string
+	DocumentID    string
+	Blind         bool
+	Label         string
+	Note          *string
+	Decision      *string
+	Comment       *string
+	AnsweredAt    *time.Time
+}
+
 type Company struct {
 	ID                  string
 	TenantID            string
@@ -974,6 +1006,15 @@ type FolderShare struct {
 	TenantID  string
 	UserID    string
 	CreatedAt time.Time
+}
+
+type FormattedCv struct {
+	TenantID      string
+	DocumentID    string
+	CandidateID   string
+	Blind         bool
+	IncludeSalary bool
+	CreatedAt     time.Time
 }
 
 type HrApolloConnection struct {
