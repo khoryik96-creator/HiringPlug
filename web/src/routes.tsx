@@ -66,6 +66,7 @@ const ListSettings = page(() => import("./pages/Settings"), "ListSettings");
 const System = page(() => import("./pages/System"), "System");
 const BackupsPage = page(() => import("./pages/Backups"), "BackupsPage");
 const Team = page(() => import("./pages/Team"), "Team");
+const Help = page(() => import("./pages/Help"), "Help");
 
 /** What a page is given: who is signed in, and the record its address names. */
 export type PageContext = { permissions: Permission[]; me: Me; id: string };
@@ -123,6 +124,8 @@ export const ROUTES: Route[] = [
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
+  // Help: for everyone, from the ? in the top bar; a topic at #/help/<topic>.
+  { section: "help", path: /^#\/help(?:\/([a-z-]+))?$/, render: (c) => <Help key={c.id} permissions={c.permissions} topicId={c.id} /> },
   { section: "outlook", path: /^#\/outlook$/, permission: "emails:send",
     render: (c) => <OutlookMail canImportCv={can(c, "intake:create")} userId={c.me.user.id}
       permissions={c.permissions} /> },

@@ -207,6 +207,14 @@ describe("top bar", () => {
     await waitFor(() => { expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull(); });
   });
 
+  it("has Help (?) in the header for everyone, just before Settings", async () => {
+    signedIn(RECRUITER);
+    const help = await screen.findByRole("link", { name: "Help" });
+    expect(help.getAttribute("href")).toBe("#/help");
+    expect(help.nextElementSibling?.getAttribute("href")).toBe("#/settings");
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("title"), "a tooltip when only its gear shows").toBe("Settings");
+  });
+
   it("places Outlook beside Calendar in the header for permitted users", async () => {
     signedIn([...RECRUITER, "calendars:use", "emails:send"]);
     const icon = await screen.findByRole("link", { name: /^Calendar$/ });

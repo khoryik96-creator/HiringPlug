@@ -7,6 +7,7 @@ import { CvImports } from "../components/CvImports";
 import { DashboardBlocks } from "../components/DashboardBlocks";
 import { Change, Heat, HeatLegend, lastActivity } from "../components/heat";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { FirstRunGuide } from "../components/FirstRunGuide";
 import { MyInterviews } from "../components/Interviews";
 import { useJobProgress } from "../components/JobProgressTable";
 import { MyTasks } from "../components/MyTasks";
@@ -33,6 +34,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
   return (
     <main>
       <h2>Dashboard</h2>
+      <FirstRunGuide permissions={permissions} />
       <QuickSearch permissions={permissions} />
       <DashboardBlocks blocks={[
         { id: "numbers", label: "the numbers", node: (

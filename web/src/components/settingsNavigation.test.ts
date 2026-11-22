@@ -25,10 +25,11 @@ describe("Settings navigation", () => {
 
   it("only indexes permitted Settings pages and usable feature shortcuts", () => {
     const entries = entriesFor([]);
-    expect(entries.map(({ href }) => href)).toEqual(["#/account", "#/my-dropdowns", "#/ai-provider", "#/companion"]);
+    expect(entries.map(({ href }) => href)).toEqual(["#/account", "#/my-dropdowns", "#/ai-provider", "#/companion", "#/help"]);
     expect(searchSettings(entries, "who can see salary")).toEqual([]);
     expect(searchSettings(entries, "Outlook")).toEqual([]);
     expect(searchSettings(entries, "upload CVs")).toEqual([]);
     expect(searchSettings(entriesFor(["emails:send"]), "Outlook Mail")[0]?.href).toBe("#/outlook");
+    expect(searchSettings(entries, "help")[0]?.href, "the help, for everyone").toBe("#/help");
   });
 });
