@@ -10,6 +10,7 @@ import { MoveChosen, MoveMenu } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
 import { type Person, SeparateEmail } from "./SeparateEmail";
+import type { LinkCandidate } from "./shortlists/ClientLinkForm";
 import { ErrorMessage } from "./ErrorMessage";
 import { hashParam } from "../hashQuery";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
@@ -24,8 +25,10 @@ import { type MoveRequest, useMoveApplication, useMoveApplications } from "./use
  * With matching, each card shows its fit score and the board can put the
  * best fits first.
  */
-export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: {
+export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink, children }: {
   jobId: string; canUpdate: boolean; permissions?: Permission[];
+  /** Starts a client shortlist link for the chosen candidates (with shortlists:share). */
+  onClientLink?: (people: LinkCandidate[]) => void;
   /** Shown under the board (the job's possible candidates). */
   children?: ReactNode;
 }) {
@@ -73,7 +76,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const [shortlist, setShortlist] = useState<Shortlisted[] | null>(null);
   const [separately, setSeparately] = useState<Person[] | null>(null);
   const canEmail = permissions.includes("emails:send");
-  const canPick = canEmail || canUpdate;
+  const canPick = canEmail || canUpdate || Boolean(onClientLink);
   const chosenApps = apps.filter((a) => picked.includes(a.id));
   const setSelected = (selected: Application[], on: boolean) => {
     const ids = new Set(selected.map((a) => a.id));
@@ -198,6 +201,13 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
             }}>Email each candidate separately</button>
           </>}
+          {onClientLink && (
+            <button type="button" disabled={chosenApps.some((a) => a.stage === "rejected" || a.stage === "withdrawn") || picked.length > 20}
+              title="A link for the client to approve or reject them" onClick={() => {
+                onClientLink(chosenApps.map((a) => ({ applicationId: a.id, candidateId: a.candidateId, name: a.candidateName, stage: a.stage })));
+                setPicked([]);
+              }}>Client link for {picked.length}</button>
+          )}
           {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} columns={columns} />}
           <IconButton label="Clear" tip="Clear selection" icon={<CloseIcon />} onClick={() => { setPicked([]); }} />
           {canEmail && picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}

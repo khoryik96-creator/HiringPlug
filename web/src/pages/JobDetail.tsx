@@ -20,6 +20,8 @@ import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
 import { PossibleCandidates } from "../components/PossibleCandidates";
+import type { LinkCandidate } from "../components/shortlists/ClientLinkForm";
+import { ClientShortlists } from "../components/shortlists/ClientShortlists";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { countryName, formatDay } from "../labels";
 import { useFieldSettings } from "../components/useFieldSettings";
@@ -30,6 +32,8 @@ type JobTab = "activity" | "details" | "ads" | "market" | "money" | "interview" 
 export function JobDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<JobTab>("activity");
+  const [linkFor, setLinkFor] = useState<LinkCandidate[] | null>(null);
+  const canShare = permissions.includes("shortlists:share");
   const fs = useFieldSettings();
   const queryClient = useQueryClient();
   const job = useQuery({
@@ -103,10 +107,16 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       </div>
       {editing && <JobForm job={j} onDone={() => { setEditing(false); }} />}
       {permissions.includes("pipeline:read") && (
-        <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions}>
+        <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions}
+          onClientLink={canShare ? (people) => {
+            setLinkFor(people);
+            window.setTimeout(() => { document.getElementById("client-links")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 0);
+          } : undefined}>
           <PossibleCandidates jobId={j.id} permissions={permissions} />
         </PipelineBoard>
       )}
+      {canShare && <ClientShortlists jobId={j.id} contactName={j.contactName} canEmail={permissions.includes("emails:send")}
+        start={linkFor} onStarted={() => { setLinkFor(null); }} />}
       <SectionTabs name="job" label="Job sections" sections={sections} active={tab} onChange={setTab} />
     </main>
   );

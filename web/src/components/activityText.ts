@@ -26,6 +26,12 @@ function show(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Who did it: the client, for what they did on a shortlist link (the app records it for them). */
+export function actorOf(entry: ActivityEntry): string {
+  const byClient = ["client_shortlist.opened", "client_shortlist.answered"].includes(entry.action);
+  return byClient && entry.actorName === "System" ? "The client" : entry.actorName;
+}
+
 /** What happened, in words; null for entries the timeline shows another way (notes). */
 export function describe(entry: ActivityEntry): string | null {
   const [, verb] = entry.action.split(".");
@@ -58,6 +64,23 @@ export function describe(entry: ActivityEntry): string | null {
     case "email.shortlist_sent": {
       const n = typeof entry.changes.candidates === "number" ? entry.changes.candidates : 0;
       return `emailed the client about ${String(n)} candidate${n === 1 ? "" : "s"}`;
+    }
+    case "client_shortlist.created": {
+      const n = typeof entry.changes.candidates === "number" ? entry.changes.candidates : 0;
+      const to = typeof entry.changes.emailedTo === "string" ? ` and emailed it to ${entry.changes.emailedTo}` : "";
+      return `made a client link for ${String(n)} candidate${n === 1 ? "" : "s"}${to}`;
+    }
+    case "client_shortlist.shared":
+      return `put them on a client link for ${show(entry.changes.jobTitle)}${entry.changes.blind === true ? " (blind CV)" : ""}`;
+    case "client_shortlist.opened":
+      return "opened the shortlist link";
+    case "client_shortlist.revoked":
+      return "revoked a client link";
+    case "client_shortlist.answered": {
+      const verb = entry.changes.decision === "approved" ? "approved" : "rejected";
+      const who = typeof entry.changes.candidateName === "string" ? entry.changes.candidateName : `them for ${show(entry.changes.jobTitle)}`;
+      const said = typeof entry.changes.comment === "string" ? `: “${entry.changes.comment}”` : "";
+      return `${verb} ${who} on the shortlist link${said}`;
     }
     case "job.jd_uploaded":
       return `uploaded the job description ${show(entry.changes.fileName)}`;
