@@ -31,6 +31,7 @@ class Permission(StrEnum):
     candidates_compensation_update = "candidates.compensation:update"
     candidates_status_update = "candidates.status:update"
     candidates_create = "candidates:create"
+    candidates_export = "candidates:export"
     candidates_merge = "candidates:merge"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
@@ -40,12 +41,14 @@ class Permission(StrEnum):
     companies_category_update = "companies.category:update"
     companies_documents_delete = "companies.documents:delete"
     companies_create = "companies:create"
+    companies_export = "companies:export"
     companies_merge = "companies:merge"
     companies_read = "companies:read"
     companies_update = "companies:update"
     contacts_apollo_use = "contacts.apollo:use"
     contacts_role_update = "contacts.role:update"
     contacts_create = "contacts:create"
+    contacts_export = "contacts:export"
     contacts_merge = "contacts:merge"
     contacts_read = "contacts:read"
     contacts_update = "contacts:update"
@@ -73,6 +76,7 @@ class Permission(StrEnum):
     jobs_salary_read = "jobs.salary:read"
     jobs_salary_update = "jobs.salary:update"
     jobs_create = "jobs:create"
+    jobs_export = "jobs:export"
     jobs_read = "jobs:read"
     jobs_update = "jobs:update"
     leads_manage = "leads:manage"
@@ -96,6 +100,7 @@ class Permission(StrEnum):
     pipeline_update = "pipeline:update"
     placements_fees_read = "placements.fees:read"
     placements_fees_update = "placements.fees:update"
+    placements_export = "placements:export"
     placements_manage = "placements:manage"
     placements_read = "placements:read"
     privacy_manage = "privacy:manage"
@@ -141,6 +146,7 @@ class ErrorCode(StrEnum):
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
     EMAIL_UNDELIVERABLE = "EMAIL_UNDELIVERABLE"
+    EXPORT_TOO_LARGE = "EXPORT_TOO_LARGE"
     FOLDER_OWNER_ONLY = "FOLDER_OWNER_ONLY"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
@@ -271,6 +277,11 @@ class UserId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["usr_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^usr_[0-9a-hjkmnp-tv-z]{26}$")
     ]
+
+
+class ExportFormat(StrEnum):
+    xlsx = "xlsx"
+    csv = "csv"
 
 
 class CountryCode(RootModel[str]):
@@ -8559,6 +8570,19 @@ class AiProviders(BaseModel):
         list[AiProviderEntry],
         Field(description="Every provider, in the order deepseek, claude, openai, qwen."),
     ]
+
+
+class CandidateExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    search: Annotated[
+        CandidateSearch | None,
+        Field(
+            description="The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone."
+        ),
+    ] = None
 
 
 class ScreeningCallResult(BaseModel):

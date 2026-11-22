@@ -246,3 +246,14 @@ SELECT job_order_id FROM job_retainer;
 -- Merging duplicate contacts: invoices addressed to the duplicate go to the contact kept.
 -- name: MoveInvoicesToContact :execrows
 UPDATE placement_invoice SET contact_id = @to_id WHERE contact_id = @from_id;
+
+-- Placements for an export: the same filters as the list, up to one more
+-- than an export holds (so too many can be told).
+-- name: ExportPlacements :many
+SELECT * FROM placement
+WHERE (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status))
+  AND (sqlc.narg(invoice_status)::text IS NULL OR invoice_status = sqlc.narg(invoice_status))
+  AND (sqlc.narg(start_from)::date IS NULL OR start_date >= sqlc.narg(start_from))
+  AND (sqlc.narg(start_to)::date IS NULL OR start_date <= sqlc.narg(start_to))
+ORDER BY start_date DESC, id DESC
+LIMIT 10001;

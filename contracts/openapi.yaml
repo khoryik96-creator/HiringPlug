@@ -157,6 +157,10 @@ x-error-codes:
     module: emails
     status: 409
     description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
+  EXPORT_TOO_LARGE:
+    module: shared
+    status: 422
+    description: 'An export holds at most 10,000 rows: narrow the search. `details.limit` is the most.'
   FOLDER_OWNER_ONLY:
     module: folders
     status: 403
@@ -1077,6 +1081,35 @@ paths:
             Referrer-Policy:
               schema:
                 type: string
+  /v1/candidates/export:
+    post:
+      operationId: exportCandidates
+      tags: [candidates]
+      summary: Everyone an advanced search finds, as Excel or CSV (at most 10,000); salaries only for roles that may see them
+      x-permission: candidates:export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CandidateExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/salary-calculations:
     post:
       operationId: calculateSalary
@@ -1913,6 +1946,56 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/companies/export:
+    get:
+      operationId: exportCompanies
+      tags: [companies]
+      summary: Companies matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: companies:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - name: q
+          in: query
+          description: "Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written."
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: boolean
+          in: query
+          description: >-
+            A boolean search of the name, website, industries and subindustries (and the industry LinkedIn gives), city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks).
+          schema: {type: string, minLength: 1, maxLength: 1000}
+        - name: type
+          in: query
+          schema: {$ref: '#/components/schemas/CompanyType'}
+        - name: category
+          in: query
+          description: Only companies in this category (a key of the company_category list).
+          schema: {type: string, pattern: '^[a-z0-9_]{1,40}$'}
+        - name: linkedinCompany
+          in: query
+          description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
+          schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/companies:
     get:
       operationId: listCompanies
@@ -2325,6 +2408,61 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/contacts/export:
+    get:
+      operationId: exportContacts
+      tags: [contacts]
+      summary: Contacts matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: contacts:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - name: q
+          in: query
+          description: "Every word must appear in the name, email or job title (ignoring case and accents); or a phone or mobile number, however it is written."
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: boolean
+          in: query
+          description: >-
+            A boolean search of the name, job title and email: (HR OR "talent acquisition") AND manager NOT intern*, word NEAR/3 word. Words match their other forms (manager, managers).
+          schema: {type: string, minLength: 1, maxLength: 1000}
+        - name: companyId
+          in: query
+          description: Only this company's contacts.
+          schema: {$ref: '#/components/schemas/CompanyId'}
+        - name: role
+          in: query
+          description: Only contacts with this role (a key of the contact_role list, e.g. hr or hiring_manager).
+          schema: {$ref: '#/components/schemas/ContactRole'}
+        - name: roleNotSet
+          in: query
+          description: Only contacts whose role is not set yet (ignored with role).
+          schema: {type: boolean, default: false}
+        - name: status
+          in: query
+          description: Only contacts who still work there (active) or have left.
+          schema: {$ref: '#/components/schemas/ContactStatus'}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/contacts:
     get:
       operationId: listContacts
@@ -6181,6 +6319,51 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/jobs/export:
+    get:
+      operationId: exportJobs
+      tags: [jobs]
+      summary: Jobs matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: jobs:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - name: q
+          in: query
+          description: "Every word must appear in the title, location or client company's name (ignoring case and accents)."
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/JobStatus'}
+        - name: companyId
+          in: query
+          description: Only this company's jobs.
+          schema: {$ref: '#/components/schemas/CompanyId'}
+        - name: contactId
+          in: query
+          description: Only jobs with this hiring contact.
+          schema: {$ref: '#/components/schemas/ContactId'}
+        - name: mine
+          in: query
+          description: Only the jobs you own.
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/jobs:
     get:
       operationId: listJobs
@@ -7529,6 +7712,36 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/placements/export:
+    get:
+      operationId: exportPlacements
+      tags: [placements]
+      summary: Placements matching the filters, as Excel or CSV; fees only with placements.fees:read
+      x-permission: placements:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/PlacementStatus'}}
+        - {name: invoiceStatus, in: query, required: false, schema: {$ref: '#/components/schemas/InvoiceStatus'}}
+        - {name: startFrom, in: query, required: false, description: Started on or after this day., schema: {type: string, format: date}}
+        - {name: startTo, in: query, required: false, description: Started on or before this day., schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/placements:
     get:
       operationId: listPlacements
@@ -7912,6 +8125,34 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/reports/summary/export:
+    get:
+      operationId: exportReport
+      tags: [reports]
+      summary: The reports for a period as Excel (a sheet each) or CSV
+      x-permission: reports:read
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - {name: from, in: query, required: false, description: First day of the period., schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, description: Last day of the period (today unless given)., schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/reports/summary:
     get:
       operationId: getReport
@@ -8565,6 +8806,7 @@ components:
         - candidates.compensation:update
         - candidates.status:update
         - candidates:create
+        - candidates:export
         - candidates:merge
         - candidates:read
         - candidates:update
@@ -8574,12 +8816,14 @@ components:
         - companies.category:update
         - companies.documents:delete
         - companies:create
+        - companies:export
         - companies:merge
         - companies:read
         - companies:update
         - contacts.apollo:use
         - contacts.role:update
         - contacts:create
+        - contacts:export
         - contacts:merge
         - contacts:read
         - contacts:update
@@ -8607,6 +8851,7 @@ components:
         - jobs.salary:read
         - jobs.salary:update
         - jobs:create
+        - jobs:export
         - jobs:read
         - jobs:update
         - leads:manage
@@ -8630,6 +8875,7 @@ components:
         - pipeline:update
         - placements.fees:read
         - placements.fees:update
+        - placements:export
         - placements:manage
         - placements:read
         - privacy:manage
@@ -8675,6 +8921,7 @@ components:
         - DOCUMENT_NOT_DELETABLE
         - EMAIL_DO_NOT_CONTACT
         - EMAIL_UNDELIVERABLE
+        - EXPORT_TOO_LARGE
         - FOLDER_OWNER_ONLY
         - FORBIDDEN
         - INTERNAL
@@ -8807,6 +9054,10 @@ components:
       type: string
       pattern: '^usr_[0-9a-hjkmnp-tv-z]{26}$'
       example: usr_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ExportFormat:
+      type: string
+      enum: [xlsx, csv]
+      description: An Excel workbook, or CSV (UTF-8) for any spreadsheet.
     CountryCode:
       type: string
       description: ISO 3166-1 alpha-2 country code, e.g. MY, SG.
@@ -10041,6 +10292,15 @@ components:
           nullable: true
         tags: {type: array, items: {type: string}}
         updatedAt: {type: string, format: date-time}
+    CandidateExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        search:
+          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone.
+          allOf: [{$ref: '#/components/schemas/CandidateSearch'}]
     CandidateSearch:
       type: object
       additionalProperties: false
@@ -17012,6 +17272,11 @@ x-permissions:
     description: Add candidates.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  candidates:export:
+    module: candidates
+    description: Export candidates (what a search finds) to Excel or CSV; salaries only with candidates.compensation:read.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   candidates:merge:
     module: candidates
     description: Merge a duplicate candidate into another (needs to see salaries, so nothing is lost unseen).
@@ -17057,6 +17322,11 @@ x-permissions:
     description: Add companies.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  companies:export:
+    module: companies
+    description: Export the company list (what a search finds) to Excel or CSV.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   companies:merge:
     module: companies
     description: Merge a duplicate company into another (its contacts, jobs, notes and documents move over).
@@ -17087,6 +17357,11 @@ x-permissions:
     description: Add contacts.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  contacts:export:
+    module: contacts
+    description: Export the contact list (what a search finds) to Excel or CSV.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   contacts:merge:
     module: contacts
     description: Merge a duplicate contact into another (their emails, jobs, notes and checks move over).
@@ -17222,6 +17497,11 @@ x-permissions:
     description: Add jobs.
     sensitive: false
     roles: [owner, admin, recruiter]
+  jobs:export:
+    module: jobs
+    description: Export the job list (what a search finds) to Excel or CSV.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   jobs:read:
     module: jobs
     description: View jobs (the salary budget needs jobs.salary:read).
@@ -17335,6 +17615,11 @@ x-permissions:
   placements.fees:update:
     module: placements
     description: Set or change a placement's agreed salary and fee.
+    sensitive: false
+    roles: [owner, admin, recruiter]
+  placements:export:
+    module: placements
+    description: Export placements to Excel or CSV (fees in it need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter]
   placements:manage:

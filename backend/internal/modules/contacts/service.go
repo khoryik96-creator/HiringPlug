@@ -15,7 +15,6 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/boolsearch"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
 )
@@ -227,63 +226,6 @@ type Filter struct {
 	Folder           *string // only the contacts in this folder
 	// Similar: names like Query (typos), the closest first, one page only.
 	Similar bool
-}
-
-// List returns up to limit contacts matching f, newest first.
-func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor *string, limit int) (Page, error) {
-	var page Page
-	tsquery, err := boolsearch.TSQueryOf("boolean", f.Boolean)
-	if err != nil {
-		return page, err
-	}
-	similar := f.Similar && f.Query != nil
-	if similar {
-		cursor = nil // ordered by likeness, not by id: one page
-	}
-	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		inIDs, err := s.folderItems.IDs(ctx, tx, p, f.Folder)
-		if err != nil {
-			return err
-		}
-		rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Tsquery: tsquery, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet, InIds: inIDs,
-			SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
-		})
-		if err != nil {
-			return err
-		}
-		if similar && len(rows) > limit {
-			rows = rows[:limit]
-		}
-		if len(rows) > limit {
-			rows = rows[:limit]
-			last := rows[len(rows)-1].ID
-			page.NextCursor = &last
-		}
-		ids := make([]string, len(rows))
-		for i, r := range rows {
-			ids[i] = r.CompanyID
-		}
-		names, err := s.companies.Names(ctx, tx, ids)
-		if err != nil {
-			return err
-		}
-		page.Items = make([]Summary, len(rows))
-		for i, r := range rows {
-			page.Items[i] = Summary{
-				ID: r.ID, CompanyID: r.CompanyID, CompanyName: names[r.CompanyID], FirstName: r.FirstName, LastName: r.LastName,
-				Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus, MailboxStatus: r.MailboxStatus,
-				Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt,
-			}
-			page.Items[i].MailboxCheckedAt = r.MailboxCheckedAt
-			if r.LinkedinCheckedAt != nil {
-				page.Items[i].Linkedin = &LinkedinEmployment{Current: r.LinkedinCurrent, Joined: r.LinkedinJoined, Left: r.LinkedinLeft,
-					MatchedByName: r.LinkedinMatchedByName, CheckedAt: *r.LinkedinCheckedAt}
-			}
-		}
-		return nil
-	})
-	return page, err
 }
 
 // Exists reports whether a contact exists in the transaction's tenant.

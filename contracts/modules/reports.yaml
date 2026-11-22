@@ -15,6 +15,35 @@ x-module:
   jobs: {}
 
 paths:
+  /v1/reports/summary/export:
+    get:
+      operationId: exportReport
+      tags: [reports]
+      summary: The reports for a period as Excel (a sheet each) or CSV
+      x-permission: reports:read
+      parameters:
+        - { name: format, in: query, required: true, schema: { $ref: '#/components/schemas/ExportFormat' } }
+        - { name: from, in: query, required: false, description: First day of the period., schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, description: Last day of the period (today unless given)., schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /v1/reports/summary:
     get:
       operationId: getReport

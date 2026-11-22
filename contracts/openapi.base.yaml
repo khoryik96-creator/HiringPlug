@@ -50,6 +50,7 @@ x-error-codes:
   PAYLOAD_TOO_LARGE: { status: 413, description: The request body or uploaded file is too large. }
   UNSUPPORTED_MEDIA_TYPE: { status: 415, description: The content type or file type is not supported. }
   INTERNAL: { status: 500, description: Something went wrong on our side. Quote the requestId when reporting it. }
+  EXPORT_TOO_LARGE: { status: 422, description: "An export holds at most 10,000 rows: narrow the search. `details.limit` is the most." }
   SERVICE_UNAVAILABLE: { status: 503, description: A dependency is temporarily unavailable. Retry later. }
 
 paths: {}
@@ -144,6 +145,11 @@ components:
       type: string
       pattern: '^usr_[0-9a-hjkmnp-tv-z]{26}$'
       example: usr_01jbz6w0m0k8q9x2r3s4t5v6w7
+
+    ExportFormat:
+      type: string
+      enum: [xlsx, csv]
+      description: An Excel workbook, or CSV (UTF-8) for any spreadsheet.
 
     CountryCode:
       type: string

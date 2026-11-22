@@ -5,6 +5,9 @@ x-module:
   name: jobs
   description: Job orders (agency) or requisitions (in-house), with an optional salary budget.
   permissions:
+    jobs:export:
+      description: Export the job list (what a search finds) to Excel or CSV.
+      roles: [owner, admin, recruiter]
     jobs:read:
       description: View jobs (the salary budget needs jobs.salary:read).
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
@@ -68,6 +71,52 @@ x-module:
       description: "Save a job description's text and the ad details read from it: title, location, salary... (Go worker)."
 
 paths:
+  /v1/jobs/export:
+    get:
+      operationId: exportJobs
+      tags: [jobs]
+      summary: Jobs matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: jobs:export
+      parameters:
+        - { name: format, in: query, required: true, schema: { $ref: '#/components/schemas/ExportFormat' } }
+        - name: q
+          in: query
+          description: "Every word must appear in the title, location or client company's name (ignoring case and accents)."
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/JobStatus' }
+        - name: companyId
+          in: query
+          description: Only this company's jobs.
+          schema: { $ref: '#/components/schemas/CompanyId' }
+        - name: contactId
+          in: query
+          description: Only jobs with this hiring contact.
+          schema: { $ref: '#/components/schemas/ContactId' }
+        - name: mine
+          in: query
+          description: Only the jobs you own.
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /v1/jobs:
     get:
       operationId: listJobs

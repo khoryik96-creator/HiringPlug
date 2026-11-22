@@ -235,39 +235,52 @@ type Page struct {
 // List returns up to limit companies, optionally matching query and type, or
 // only those in a folder, starting after cursor (the last ID of the previous page).
 func (s *Service) List(ctx context.Context, p authz.Principal, query, boolean, companyType, category, linkedinCompany, folder, cursor *string, limit int) (Page, error) {
-	tsquery, err := boolsearch.TSQueryOf("boolean", boolean)
+	f := ListFilter{Query: query, Boolean: boolean, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Folder: folder}
+	var page Page
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		page, err = s.listTx(ctx, tx, p, f, cursor, limit)
+		return err
+	})
+	return page, err
+}
+
+// ListFilter is what the company list is narrowed by.
+type ListFilter struct {
+	Query, Boolean, Type, Category, LinkedinCompany, Folder *string
+}
+
+func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f ListFilter, cursor *string, limit int) (Page, error) {
+	tsquery, err := boolsearch.TSQueryOf("boolean", f.Boolean)
 	if err != nil {
 		return Page{}, err
 	}
 	var page Page
-	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if s.industries != nil {
-			if err := s.industries.LockIn(ctx, tx); err != nil {
-				return err
-			}
+	if s.industries != nil {
+		if err := s.industries.LockIn(ctx, tx); err != nil {
+			return page, err
 		}
-		inIDs, err := s.folderItems.IDs(ctx, tx, p, folder)
-		if err != nil {
-			return err
-		}
-		rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
-			Cursor: cursor, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Query: query, Tsquery: tsquery, InIds: inIDs, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
-		})
-		if err != nil {
-			return err
-		}
-		if len(rows) > limit {
-			rows = rows[:limit]
-			last := rows[len(rows)-1].ID
-			page.NextCursor = &last
-		}
-		page.Items = make([]Summary, len(rows))
-		for i, r := range rows {
-			page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Website: r.Website, LinkedinURL: r.LinkedinUrl, UpdatedAt: r.UpdatedAt}
-		}
-		return nil
+	}
+	inIDs, err := s.folderItems.IDs(ctx, tx, p, f.Folder)
+	if err != nil {
+		return page, err
+	}
+	rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
+		Cursor: cursor, Type: f.Type, Category: f.Category, LinkedinCompany: f.LinkedinCompany, Query: f.Query, Tsquery: tsquery, InIds: inIDs, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	})
-	return page, err
+	if err != nil {
+		return page, err
+	}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[len(rows)-1].ID
+		page.NextCursor = &last
+	}
+	page.Items = make([]Summary, len(rows))
+	for i, r := range rows {
+		page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Website: r.Website, LinkedinURL: r.LinkedinUrl, UpdatedAt: r.UpdatedAt}
+	}
+	return page, nil
 }
 
 // Exists reports whether a company exists in the transaction's tenant.

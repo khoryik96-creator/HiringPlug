@@ -208,6 +208,17 @@ type Page struct {
 func (s *Service) List(ctx context.Context, p authz.Principal, query, status, companyID, contactID, ownerID, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		page, err = s.listTx(ctx, tx, query, status, companyID, contactID, ownerID, cursor, limit)
+		return err
+	})
+	return page, err
+}
+
+// listTx is List in the caller's transaction (exports page through it).
+func (s *Service) listTx(ctx context.Context, tx pgx.Tx, query, status, companyID, contactID, ownerID, cursor *string, limit int) (Page, error) {
+	var page Page
+	err := func() error {
 		// A word of the search may be the client's name rather than in the title.
 		hits := []string{}
 		if query != nil {
@@ -258,7 +269,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, status, co
 			}
 		}
 		return nil
-	})
+	}()
 	return page, err
 }
 

@@ -11,6 +11,9 @@ x-module:
     the recruiter credited, the agreed salary and the fee, and whether it has
     been invoiced and paid. Recording one moves the application to placed.
   permissions:
+    placements:export:
+      description: Export placements to Excel or CSV (fees in it need placements.fees:read).
+      roles: [owner, admin, recruiter]
     placements:read:
       description: View placements (salary and fee need placements.fees:read).
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
@@ -34,6 +37,37 @@ x-module:
       description: "On a placement's start date: email its invoice to the client, if it is still to be emailed (Go worker)."
 
 paths:
+  /v1/placements/export:
+    get:
+      operationId: exportPlacements
+      tags: [placements]
+      summary: Placements matching the filters, as Excel or CSV; fees only with placements.fees:read
+      x-permission: placements:export
+      parameters:
+        - { name: format, in: query, required: true, schema: { $ref: '#/components/schemas/ExportFormat' } }
+        - { name: status, in: query, required: false, schema: { $ref: '#/components/schemas/PlacementStatus' } }
+        - { name: invoiceStatus, in: query, required: false, schema: { $ref: '#/components/schemas/InvoiceStatus' } }
+        - { name: startFrom, in: query, required: false, description: Started on or after this day., schema: { type: string, format: date } }
+        - { name: startTo, in: query, required: false, description: Started on or before this day., schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /v1/placements:
     get:
       operationId: listPlacements

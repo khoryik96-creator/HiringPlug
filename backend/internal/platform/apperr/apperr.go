@@ -127,3 +127,9 @@ var statuses = sync.OnceValue(func() map[api.ErrorCode]int {
 	}
 	return out
 })
+
+// ExportTooLarge returns EXPORT_TOO_LARGE: a search finds more rows than an
+// export holds (limit).
+func ExportTooLarge(limit int) *Error {
+	return New(api.ErrorCodeEXPORTTOOLARGE, fmt.Sprintf("That finds more than %d. Narrow the search and export again.", limit)).WithDetail("limit", limit)
+}
