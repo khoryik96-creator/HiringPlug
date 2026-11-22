@@ -57,7 +57,7 @@ function HelpIndex({ topics, permissions }: { topics: HelpTopic[]; permissions: 
           <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" />
           </svg>
-          <input type="search" aria-label="Search help" placeholder="Search help, e.g. import Excel, invite, boolean"
+          <input type="search" aria-label="Search help" placeholder="Search help, e.g. import Excel"
             value={query} onChange={(e) => { change(e.target.value); }}
             onKeyDown={(e) => { if (e.key === "Escape" && query) { e.stopPropagation(); change(""); } }} />
         </label>

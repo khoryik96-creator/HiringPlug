@@ -565,6 +565,32 @@ for each of their jobs, with **Score fit** / **Score again**.
   would start a formula is written as text. Reports come one sheet each.
   **Import** reads Excel (.xlsx, its first sheet; dates as dates) as well as
   CSV; an old .xls is asked to be saved as .xlsx.
+- **In-app help and a getting-started checklist** ✅ (1.37.0): the **?** in
+  the top bar opens **Help** (`#/help`, also found by Settings' search): short
+  topics in plain words on adding and importing candidates (CVs, LinkedIn
+  PDFs, CSV and Excel), searching (quick, boolean, advanced, AI), jobs and the
+  pipeline, interviews and the calendar, offers, placements and invoices,
+  email and templates, WhatsApp, folders, duplicates, notifications, exports,
+  reports, AI, automations, claims, leads, your account, and settings, team
+  and roles. A search box finds topics by any of their words (every word
+  must match; accents and words like "how" and "to" ignored), showing the
+  sentence that matched; the search stays in the address so Back returns to
+  it. Each topic links to the screens it describes. Topics, their parts and
+  their links follow the person's permissions (a viewer reads nothing about
+  exporting, and no link opens a page they would not be shown). The topics
+  are a typed data file in the web app (`web/src/help/`), versioned with it.
+  **Getting started** on the Dashboard, for a new company: add your company's
+  details (Settings › Invoicing), invite your team, connect your email, add
+  your first job, import candidates and set up the AI provider, each with a
+  button to its screen, only the steps the person's role can do. Each ticks
+  itself from the records (the invoice template saved, more than one person
+  on the team, a mailbox connected, a job, a candidate, an AI provider on); it
+  disappears once all are done, so an agency already set up never sees it.
+  **Hide checklist** hides it for that person (`guideDismissed` in
+  `/v1/me/preferences`); "Show the getting-started checklist" at the foot of
+  Help brings it back. On laptop widths (701 to 1500px) Settings in the top
+  bar is its gear alone (named for screen readers and in a tooltip) and the
+  page links sit closer, so More fits on a 1366px screen.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,
   what it offers and what it checks before an offer, recorded from the
   agency's template (Hyppies' Benefits & Pre-Offer Process to start with:

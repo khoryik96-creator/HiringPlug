@@ -60,7 +60,7 @@ five are being built now; the rest are queued in this order.
 | ⬜ 7 | **Client shortlist link**: the client sees the shortlist (blind or formatted CVs), approves or rejects with a comment; the stage moves and the answer is logged | Client feedback comes back by email and is typed in |
 | ⬜ 8 | **Activity targets and revenue forecast**: calls, CVs sent, interviews arranged per recruiter against targets; fees expected from the pipeline, weighted by stage | Reports cover outcomes, not activity or what is coming |
 | ⬜ 9 | **Search by meaning** (embeddings) beside the keyword search for possible candidates | "Talent acquisition" and "recruitment" are different words today |
-| ⬜ 10 | **Housekeeping**: in-app help and a first-run guide, a refreshed handover, old branches tidied (the Leads workspace merged or closed) | The feature list is 1,800 lines; some notes are out of date |
+| 🟡 10 | **Housekeeping**: in-app help and a first-run guide ✅ 1.37.0, a refreshed handover ✅ 1.37.0; old branches tidied (the Leads workspace merged or closed): left to the owner | The feature list is 1,800 lines; some notes are out of date |
 | ⬜ | Batch CV formatting | One CV at a time today |
 | ⬜ | Find HR for a lead not yet linked to a company | A lead must be linked first |
 | ⬜ | Gmail replies and bounces read back (needs Google's restricted scope) | Gmail can only send |

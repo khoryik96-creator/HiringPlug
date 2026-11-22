@@ -52,7 +52,7 @@ describe("the help page", () => {
   it("starts from the search in the address (coming back from a topic)", () => {
     window.location.hash = "#/help?q=folders";
     renderWithClient(<Help permissions={RECRUITER} topicId="" />);
-    expect((screen.getByRole("searchbox", { name: "Search help" }) as HTMLInputElement).value).toBe("folders");
+    expect(screen.getByRole<HTMLInputElement>("searchbox", { name: "Search help" }).value).toBe("folders");
     expect(screen.getByRole("link", { name: "Folders" })).toBeTruthy();
   });
 
