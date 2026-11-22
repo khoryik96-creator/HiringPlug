@@ -7,6 +7,7 @@ import { AiNotice } from "./components/AiNotice";
 import { CloseIcon, DockRightIcon, IconButton, OutlookIcon } from "./components/ActionIcons";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { CvImportIndicator } from "./components/outlook/CvImportIndicator";
+import { NotificationBell } from "./components/Notifications";
 import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { SettingsLayout } from "./components/SettingsLayout";
@@ -100,6 +101,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             aria-label="Dock calendar" title={showCalendarDock ? "Close calendar dock" : "Dock calendar"} aria-pressed={showCalendarDock}
             aria-controls={showCalendarDock ? "calendar-dock" : undefined} onClick={() => { setCalendarDocked(!showCalendarDock); }}><DockRightIcon /></button>}
           {permissions.includes("intake:create") && <CvImportIndicator userId={me.data.user.id} />}
+          {permissions.includes("notifications:read") && <NotificationBell />}
           <a className="settings-link" href="#/settings" aria-current={inSettings ? "page" : undefined}>
             <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3" />

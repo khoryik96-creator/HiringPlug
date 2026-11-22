@@ -25,5 +25,5 @@ How to write an entry (newest at the top, one per task):
 - Branch: claude/relaxed-hopper-ex7y3v
 - Touches: a new notifications module (migration 00165), small read functions in jobs, pipeline, automations, offers, interviews; the top bar (web/src/App*), Settings › Your account
 - Started: 22 Nov 2026    Last update: 22 Nov 2026
-- State: in progress (backend done and tested; web next)
-- Next: web: bell with unseen count in the top bar (GET /v1/notifications, POST /v1/notifications/seen); Settings › Your account "Notifications" section with a switch per kind and the morning email (PUT /v1/notifications/settings); web tests, screenshots, docs, VERSION 1.33.0, task verify
+- State: ready to merge (1.33.0: backend, bell, Settings switches, tests, screenshots)
+- Next: the owner says merge; then remove this entry

@@ -535,6 +535,18 @@ for each of their jobs, with **Score fit** / **Score again**.
   and checks. Empty fields are filled from the duplicate (a contact's notes
   are joined), the duplicate is deleted, and both records' activity says so.
   Contacts at two companies are not merged (they may have changed jobs).
+- **Notifications** ✅ (1.33.0): a bell in the top bar lists what needs you,
+  newest first, with a red count of what is new since you last opened it: new
+  applicants on jobs you own (careers page, job boards, referrals; the last 7
+  days), your tasks due today or overdue, offers waiting for your approval
+  (offers:approve; never your own request) and your interviews today and
+  tomorrow (on the panel or arranged by you). Each opens the candidate (or the
+  dashboard). Nothing is copied: the list is worked out from the records as
+  you, so it shows only what you may see, and never a salary. **Settings ›
+  Your account › Notifications** has a switch for each kind and for the
+  **morning email**: at 8:00 agency time (HP_TIME_ZONE) the same list by
+  email, only on mornings when there is something (applicants only from the
+  last day).
   Everything moves, also what the person merging cannot see (records in the
   Bin, sensitive notes, colleagues' Outlook threads and Apollo lookups),
   without being shown to them. A website on a shared host (facebook.com/…,

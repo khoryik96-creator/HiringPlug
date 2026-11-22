@@ -274,7 +274,7 @@ func DigestText(items []Item, publicURL string) (subject, body string, ok bool) 
 			}
 		}
 	}
-	b.WriteString("\nTo stop these emails, open the bell in HiringPlug and untick \"Email me this each morning\".\n\nHiringPlug")
+	b.WriteString("\nTo choose what you get, or stop these emails: Settings > Your account > Notifications.\n\nHiringPlug")
 	return "Today: " + strings.Join(parts, ", "), b.String(), true
 }
 

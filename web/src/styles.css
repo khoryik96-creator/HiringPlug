@@ -1473,3 +1473,44 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .dupe-group ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
 .dupe-why { display: inline-block; font-size: 0.78rem; font-weight: 700; color: #93500a; background: #fff1cc; border-radius: 999px; padding: 0.1rem 0.6rem; }
 .list-top .dupes-link { white-space: nowrap; font-size: 0.85rem; }
+
+/* The bell in the top bar (components/Notifications.tsx): the count of new
+   ones, and the list it opens. */
+.bell { position: relative; }
+.bell > summary { list-style: none; cursor: pointer; position: relative; }
+.bell > summary::-webkit-details-marker { display: none; }
+.bell-count {
+  position: absolute; top: -5px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 999px;
+  font-size: .68rem; font-weight: 700; line-height: 16px; text-align: center; color: #fff; background: #dc2626;
+}
+.bell-menu {
+  position: absolute; z-index: 60; top: calc(100% + 8px); right: 0; width: 24rem; max-width: calc(100vw - 2rem); padding: .7rem .8rem;
+  background: var(--surface, #fff); color: var(--text); border: 1px solid var(--line, #ded8eb); border-radius: 12px; box-shadow: 0 10px 28px rgba(29, 21, 48, .18);
+  display: grid; gap: .5rem; font-size: .88rem; text-align: left;
+}
+.bell-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.bell-head a { font-size: .8rem; }
+.bell-menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; max-height: min(26rem, 70vh); overflow: auto; }
+.bell-item a {
+  display: grid; grid-template-columns: auto 1fr; column-gap: .5rem; row-gap: .05rem; padding: .4rem .55rem; border-radius: 8px;
+  border-left: 3px solid var(--line, #ded8eb); background: var(--soft, #f7f5fc); color: inherit; text-decoration: none;
+}
+.bell-item a:hover, .bell-item a:focus-visible { background: var(--accent-soft, #efe9fb); }
+.bell-item.new a { background: #fff7ed; }
+.bell-item.new .bell-title { font-weight: 700; }
+.bell-item.kind-applicant a { border-left-color: #16a34a; }
+.bell-item.kind-task a { border-left-color: #d97706; }
+.bell-item.kind-offer_approval a { border-left-color: #dc2626; }
+.bell-item.kind-interview a { border-left-color: #7c3aed; }
+.bell-kind { grid-row: span 2; align-self: start; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #6b6680); padding-top: .1rem; min-width: 4.6rem; }
+.bell-title { overflow-wrap: anywhere; }
+.bell-detail { font-size: .8rem; overflow-wrap: anywhere; }
+.notification-settings .switch-row { margin: .45rem 0; }
+.notification-settings .switch-row.morning { margin-top: .9rem; padding-top: .75rem; border-top: 1px solid var(--line, #ded8eb); }
+/* On a phone the bell is not at the screen's edge: the list spans the screen. */
+@media (max-width: 640px) {
+  .bell-menu { position: fixed; top: 3.4rem; left: .5rem; right: .5rem; width: auto; max-width: none; }
+  .bell-kind { min-width: 0; }
+  .bell-item a { grid-template-columns: 1fr; }
+  .bell-kind { grid-row: auto; }
+}
