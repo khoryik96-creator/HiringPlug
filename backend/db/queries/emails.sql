@@ -186,3 +186,29 @@ WHERE id = @id AND status = 'queued' AND delivery_attempted_at IS NULL;
 
 -- name: ReleaseEmailDelivery :exec
 UPDATE email SET delivery_attempted_at = NULL WHERE id = @id AND status = 'queued';
+
+-- name: ListWhatsAppTemplates :many
+SELECT * FROM whatsapp_template ORDER BY lower(name) LIMIT 200;
+
+-- name: GetWhatsAppTemplate :one
+SELECT * FROM whatsapp_template WHERE id = @id;
+
+-- name: InsertWhatsAppTemplate :one
+INSERT INTO whatsapp_template (tenant_id, name, body, created_by)
+VALUES (app_current_tenant(), @name, @body, app_current_user())
+RETURNING *;
+
+-- The starter WhatsApp templates, added the first time a company opens them.
+-- name: SeedWhatsAppTemplate :exec
+INSERT INTO whatsapp_template (tenant_id, name, body, created_by)
+VALUES (app_current_tenant(), @name, @body, app_current_user())
+ON CONFLICT DO NOTHING;
+
+-- Optimistic concurrency: no row returned = stale version (or not found).
+-- name: UpdateWhatsAppTemplate :one
+UPDATE whatsapp_template SET name = @name, body = @body, version = version + 1, updated_at = now()
+WHERE id = @id AND version = @expected_version
+RETURNING *;
+
+-- name: DeleteWhatsAppTemplate :execrows
+DELETE FROM whatsapp_template WHERE id = @id;

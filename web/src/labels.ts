@@ -201,6 +201,7 @@ export const NOTE_KIND: Record<Schemas["NoteKind"], string> = {
   interview: "Interview",
   call: "Call",
   reference: "Reference check",
+  whatsapp: "WhatsApp",
 };
 
 /** The values of a label map, in its order: the options of a select. */

@@ -12,6 +12,7 @@ import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { MailboxBadge } from "./MailboxBadge";
 import { ErrorMessage } from "./ErrorMessage";
+import { WhatsAppButton } from "./WhatsApp";
 import { useFieldSettings } from "./useFieldSettings";
 
 type Change = { role?: string | null; status?: Schemas["ContactStatus"] };
@@ -81,7 +82,7 @@ export function ContactBanner({ contact: c, canEdit, canEditRole = canEdit }: { 
             {/* The mail server's answer says more than the quick check of the address. */}
             {c.email && (c.mailboxCheck ? <MailboxBadge check={c.mailboxCheck} /> : <EmailCheckBadge check={c.emailCheck} />)}
           </div>
-          <div><span className="label">Mobile</span><span className="figure small">{c.mobile ? <a href={`tel:${c.mobile}`}>{c.mobile}</a> : "—"}</span></div>
+          <div><span className="label">Mobile</span><span className="figure small plate-phone">{c.mobile ? <a href={`tel:${c.mobile}`}>{c.mobile}</a> : "—"}<WhatsAppButton subject={{ kind: "contact", id: c.id, name: c.fullName }} hasNumber={!!(c.mobile ?? c.phone)} /></span></div>
           <div><span className="label">Office phone</span><span className="figure small">{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</span></div>
         </div>
       </div>

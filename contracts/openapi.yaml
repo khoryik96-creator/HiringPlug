@@ -4207,6 +4207,97 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/whatsapp-templates:
+    get:
+      operationId: listWhatsAppTemplates
+      tags: [emails]
+      summary: The company's WhatsApp message templates (starter templates are added the first time)
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WhatsAppTemplateList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createWhatsAppTemplate
+      tags: [emails]
+      summary: Add a WhatsApp template
+      x-permission: emails.templates:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WhatsAppTemplateInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WhatsAppTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/whatsapp-templates/{templateId}:
+    parameters:
+      - $ref: '#/components/parameters/WhatsAppTemplateIdPath'
+    put:
+      operationId: updateWhatsAppTemplate
+      tags: [emails]
+      summary: Change a WhatsApp template
+      x-permission: emails.templates:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WhatsAppTemplateUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WhatsAppTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteWhatsAppTemplate
+      tags: [emails]
+      summary: Delete a WhatsApp template
+      x-permission: emails.templates:manage
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/whatsapp-drafts:
+    post:
+      operationId: draftWhatsApp
+      tags: [emails]
+      summary: A WhatsApp message for a candidate or a contact, and their numbers to open the chat with
+      description: >
+        Fills a template (or starts blank) with the person's details, as email templates are filled; salary fields are never filled (the message is kept as a note, which may be read without salary access) and stay in brackets, listed in `missing`. `numbers` are the person's phone numbers, each with `chatNumber` (country code and number, digits only, for https://wa.me/) when it is a valid number; numbers without a country code are read as HP_DEFAULT_PHONE_REGION's.
+
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WhatsAppDraftRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WhatsAppDraft'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/email-previews:
     post:
       operationId: previewEmail
@@ -12491,6 +12582,79 @@ components:
         url:
           type: string
           format: uri
+    WhatsAppTemplateId:
+      type: string
+      pattern: '^wtpl_[0-9a-hjkmnp-tv-z]{26}$'
+      example: wtpl_01jbz6w0m0k8q9x2r3s4t5v6w7
+    WhatsAppTemplate:
+      type: object
+      required: [id, version, name, body, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/WhatsAppTemplateId'}
+        version: {type: integer}
+        name: {type: string}
+        body:
+          type: string
+          description: "Plain text with placeholders such as {{candidate.firstName}} (the list is in WhatsAppTemplateList.placeholders); *bold* and _italic_ as WhatsApp writes them."
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    WhatsAppTemplateList:
+      type: object
+      required: [items, placeholders]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/WhatsAppTemplate'}
+        placeholders:
+          type: array
+          description: The placeholders WhatsApp templates may use (no salary fields).
+          items: {type: string}
+    WhatsAppTemplateInput:
+      type: object
+      additionalProperties: false
+      required: [name, body]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        body: {type: string, minLength: 1, maxLength: 4000}
+    WhatsAppTemplateUpdate:
+      type: object
+      additionalProperties: false
+      required: [version, name, body]
+      properties:
+        version: {type: integer, minimum: 1}
+        name: {type: string, minLength: 1, maxLength: 100}
+        body: {type: string, minLength: 1, maxLength: 4000}
+    WhatsAppDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [timeZone]
+      description: For a candidate (candidateId) or a client's contact (contactId); without templateId the message starts blank.
+      properties:
+        templateId: {$ref: '#/components/schemas/WhatsAppTemplateId'}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        contactId: {$ref: '#/components/schemas/ContactId'}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        timeZone: {type: string, minLength: 1, maxLength: 64, example: Asia/Kuala_Lumpur}
+    WhatsAppNumber:
+      type: object
+      required: [label, number]
+      properties:
+        label: {type: string, description: 'Phone, Mobile or Office phone.'}
+        number: {type: string, description: The number as saved.}
+        chatNumber:
+          type: string
+          description: Country code and number, digits only (https://wa.me/<chatNumber>); missing when the number is not valid.
+    WhatsAppDraft:
+      type: object
+      required: [text, missing, numbers]
+      properties:
+        text: {type: string}
+        missing:
+          type: array
+          items: {type: string}
+        numbers:
+          type: array
+          items: {$ref: '#/components/schemas/WhatsAppNumber'}
     EmailTemplateId:
       type: string
       pattern: '^etpl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -14925,7 +15089,7 @@ components:
       enum: [candidate, job, company, contact]
     NoteKind:
       type: string
-      enum: [general, screening, interview, call, reference]
+      enum: [general, screening, interview, call, reference, whatsapp]
     Note:
       type: object
       required: [id, subjectType, subjectId, kind, body, sensitive, authorId, authorName, createdAt]
@@ -16382,6 +16546,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/DocumentId'}
+    WhatsAppTemplateIdPath:
+      name: templateId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/WhatsAppTemplateId'}
     EmailTemplateIdPath:
       name: templateId
       in: path

@@ -86,7 +86,7 @@ ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_nor
 LIMIT @row_limit;
 
 -- name: ContactBriefs :many
-SELECT id, first_name, last_name, company_id, email FROM contact WHERE id = ANY(@ids::text[]);
+SELECT id, first_name, last_name, company_id, email, phone, mobile FROM contact WHERE id = ANY(@ids::text[]);
 
 -- name: NewEmploymentCheckID :one
 SELECT new_id('cec')::text;

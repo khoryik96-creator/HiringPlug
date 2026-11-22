@@ -141,6 +141,18 @@ func (q *Queries) DeleteTemplate(ctx context.Context, id string) (int64, error) 
 	return result.RowsAffected(), nil
 }
 
+const deleteWhatsAppTemplate = `-- name: DeleteWhatsAppTemplate :execrows
+DELETE FROM whatsapp_template WHERE id = $1
+`
+
+func (q *Queries) DeleteWhatsAppTemplate(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWhatsAppTemplate, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const dropShortlistDuplicates = `-- name: DropShortlistDuplicates :exec
 DELETE FROM email_candidate d WHERE d.candidate_id = $1
   AND EXISTS (SELECT 1 FROM email_candidate k WHERE k.email_id = d.email_id AND k.candidate_id = $2)
@@ -314,6 +326,26 @@ func (q *Queries) GetTemplate(ctx context.Context, id string) (EmailTemplate, er
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.BodyHtml,
+	)
+	return i, err
+}
+
+const getWhatsAppTemplate = `-- name: GetWhatsAppTemplate :one
+SELECT id, tenant_id, version, name, body, created_by, created_at, updated_at FROM whatsapp_template WHERE id = $1
+`
+
+func (q *Queries) GetWhatsAppTemplate(ctx context.Context, id string) (WhatsappTemplate, error) {
+	row := q.db.QueryRow(ctx, getWhatsAppTemplate, id)
+	var i WhatsappTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.Body,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -526,6 +558,33 @@ func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) 
 	return i, err
 }
 
+const insertWhatsAppTemplate = `-- name: InsertWhatsAppTemplate :one
+INSERT INTO whatsapp_template (tenant_id, name, body, created_by)
+VALUES (app_current_tenant(), $1, $2, app_current_user())
+RETURNING id, tenant_id, version, name, body, created_by, created_at, updated_at
+`
+
+type InsertWhatsAppTemplateParams struct {
+	Name string
+	Body string
+}
+
+func (q *Queries) InsertWhatsAppTemplate(ctx context.Context, arg InsertWhatsAppTemplateParams) (WhatsappTemplate, error) {
+	row := q.db.QueryRow(ctx, insertWhatsAppTemplate, arg.Name, arg.Body)
+	var i WhatsappTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.Body,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listBanners = `-- name: ListBanners :many
 SELECT id, tenant_id, name, content_type, size_bytes, storage_key, created_by, created_at, deleted_at FROM email_banner WHERE deleted_at IS NULL ORDER BY created_at, id LIMIT 100
 `
@@ -694,6 +753,39 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]EmailTemplate, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.BodyHtml,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWhatsAppTemplates = `-- name: ListWhatsAppTemplates :many
+SELECT id, tenant_id, version, name, body, created_by, created_at, updated_at FROM whatsapp_template ORDER BY lower(name) LIMIT 200
+`
+
+func (q *Queries) ListWhatsAppTemplates(ctx context.Context) ([]WhatsappTemplate, error) {
+	rows, err := q.db.Query(ctx, listWhatsAppTemplates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhatsappTemplate
+	for rows.Next() {
+		var i WhatsappTemplate
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.Name,
+			&i.Body,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1080,6 +1172,23 @@ func (q *Queries) SeedTemplate(ctx context.Context, arg SeedTemplateParams) erro
 	return err
 }
 
+const seedWhatsAppTemplate = `-- name: SeedWhatsAppTemplate :exec
+INSERT INTO whatsapp_template (tenant_id, name, body, created_by)
+VALUES (app_current_tenant(), $1, $2, app_current_user())
+ON CONFLICT DO NOTHING
+`
+
+type SeedWhatsAppTemplateParams struct {
+	Name string
+	Body string
+}
+
+// The starter WhatsApp templates, added the first time a company opens them.
+func (q *Queries) SeedWhatsAppTemplate(ctx context.Context, arg SeedWhatsAppTemplateParams) error {
+	_, err := q.db.Exec(ctx, seedWhatsAppTemplate, arg.Name, arg.Body)
+	return err
+}
+
 const setEmailCalendar = `-- name: SetEmailCalendar :exec
 UPDATE email SET calendar = $1 WHERE id = $2
 `
@@ -1181,6 +1290,41 @@ func (q *Queries) UpdateTemplate(ctx context.Context, arg UpdateTemplateParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.BodyHtml,
+	)
+	return i, err
+}
+
+const updateWhatsAppTemplate = `-- name: UpdateWhatsAppTemplate :one
+UPDATE whatsapp_template SET name = $1, body = $2, version = version + 1, updated_at = now()
+WHERE id = $3 AND version = $4
+RETURNING id, tenant_id, version, name, body, created_by, created_at, updated_at
+`
+
+type UpdateWhatsAppTemplateParams struct {
+	Name            string
+	Body            string
+	ID              string
+	ExpectedVersion int32
+}
+
+// Optimistic concurrency: no row returned = stale version (or not found).
+func (q *Queries) UpdateWhatsAppTemplate(ctx context.Context, arg UpdateWhatsAppTemplateParams) (WhatsappTemplate, error) {
+	row := q.db.QueryRow(ctx, updateWhatsAppTemplate,
+		arg.Name,
+		arg.Body,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	var i WhatsappTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.Body,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

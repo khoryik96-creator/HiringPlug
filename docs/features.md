@@ -1712,6 +1712,15 @@ Job details can be expanded or collapsed below the pipeline and start collapsed.
 
 Email composers show Cc and Bcc on demand beside To. Filled copy recipients and invalid fields stay visible.
 
+**WhatsApp** ✅: a green chat button beside a candidate's phone and a contact's
+mobile opens a message: blank, or from a **WhatsApp template** (Settings ›
+WhatsApp templates; three to start with) filled with their name, the job
+chosen and yours. Salary fields are never filled. "Open in WhatsApp" opens the
+recruiter's own WhatsApp (app or web, a wa.me chat link) with the message
+typed in, and keeps it on their timeline as a **WhatsApp** note. Numbers saved
+without a country code are read as `HP_DEFAULT_PHONE_REGION`'s. Nothing is
+sent by HiringPlug itself, so no WhatsApp Business account is needed.
+
 ## Calendar and Outlook
 
 The Calendar icon opens the full calendar. The dock icon beside it opens the calendar

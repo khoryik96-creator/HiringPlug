@@ -3074,6 +3074,67 @@ class MailboxAuthorization(BaseModel):
     url: AnyUrl
 
 
+class WhatsAppTemplateId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["wtpl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^wtpl_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class WhatsAppTemplate(BaseModel):
+    id: WhatsAppTemplateId
+    version: int
+    name: str
+    body: Annotated[
+        str,
+        Field(
+            description="Plain text with placeholders such as {{candidate.firstName}} (the list is in WhatsAppTemplateList.placeholders); *bold* and _italic_ as WhatsApp writes them."
+        ),
+    ]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class WhatsAppTemplateList(BaseModel):
+    items: list[WhatsAppTemplate]
+    placeholders: Annotated[
+        list[str], Field(description="The placeholders WhatsApp templates may use (no salary fields).")
+    ]
+
+
+class WhatsAppTemplateInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    body: Annotated[str, Field(max_length=4000, min_length=1)]
+
+
+class WhatsAppTemplateUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    body: Annotated[str, Field(max_length=4000, min_length=1)]
+
+
+class WhatsAppNumber(BaseModel):
+    label: Annotated[str, Field(description="Phone, Mobile or Office phone.")]
+    number: Annotated[str, Field(description="The number as saved.")]
+    chatNumber: Annotated[
+        str | None,
+        Field(
+            description="Country code and number, digits only (https://wa.me/<chatNumber>); missing when the number is not valid."
+        ),
+    ] = None
+
+
+class WhatsAppDraft(BaseModel):
+    text: str
+    missing: list[str]
+    numbers: list[WhatsAppNumber]
+
+
 class EmailTemplateId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["etpl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^etpl_[0-9a-hjkmnp-tv-z]{26}$")
@@ -5205,6 +5266,7 @@ class NoteKind(StrEnum):
     interview = "interview"
     call = "call"
     reference = "reference"
+    whatsapp = "whatsapp"
 
 
 class Note(BaseModel):
@@ -7424,6 +7486,17 @@ class MailApps(BaseModel):
     ]
     microsoft: MailApp
     google: MailApp
+
+
+class WhatsAppDraftRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    templateId: WhatsAppTemplateId | None = None
+    candidateId: CandidateId | None = None
+    contactId: ContactId | None = None
+    applicationId: ApplicationId | None = None
+    timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64, min_length=1)]
 
 
 class EmailBatch(BaseModel):

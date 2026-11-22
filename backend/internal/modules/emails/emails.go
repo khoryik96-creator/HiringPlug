@@ -43,6 +43,7 @@ type Candidate struct {
 	Version, CompensationVersion  int
 	FullName, FirstName, LastName string
 	Email                         *string
+	Phone                         *string  // for a WhatsApp chat; nil when only a brief was read
 	Details                       *Details // for fields; nil when only a brief was read
 }
 
@@ -85,7 +86,10 @@ type Interview struct {
 // Deps is what the module needs from other modules, each read in the caller's
 // transaction.
 type Deps struct {
-	Users interface {
+	// PhoneRegion is the country of numbers saved without a country code
+	// (HP_DEFAULT_PHONE_REGION), for WhatsApp chat links.
+	PhoneRegion string
+	Users       interface {
 		PrincipalFor(context.Context, pgx.Tx, string) (authz.Principal, bool, error)
 	}
 	Candidates interface {
@@ -152,6 +156,7 @@ type Contact struct {
 	FirstName, LastName, FullName string
 	CompanyName                   string
 	Email                         *string
+	Phone, Mobile                 *string
 }
 
 // Module is the emails module.

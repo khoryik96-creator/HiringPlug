@@ -45,6 +45,7 @@ export const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Claims = page(() => import("./pages/Claims"), "Claims");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
+const WhatsAppTemplates = page(() => import("./pages/WhatsAppTemplates"), "WhatsAppTemplates");
 const Invoicing = page(() => import("./pages/Invoicing"), "Invoicing");
 const ImportPage = page(() => import("./pages/ImportPage"), "ImportPage");
 const Integrations = page(() => import("./pages/Integrations"), "Integrations");
@@ -167,6 +168,8 @@ export const ROUTES: Route[] = [
   { section: "email-connection", path: /^#\/email-connection/, permission: "emails:send", menu: { in: "settings", label: "Email connection", href: "#/email-connection" }, render: (c) => <EmailConnection canManageApps={can(c, "emails.apps:manage")} /> },
   { section: "email-templates", path: /^#\/email-templates/, permission: "emails:send", menu: { in: "settings", label: "Email templates", href: "#/email-templates" },
     render: (c) => <EmailTemplates canManage={can(c, "emails.templates:manage")} canCreate={can(c, "emails.templates:create")} canPreview={can(c, "emails:send") && can(c, "candidates:read")} /> },
+  { section: "whatsapp-templates", path: /^#\/whatsapp-templates/, permission: "emails:send", menu: { in: "settings", label: "WhatsApp templates", href: "#/whatsapp-templates" },
+    render: (c) => <WhatsAppTemplates canManage={can(c, "emails.templates:manage")} canCreate={can(c, "emails.templates:create")} /> },
   { section: "automations", path: /^#\/automations/, permission: "automations:read", menu: { in: "settings", label: "Automations", href: "#/automations" },
     render: (c) => <Automations permissions={c.permissions} /> },
   { section: "invoicing", path: /^#\/invoicing/, permission: "placements:read", menu: { in: "settings", label: "Invoicing", href: "#/invoicing" },

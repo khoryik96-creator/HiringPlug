@@ -1723,3 +1723,14 @@ type WebhookDelivery struct {
 	CreatedAt      time.Time
 	DeliveredAt    *time.Time
 }
+
+type WhatsappTemplate struct {
+	ID        string
+	TenantID  string
+	Version   int32
+	Name      string
+	Body      string
+	CreatedBy string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}

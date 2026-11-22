@@ -97,7 +97,7 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 	}
 	return emails.Candidate{
 		Version: v.Version, CompensationVersion: compensationVersion,
-		FullName: candidates.FullName(pr), FirstName: pr.FirstName, LastName: pr.LastName, Email: pr.Email, Details: d,
+		FullName: candidates.FullName(pr), FirstName: pr.FirstName, LastName: pr.LastName, Email: pr.Email, Phone: pr.Phone, Details: d,
 	}, nil
 }
 
@@ -254,7 +254,7 @@ func (a emailContacts) Contact(ctx context.Context, tx pgx.Tx, id string) (email
 		return emails.Contact{}, err
 	}
 	first, last, _ := strings.Cut(strings.TrimSpace(b.Name), " ")
-	return emails.Contact{FirstName: first, LastName: strings.TrimSpace(last), FullName: b.Name, CompanyName: names[b.CompanyID], Email: b.Email}, nil
+	return emails.Contact{FirstName: first, LastName: strings.TrimSpace(last), FullName: b.Name, CompanyName: names[b.CompanyID], Email: b.Email, Phone: b.Phone, Mobile: b.Mobile}, nil
 }
 
 // Presentation cleanup leaves the stored salary record untouched.

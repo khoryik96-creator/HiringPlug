@@ -4,7 +4,7 @@ import { resolve, type Route } from "../routes";
 export const settingsGroups = [
   { label: "My settings", sections: ["account", "my-dropdowns"] },
   { label: "Recruiting setup", sections: ["settings-stages", "settings-lists", "industries", "settings-salary", "cv-templates"] },
-  { label: "Email & scheduling", sections: ["email-connection", "email-templates", "booking-calendars", "automations"] },
+  { label: "Email & scheduling", sections: ["email-connection", "email-templates", "whatsapp-templates", "booking-calendars", "automations"] },
   { label: "Team & agency", sections: ["settings", "team", "access", "privacy"] },
   { label: "Finance", sections: ["invoicing", "settings-claims-storage"] },
   { label: "System & integrations", sections: ["integrations", "ai-provider", "companion", "system", "backups", "bin"] },
@@ -20,6 +20,7 @@ const aliases: Record<string, string> = {
   "cv-templates": "format resume résumé CV Studio document styling",
   "email-connection": "connect outlook microsoft gmail google SMTP mailbox inbox sign in login OAuth Entra application registration",
   "email-templates": "candidate email messages banner canned replies",
+  "whatsapp-templates": "whatsapp chat message text phone",
   "booking-calendars": "team interview availability scheduling bookings calendar",
   automations: "rules automatic workflow reminders email triggers",
   settings: "agency name branding required fields",

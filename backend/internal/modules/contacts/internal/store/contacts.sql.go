@@ -115,7 +115,7 @@ func (q *Queries) CompanyContactsWithEmail(ctx context.Context, companyID string
 }
 
 const contactBriefs = `-- name: ContactBriefs :many
-SELECT id, first_name, last_name, company_id, email FROM contact WHERE id = ANY($1::text[])
+SELECT id, first_name, last_name, company_id, email, phone, mobile FROM contact WHERE id = ANY($1::text[])
 `
 
 type ContactBriefsRow struct {
@@ -124,6 +124,8 @@ type ContactBriefsRow struct {
 	LastName  string
 	CompanyID string
 	Email     *string
+	Phone     *string
+	Mobile    *string
 }
 
 func (q *Queries) ContactBriefs(ctx context.Context, ids []string) ([]ContactBriefsRow, error) {
@@ -141,6 +143,8 @@ func (q *Queries) ContactBriefs(ctx context.Context, ids []string) ([]ContactBri
 			&i.LastName,
 			&i.CompanyID,
 			&i.Email,
+			&i.Phone,
+			&i.Mobile,
 		); err != nil {
 			return nil, err
 		}

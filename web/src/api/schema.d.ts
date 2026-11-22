@@ -2319,6 +2319,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/whatsapp-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's WhatsApp message templates (starter templates are added the first time) */
+        get: operations["listWhatsAppTemplates"];
+        put?: never;
+        /** Add a WhatsApp template */
+        post: operations["createWhatsAppTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/whatsapp-templates/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["WhatsAppTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Change a WhatsApp template */
+        put: operations["updateWhatsAppTemplate"];
+        post?: never;
+        /** Delete a WhatsApp template */
+        delete: operations["deleteWhatsAppTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/whatsapp-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A WhatsApp message for a candidate or a contact, and their numbers to open the chat with
+         * @description Fills a template (or starts blank) with the person's details, as email templates are filled; salary fields are never filled (the message is kept as a note, which may be read without salary access) and stay in brackets, listed in `missing`. `numbers` are the person's phone numbers, each with `chatNumber` (country code and number, digits only, for https://wa.me/) when it is a valid number; numbers without a country code are read as HP_DEFAULT_PHONE_REGION's.
+         */
+        post: operations["draftWhatsApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/email-previews": {
         parameters: {
             query?: never;
@@ -7818,6 +7876,55 @@ export interface components {
             /** Format: uri */
             url: string;
         };
+        /** @example wtpl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        WhatsAppTemplateId: string;
+        WhatsAppTemplate: {
+            id: components["schemas"]["WhatsAppTemplateId"];
+            version: number;
+            name: string;
+            /** @description Plain text with placeholders such as {{candidate.firstName}} (the list is in WhatsAppTemplateList.placeholders); *bold* and _italic_ as WhatsApp writes them. */
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        WhatsAppTemplateList: {
+            items: components["schemas"]["WhatsAppTemplate"][];
+            /** @description The placeholders WhatsApp templates may use (no salary fields). */
+            placeholders: string[];
+        };
+        WhatsAppTemplateInput: {
+            name: string;
+            body: string;
+        };
+        WhatsAppTemplateUpdate: {
+            version: number;
+            name: string;
+            body: string;
+        };
+        /** @description For a candidate (candidateId) or a client's contact (contactId); without templateId the message starts blank. */
+        WhatsAppDraftRequest: {
+            templateId?: components["schemas"]["WhatsAppTemplateId"];
+            candidateId?: components["schemas"]["CandidateId"];
+            contactId?: components["schemas"]["ContactId"];
+            applicationId?: components["schemas"]["ApplicationId"];
+            /** @example Asia/Kuala_Lumpur */
+            timeZone: string;
+        };
+        WhatsAppNumber: {
+            /** @description Phone, Mobile or Office phone. */
+            label: string;
+            /** @description The number as saved. */
+            number: string;
+            /** @description Country code and number, digits only (https://wa.me/<chatNumber>); missing when the number is not valid. */
+            chatNumber?: string;
+        };
+        WhatsAppDraft: {
+            text: string;
+            missing: string[];
+            numbers: components["schemas"]["WhatsAppNumber"][];
+        };
         /** @example etpl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         EmailTemplateId: string;
         /** @example eml_01jbz6w0m0k8q9x2r3s4t5v6w7 */
@@ -9620,7 +9727,7 @@ export interface components {
         /** @enum {string} */
         NoteSubjectType: "candidate" | "job" | "company" | "contact";
         /** @enum {string} */
-        NoteKind: "general" | "screening" | "interview" | "call" | "reference";
+        NoteKind: "general" | "screening" | "interview" | "call" | "reference" | "whatsapp";
         Note: {
             id: components["schemas"]["NoteId"];
             subjectType: components["schemas"]["NoteSubjectType"];
@@ -11128,6 +11235,7 @@ export interface components {
         ContactIdPath: components["schemas"]["ContactId"];
         CvTemplateIdPath: components["schemas"]["CvTemplateId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
+        WhatsAppTemplateIdPath: components["schemas"]["WhatsAppTemplateId"];
         EmailTemplateIdPath: components["schemas"]["EmailTemplateId"];
         FolderIdPath: components["schemas"]["FolderId"];
         CvImportIdPath: components["schemas"]["CvImportId"];
@@ -15893,6 +16001,137 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listWhatsAppTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createWhatsAppTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateWhatsAppTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["WhatsAppTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteWhatsAppTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["WhatsAppTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    draftWhatsApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppDraft"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

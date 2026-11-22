@@ -77,9 +77,10 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, contactID string) (bool,
 
 // Brief is what other modules need to show a contact.
 type Brief struct {
-	Name      string
-	CompanyID string
-	Email     *string
+	Name          string
+	CompanyID     string
+	Email         *string
+	Phone, Mobile *string
 }
 
 // Briefs returns name and company of the given contacts (missing ones are

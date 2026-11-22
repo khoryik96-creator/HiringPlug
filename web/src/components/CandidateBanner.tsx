@@ -9,6 +9,7 @@ import {
 } from "./candidateLook";
 import { cardGradient } from "./companyCategory";
 import { CopyText } from "./CopyButton";
+import { WhatsAppButton } from "./WhatsApp";
 import { ErrorMessage } from "./ErrorMessage";
 
 const SHOWN_SKILLS = 6;
@@ -54,7 +55,7 @@ export function CandidateBanner({ candidate: c, canEdit, canEditStatus = canEdit
             <div><dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd></div>
             <div><dt>Lives in</dt><dd>{lives || "—"}</dd></div>
             <div className="plate-reach"><dt>Email</dt><dd>{c.email ? <CopyText text={c.email} what="email" /> : "—"}</dd></div>
-            <div><dt>Phone</dt><dd>{c.phone ? <CopyText text={c.phone} what="phone number" /> : "—"}</dd></div>
+            <div><dt>Phone</dt><dd className="plate-phone">{c.phone ? <CopyText text={c.phone} what="phone number" /> : "—"}<WhatsAppButton subject={{ kind: "candidate", id: c.id, name: c.fullName }} hasNumber={!!c.phone} /></dd></div>
             <div><dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>Profile ↗</a> : "—"}</dd></div>
           </dl>
         </div>
