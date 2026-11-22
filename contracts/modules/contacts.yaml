@@ -13,6 +13,9 @@ x-module:
     contacts:update:
       description: Edit contacts and re-check their email.
       roles: [owner, admin, recruiter, sourcer]
+    contacts:merge:
+      description: Merge a duplicate contact into another (their emails, jobs, notes and checks move over).
+      roles: [owner, admin, recruiter]
     contacts.apollo:use:
       description: Connect a personal Apollo account and confirm work-email lookups in Find HR.
       roles: [owner, admin, recruiter, sourcer]
@@ -160,6 +163,74 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ContactUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contact' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/contacts/duplicates:
+    get:
+      operationId: listContactDuplicates
+      tags: [contacts]
+      summary: Possible duplicates among all contacts
+      description: >
+        Groups of contacts with the same LinkedIn profile, or the same name
+        (any order, titles aside) at the same company, newest first. Open one
+        and merge the others into it.
+      x-permission: contacts:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactDuplicateGroups' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/contacts/{contactId}/similar:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    get:
+      operationId: listSimilarContacts
+      tags: [contacts]
+      summary: Possible duplicates of a contact (same LinkedIn profile, name or phone, or a name much alike at the same company)
+      x-permission: contacts:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SimilarContacts' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/contacts/{contactId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    post:
+      operationId: mergeContact
+      tags: [contacts]
+      summary: Merge a duplicate into this contact
+      description: >
+        The duplicate's emails (and Outlook threads), jobs, invoices, notes,
+        folder places and checks move to this contact; this contact's empty
+        fields are filled from the duplicate's (its email only if this
+        contact has none); then the duplicate is deleted. This contact keeps
+        its company. `version` is this contact's.
+      x-permission: contacts:merge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactMerge' }
       responses:
         '200':
           description: OK
@@ -854,6 +925,48 @@ components:
           nullable: true
         notes: { type: string, maxLength: 4000, nullable: true }
 
+    ContactMerge:
+      type: object
+      additionalProperties: false
+      required: [duplicateId, version]
+      properties:
+        duplicateId:
+          description: The contact to merge in (and delete).
+          allOf: [{ $ref: '#/components/schemas/ContactId' }]
+        version: { type: integer, minimum: 1, description: The version of the contact you keep. }
+    ContactDuplicateReason:
+      type: string
+      enum: [same_linkedin, same_name, same_phone, similar_name]
+    ContactLookalike:
+      type: object
+      required: [id, companyId, companyName, fullName, title, email, reasons]
+      properties:
+        id: { $ref: '#/components/schemas/ContactId' }
+        companyId: { type: string }
+        companyName: { type: string, nullable: true }
+        fullName: { type: string }
+        title: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        reasons: { type: array, items: { $ref: '#/components/schemas/ContactDuplicateReason' } }
+    SimilarContacts:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ContactLookalike' } }
+    ContactDuplicateGroup:
+      type: object
+      required: [reasons, contacts]
+      properties:
+        reasons: { type: array, items: { $ref: '#/components/schemas/ContactDuplicateReason' } }
+        contacts:
+          description: Newest first; `reasons` on each is empty (the group's say why).
+          type: array
+          items: { $ref: '#/components/schemas/ContactLookalike' }
+    ContactDuplicateGroups:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ContactDuplicateGroup' } }
     ContactSummary:
       type: object
       required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, mailboxCheckedAt, linkedinEmployment, phone, mobile, status, role, updatedAt]

@@ -63,3 +63,10 @@ LIMIT 500;
 UPDATE job_lead SET status = @status, notes = sqlc.narg(notes), company_id = sqlc.narg(company_id), version = version + 1, updated_at = now()
 WHERE id = @id AND version = @expected_version
 RETURNING *;
+
+-- Merging duplicate companies: leads and lead sources linked to the duplicate go to the one kept.
+-- name: MoveCompanyLeads :exec
+UPDATE job_lead SET company_id = @to_id WHERE company_id = @from_id;
+
+-- name: MoveCompanyLeadSources :exec
+UPDATE lead_source SET company_id = @to_id WHERE company_id = @from_id;

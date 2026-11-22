@@ -31,6 +31,7 @@ type Service struct {
 	files        *blob.Store // documents kept with terms and benefits
 	users        Users
 	folderItems  folderfilter.Items // a folder's companies (UseFolders)
+	movers       []RecordMover      // other modules' records that follow a merge
 }
 
 // Create adds a company.

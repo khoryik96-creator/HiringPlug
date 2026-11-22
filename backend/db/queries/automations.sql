@@ -92,3 +92,7 @@ RETURNING *;
 -- name: SkipScheduledRun :execrows
 UPDATE automation_run SET status = 'skipped', detail = @detail, finished_at = now()
 WHERE automation_id = @automation_id AND subject_id = @subject_id AND status = 'scheduled';
+
+-- Merging duplicate companies: automations about the duplicate follow the one kept.
+-- name: MoveCompanyAutomations :execrows
+UPDATE automation SET company_id = @to_id WHERE company_id = @from_id;

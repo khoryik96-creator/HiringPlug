@@ -16,6 +16,9 @@ x-module:
     companies.category:update:
       description: "Change a company's category (signed client, prospect…) on its card and form."
       roles: [owner, admin, recruiter]
+    companies:merge:
+      description: Merge a duplicate company into another (its contacts, jobs, notes and documents move over).
+      roles: [owner, admin, recruiter]
     companies.documents:delete:
       description: "Delete documents kept with a client's terms of business or benefits (give it to the people you trust)."
       roles: [owner, admin]
@@ -147,6 +150,75 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/CompanyUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Company' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/companies/duplicates:
+    get:
+      operationId: listCompanyDuplicates
+      tags: [companies]
+      summary: Possible duplicates among all companies
+      description: >
+        Groups of companies sharing a website, a LinkedIn page or a name
+        without its legal form ("Acme Sdn Bhd" and "ACME Berhad"), newest
+        first. Open one and merge the others into it.
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyDuplicateGroups' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/companies/{companyId}/similar:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: listSimilarCompanies
+      tags: [companies]
+      summary: Possible duplicates of a company (same website or LinkedIn page, or a name much alike)
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SimilarCompanies' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/companies/{companyId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    post:
+      operationId: mergeCompany
+      tags: [companies]
+      summary: Merge a duplicate into this company
+      description: >
+        The duplicate's contacts, jobs, notes, documents, leads, automations,
+        industries and folder places move to this company; its terms of
+        business and benefits too if this company has none (otherwise this
+        company's are kept); this company's empty fields are filled from the
+        duplicate's; then the duplicate is deleted. `version` is this
+        company's.
+      x-permission: companies:merge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyMerge' }
       responses:
         '200':
           description: OK
@@ -647,6 +719,47 @@ components:
         registrationNumber: { type: string, maxLength: 50, nullable: true }
         about: { type: string, maxLength: 4000, nullable: true }
 
+    CompanyMerge:
+      type: object
+      additionalProperties: false
+      required: [duplicateId, version]
+      properties:
+        duplicateId:
+          description: The company to merge in (and delete).
+          allOf: [{ $ref: '#/components/schemas/CompanyId' }]
+        version: { type: integer, minimum: 1, description: The version of the company you keep. }
+    CompanyDuplicateReason:
+      type: string
+      enum: [same_website, same_linkedin, similar_name]
+    CompanyLookalike:
+      type: object
+      required: [id, name, city, website, industry, reasons]
+      properties:
+        id: { $ref: '#/components/schemas/CompanyId' }
+        name: { type: string }
+        city: { type: string, nullable: true }
+        website: { type: string, nullable: true }
+        industry: { type: string, nullable: true }
+        reasons: { type: array, items: { $ref: '#/components/schemas/CompanyDuplicateReason' } }
+    SimilarCompanies:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CompanyLookalike' } }
+    CompanyDuplicateGroup:
+      type: object
+      required: [reasons, companies]
+      properties:
+        reasons: { type: array, items: { $ref: '#/components/schemas/CompanyDuplicateReason' } }
+        companies:
+          description: Newest first; `reasons` on each is empty (the group's say why).
+          type: array
+          items: { $ref: '#/components/schemas/CompanyLookalike' }
+    CompanyDuplicateGroups:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CompanyDuplicateGroup' } }
     CompanySummary:
       type: object
       required: [id, name, type, category, industry, city, website, linkedinUrl, updatedAt]

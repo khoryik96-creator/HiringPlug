@@ -25,3 +25,7 @@ UPDATE note SET subject_id = @to_id WHERE subject_type = 'candidate' AND subject
 -- A record deleted for good (the Bin) takes its notes with it.
 -- name: DeleteSubjectNotes :exec
 DELETE FROM note WHERE subject_type = @subject_type AND subject_id = ANY(@subject_ids::text[]);
+
+-- Merging duplicate companies or contacts: the duplicate's notes go to the record kept.
+-- name: MoveSubjectNotes :execrows
+UPDATE note SET subject_id = @to_id WHERE subject_type = @subject_type AND subject_id = @from_id;

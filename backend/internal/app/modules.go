@@ -241,6 +241,10 @@ func NewModules(d Deps) *Modules {
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims)
+	// A merged duplicate company's contacts, jobs, notes and the rest follow it;
+	// a merged contact's emails, jobs, invoices and notes follow them.
+	m.Companies.MoveRecordsWith(m.Contacts, m.Jobs, m.Notes, m.Folders, m.Leads, m.Automations, m.Industries)
+	m.Contacts.MoveRecordsWith(m.Jobs, m.Notes, m.Folders, m.Emails, m.Placements)
 	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)

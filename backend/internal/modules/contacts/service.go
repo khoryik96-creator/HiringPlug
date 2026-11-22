@@ -36,6 +36,7 @@ type Service struct {
 	files       *blob.Store
 	mailboxes   Mailboxes
 	folderItems folderfilter.Items // a folder's contacts (UseFolders)
+	movers      []RecordMover      // other modules' records that follow a merge
 }
 
 // Create adds a contact. The email is checked before the transaction starts

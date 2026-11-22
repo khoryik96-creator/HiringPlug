@@ -64,8 +64,23 @@ func (m *Module) ItemsOf(kind string) func(ctx context.Context, tx pgx.Tx, p aut
 }
 
 // MoveCandidate puts a merged duplicate's place in folders on the record kept
-// (once in each folder), in the merge's transaction.
+// (once in each folder), in the merge's transaction. MoveCompany and
+// MoveContact do the same for companies and contacts (ids never clash).
 func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
+	return m.moveItem(ctx, tx, fromID, toID)
+}
+
+// MoveCompany: see MoveCandidate.
+func (m *Module) MoveCompany(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
+	return m.moveItem(ctx, tx, fromID, toID)
+}
+
+// MoveContact: see MoveCandidate.
+func (m *Module) MoveContact(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
+	return m.moveItem(ctx, tx, fromID, toID)
+}
+
+func (m *Module) moveItem(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
 	q := store.New(tx)
 	if err := q.MoveItems(ctx, store.MoveItemsParams{FromID: fromID, ToID: toID}); err != nil {
 		return err

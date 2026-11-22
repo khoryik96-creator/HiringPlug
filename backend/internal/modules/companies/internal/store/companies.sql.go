@@ -66,6 +66,46 @@ func (q *Queries) ClearSuggestions(ctx context.Context, companyID string) error 
 	return err
 }
 
+const companyDuplicateGroups = `-- name: CompanyDuplicateGroups :many
+SELECT kind::text AS kind, ids::text[] AS ids FROM (
+  SELECT 'similar_name' AS kind, array_agg(id ORDER BY id) AS ids FROM company WHERE name_core <> '' GROUP BY name_core HAVING count(*) > 1
+  UNION ALL
+  SELECT 'same_website', array_agg(id ORDER BY id) FROM company WHERE site_key IS NOT NULL GROUP BY site_key HAVING count(*) > 1
+  UNION ALL
+  SELECT 'same_linkedin', array_agg(id ORDER BY id) FROM company WHERE linkedin_url IS NOT NULL
+  GROUP BY lower(rtrim(linkedin_url, '/')) HAVING count(*) > 1
+) g
+ORDER BY ids[cardinality(ids)] DESC
+LIMIT 500
+`
+
+type CompanyDuplicateGroupsRow struct {
+	Kind string
+	Ids  []string
+}
+
+// Every group of companies sharing a website, a LinkedIn page or a name
+// without its legal form (the Possible duplicates list).
+func (q *Queries) CompanyDuplicateGroups(ctx context.Context) ([]CompanyDuplicateGroupsRow, error) {
+	rows, err := q.db.Query(ctx, companyDuplicateGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompanyDuplicateGroupsRow
+	for rows.Next() {
+		var i CompanyDuplicateGroupsRow
+		if err := rows.Scan(&i.Kind, &i.Ids); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const companyExists = `-- name: CompanyExists :one
 SELECT EXISTS (SELECT 1 FROM company WHERE id = $1)
 `
@@ -97,6 +137,45 @@ func (q *Queries) CompanyLinkedin(ctx context.Context, id string) (string, error
 	var column_1 string
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const companyLookalikes = `-- name: CompanyLookalikes :many
+SELECT id, name, city, website, industry FROM company WHERE id = ANY($1::text[])
+`
+
+type CompanyLookalikesRow struct {
+	ID       string
+	Name     string
+	City     *string
+	Website  *string
+	Industry *string
+}
+
+// The companies of the Possible duplicates list.
+func (q *Queries) CompanyLookalikes(ctx context.Context, ids []string) ([]CompanyLookalikesRow, error) {
+	rows, err := q.db.Query(ctx, companyLookalikes, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompanyLookalikesRow
+	for rows.Next() {
+		var i CompanyLookalikesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.City,
+			&i.Website,
+			&i.Industry,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const companyNames = `-- name: CompanyNames :many
@@ -210,6 +289,19 @@ func (q *Queries) DeleteCompanyDocument(ctx context.Context, arg DeleteCompanyDo
 	return storage_key, err
 }
 
+const deleteMergedCompany = `-- name: DeleteMergedCompany :execrows
+DELETE FROM company WHERE id = $1
+`
+
+// The duplicate, once everything has moved (suggestions waiting for it go with it).
+func (q *Queries) DeleteMergedCompany(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteMergedCompany, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findCompanyIDByName = `-- name: FindCompanyIDByName :one
 SELECT id FROM company WHERE name_key = app_normalize_text($1::text)
 `
@@ -222,7 +314,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -260,6 +352,8 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
 		&i.BinnedAt,
+		&i.NameCore,
+		&i.SiteKey,
 	)
 	return i, err
 }
@@ -403,7 +497,7 @@ INSERT INTO company (
   $8, $9, $10, $11,
   $12, $13, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key
 `
 
 type InsertCompanyParams struct {
@@ -473,6 +567,8 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
 		&i.BinnedAt,
+		&i.NameCore,
+		&i.SiteKey,
 	)
 	return i, err
 }
@@ -767,6 +863,51 @@ func (q *Queries) ListCompanyDocuments(ctx context.Context, companyID string) ([
 	return items, nil
 }
 
+const moveBenefitsIfNone = `-- name: MoveBenefitsIfNone :exec
+UPDATE company_benefits t SET company_id = $1
+WHERE t.company_id = $2 AND NOT EXISTS (SELECT 1 FROM company_benefits k WHERE k.company_id = $1)
+`
+
+type MoveBenefitsIfNoneParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveBenefitsIfNone(ctx context.Context, arg MoveBenefitsIfNoneParams) error {
+	_, err := q.db.Exec(ctx, moveBenefitsIfNone, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveCompanyDocuments = `-- name: MoveCompanyDocuments :exec
+UPDATE company_document SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyDocumentsParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveCompanyDocuments(ctx context.Context, arg MoveCompanyDocumentsParams) error {
+	_, err := q.db.Exec(ctx, moveCompanyDocuments, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveTermsIfNone = `-- name: MoveTermsIfNone :exec
+UPDATE company_terms t SET company_id = $1
+WHERE t.company_id = $2 AND NOT EXISTS (SELECT 1 FROM company_terms k WHERE k.company_id = $1)
+`
+
+type MoveTermsIfNoneParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging duplicates: the duplicate's terms and benefits only if the company kept has none; its documents always.
+func (q *Queries) MoveTermsIfNone(ctx context.Context, arg MoveTermsIfNoneParams) error {
+	_, err := q.db.Exec(ctx, moveTermsIfNone, arg.ToID, arg.FromID)
+	return err
+}
+
 const pendingSuggestions = `-- name: PendingSuggestions :many
 SELECT id, tenant_id, company_id, field, value, source, status, created_at FROM company_suggestion WHERE company_id = $1 AND status = 'pending' ORDER BY id
 `
@@ -983,8 +1124,64 @@ func (q *Queries) SetIndustryTerms(ctx context.Context, arg SetIndustryTermsPara
 	return err
 }
 
+const similarCompanies = `-- name: SimilarCompanies :many
+SELECT c.id, c.name, c.city, c.website, c.industry,
+       coalesce(c.site_key = me.site_key, false)::boolean AS same_website,
+       coalesce(lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/')), false)::boolean AS same_linkedin,
+       (me.name_core <> '' AND (c.name_core = me.name_core OR similarity(c.name_core, me.name_core) >= 0.6))::boolean AS similar_name
+FROM company c, (SELECT x.site_key, x.linkedin_url, x.name_core FROM company x WHERE x.id = $1) me
+WHERE c.id <> $1
+  AND (c.site_key = me.site_key
+       OR lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/'))
+       OR (me.name_core <> '' AND (c.name_core = me.name_core OR similarity(c.name_core, me.name_core) >= 0.6)))
+ORDER BY c.id DESC
+LIMIT 20
+`
+
+type SimilarCompaniesRow struct {
+	ID           string
+	Name         string
+	City         *string
+	Website      *string
+	Industry     *string
+	SameWebsite  bool
+	SameLinkedin bool
+	SimilarName  bool
+}
+
+// Possible duplicates of a company: the same website, LinkedIn page or name
+// without its legal form, or a name much like it. Newest first.
+func (q *Queries) SimilarCompanies(ctx context.Context, id string) ([]SimilarCompaniesRow, error) {
+	rows, err := q.db.Query(ctx, similarCompanies, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SimilarCompaniesRow
+	for rows.Next() {
+		var i SimilarCompaniesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.City,
+			&i.Website,
+			&i.Industry,
+			&i.SameWebsite,
+			&i.SameLinkedin,
+			&i.SimilarName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const touchCompany = `-- name: TouchCompany :one
-UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at
+UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key
 `
 
 type TouchCompanyParams struct {
@@ -1027,6 +1224,8 @@ func (q *Queries) TouchCompany(ctx context.Context, arg TouchCompanyParams) (Com
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
 		&i.BinnedAt,
+		&i.NameCore,
+		&i.SiteKey,
 	)
 	return i, err
 }
@@ -1049,7 +1248,7 @@ UPDATE company SET
   version = version + 1,
   updated_at = now()
 WHERE id = $14 AND version = $15
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key
 `
 
 type UpdateCompanyParams struct {
@@ -1122,6 +1321,8 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
 		&i.BinnedAt,
+		&i.NameCore,
+		&i.SiteKey,
 	)
 	return i, err
 }

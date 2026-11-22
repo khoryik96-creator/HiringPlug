@@ -1157,6 +1157,67 @@ export interface paths {
         patch: operations["updateCompany"];
         trace?: never;
     };
+    "/v1/companies/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Possible duplicates among all companies
+         * @description Groups of companies sharing a website, a LinkedIn page or a name without its legal form ("Acme Sdn Bhd" and "ACME Berhad"), newest first. Open one and merge the others into it.
+         */
+        get: operations["listCompanyDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Possible duplicates of a company (same website or LinkedIn page, or a name much alike) */
+        get: operations["listSimilarCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge a duplicate into this company
+         * @description The duplicate's contacts, jobs, notes, documents, leads, automations, industries and folder places move to this company; its terms of business and benefits too if this company has none (otherwise this company's are kept); this company's empty fields are filled from the duplicate's; then the duplicate is deleted. `version` is this company's.
+         */
+        post: operations["mergeCompany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/companies/{companyId}/autofill": {
         parameters: {
             query?: never;
@@ -1370,6 +1431,67 @@ export interface paths {
          * @description Only the fields you send change. Send `null` to clear a field. `version` must be the version you loaded. A changed email is checked again.
          */
         patch: operations["updateContact"];
+        trace?: never;
+    };
+    "/v1/contacts/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Possible duplicates among all contacts
+         * @description Groups of contacts with the same LinkedIn profile, or the same name (any order, titles aside) at the same company, newest first. Open one and merge the others into it.
+         */
+        get: operations["listContactDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Possible duplicates of a contact (same LinkedIn profile, name or phone, or a name much alike at the same company) */
+        get: operations["listSimilarContacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge a duplicate into this contact
+         * @description The duplicate's emails (and Outlook threads), jobs, invoices, notes, folder places and checks move to this contact; this contact's empty fields are filled from the duplicate's (its email only if this contact has none); then the duplicate is deleted. This contact keeps its company. `version` is this contact's.
+         */
+        post: operations["mergeContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/contacts/{contactId}/email-check": {
@@ -5215,7 +5337,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -6734,6 +6856,33 @@ export interface components {
             registrationNumber?: string | null;
             about?: string | null;
         };
+        CompanyMerge: {
+            /** @description The company to merge in (and delete). */
+            duplicateId: components["schemas"]["CompanyId"];
+            /** @description The version of the company you keep. */
+            version: number;
+        };
+        /** @enum {string} */
+        CompanyDuplicateReason: "same_website" | "same_linkedin" | "similar_name";
+        CompanyLookalike: {
+            id: components["schemas"]["CompanyId"];
+            name: string;
+            city: string | null;
+            website: string | null;
+            industry: string | null;
+            reasons: components["schemas"]["CompanyDuplicateReason"][];
+        };
+        SimilarCompanies: {
+            items: components["schemas"]["CompanyLookalike"][];
+        };
+        CompanyDuplicateGroup: {
+            reasons: components["schemas"]["CompanyDuplicateReason"][];
+            /** @description Newest first; `reasons` on each is empty (the group's say why). */
+            companies: components["schemas"]["CompanyLookalike"][];
+        };
+        CompanyDuplicateGroups: {
+            items: components["schemas"]["CompanyDuplicateGroup"][];
+        };
         CompanySummary: {
             id: components["schemas"]["CompanyId"];
             name: string;
@@ -7051,6 +7200,34 @@ export interface components {
             /** @description Hiring manager, HR… (a key of the contact_role list); null when not set. */
             role?: components["schemas"]["ContactRole"] | null;
             notes?: string | null;
+        };
+        ContactMerge: {
+            /** @description The contact to merge in (and delete). */
+            duplicateId: components["schemas"]["ContactId"];
+            /** @description The version of the contact you keep. */
+            version: number;
+        };
+        /** @enum {string} */
+        ContactDuplicateReason: "same_linkedin" | "same_name" | "same_phone" | "similar_name";
+        ContactLookalike: {
+            id: components["schemas"]["ContactId"];
+            companyId: string;
+            companyName: string | null;
+            fullName: string;
+            title: string | null;
+            email: string | null;
+            reasons: components["schemas"]["ContactDuplicateReason"][];
+        };
+        SimilarContacts: {
+            items: components["schemas"]["ContactLookalike"][];
+        };
+        ContactDuplicateGroup: {
+            reasons: components["schemas"]["ContactDuplicateReason"][];
+            /** @description Newest first; `reasons` on each is empty (the group's say why). */
+            contacts: components["schemas"]["ContactLookalike"][];
+        };
+        ContactDuplicateGroups: {
+            items: components["schemas"]["ContactDuplicateGroup"][];
         };
         ContactSummary: {
             id: components["schemas"]["ContactId"];
@@ -13386,6 +13563,84 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    listCompanyDuplicates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDuplicateGroups"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listSimilarCompanies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarCompanies"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    mergeCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyMerge"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     getCompanyAutofill: {
         parameters: {
             query?: never;
@@ -13831,6 +14086,84 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ContactUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listContactDuplicates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactDuplicateGroups"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listSimilarContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarContacts"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    mergeContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactMerge"];
             };
         };
         responses: {

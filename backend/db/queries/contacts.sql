@@ -306,3 +306,64 @@ ORDER BY f.i, c.id;
 -- name: LockInvoiceRecipient :one
 SELECT id FROM contact WHERE id = @id AND company_id = @company_id AND lower(email) = lower(@address::text)
 FOR SHARE;
+
+-- Merging duplicate companies: the duplicate's contacts, LinkedIn checks and HR searches go to the one kept.
+-- name: MoveCompanyContacts :execrows
+UPDATE contact SET company_id = @to_id WHERE company_id = @from_id;
+
+-- name: MoveCompanyLinkedinChecks :exec
+UPDATE contact_linkedin_check SET company_id = @to_id WHERE company_id = @from_id;
+
+-- name: MoveCompanyHRScans :exec
+UPDATE hr_scan SET company_id = @to_id WHERE company_id = @from_id;
+
+-- Merging duplicate contacts: the duplicate's checks go to the contact kept.
+-- name: MoveEmploymentChecks :exec
+UPDATE contact_employment_check SET contact_id = @to_id WHERE contact_id = @from_id;
+
+-- name: MoveLinkedinChecks :exec
+UPDATE contact_linkedin_check SET contact_id = @to_id WHERE contact_id = @from_id;
+
+-- name: MoveMailboxChecks :exec
+UPDATE contact_mailbox_check SET contact_id = @to_id WHERE contact_id = @from_id;
+
+-- The duplicate, once everything has moved.
+-- name: DeleteMergedContact :execrows
+DELETE FROM contact WHERE id = @id;
+
+-- Possible duplicates of a contact: the same LinkedIn profile, the same name
+-- words (any order, titles aside), the same phone (9 digits or more), or a name much like it at
+-- the same company. Newest first.
+-- name: SimilarContacts :many
+SELECT c.id, c.company_id, c.first_name, c.last_name, c.title, c.email,
+       coalesce(lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/')), false)::boolean AS same_linkedin,
+       (cardinality(me.name_words) >= 2 AND c.name_words = me.name_words)::boolean AS same_name,
+       (string_to_array(c.phone_digits, ' ') && me.phones)::boolean AS same_phone,
+       (c.company_id = me.company_id AND similarity(c.name_text, me.name_text) >= 0.6)::boolean AS similar_name
+FROM contact c, (SELECT x.company_id, x.linkedin_url, x.name_words, x.name_text,
+                         ARRAY(SELECT p FROM unnest(string_to_array(x.phone_digits, ' ')) AS p WHERE length(p) >= 9) AS phones
+                  FROM contact x WHERE x.id = @id) me
+WHERE c.id <> @id
+  AND (lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/'))
+       OR (cardinality(me.name_words) >= 2 AND c.name_words = me.name_words)
+       OR string_to_array(c.phone_digits, ' ') && me.phones
+       OR (c.company_id = me.company_id AND similarity(c.name_text, me.name_text) >= 0.6))
+ORDER BY c.id DESC
+LIMIT 20;
+
+-- Every group of contacts sharing a LinkedIn profile or the same name words
+-- (two or more) at the same company (the Possible duplicates list).
+-- name: ContactDuplicateGroups :many
+SELECT kind::text AS kind, ids::text[] AS ids FROM (
+  SELECT 'same_name' AS kind, array_agg(id ORDER BY id) AS ids FROM contact
+  WHERE cardinality(name_words) >= 2 GROUP BY company_id, name_words HAVING count(*) > 1
+  UNION ALL
+  SELECT 'same_linkedin', array_agg(id ORDER BY id) FROM contact WHERE linkedin_url IS NOT NULL
+  GROUP BY lower(rtrim(linkedin_url, '/')) HAVING count(*) > 1
+) g
+ORDER BY ids[cardinality(ids)] DESC
+LIMIT 500;
+
+-- The contacts of the Possible duplicates list.
+-- name: ContactLookalikes :many
+SELECT id, company_id, first_name, last_name, title, email FROM contact WHERE id = ANY(@ids::text[]);

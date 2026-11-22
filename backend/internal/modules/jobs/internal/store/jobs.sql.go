@@ -1057,6 +1057,41 @@ func (q *Queries) ListPublishedAds(ctx context.Context, today pgtype.Date) ([]Jo
 	return items, nil
 }
 
+const moveCompanyJobs = `-- name: MoveCompanyJobs :execrows
+UPDATE job_order SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyJobsParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging duplicates: the duplicate company's or contact's jobs go to the one kept.
+func (q *Queries) MoveCompanyJobs(ctx context.Context, arg MoveCompanyJobsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveCompanyJobs, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const moveContactJobs = `-- name: MoveContactJobs :execrows
+UPDATE job_order SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveContactJobsParams struct {
+	ToID   *string
+	FromID *string
+}
+
+func (q *Queries) MoveContactJobs(ctx context.Context, arg MoveContactJobsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveContactJobs, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const moveJobsToCompany = `-- name: MoveJobsToCompany :execrows
 UPDATE job_order SET company_id = $1, version = version + 1, updated_at = now()
 WHERE company_id = $2 AND binned_at IS NULL

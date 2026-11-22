@@ -257,3 +257,10 @@ WITH files AS (DELETE FROM job_description_file
                WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL) RETURNING storage_key, pdf_key),
      gone AS (DELETE FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL RETURNING id)
 SELECT storage_key, pdf_key FROM files;
+
+-- Merging duplicates: the duplicate company's or contact's jobs go to the one kept.
+-- name: MoveCompanyJobs :execrows
+UPDATE job_order SET company_id = @to_id WHERE company_id = @from_id;
+
+-- name: MoveContactJobs :execrows
+UPDATE job_order SET contact_id = @to_id WHERE contact_id = @from_id;

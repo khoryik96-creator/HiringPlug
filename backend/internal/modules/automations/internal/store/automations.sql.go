@@ -457,6 +457,24 @@ func (q *Queries) MarkSeeded(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const moveCompanyAutomations = `-- name: MoveCompanyAutomations :execrows
+UPDATE automation SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyAutomationsParams struct {
+	ToID   *string
+	FromID *string
+}
+
+// Merging duplicate companies: automations about the duplicate follow the one kept.
+func (q *Queries) MoveCompanyAutomations(ctx context.Context, arg MoveCompanyAutomationsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveCompanyAutomations, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const putSettings = `-- name: PutSettings :one
 UPDATE automation_settings SET default_send_mode = $1, updated_at = now()
 WHERE tenant_id = app_current_tenant() RETURNING tenant_id, default_send_mode, seeded, updated_at

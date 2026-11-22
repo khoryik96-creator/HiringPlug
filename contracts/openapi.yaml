@@ -2021,6 +2021,67 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/companies/duplicates:
+    get:
+      operationId: listCompanyDuplicates
+      tags: [companies]
+      summary: Possible duplicates among all companies
+      description: >
+        Groups of companies sharing a website, a LinkedIn page or a name without its legal form ("Acme Sdn Bhd" and "ACME Berhad"), newest first. Open one and merge the others into it.
+
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDuplicateGroups'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/companies/{companyId}/similar:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: listSimilarCompanies
+      tags: [companies]
+      summary: Possible duplicates of a company (same website or LinkedIn page, or a name much alike)
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SimilarCompanies'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/companies/{companyId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    post:
+      operationId: mergeCompany
+      tags: [companies]
+      summary: Merge a duplicate into this company
+      description: >
+        The duplicate's contacts, jobs, notes, documents, leads, automations, industries and folder places move to this company; its terms of business and benefits too if this company has none (otherwise this company's are kept); this company's empty fields are filled from the duplicate's; then the duplicate is deleted. `version` is this company's.
+
+      x-permission: companies:merge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyMerge'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Company'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/companies/{companyId}/autofill:
     parameters:
       - $ref: '#/components/parameters/CompanyIdPath'
@@ -2370,6 +2431,67 @@ paths:
         content:
           application/json:
             schema: {$ref: '#/components/schemas/ContactUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Contact'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/contacts/duplicates:
+    get:
+      operationId: listContactDuplicates
+      tags: [contacts]
+      summary: Possible duplicates among all contacts
+      description: >
+        Groups of contacts with the same LinkedIn profile, or the same name (any order, titles aside) at the same company, newest first. Open one and merge the others into it.
+
+      x-permission: contacts:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContactDuplicateGroups'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/contacts/{contactId}/similar:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    get:
+      operationId: listSimilarContacts
+      tags: [contacts]
+      summary: Possible duplicates of a contact (same LinkedIn profile, name or phone, or a name much alike at the same company)
+      x-permission: contacts:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SimilarContacts'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/contacts/{contactId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    post:
+      operationId: mergeContact
+      tags: [contacts]
+      summary: Merge a duplicate into this contact
+      description: >
+        The duplicate's emails (and Outlook threads), jobs, invoices, notes, folder places and checks move to this contact; this contact's empty fields are filled from the duplicate's (its email only if this contact has none); then the duplicate is deleted. This contact keeps its company. `version` is this contact's.
+
+      x-permission: contacts:merge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ContactMerge'}
       responses:
         '200':
           description: OK
@@ -8402,11 +8524,13 @@ components:
         - companies.category:update
         - companies.documents:delete
         - companies:create
+        - companies:merge
         - companies:read
         - companies:update
         - contacts.apollo:use
         - contacts.role:update
         - contacts:create
+        - contacts:merge
         - contacts:read
         - contacts:update
         - cvformats.templates:manage
@@ -10746,6 +10870,47 @@ components:
           nullable: true
         registrationNumber: {type: string, maxLength: 50, nullable: true}
         about: {type: string, maxLength: 4000, nullable: true}
+    CompanyMerge:
+      type: object
+      additionalProperties: false
+      required: [duplicateId, version]
+      properties:
+        duplicateId:
+          description: The company to merge in (and delete).
+          allOf: [{$ref: '#/components/schemas/CompanyId'}]
+        version: {type: integer, minimum: 1, description: The version of the company you keep.}
+    CompanyDuplicateReason:
+      type: string
+      enum: [same_website, same_linkedin, similar_name]
+    CompanyLookalike:
+      type: object
+      required: [id, name, city, website, industry, reasons]
+      properties:
+        id: {$ref: '#/components/schemas/CompanyId'}
+        name: {type: string}
+        city: {type: string, nullable: true}
+        website: {type: string, nullable: true}
+        industry: {type: string, nullable: true}
+        reasons: {type: array, items: {$ref: '#/components/schemas/CompanyDuplicateReason'}}
+    SimilarCompanies:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/CompanyLookalike'}}
+    CompanyDuplicateGroup:
+      type: object
+      required: [reasons, companies]
+      properties:
+        reasons: {type: array, items: {$ref: '#/components/schemas/CompanyDuplicateReason'}}
+        companies:
+          description: Newest first; `reasons` on each is empty (the group's say why).
+          type: array
+          items: {$ref: '#/components/schemas/CompanyLookalike'}
+    CompanyDuplicateGroups:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/CompanyDuplicateGroup'}}
     CompanySummary:
       type: object
       required: [id, name, type, category, industry, city, website, linkedinUrl, updatedAt]
@@ -11171,6 +11336,48 @@ components:
           allOf: [{$ref: '#/components/schemas/ContactRole'}]
           nullable: true
         notes: {type: string, maxLength: 4000, nullable: true}
+    ContactMerge:
+      type: object
+      additionalProperties: false
+      required: [duplicateId, version]
+      properties:
+        duplicateId:
+          description: The contact to merge in (and delete).
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
+        version: {type: integer, minimum: 1, description: The version of the contact you keep.}
+    ContactDuplicateReason:
+      type: string
+      enum: [same_linkedin, same_name, same_phone, similar_name]
+    ContactLookalike:
+      type: object
+      required: [id, companyId, companyName, fullName, title, email, reasons]
+      properties:
+        id: {$ref: '#/components/schemas/ContactId'}
+        companyId: {type: string}
+        companyName: {type: string, nullable: true}
+        fullName: {type: string}
+        title: {type: string, nullable: true}
+        email: {type: string, nullable: true}
+        reasons: {type: array, items: {$ref: '#/components/schemas/ContactDuplicateReason'}}
+    SimilarContacts:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/ContactLookalike'}}
+    ContactDuplicateGroup:
+      type: object
+      required: [reasons, contacts]
+      properties:
+        reasons: {type: array, items: {$ref: '#/components/schemas/ContactDuplicateReason'}}
+        contacts:
+          description: Newest first; `reasons` on each is empty (the group's say why).
+          type: array
+          items: {$ref: '#/components/schemas/ContactLookalike'}
+    ContactDuplicateGroups:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/ContactDuplicateGroup'}}
     ContactSummary:
       type: object
       required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, mailboxCheckedAt, linkedinEmployment, phone, mobile, status, role, updatedAt]
@@ -16742,6 +16949,11 @@ x-permissions:
     description: Add companies.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  companies:merge:
+    module: companies
+    description: Merge a duplicate company into another (its contacts, jobs, notes and documents move over).
+    sensitive: false
+    roles: [owner, admin, recruiter]
   companies:read:
     module: companies
     description: View companies.
@@ -16767,6 +16979,11 @@ x-permissions:
     description: Add contacts.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  contacts:merge:
+    module: contacts
+    description: Merge a duplicate contact into another (their emails, jobs, notes and checks move over).
+    sensitive: false
+    roles: [owner, admin, recruiter]
   contacts:read:
     module: contacts
     description: View contacts.

@@ -254,6 +254,20 @@ func (q *Queries) MarkOutlookSync(ctx context.Context, arg MarkOutlookSyncParams
 	return err
 }
 
+const moveOutlookLinksToContact = `-- name: MoveOutlookLinksToContact :exec
+UPDATE email_outlook_link SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveOutlookLinksToContactParams struct {
+	ToID   *string
+	FromID *string
+}
+
+func (q *Queries) MoveOutlookLinksToContact(ctx context.Context, arg MoveOutlookLinksToContactParams) error {
+	_, err := q.db.Exec(ctx, moveOutlookLinksToContact, arg.ToID, arg.FromID)
+	return err
+}
+
 const moveOutlookMessage = `-- name: MoveOutlookMessage :exec
 UPDATE email_outlook_message SET folder_id= $1,changed_at=GREATEST(changed_at,$2) WHERE id= $3
 `

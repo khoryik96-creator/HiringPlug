@@ -514,6 +514,8 @@ type Company struct {
 	IndustryPickSince   *time.Time
 	IndustryTerms       *string
 	BinnedAt            *time.Time
+	NameCore            *string
+	SiteKey             *string
 }
 
 type CompanyBenefit struct {

@@ -223,3 +223,52 @@ SELECT storage_key FROM docs WHERE EXISTS (SELECT 1 FROM gone);
 
 -- name: CompanyLabel :one
 SELECT name FROM company WHERE id = @id;
+
+-- Possible duplicates of a company: the same website, LinkedIn page or name
+-- without its legal form, or a name much like it. Newest first.
+-- name: SimilarCompanies :many
+SELECT c.id, c.name, c.city, c.website, c.industry,
+       coalesce(c.site_key = me.site_key, false)::boolean AS same_website,
+       coalesce(lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/')), false)::boolean AS same_linkedin,
+       (me.name_core <> '' AND (c.name_core = me.name_core OR similarity(c.name_core, me.name_core) >= 0.6))::boolean AS similar_name
+FROM company c, (SELECT x.site_key, x.linkedin_url, x.name_core FROM company x WHERE x.id = @id) me
+WHERE c.id <> @id
+  AND (c.site_key = me.site_key
+       OR lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/'))
+       OR (me.name_core <> '' AND (c.name_core = me.name_core OR similarity(c.name_core, me.name_core) >= 0.6)))
+ORDER BY c.id DESC
+LIMIT 20;
+
+-- Every group of companies sharing a website, a LinkedIn page or a name
+-- without its legal form (the Possible duplicates list).
+-- name: CompanyDuplicateGroups :many
+SELECT kind::text AS kind, ids::text[] AS ids FROM (
+  SELECT 'similar_name' AS kind, array_agg(id ORDER BY id) AS ids FROM company WHERE name_core <> '' GROUP BY name_core HAVING count(*) > 1
+  UNION ALL
+  SELECT 'same_website', array_agg(id ORDER BY id) FROM company WHERE site_key IS NOT NULL GROUP BY site_key HAVING count(*) > 1
+  UNION ALL
+  SELECT 'same_linkedin', array_agg(id ORDER BY id) FROM company WHERE linkedin_url IS NOT NULL
+  GROUP BY lower(rtrim(linkedin_url, '/')) HAVING count(*) > 1
+) g
+ORDER BY ids[cardinality(ids)] DESC
+LIMIT 500;
+
+-- Merging duplicates: the duplicate's terms and benefits only if the company kept has none; its documents always.
+-- name: MoveTermsIfNone :exec
+UPDATE company_terms t SET company_id = @to_id
+WHERE t.company_id = @from_id AND NOT EXISTS (SELECT 1 FROM company_terms k WHERE k.company_id = @to_id);
+
+-- name: MoveBenefitsIfNone :exec
+UPDATE company_benefits t SET company_id = @to_id
+WHERE t.company_id = @from_id AND NOT EXISTS (SELECT 1 FROM company_benefits k WHERE k.company_id = @to_id);
+
+-- name: MoveCompanyDocuments :exec
+UPDATE company_document SET company_id = @to_id WHERE company_id = @from_id;
+
+-- The duplicate, once everything has moved (suggestions waiting for it go with it).
+-- name: DeleteMergedCompany :execrows
+DELETE FROM company WHERE id = @id;
+
+-- The companies of the Possible duplicates list.
+-- name: CompanyLookalikes :many
+SELECT id, name, city, website, industry FROM company WHERE id = ANY(@ids::text[]);

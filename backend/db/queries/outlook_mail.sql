@@ -162,3 +162,6 @@ RETURNING *;
 
 -- name: TryLockOutlookSendMailbox :one
 SELECT pg_try_advisory_lock(hashtextextended(@tenant_id::text || ':' || @user_id::text,0)) AS acquired;
+
+-- name: MoveOutlookLinksToContact :exec
+UPDATE email_outlook_link SET contact_id = @to_id WHERE contact_id = @from_id;

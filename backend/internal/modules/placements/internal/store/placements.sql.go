@@ -730,6 +730,24 @@ func (q *Queries) MarkPlacementInvoiced(ctx context.Context, arg MarkPlacementIn
 	return err
 }
 
+const moveInvoicesToContact = `-- name: MoveInvoicesToContact :execrows
+UPDATE placement_invoice SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveInvoicesToContactParams struct {
+	ToID   *string
+	FromID *string
+}
+
+// Merging duplicate contacts: invoices addressed to the duplicate go to the contact kept.
+func (q *Queries) MoveInvoicesToContact(ctx context.Context, arg MoveInvoicesToContactParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveInvoicesToContact, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const placementFacts = `-- name: PlacementFacts :many
 SELECT p.id, p.recruiter_id, p.status, p.start_date, m.fee_amount, m.fee_currency
 FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id

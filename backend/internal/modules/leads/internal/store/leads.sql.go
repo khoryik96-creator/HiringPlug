@@ -294,6 +294,35 @@ func (q *Queries) ListSources(ctx context.Context) ([]LeadSource, error) {
 	return items, nil
 }
 
+const moveCompanyLeadSources = `-- name: MoveCompanyLeadSources :exec
+UPDATE lead_source SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyLeadSourcesParams struct {
+	ToID   *string
+	FromID *string
+}
+
+func (q *Queries) MoveCompanyLeadSources(ctx context.Context, arg MoveCompanyLeadSourcesParams) error {
+	_, err := q.db.Exec(ctx, moveCompanyLeadSources, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveCompanyLeads = `-- name: MoveCompanyLeads :exec
+UPDATE job_lead SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyLeadsParams struct {
+	ToID   *string
+	FromID *string
+}
+
+// Merging duplicate companies: leads and lead sources linked to the duplicate go to the one kept.
+func (q *Queries) MoveCompanyLeads(ctx context.Context, arg MoveCompanyLeadsParams) error {
+	_, err := q.db.Exec(ctx, moveCompanyLeads, arg.ToID, arg.FromID)
+	return err
+}
+
 const recordCheck = `-- name: RecordCheck :exec
 UPDATE lead_source SET last_checked_at = now(), last_error = $1, open_leads = $2,
   next_check_at = $3, name = $4

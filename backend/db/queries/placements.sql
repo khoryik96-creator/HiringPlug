@@ -242,3 +242,7 @@ ORDER BY id LIMIT 1;
 -- placement's invoice state in the fee totals.
 -- name: RetainerJobs :many
 SELECT job_order_id FROM job_retainer;
+
+-- Merging duplicate contacts: invoices addressed to the duplicate go to the contact kept.
+-- name: MoveInvoicesToContact :execrows
+UPDATE placement_invoice SET contact_id = @to_id WHERE contact_id = @from_id;

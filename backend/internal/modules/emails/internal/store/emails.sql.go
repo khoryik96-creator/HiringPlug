@@ -955,6 +955,24 @@ func (q *Queries) MoveEmailsToCandidate(ctx context.Context, arg MoveEmailsToCan
 	return result.RowsAffected(), nil
 }
 
+const moveEmailsToContact = `-- name: MoveEmailsToContact :execrows
+UPDATE email SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveEmailsToContactParams struct {
+	ToID   *string
+	FromID *string
+}
+
+// Merging duplicate contacts: emails to the duplicate go to the contact kept.
+func (q *Queries) MoveEmailsToContact(ctx context.Context, arg MoveEmailsToContactParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveEmailsToContact, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const moveShortlistsToCandidate = `-- name: MoveShortlistsToCandidate :exec
 UPDATE email_candidate SET candidate_id = $1 WHERE candidate_id = $2
 `

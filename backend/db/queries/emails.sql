@@ -212,3 +212,7 @@ RETURNING *;
 
 -- name: DeleteWhatsAppTemplate :execrows
 DELETE FROM whatsapp_template WHERE id = @id;
+
+-- Merging duplicate contacts: emails to the duplicate go to the contact kept.
+-- name: MoveEmailsToContact :execrows
+UPDATE email SET contact_id = @to_id WHERE contact_id = @from_id;

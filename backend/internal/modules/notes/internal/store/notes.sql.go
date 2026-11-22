@@ -174,3 +174,22 @@ func (q *Queries) MoveCandidateNotes(ctx context.Context, arg MoveCandidateNotes
 	}
 	return result.RowsAffected(), nil
 }
+
+const moveSubjectNotes = `-- name: MoveSubjectNotes :execrows
+UPDATE note SET subject_id = $1 WHERE subject_type = $2 AND subject_id = $3
+`
+
+type MoveSubjectNotesParams struct {
+	ToID        string
+	SubjectType string
+	FromID      string
+}
+
+// Merging duplicate companies or contacts: the duplicate's notes go to the record kept.
+func (q *Queries) MoveSubjectNotes(ctx context.Context, arg MoveSubjectNotesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveSubjectNotes, arg.ToID, arg.SubjectType, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

@@ -156,6 +156,45 @@ func (q *Queries) ContactBriefs(ctx context.Context, ids []string) ([]ContactBri
 	return items, nil
 }
 
+const contactDuplicateGroups = `-- name: ContactDuplicateGroups :many
+SELECT kind::text AS kind, ids::text[] AS ids FROM (
+  SELECT 'same_name' AS kind, array_agg(id ORDER BY id) AS ids FROM contact
+  WHERE cardinality(name_words) >= 2 GROUP BY company_id, name_words HAVING count(*) > 1
+  UNION ALL
+  SELECT 'same_linkedin', array_agg(id ORDER BY id) FROM contact WHERE linkedin_url IS NOT NULL
+  GROUP BY lower(rtrim(linkedin_url, '/')) HAVING count(*) > 1
+) g
+ORDER BY ids[cardinality(ids)] DESC
+LIMIT 500
+`
+
+type ContactDuplicateGroupsRow struct {
+	Kind string
+	Ids  []string
+}
+
+// Every group of contacts sharing a LinkedIn profile or the same name words
+// (two or more) at the same company (the Possible duplicates list).
+func (q *Queries) ContactDuplicateGroups(ctx context.Context) ([]ContactDuplicateGroupsRow, error) {
+	rows, err := q.db.Query(ctx, contactDuplicateGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactDuplicateGroupsRow
+	for rows.Next() {
+		var i ContactDuplicateGroupsRow
+		if err := rows.Scan(&i.Kind, &i.Ids); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const contactExists = `-- name: ContactExists :one
 SELECT EXISTS (SELECT 1 FROM contact WHERE id = $1)
 `
@@ -200,6 +239,47 @@ func (q *Queries) ContactLabel(ctx context.Context, id string) (string, error) {
 	var label string
 	err := row.Scan(&label)
 	return label, err
+}
+
+const contactLookalikes = `-- name: ContactLookalikes :many
+SELECT id, company_id, first_name, last_name, title, email FROM contact WHERE id = ANY($1::text[])
+`
+
+type ContactLookalikesRow struct {
+	ID        string
+	CompanyID string
+	FirstName string
+	LastName  string
+	Title     *string
+	Email     *string
+}
+
+// The contacts of the Possible duplicates list.
+func (q *Queries) ContactLookalikes(ctx context.Context, ids []string) ([]ContactLookalikesRow, error) {
+	rows, err := q.db.Query(ctx, contactLookalikes, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactLookalikesRow
+	for rows.Next() {
+		var i ContactLookalikesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CompanyID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Title,
+			&i.Email,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const contactsForLinkedin = `-- name: ContactsForLinkedin :many
@@ -357,6 +437,19 @@ func (q *Queries) CountMailboxesChecking(ctx context.Context) (int32, error) {
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const deleteMergedContact = `-- name: DeleteMergedContact :execrows
+DELETE FROM contact WHERE id = $1
+`
+
+// The duplicate, once everything has moved.
+func (q *Queries) DeleteMergedContact(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteMergedContact, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const expireLinkedinCheck = `-- name: ExpireLinkedinCheck :exec
@@ -981,6 +1074,52 @@ func (q *Queries) MarkMailboxBounced(ctx context.Context, arg MarkMailboxBounced
 	return items, nil
 }
 
+const moveCompanyContacts = `-- name: MoveCompanyContacts :execrows
+UPDATE contact SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyContactsParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging duplicate companies: the duplicate's contacts, LinkedIn checks and HR searches go to the one kept.
+func (q *Queries) MoveCompanyContacts(ctx context.Context, arg MoveCompanyContactsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveCompanyContacts, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const moveCompanyHRScans = `-- name: MoveCompanyHRScans :exec
+UPDATE hr_scan SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyHRScansParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveCompanyHRScans(ctx context.Context, arg MoveCompanyHRScansParams) error {
+	_, err := q.db.Exec(ctx, moveCompanyHRScans, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveCompanyLinkedinChecks = `-- name: MoveCompanyLinkedinChecks :exec
+UPDATE contact_linkedin_check SET company_id = $1 WHERE company_id = $2
+`
+
+type MoveCompanyLinkedinChecksParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveCompanyLinkedinChecks(ctx context.Context, arg MoveCompanyLinkedinChecksParams) error {
+	_, err := q.db.Exec(ctx, moveCompanyLinkedinChecks, arg.ToID, arg.FromID)
+	return err
+}
+
 const moveContactsToCompany = `-- name: MoveContactsToCompany :execrows
 UPDATE contact SET company_id = $1, version = version + 1, updated_at = now()
 WHERE company_id = $2 AND binned_at IS NULL
@@ -997,6 +1136,49 @@ func (q *Queries) MoveContactsToCompany(ctx context.Context, arg MoveContactsToC
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const moveEmploymentChecks = `-- name: MoveEmploymentChecks :exec
+UPDATE contact_employment_check SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveEmploymentChecksParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging duplicate contacts: the duplicate's checks go to the contact kept.
+func (q *Queries) MoveEmploymentChecks(ctx context.Context, arg MoveEmploymentChecksParams) error {
+	_, err := q.db.Exec(ctx, moveEmploymentChecks, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveLinkedinChecks = `-- name: MoveLinkedinChecks :exec
+UPDATE contact_linkedin_check SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveLinkedinChecksParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveLinkedinChecks(ctx context.Context, arg MoveLinkedinChecksParams) error {
+	_, err := q.db.Exec(ctx, moveLinkedinChecks, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveMailboxChecks = `-- name: MoveMailboxChecks :exec
+UPDATE contact_mailbox_check SET contact_id = $1 WHERE contact_id = $2
+`
+
+type MoveMailboxChecksParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveMailboxChecks(ctx context.Context, arg MoveMailboxChecksParams) error {
+	_, err := q.db.Exec(ctx, moveMailboxChecks, arg.ToID, arg.FromID)
+	return err
 }
 
 const newEmploymentCheckID = `-- name: NewEmploymentCheckID :one
@@ -1300,6 +1482,71 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 		&i.NameWords,
 	)
 	return i, err
+}
+
+const similarContacts = `-- name: SimilarContacts :many
+SELECT c.id, c.company_id, c.first_name, c.last_name, c.title, c.email,
+       coalesce(lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/')), false)::boolean AS same_linkedin,
+       (cardinality(me.name_words) >= 2 AND c.name_words = me.name_words)::boolean AS same_name,
+       (string_to_array(c.phone_digits, ' ') && me.phones)::boolean AS same_phone,
+       (c.company_id = me.company_id AND similarity(c.name_text, me.name_text) >= 0.6)::boolean AS similar_name
+FROM contact c, (SELECT x.company_id, x.linkedin_url, x.name_words, x.name_text,
+                         ARRAY(SELECT p FROM unnest(string_to_array(x.phone_digits, ' ')) AS p WHERE length(p) >= 9) AS phones
+                  FROM contact x WHERE x.id = $1) me
+WHERE c.id <> $1
+  AND (lower(rtrim(c.linkedin_url, '/')) = lower(rtrim(me.linkedin_url, '/'))
+       OR (cardinality(me.name_words) >= 2 AND c.name_words = me.name_words)
+       OR string_to_array(c.phone_digits, ' ') && me.phones
+       OR (c.company_id = me.company_id AND similarity(c.name_text, me.name_text) >= 0.6))
+ORDER BY c.id DESC
+LIMIT 20
+`
+
+type SimilarContactsRow struct {
+	ID           string
+	CompanyID    string
+	FirstName    string
+	LastName     string
+	Title        *string
+	Email        *string
+	SameLinkedin bool
+	SameName     bool
+	SamePhone    bool
+	SimilarName  bool
+}
+
+// Possible duplicates of a contact: the same LinkedIn profile, the same name
+// words (any order, titles aside), the same phone (9 digits or more), or a name much like it at
+// the same company. Newest first.
+func (q *Queries) SimilarContacts(ctx context.Context, id string) ([]SimilarContactsRow, error) {
+	rows, err := q.db.Query(ctx, similarContacts, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SimilarContactsRow
+	for rows.Next() {
+		var i SimilarContactsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CompanyID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Title,
+			&i.Email,
+			&i.SameLinkedin,
+			&i.SameName,
+			&i.SamePhone,
+			&i.SimilarName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const startHrScan = `-- name: StartHrScan :one

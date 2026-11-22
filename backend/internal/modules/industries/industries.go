@@ -108,14 +108,27 @@ func (m *Module) SummaryIn(ctx context.Context, tx pgx.Tx, in *classification.Se
 
 // MoveCandidate preserves both records' classifications during duplicate merging.
 func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
-	if err := m.LockIn(ctx, tx); err != nil {
+	return m.service.moveSubject(ctx, tx, "candidate", fromID, toID)
+}
+
+// MoveCompany gives the company kept in a merge the duplicate's industries
+// too (its own current one stays current, or takes the duplicate's).
+func (m *Module) MoveCompany(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
+	return m.service.moveSubject(ctx, tx, "company", fromID, toID)
+}
+
+func (s *Service) moveSubject(ctx context.Context, tx pgx.Tx, kind, fromID, toID string) error {
+	if err := s.ensureIn(ctx, tx); err != nil {
 		return err
 	}
-	from, e := m.service.readIn(ctx, tx, "candidate", fromID)
+	if _, err := store.New(tx).ShareCatalogue(ctx); err != nil {
+		return err
+	}
+	from, e := s.readIn(ctx, tx, kind, fromID)
 	if e != nil {
 		return e
 	}
-	to, e := m.service.readIn(ctx, tx, "candidate", toID)
+	to, e := s.readIn(ctx, tx, kind, toID)
 	if e != nil {
 		return e
 	}
@@ -127,10 +140,28 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 	if to.PrimaryId == nil {
 		to.PrimaryId = from.PrimaryId
 	}
-	if err := writeSelections(ctx, store.New(tx), "candidate", toID, to); err != nil {
+	q := store.New(tx)
+	if err := writeSelections(ctx, q, kind, toID, to); err != nil {
 		return err
 	}
-	return nil
+	if kind != "company" || s.records == nil || len(from.Ids) == 0 {
+		return nil
+	}
+	// The kept company's summary and search words follow its industries.
+	c, err := catalogueIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	items := catalogueMap(c.Items)
+	var label *string
+	if to.PrimaryId != nil {
+		l := root(items[*to.PrimaryId], items).Label
+		label = &l
+	}
+	if err := s.records.SetIndustrySummary(ctx, tx, kind, toID, label); err != nil {
+		return err
+	}
+	return s.records.SetIndustryTerms(ctx, tx, kind, []string{toID}, []string{termsOf(to.Ids, items)}, false)
 }
 
 // Choice is an industry or subindustry in use: its id, its words
