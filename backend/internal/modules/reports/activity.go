@@ -109,7 +109,10 @@ func (s *Service) activityIn(ctx context.Context, tx pgx.Tx, p authz.Principal, 
 	if f.Placements, err = src.Placements(ctx, tx, start, end); err != nil {
 		return out, err
 	}
-	counts := CountActivity(f, func(t time.Time) time.Time { t = t.In(s.loc); return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC) })
+	counts := CountActivity(f, func(t time.Time) time.Time {
+		t = t.In(s.loc)
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	})
 	names := map[string]string{}
 	if out.Team {
 		members, err := src.Members(ctx, tx)
