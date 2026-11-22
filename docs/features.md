@@ -1014,8 +1014,18 @@ lead's company (with the built-in email check).
   and 30 seconds) and the scan then stops at that page, keeping what it
   found, to resume there. A sign-in or check page is never retried. People
   are ranked A (recruitment and HR leads), B (HR managers and partners), C;
-  former staff and interns are hidden. Each shows whether they are a contact
-  already (same LinkedIn profile) or may be (same name). Clicking a row
+  former staff and interns are hidden. Each is checked against every contact
+  in the agency, and the likeliest one is shown with their company, job title,
+  email (click to copy) and whether they left: **In HiringPlug** (the same
+  LinkedIn profile, however its address is written), **Same name** (the same
+  words in any order, accents, punctuation, titles such as Dato' or Dr,
+  bin/binti, credentials and "(She/Her)" aside, with Mohd, Md and Abd read as
+  Muhammad and Abdul) or **Similar name** (one name inside the other, two
+  words or more: "Aisyah Ahmad", "Nur Aisyah binti Ahmad"). Other contacts
+  who may also be them are counted. Above the list: how many are in
+  HiringPlug, may be, or are new. Apollo's **Work email** is not offered for
+  someone whose work address HiringPlug has at this company already. From
+  Leads, a lead's company has the same Find HR. Clicking a row
   chooses it (All / None too); clicking a name opens their LinkedIn profile.
   Chosen people get their joining dates read from their profile (only those
   not read yet, so clicking again after a failure carries on from there), or

@@ -1,6 +1,7 @@
 // Company › Find HR: its people in HR on LinkedIn, read by the companion in
 // the recruiter's own browser, a page at a time (country, job titles and
-// pages chosen here). Who is a contact already, or may be, is shown; chosen
+// pages chosen here). Who is a contact already, or may be (the same or a
+// similar name, anywhere in the agency), is shown with their email; chosen
 // people are added as contacts (their email guessed from colleagues', then
 // verified like every new address). A click on a name opens the profile.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +12,7 @@ import { companionAtLeast, companionCall, operationId, useCompanion } from "../c
 import { linkedinDates } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 import { ApolloConnectionDialog, ApolloLookupDialog, useHRApollo } from "./FindHRApollo";
+import { HRMatch, HRMatchSummary, workEmailKnown } from "./FindHRMatch";
 import { activeRuns, newRun, type Run, runScan, splitName, stopRun } from "./findHrRun";
 import { companyPage } from "./linkedinCompany";
 
@@ -165,7 +167,7 @@ export function FindHR({ company, canCreate, canUseApollo }: { company: Company;
           <span>
             {running
               ? <>Reading search {String((s.next?.query ?? 0) + 1)} of {String(s.queries.length)}, page {String(s.next?.page ?? 1)} · {people.length} found</>
-              : s.status === "done" ? <>Done · {String(s.pagesRead)} pages read · {people.length} found</>
+              : s.status === "done" ? <>Done · {String(s.pagesRead)} {s.pagesRead === 1 ? "page" : "pages"} read · {people.length} found</>
                 : s.status === "stopped" ? <>Stopped at search {String((s.next?.query ?? 0) + 1)}, page {String(s.next?.page ?? 1)}: {s.error} · {people.length} kept</>
                   : <>Paused at search {String((s.next?.query ?? 0) + 1)}, page {String(s.next?.page ?? 1)} · {people.length} found</>}
             <span className="muted"> · {s.countryName ?? "Anywhere"} · {s.pages} {s.pages === 1 ? "page" : "pages"} per search</span>
@@ -187,6 +189,7 @@ export function FindHR({ company, canCreate, canUseApollo }: { company: Company;
               <button type="button" className={picked.length === 0 ? "on" : undefined} onClick={() => { setPicked([]); }}>None</button>
             </span>
           </span>
+          <HRMatchSummary people={visible} />
           {picked.length > 0 && canCreate && <>
             <button type="button" disabled={dates.isPending || !!running || chosen.every(datesRead)} onClick={() => { dates.mutate(); }}>{dates.isPending ? (datesAt ? `Reading dates… ${String(datesAt.done)} of ${String(datesAt.of)}` : "Reading dates…")
               : `Joining dates (${String(chosen.filter((p) => !datesRead(p)).length)})`}</button>
@@ -207,10 +210,9 @@ export function FindHR({ company, canCreate, canUseApollo }: { company: Company;
                   <td className={`hr-tier t${p.tier}`} title="A: recruitment and HR leads · B: HR managers and partners · C: other HR roles">{p.tier}</td>
                   <td className="nowrap">{p.joined ? linkedinDates(p.joined) : p.current === false ? <span className="muted">left {linkedinDates(p.left)}</span> : <span className="muted">—</span>}</td>
                   <td>
-                    {p.contactId ? <a className="hr-chip have" href={`#/contacts/${p.contactId}`} onClick={(e) => { e.stopPropagation(); }}>Contact</a>
-                      : p.duplicateOf ? <a className="hr-chip dup" href={`#/contacts/${p.duplicateOf}`} onClick={(e) => { e.stopPropagation(); }}>Possible duplicate: {p.duplicateName}</a>
-                        : <span className="hr-chip new">New</span>}
-                    {canUseApollo && apollo.data && apollo.data.state !== "disabled" && p.current !== false &&
+                    <HRMatch person={p} />
+                    {/* No Apollo credit for a work email HiringPlug has already. */}
+                    {canUseApollo && apollo.data && apollo.data.state !== "disabled" && p.current !== false && !workEmailKnown(p) &&
                       <button type="button" className="link small hr-email-action" aria-label={`Work email for ${p.name}`}
                         onClick={(e) => { e.stopPropagation(); setApolloPerson(p); }}>Work email</button>}
                   </td>

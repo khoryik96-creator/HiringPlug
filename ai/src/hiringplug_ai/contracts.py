@@ -2070,6 +2070,12 @@ class Tier(StrEnum):
     C = "C"
 
 
+class Kind2(StrEnum):
+    profile = "profile"
+    same_name = "same_name"
+    similar_name = "similar_name"
+
+
 class HrScanNext(BaseModel):
     query: int
     page: int
@@ -3561,13 +3567,13 @@ class PasswordResetRequest(BaseModel):
     email: Annotated[EmailStr, Field(max_length=254)]
 
 
-class Kind2(StrEnum):
+class Kind3(StrEnum):
     invite = "invite"
     reset = "reset"
 
 
 class AuthLink(BaseModel):
-    kind: Kind2
+    kind: Kind3
     email: str
     name: str
     companyName: str
@@ -6925,62 +6931,29 @@ class HrScanJoined(BaseModel):
     left: LinkedinYearMonth | None = None
 
 
-class HrScanPerson(BaseModel):
-    url: str
-    name: str
-    title: str
-    location: str
-    tier: Annotated[
-        Tier,
+class HrScanMatch(BaseModel):
+    kind: Annotated[
+        Kind2,
         Field(
-            description="How likely they hire: A recruitment and HR leads, B HR managers and partners, C other HR roles."
+            description='profile = the same LinkedIn profile (them); same_name = the same name, in any order (titles, bin/binti and the like aside); similar_name = one name inside the other ("Aisyah Ahmad", "Nur Aisyah binti Ahmad").\n'
         ),
     ]
-    hidden: Annotated[
-        str | None, Field(description="Why they are left out (a former employee, an intern), or null.")
+    contactId: ContactId
+    name: str
+    title: Annotated[str | None, Field(...)]
+    companyId: str
+    companyName: Annotated[str, Field(description="The company the contact is at in HiringPlug.")]
+    sameCompany: Annotated[bool, Field(description="The contact is at the company searched.")]
+    email: Annotated[str | None, Field(description="Their email in HiringPlug.")]
+    emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
+    emailPersonal: Annotated[
+        bool,
+        Field(
+            description="The email is at a free mail service (gmail.com and the like): their own, not their work address."
+        ),
     ]
-    joined: Annotated[LinkedinYearMonth | None, Field(...)]
-    left: Annotated[LinkedinYearMonth | None, Field(...)]
-    current: Annotated[
-        bool | None,
-        Field(description="From their profile once read: true works there now; null not read or unclear."),
-    ]
-    contactId: Annotated[str | None, Field(description="A contact with this LinkedIn profile already.")]
-    contactName: Annotated[str | None, Field(...)]
-    duplicateOf: Annotated[
-        str | None, Field(description="A contact with the same name (a possible duplicate).")
-    ]
-    duplicateName: Annotated[str | None, Field(...)]
-
-
-class HrScan(BaseModel):
-    companyId: CompanyId
-    linkedinCompanyId: str
-    linkedinCompanyName: str
-    country: Annotated[HrCountry | None, Field(...)]
-    countryName: Annotated[
-        str | None, Field(description='The country as LinkedIn names it ("Hong Kong SAR").')
-    ]
-    geoId: Annotated[str | None, Field(description="LinkedIn's number for the country (its geoUrn).")]
-    keywords: list[str]
-    queries: Annotated[
-        list[str],
-        Field(description="The searches run, a few keywords each (LinkedIn returns nothing for long ORs)."),
-    ]
-    pages: int
-    status: HrScanStatus
-    next: Annotated[
-        HrScanNext | None, Field(description="The page to read next (also after a stop); null once done.")
-    ]
-    pagesRead: int
-    error: Annotated[str | None, Field(...)]
-    people: Annotated[list[HrScanPerson], Field(description="Best first (tier, then name).")]
-    startedAt: AwareDatetime
-    updatedAt: AwareDatetime
-
-
-class HrScanOrNone(BaseModel):
-    scan: Annotated[HrScan | None, Field(...)]
+    left: Annotated[bool, Field(description="The contact is marked as having left that company.")]
+    more: Annotated[int, Field(description="How many other contacts may also be them.", ge=0)]
 
 
 class ContactSummary(BaseModel):
@@ -8317,6 +8290,73 @@ class CandidateFindSearch(BaseModel):
 class CareersPage(BaseModel):
     companyName: str
     ads: list[PublicJobAd]
+
+
+class HrScanPerson(BaseModel):
+    url: str
+    name: str
+    title: str
+    location: str
+    tier: Annotated[
+        Tier,
+        Field(
+            description="How likely they hire: A recruitment and HR leads, B HR managers and partners, C other HR roles."
+        ),
+    ]
+    hidden: Annotated[
+        str | None, Field(description="Why they are left out (a former employee, an intern), or null.")
+    ]
+    joined: Annotated[LinkedinYearMonth | None, Field(...)]
+    left: Annotated[LinkedinYearMonth | None, Field(...)]
+    current: Annotated[
+        bool | None,
+        Field(description="From their profile once read: true works there now; null not read or unclear."),
+    ]
+    contactId: Annotated[str | None, Field(description="A contact with this LinkedIn profile already.")]
+    contactName: Annotated[str | None, Field(...)]
+    duplicateOf: Annotated[
+        str | None,
+        Field(
+            description="A contact with the same or a similar name (a possible duplicate), when none has their profile."
+        ),
+    ]
+    duplicateName: Annotated[str | None, Field(...)]
+    match: Annotated[
+        HrScanMatch | None,
+        Field(
+            description="The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none."
+        ),
+    ]
+
+
+class HrScan(BaseModel):
+    companyId: CompanyId
+    linkedinCompanyId: str
+    linkedinCompanyName: str
+    country: Annotated[HrCountry | None, Field(...)]
+    countryName: Annotated[
+        str | None, Field(description='The country as LinkedIn names it ("Hong Kong SAR").')
+    ]
+    geoId: Annotated[str | None, Field(description="LinkedIn's number for the country (its geoUrn).")]
+    keywords: list[str]
+    queries: Annotated[
+        list[str],
+        Field(description="The searches run, a few keywords each (LinkedIn returns nothing for long ORs)."),
+    ]
+    pages: int
+    status: HrScanStatus
+    next: Annotated[
+        HrScanNext | None, Field(description="The page to read next (also after a stop); null once done.")
+    ]
+    pagesRead: int
+    error: Annotated[str | None, Field(...)]
+    people: Annotated[list[HrScanPerson], Field(description="Best first (tier, then name).")]
+    startedAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class HrScanOrNone(BaseModel):
+    scan: Annotated[HrScan | None, Field(...)]
 
 
 class Contact(BaseModel):

@@ -646,7 +646,7 @@ components:
       enum: [running, stopped, done]
     HrScanPerson:
       type: object
-      required: [url, name, title, location, tier, hidden, joined, left, current, contactId, contactName, duplicateOf, duplicateName]
+      required: [url, name, title, location, tier, hidden, joined, left, current, contactId, contactName, duplicateOf, duplicateName, match]
       properties:
         url: { type: string }
         name: { type: string }
@@ -666,8 +666,37 @@ components:
         current: { type: boolean, nullable: true, description: "From their profile once read: true works there now; null not read or unclear." }
         contactId: { type: string, nullable: true, description: A contact with this LinkedIn profile already. }
         contactName: { type: string, nullable: true }
-        duplicateOf: { type: string, nullable: true, description: A contact with the same name (a possible duplicate). }
+        duplicateOf: { type: string, nullable: true, description: "A contact with the same or a similar name (a possible duplicate), when none has their profile." }
         duplicateName: { type: string, nullable: true }
+        match:
+          nullable: true
+          description: The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none.
+          allOf: [{ $ref: '#/components/schemas/HrScanMatch' }]
+    HrScanMatch:
+      type: object
+      required: [kind, contactId, name, title, companyId, companyName, sameCompany, email, emailCheckStatus, emailPersonal, left, more]
+      properties:
+        kind:
+          type: string
+          enum: [profile, same_name, similar_name]
+          description: >
+            profile = the same LinkedIn profile (them); same_name = the same
+            name, in any order (titles, bin/binti and the like aside);
+            similar_name = one name inside the other ("Aisyah Ahmad", "Nur
+            Aisyah binti Ahmad").
+        contactId: { $ref: '#/components/schemas/ContactId' }
+        name: { type: string }
+        title: { type: string, nullable: true }
+        companyId: { type: string }
+        companyName: { type: string, description: The company the contact is at in HiringPlug. }
+        sameCompany: { type: boolean, description: The contact is at the company searched. }
+        email: { type: string, nullable: true, description: Their email in HiringPlug. }
+        emailCheckStatus:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/EmailCheckStatus' }]
+        emailPersonal: { type: boolean, description: "The email is at a free mail service (gmail.com and the like): their own, not their work address." }
+        left: { type: boolean, description: The contact is marked as having left that company. }
+        more: { type: integer, minimum: 0, description: How many other contacts may also be them. }
     HrScanNext:
       type: object
       required: [query, page]

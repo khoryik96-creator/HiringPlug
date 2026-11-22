@@ -89,3 +89,68 @@ func TestFindHRReadsPageByPageResumesWhereAPageFailedAndKnowsWhoIsAContact(t *te
 		}
 	}
 }
+
+// Find HR checks the people it finds against every contact in the agency:
+// the same LinkedIn profile however it is written, the same name in another
+// order or form (bin/binti, Mohd, titles), or one name inside the other, and
+// shows the likeliest contact with their company and email.
+func TestFindHRShowsWhoIsInHiringPlugAndTheirEmail(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	bank := a.createCompany(token, map[string]any{"name": "Maju Bank Berhad"})
+	old := a.createCompany(token, map[string]any{"name": "Contoh Holdings"})
+	a.createContact(token, map[string]any{"companyId": old.Id, "firstName": "Kumar", "lastName": "Selvam", "title": "HR Director",
+		"email": "kumar@contoh.example", "linkedinUrl": "https://www.linkedin.com/in/Kumar-Selvam"})
+	a.createContact(token, map[string]any{"companyId": bank.Id, "firstName": "Nur Aisyah", "lastName": "binti Ahmad", "email": "aisyah@maju.example"})
+	a.createContact(token, map[string]any{"companyId": old.Id, "firstName": "Mohd Faizal", "lastName": "Abd Rahman", "email": "faizal.rahman@gmail.com"})
+	a.createContact(token, map[string]any{"companyId": old.Id, "firstName": "Lee", "lastName": "Daniel", "status": "left"})
+	a.createContact(token, map[string]any{"companyId": old.Id, "firstName": "Nur", "lastName": "Zainal"}) // one word in common only
+	base := "/v1/companies/" + bank.Id + "/hr-scan"
+	a.hrScan(http.MethodPut, base, token, map[string]any{"linkedinCompanyId": "123456", "linkedinCompanyName": "Maju Bank",
+		"keywords": []string{"HR manager"}, "pages": 1}, http.StatusOK)
+	scan := a.hrScan(http.MethodPost, base+"/pages", token, map[string]any{"query": 0, "page": 1, "hasNext": false, "people": []any{
+		person("kumar-selvam", "Kumar Selvam", "HR Manager"), person("aisyah", "Aisyah Ahmad", "Talent Acquisition Lead"),
+		person("faizal", "Muhammad Faizal Abdul Rahman (He/Him)", "HR Business Partner"), person("daniel", "Daniel Lee", "Recruiter"),
+		person("nur-huda", "Nur Huda", "HR Executive"),
+	}}, http.StatusOK)
+	match := map[string]api.HrScanMatch{}
+	for _, p := range scan.People {
+		if m, err := p.Match.Get(); err == nil {
+			match[p.Name] = m
+		}
+	}
+
+	kumar := match["Kumar Selvam"]
+	assert.Equal(t, api.HrScanMatchKindProfile, kumar.Kind, "the same profile, whatever its letter case")
+	assert.Equal(t, "kumar@contoh.example", kumar.Email.MustGet())
+	assert.Equal(t, "Contoh Holdings", kumar.CompanyName, "at another company in HiringPlug")
+	assert.False(t, kumar.SameCompany)
+	assert.Equal(t, "HR Director", kumar.Title.MustGet())
+
+	aisyah := match["Aisyah Ahmad"]
+	assert.Equal(t, api.HrScanMatchKindSimilarName, aisyah.Kind, "one name inside the other")
+	assert.Equal(t, "aisyah@maju.example", aisyah.Email.MustGet())
+	assert.True(t, aisyah.SameCompany)
+	assert.False(t, aisyah.EmailPersonal)
+
+	faizal := match["Muhammad Faizal Abdul Rahman (He/Him)"]
+	assert.Equal(t, api.HrScanMatchKindSameName, faizal.Kind, "Mohd, Abd and (He/Him) aside, the same name")
+	assert.True(t, faizal.EmailPersonal, "a gmail address is theirs, not work")
+
+	daniel := match["Daniel Lee"]
+	assert.Equal(t, api.HrScanMatchKindSameName, daniel.Kind, "in any order")
+	assert.True(t, daniel.Left)
+	assert.True(t, daniel.Email.IsNull())
+
+	assert.NotContains(t, match, "Nur Huda", "one word in common is not a match")
+	for _, p := range scan.People {
+		switch p.Name {
+		case "Kumar Selvam":
+			assert.False(t, p.ContactId.IsNull(), "still named as a contact for older clients")
+		case "Aisyah Ahmad":
+			assert.False(t, p.DuplicateOf.IsNull(), "and as a possible duplicate")
+		}
+	}
+}

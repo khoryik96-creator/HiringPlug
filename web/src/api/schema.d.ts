@@ -6678,9 +6678,35 @@ export interface components {
             /** @description A contact with this LinkedIn profile already. */
             contactId: string | null;
             contactName: string | null;
-            /** @description A contact with the same name (a possible duplicate). */
+            /** @description A contact with the same or a similar name (a possible duplicate), when none has their profile. */
             duplicateOf: string | null;
             duplicateName: string | null;
+            /** @description The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none. */
+            match: components["schemas"]["HrScanMatch"] | null;
+        };
+        HrScanMatch: {
+            /**
+             * @description profile = the same LinkedIn profile (them); same_name = the same name, in any order (titles, bin/binti and the like aside); similar_name = one name inside the other ("Aisyah Ahmad", "Nur Aisyah binti Ahmad").
+             * @enum {string}
+             */
+            kind: "profile" | "same_name" | "similar_name";
+            contactId: components["schemas"]["ContactId"];
+            name: string;
+            title: string | null;
+            companyId: string;
+            /** @description The company the contact is at in HiringPlug. */
+            companyName: string;
+            /** @description The contact is at the company searched. */
+            sameCompany: boolean;
+            /** @description Their email in HiringPlug. */
+            email: string | null;
+            emailCheckStatus: components["schemas"]["EmailCheckStatus"] | null;
+            /** @description The email is at a free mail service (gmail.com and the like): their own, not their work address. */
+            emailPersonal: boolean;
+            /** @description The contact is marked as having left that company. */
+            left: boolean;
+            /** @description How many other contacts may also be them. */
+            more: number;
         };
         HrScanNext: {
             query: number;

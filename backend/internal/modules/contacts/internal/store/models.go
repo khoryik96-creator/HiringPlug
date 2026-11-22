@@ -601,6 +601,7 @@ type Contact struct {
 	PhoneDigits       *string
 	Role              *string
 	BinnedAt          *time.Time
+	NameWords         []string
 }
 
 type ContactEmploymentCheck struct {

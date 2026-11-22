@@ -42,7 +42,7 @@ func (s *Service) HRScan(ctx context.Context, p authz.Principal, companyID strin
 		if err != nil {
 			return err
 		}
-		scan, err := hrScanToAPI(ctx, tx, row)
+		scan, err := s.hrScanToAPI(ctx, tx, row)
 		out = &scan
 		return err
 	})
@@ -96,7 +96,7 @@ func (s *Service) StartHRScan(ctx context.Context, p authz.Principal, companyID 
 			Changes: map[string]any{"country": country, "keywords": keywords, "pages": in.Pages}}); err != nil {
 			return err
 		}
-		out, err = hrScanToAPI(ctx, tx, row)
+		out, err = s.hrScanToAPI(ctx, tx, row)
 		return err
 	})
 	return out, err
@@ -180,7 +180,7 @@ func (s *Service) updateHRScan(ctx context.Context, p authz.Principal, companyID
 			Changes: map[string]any{"status": saved.Status, "pagesRead": saved.PagesRead, "people": len(people)}}); err != nil {
 			return err
 		}
-		out, err = hrScanToAPI(ctx, tx, saved)
+		out, err = s.hrScanToAPI(ctx, tx, saved)
 		return err
 	})
 	return out, err
@@ -193,19 +193,16 @@ func nullableString(v interface{ Get() (string, error) }) *string {
 	return nil
 }
 
-// hrScanToAPI shows a scan, best first, with who is a contact already (same
-// LinkedIn profile) or may be (same name, anywhere in the agency).
-func hrScanToAPI(ctx context.Context, tx pgx.Tx, row store.HrScan) (api.HrScan, error) {
+// hrScanToAPI shows a scan, best first, with who in HiringPlug each person
+// is (the same LinkedIn profile) or may be (the same or a similar name),
+// anywhere in the agency, with that contact's company and email.
+func (s *Service) hrScanToAPI(ctx context.Context, tx pgx.Tx, row store.HrScan) (api.HrScan, error) {
 	var people []HRPerson
 	if err := json.Unmarshal(row.People, &people); err != nil {
 		return api.HrScan{}, err
 	}
 	SortHRPeople(people)
-	urls, names := make([]string, len(people)), make([]string, len(people))
-	for i, p := range people {
-		urls[i], names[i] = p.URL, strings.ToLower(strings.Join(strings.Fields(p.Name), " "))
-	}
-	like, err := store.New(tx).ContactsLike(ctx, store.ContactsLikeParams{Urls: urls, Names: names})
+	matches, companies, err := s.hrMatches(ctx, tx, row.CompanyID, people)
 	if err != nil {
 		return api.HrScan{}, err
 	}
@@ -241,23 +238,56 @@ func hrScanToAPI(ctx context.Context, tx pgx.Tx, row store.HrScan) (api.HrScan, 
 		person.ContactName.SetNull()
 		person.DuplicateOf.SetNull()
 		person.DuplicateName.SetNull()
-		for _, c := range like {
-			switch {
-			case c.LinkedinUrl == p.URL:
-				person.ContactId.Set(c.ID)
-				person.ContactName.Set(c.Name)
-			case !person.DuplicateOf.IsSpecified() || person.DuplicateOf.IsNull():
-				if strings.EqualFold(strings.Join(strings.Fields(c.Name), " "), names[i]) {
-					person.DuplicateOf.Set(c.ID)
-					person.DuplicateName.Set(c.Name)
-				}
+		person.Match.SetNull()
+		if best, more, ok := BestHRMatch(matches[i], row.CompanyID); ok {
+			if best.Kind == HRMatchProfile {
+				person.ContactId.Set(best.ID)
+				person.ContactName.Set(best.Name)
+			} else {
+				person.DuplicateOf.Set(best.ID)
+				person.DuplicateName.Set(best.Name)
 			}
-		}
-		if !person.ContactId.IsNull() {
-			person.DuplicateOf.SetNull()
-			person.DuplicateName.SetNull()
+			person.Match.Set(hrMatchToAPI(best, more, row.CompanyID, companies[best.CompanyID]))
 		}
 		out.People[i] = person
 	}
 	return out, nil
+}
+
+// hrMatches is, for each person (by place), the contacts who are or may be
+// them, and the names of those contacts' companies.
+func (s *Service) hrMatches(ctx context.Context, tx pgx.Tx, companyID string, people []HRPerson) ([][]HRContact, map[string]string, error) {
+	urls, names := make([]string, len(people)), make([]string, len(people))
+	for i, p := range people {
+		urls[i], names[i] = hrProfileKey(p.URL), p.Name
+	}
+	rows, err := store.New(tx).ContactsLike(ctx, store.ContactsLikeParams{Urls: urls, Names: names})
+	if err != nil {
+		return nil, nil, err
+	}
+	out := make([][]HRContact, len(people))
+	ids := []string{companyID}
+	for _, r := range rows {
+		i := int(r.I) - 1
+		if i < 0 || i >= len(people) {
+			continue
+		}
+		out[i] = append(out[i], HRContact{ID: r.ID, Name: r.Name, CompanyID: r.CompanyID, Title: r.Title, Email: r.Email,
+			EmailCheckStatus: r.EmailCheckStatus, Left: r.Status == "left", Kind: HRMatchKind(r.Kind), UpdatedAt: r.UpdatedAt})
+		ids = append(ids, r.CompanyID)
+	}
+	companies, err := s.companies.Names(ctx, tx, ids)
+	return out, companies, err
+}
+
+func hrMatchToAPI(c HRContact, more int, companyID, companyName string) api.HrScanMatch {
+	m := api.HrScanMatch{Kind: api.HrScanMatchKind(c.Kind), ContactId: c.ID, Name: c.Name, Title: apiconv.OrNull(c.Title),
+		CompanyId: c.CompanyID, CompanyName: companyName, SameCompany: c.CompanyID == companyID, Email: apiconv.OrNull(c.Email),
+		Left: c.Left, More: more}
+	m.EmailCheckStatus.SetNull()
+	if c.EmailCheckStatus != nil {
+		m.EmailCheckStatus.Set(api.EmailCheckStatus(*c.EmailCheckStatus))
+	}
+	m.EmailPersonal = c.Email != nil && PersonalAddress(*c.Email)
+	return m
 }

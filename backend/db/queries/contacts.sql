@@ -271,11 +271,36 @@ UPDATE hr_scan SET status = @status, next_query = @next_query, next_page = @next
 WHERE company_id = @company_id
 RETURNING *;
 
--- Contacts that may be the same people: by LinkedIn profile, or by name (anywhere in the agency).
+-- Contacts who are, or may be, the people a Find HR scan found, anywhere in
+-- the agency: the same LinkedIn profile (@urls in lower case, as stored); the
+-- same name words in any order (app_person_name_words: titles, bin/binti and
+-- the like aside); or, for names of two words or more, one name inside the
+-- other ("Aisyah Ahmad", "Nur Aisyah binti Ahmad"). i is the person's place
+-- in @names, from 1.
 -- name: ContactsLike :many
-SELECT id, btrim(first_name || ' ' || last_name)::text AS name, coalesce(linkedin_url, '')::text AS linkedin_url
-FROM contact
-WHERE linkedin_url = ANY(@urls::text[]) OR lower(btrim(first_name || ' ' || last_name)) = ANY(@names::text[]);
+WITH person AS (
+  SELECT u.i::int AS i, (@urls::text[])[u.i] AS url, app_person_name_words(u.name) AS words
+  FROM unnest(@names::text[]) WITH ORDINALITY AS u(name, i)
+), found AS (
+  SELECT p.i, c.id FROM person p JOIN contact c ON lower(rtrim(c.linkedin_url, '/')) = p.url
+  UNION
+  -- Two words in common, found by the index; which relation they have is checked below.
+  SELECT p.i, c.id FROM person p, unnest(p.words) AS a(w), unnest(p.words) AS b(w), contact c
+  WHERE a.w < b.w AND c.name_words @> ARRAY[a.w, b.w]
+  UNION
+  SELECT p.i, c.id FROM person p JOIN contact c ON cardinality(p.words) = 1 AND c.name_words = p.words
+)
+SELECT f.i, c.id, btrim(c.first_name || ' ' || c.last_name)::text AS name, c.title, c.company_id, c.email, c.email_check_status,
+       c.status, c.updated_at,
+       (CASE WHEN lower(rtrim(c.linkedin_url, '/')) = p.url THEN 'profile'
+             WHEN c.name_words = p.words THEN 'same_name'
+             ELSE 'similar_name' END)::text AS kind
+FROM found f
+JOIN person p ON p.i = f.i
+JOIN contact c ON c.id = f.id
+WHERE lower(rtrim(c.linkedin_url, '/')) = p.url OR c.name_words = p.words
+   OR (cardinality(p.words) >= 2 AND cardinality(c.name_words) >= 2 AND (c.name_words <@ p.words OR c.name_words @> p.words))
+ORDER BY f.i, c.id;
 
 -- Keep a billing contact's current company and address stable during handoff to the mail provider.
 -- name: LockInvoiceRecipient :one

@@ -14,7 +14,11 @@ afterEach(() => {
 const company = { id: "comp_1", name: "Maju Bank Berhad", linkedinUrl: "https://www.linkedin.com/company/maju-bank/" } as Company;
 const person = (over: Partial<Schemas["HrScanPerson"]>): Schemas["HrScanPerson"] => ({
   url: "https://www.linkedin.com/in/farah", name: "Farah Aziz", title: "Head of Talent Acquisition", location: "Kuala Lumpur", tier: "A",
-  hidden: null, joined: "2023-03", left: null, current: true, contactId: null, contactName: null, duplicateOf: null, duplicateName: null, ...over,
+  hidden: null, joined: "2023-03", left: null, current: true, contactId: null, contactName: null, duplicateOf: null, duplicateName: null, match: null, ...over,
+});
+const match = (over: Partial<Schemas["HrScanMatch"]>): Schemas["HrScanMatch"] => ({
+  kind: "profile", contactId: "ct_1", name: "Kumar Selvam", title: "HR Director", companyId: "comp_2", companyName: "Contoh Holdings",
+  sameCompany: false, email: "kumar@contoh.example", emailCheckStatus: "valid", emailPersonal: false, left: false, more: 0, ...over,
 });
 const scan: Schemas["HrScan"] = {
   companyId: "comp_1", linkedinCompanyId: "123", linkedinCompanyName: "Maju Bank", country: "MY", countryName: "Malaysia", geoId: "106808692",
@@ -22,8 +26,10 @@ const scan: Schemas["HrScan"] = {
   people: [
     person({}),
     person({ url: "https://www.linkedin.com/in/daniel", name: "Daniel Lee", title: "HR Business Partner", tier: "B", joined: null, current: null }),
-    person({ url: "https://www.linkedin.com/in/kumar", name: "Kumar Selvam", tier: "B", contactId: "ct_1", contactName: "Kumar Selvam" }),
-    person({ url: "https://www.linkedin.com/in/aisha", name: "Aisha Rahman", tier: "A", duplicateOf: "ct_2", duplicateName: "Aisha Rahman" }),
+    person({ url: "https://www.linkedin.com/in/kumar", name: "Kumar Selvam", tier: "B", contactId: "ct_1", contactName: "Kumar Selvam", match: match({}) }),
+    person({ url: "https://www.linkedin.com/in/aisha", name: "Aisha Rahman", tier: "A", duplicateOf: "ct_2", duplicateName: "Nur Aisha binti Rahman",
+      match: match({ kind: "similar_name", contactId: "ct_2", name: "Nur Aisha binti Rahman", title: null, companyId: "comp_1", companyName: "Maju Bank Berhad",
+        sameCompany: true, email: "aisha@majubank.my", emailCheckStatus: "risky", left: true, more: 1 }) }),
     person({ url: "https://www.linkedin.com/in/nurul", name: "Nurul Huda", title: "HR Intern", tier: "C", hidden: "an intern or trainee" }),
   ],
 };
@@ -44,11 +50,41 @@ describe("Find HR", () => {
     expect(farah.getAttribute("href")).toBe("https://www.linkedin.com/in/farah");
     expect(farah.getAttribute("target")).toBe("_blank");
     expect(farah.closest("tr")?.textContent).toContain("Mar 2023");
-    expect(screen.getByRole("link", { name: "Contact" }).getAttribute("href")).toBe("#/contacts/ct_1");
-    expect(screen.getByRole("link", { name: "Possible duplicate: Aisha Rahman" })).toBeTruthy();
+    // Who they are in HiringPlug, wherever in the agency, with the email to use.
+    const kumar = screen.getByRole("link", { name: "In HiringPlug" });
+    expect(kumar.getAttribute("href")).toBe("#/contacts/ct_1");
+    const kumarRow = kumar.closest("tr") as HTMLElement;
+    expect(kumarRow.textContent).toContain("HR Director · at Contoh Holdings");
+    expect(screen.getByRole("button", { name: "kumar@contoh.example: copy email" })).toBeTruthy();
+    const aisha = screen.getByRole("link", { name: "Similar name" }).closest("td") as HTMLElement;
+    expect(screen.getByRole("link", { name: "Nur Aisha binti Rahman" }).getAttribute("href")).toBe("#/contacts/ct_2");
+    expect(aisha.textContent).toContain("left");
+    expect(aisha.textContent).toContain("aisha@majubank.my may not arrive");
+    expect(aisha.textContent).toContain("1 more contact may be them");
+    expect(aisha.textContent).not.toContain("at Maju Bank Berhad"); // the company searched goes without saying
+    expect(screen.getByText("1 in HiringPlug · 1 may be · 2 new · 2 with an email")).toBeTruthy();
+    // Copying an email does not choose the row.
+    fireEvent.click(screen.getByRole("button", { name: "aisha@majubank.my: copy email" }));
+    expect(aisha.closest("tr")?.getAttribute("aria-selected")).toBe("false");
     expect(screen.queryByText("Nurul Huda")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /1 hidden/ }));
     expect(screen.getByText("Nurul Huda")).toBeTruthy();
+  });
+
+  it("offers no Apollo lookup for a work email HiringPlug has already", async () => {
+    const known = person({ url: "https://www.linkedin.com/in/ana", name: "Ana Lim", contactId: "ct_3",
+      match: match({ contactId: "ct_3", name: "Ana Lim", companyId: "comp_1", companyName: "Maju Bank Berhad", sameCompany: true, email: "ana@majubank.my" }) });
+    const personal = person({ url: "https://www.linkedin.com/in/raj", name: "Raj Kumar", contactId: "ct_4",
+      match: match({ contactId: "ct_4", name: "Raj Kumar", companyId: "comp_1", sameCompany: true, email: "raj@gmail.com", emailPersonal: true }) });
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: true, version: "1.2.0" });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/contacts/apollo"
+      ? { state: "connected", accountName: "Recruiter", authorizationUrl: null }
+      : { scan: { ...scan, people: [known, personal, person({})] } }))) as never);
+    renderWithClient(<FindHR company={company} canCreate canUseApollo />);
+    expect(await screen.findByRole("button", { name: "Work email for Farah Aziz" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Work email for Ana Lim" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Work email for Raj Kumar" }), "a personal address is not their work email").toBeTruthy();
+    expect(screen.getByRole("button", { name: "raj@gmail.com: copy email" }).closest("td")?.textContent).toContain("personal");
   });
 
   it("chooses by clicking a row (not its name), All and None, and adds the chosen as contacts with a guessed email", async () => {
