@@ -78,10 +78,22 @@ def rows_as_lines(
     return "\n\n".join(out)
 
 
+# Headers of tables that are not work history: certificates, awards, courses.
+_NOT_WORK = re.compile(
+    r"\b(?:issu\w*|institut\w*|universit\w*|school|college|certifi\w*|award\w*|course|"
+    r"qualification|grade|cgpa|result|publisher|journal)\b",
+    re.I,
+)
+
+
 def _is_work_header(cells: list[str]) -> bool:
-    return any(_ROLE.match(c) for c in cells) and (
-        any(_DATES.match(c) for c in cells) or any(_ORG.match(c) for c in cells)
-    )
+    """A role column with its dates or employer. A bare "Title" is a role only
+    beside an employer column ("Title | Issuer | Date" lists certificates)."""
+    if any(_NOT_WORK.search(c) for c in cells):
+        return False
+    org = any(_ORG.match(c) for c in cells)
+    role = any(_ROLE.match(c) and (org or c.strip().lower() != "title") for c in cells)
+    return role and (org or any(_DATES.match(c) for c in cells))
 
 
 def work_tables(page: Any) -> list[WorkTable]:

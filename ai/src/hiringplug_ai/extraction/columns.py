@@ -143,8 +143,10 @@ def _respaced(text: str, rows: list[_Row]) -> str:
 
 def page_text(page: Any) -> str:
     """The page's text, column by column when it has two columns; a
-    work-history table read row by row (tables.py), between the text above
-    and below it, with any text beside it (a sidebar) after it."""
+    work-history table read row by row (tables.py) in its place: on a
+    two-column page, within its column (a sidebar beside it is read as the
+    other column, never inside the work history); else between the text
+    above and below it, with text beside it before or after it."""
     tables = work_tables(page)
     if not tables:
         return _region_text(page)
@@ -163,23 +165,74 @@ def page_text(page: Any) -> str:
     # between tables are often too short to tell on their own.
     outside = [w for w in page.extract_words() if not in_table(w)]
     gutter = find_gutter(outside, x1, _rows(outside))
+    if gutter is not None and all(t.left >= gutter - 1 or t.right <= gutter + 1 for t in tables):
+        return _columns_with_tables(page, tables, gutter, outside)
     parts: list[str] = []
     for t in tables:
         if t.top - top > 1:
-            parts.append(_region_text(page.crop((x0, top, x1, min(t.top, bottom))), gutter))
-        parts.append(t.text)
-        for side in ((x0, t.left), (t.right, x1)):  # beside the table
-            if side[1] - side[0] > 1 and t.bottom > t.top:
-                parts.append(
-                    _region_text(page.crop((side[0], max(t.top, top), side[1], min(t.bottom, bottom))))
-                )
+            parts.append(_region_text(_strip(page, (x0, top, x1, t.top)), gutter))
+        beside = [
+            _column_text(_strip(page, (a, max(t.top, top), b, t.bottom)))
+            for a, b in ((x0, t.left), (t.right, x1))
+        ]
+        parts += [beside[0], t.text, beside[1]]  # text on its left first, on its right after
         top = max(top, t.bottom)
     if bottom - top > 1:
-        parts.append(_region_text(page.crop((x0, top, x1, bottom)), gutter))
+        parts.append(_region_text(_strip(page, (x0, top, x1, bottom)), gutter))
     return "\n".join(p for p in parts if p.strip())
 
 
+def _columns_with_tables(page: Any, tables: list[Any], gutter: float, outside: list[dict[str, Any]]) -> str:
+    """A two-column page whose work tables sit in one column: the lines across
+    both columns above them (the name) first, then each column top to bottom,
+    a table's rows in its place in its column."""
+    x0, top, x1, bottom = (float(v) for v in page.bbox)
+    first = min(t.top for t in tables)
+    across = [
+        r.bottom
+        for r in _rows(outside)
+        if r.bottom <= first and any(w["x0"] < gutter < w["x1"] for w in r.words)
+    ]
+    head = max(across, default=top)
+    parts = [_region_text(_strip(page, (x0, top, x1, head)), gutter)] if head - top > 1 else []
+    for a, b in ((x0, gutter), (gutter, x1)):
+        y = head
+        for t in [t for t in tables if a - 1 <= t.left and t.right <= b + 1]:
+            parts += [_column_text(_strip(page, (a, y, b, t.top))), t.text]
+            y = max(y, t.bottom)
+        parts.append(_column_text(_strip(page, (a, y, b, bottom))))
+    return "\n".join(p for p in parts if p.strip())
+
+
+def _strip(page: Any, bbox: tuple[float, float, float, float]) -> Any:
+    """A part of the page holding the characters whose middle is in it: a
+    character on a border goes to one part only, never to two."""
+    px0, ptop, px1, pbottom = (float(v) for v in page.bbox)
+    a, t, b, u = max(bbox[0], px0), max(bbox[1], ptop), min(bbox[2], px1), min(bbox[3], pbottom)
+    if b - a <= 1 or u - t <= 1:
+        return None
+
+    def inside(obj: dict[str, Any]) -> bool:
+        if obj.get("object_type") != "char":
+            return True
+        cx, cy = (obj["x0"] + obj["x1"]) / 2, (obj["top"] + obj["bottom"]) / 2
+        return bool(a <= cx < b and t <= cy < u)
+
+    # Filtered before the crop, which would clip a character to the border.
+    return page.filter(inside).crop((a, t, b, u), strict=False)
+
+
+def _column_text(page: Any) -> str:
+    """One column's text, as it stands (it is not split again)."""
+    if page is None:
+        return ""
+    words = page.extract_words()
+    return _respaced(str(page.extract_text() or ""), _rows(words))
+
+
 def _region_text(page: Any, gutter: float | None = None) -> str:
+    if page is None:
+        return ""
     words = page.extract_words()
     rows = _rows(words)
     return _respaced(_page_text(page, words, rows, gutter), rows)

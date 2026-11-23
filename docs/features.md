@@ -260,8 +260,12 @@ Every value carries the exact CV text it came from, and the server keeps only
 values whose quote is in the CV. A PDF CV whose work history is a table
 (Organization | Role | Location | Client | Industry | Duration, cells wrapped
 over several lines) is read row by row, so each job keeps its own title,
-employer and dates (1.38.0); a heading such as "IT Experience" or "SAP
-Experience" starts the work history. **A new CV updates the profile by itself** ✅:
+employer and dates (1.38.0); a heading naming a field of work ("IT
+Experience", "Relevant Work Experience", "Oil & Gas Experience") starts the
+work history, but not a job title, skill or tagline ("Head of Customer
+Experience", "User Experience", "10+ Years Experience"). A sidebar beside
+such a table is read as its own column, never inside the work history; a
+certificates table ("Title | Issuer | Date") is not read as jobs (1.38.3). **A new CV updates the profile by itself** ✅:
 once the candidate's newest CV is read, where it says they are now replaces
 what the profile had (job title, current employer, industry, location), empty
 fields are filled (contact details are only ever filled, never replaced; the
@@ -373,7 +377,10 @@ written in a template's own text, nothing is saved and you are told what
 kind of detail it was. The file name carries the reference, not the name.
 Employers, clients and their branded products are masked as whole names
 (Digi, Digi Prepaid, DigiPrepaid, Maybank2u), never inside an ordinary word:
-"Digital" stays "Digital" (CV Studio masked it as "[Company]tal").
+"Digital" stays "Digital" (CV Studio masked it as "[Company]tal"), even when
+the AI reworded the rest of the line. Only an ordinary English word is given
+back this way: a brand built on the name ("MyDigi", "Shopeepay") stays
+masked (1.38.3).
 A CV Studio blind CV keeps what CV Studio's rules made of the formatted one
 (1.38.0): the job titles, dates and last position as formatted (unless one
 names an employer), the sub-headings inside a job (not turned into bullets),

@@ -343,6 +343,31 @@ def _headlines(section: list[str], indexes: range) -> list[str]:
     return out
 
 
+# A labelled line of a table row ("Location: Malaysia").
+_ANY_LABEL = re.compile(r"^[A-Za-z][A-Za-z /&()-]{0,30}\s*[:：]\s*\S")
+
+
+def _table_row(section: list[str], i: int, start: int) -> bool:
+    """Whether line i is the "Duration:" line of a table row (tables.py): its
+    Role or Organization right below; or, with both cells empty, labelled
+    lines below it and the row above it a table row too (only labelled lines
+    back to that row's "Duration:")."""
+    if not _DURATION_LABEL.match(section[i].strip()):
+        return False
+    after = [t.strip() for t in section[i + 1 : i + 3]]
+    if any(_TITLE_LABEL.match(t) or _COMPANY_LABEL.match(t) for t in after):
+        return True
+    if not after or not _ANY_LABEL.match(after[0]):
+        return False
+    first = max(0, start - 1)  # the row above's "Duration:" line is the job line before this one's context
+    j = i - 1
+    while (
+        j > first and _ANY_LABEL.match(section[j].strip()) and not _DURATION_LABEL.match(section[j].strip())
+    ):
+        j -= 1
+    return j < i - 1 and bool(_DURATION_LABEL.match(section[j].strip()))
+
+
 def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool) -> Job | None:
     dates = find_range(section[i])
     if dates is None:
@@ -356,12 +381,9 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
     # "Organization:" in a table row): never the neighbouring job's.
     before = section[max(start, i - 4) : i][::-1]  # nearest first
     after = section[i + 1 : min(end, i + 5)]
-    # A labelled "Duration:" line (a table row) always has its role and
-    # employer below it, whatever the rest of the CV does.
-    # A table row (tables.py): "Duration:" with its Role or Organization right below.
-    table_row = bool(_DURATION_LABEL.match(section[i].strip())) and any(
-        _TITLE_LABEL.match(t) or _COMPANY_LABEL.match(t) for t in after[:2]
-    )
+    # A table row (tables.py) has its role and employer below its "Duration:"
+    # line, whatever the rest of the CV does.
+    table_row = _table_row(section, i, start)
     below_dates = dates_first or table_row
     near, far = (after, before) if below_dates else (before, after)
     lt, lc = _labelled([section[i], *near])
