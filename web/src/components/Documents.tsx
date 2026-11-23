@@ -53,7 +53,6 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
   const [comparing, setComparing] = useState(false);
   const canFormat = permissions.includes("cvformats:create");
   const studio = useStudioRun(candidateId, canFormat);
-  const [again, setAgain] = useState(false); // asked: format again, a formatted CV being saved already
 
   const docs = useQuery({
     queryKey: ["documents", candidateId],
@@ -238,7 +237,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               ? <button type="button" className="doc-btn format-done" onClick={() => { const id = studio.finished?.documentId; if (id) setPicked(id); studio.acknowledge(); }}>Done</button>
               : <IconButton label="Format a CV" icon={<SparkIcon />} onClick={() => {
                 studio.acknowledge();
-                if (all.some((d) => d.source === "formatted")) setAgain(true); else setFormatting(true);
+                setFormatting(true); // a CV of the same kind saved already is said in the form, once blind or not is chosen
               }} />)}
           {canUpload && !uploading && <IconButton label="Upload" icon={<UploadIcon />} className="icon-primary" onClick={() => { setUploading(true); }} />}
           {uploading && <IconButton label="Cancel upload" icon={<CloseIcon />} disabled={upload.isPending || checking} onClick={() => { setReplacement(null); setUploading(false); }} />}
@@ -277,15 +276,6 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               <button type="button" className="doc-btn" disabled={upload.isPending} onClick={() => { setReplacement(null); upload.reset(); }}>Cancel</button>
             </div>
           </div>}
-        </div>
-      )}
-      {again && (
-        <div className="dup-ask" role="alert">
-          <p>A formatted CV is saved already{(() => { const f = all.find((d) => d.source === "formatted"); return f ? <>: <strong>{f.fileName}</strong></> : null; })()}. Format again?</p>
-          <div className="row">
-            <button type="button" className="doc-btn primary" onClick={() => { setAgain(false); setFormatting(true); }}>Format again</button>
-            <button type="button" className="doc-btn" onClick={() => { setAgain(false); }}>Cancel</button>
-          </div>
         </div>
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}

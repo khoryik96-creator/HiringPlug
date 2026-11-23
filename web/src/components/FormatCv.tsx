@@ -59,8 +59,8 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
         </label>
       </div>
       {mode === "studio"
-        ? <StudioForm candidateId={candidateId} cvs={cvs} selection={selection} onDone={onDone} />
-        : <TemplateForm candidateId={candidateId} permissions={permissions} selection={selection} onDone={onDone} />}
+        ? <StudioForm candidateId={candidateId} cvs={cvs} formatted={formatted} selection={selection} onDone={onDone} />
+        : <TemplateForm candidateId={candidateId} permissions={permissions} formatted={formatted} selection={selection} onDone={onDone} />}
     </div>
   );
 }
@@ -94,7 +94,21 @@ export function saveSummaryChoice(choice: SummaryChoice) {
 
 type Replacement = { ids: string[]; ready: boolean; refresh: (error: unknown) => void; choice: React.ReactNode };
 
-function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: string; cvs: Document[]; selection: Replacement; onDone: () => void }) {
+/** Whether a formatted CV is a blind one: both ways of making one name it "… (Blinded).docx". */
+export const isBlindCv = (fileName: string) => /\(Blinded\)\.[a-z]+$/i.test(fileName);
+
+/** The formatted CV of the kind being made (blind or not) already saved, if any: only then is it said. */
+function AlreadySaved({ formatted, blind }: { formatted: Document[]; blind: boolean }) {
+  const same = formatted.find((d) => isBlindCv(d.fileName) === blind);
+  if (!same) return null;
+  return <p className="warning small full" role="note">
+    {blind ? "A blind CV" : "A formatted CV"} is saved already: <strong>{same.fileName}</strong>. This makes another one.
+  </p>;
+}
+
+function StudioForm({ candidateId, cvs, formatted, selection, onDone }: {
+  candidateId: string; cvs: Document[]; formatted: Document[]; selection: Replacement; onDone: () => void;
+}) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     documentId: "", blind: false, neutralGender: false, correctLanguage: true, alignment: "left" as "left" | "justify",
@@ -147,10 +161,11 @@ function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: stri
           <option value="justify">Justified</option>
         </select>
       </label>
+      <AlreadySaved formatted={formatted} blind={form.blind} />
       {selection.choice}
       <ErrorMessage error={fieldErrors(start.error).summaryDirection ? null : start.error} />
       <div className="row full">
-        <button type="submit" disabled={start.isPending || !selection.ready}>Format CV</button>
+        <button type="submit" disabled={start.isPending || !selection.ready}>{formatted.some((d) => isBlindCv(d.fileName) === form.blind) ? "Format again" : "Format CV"}</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
     </form>
@@ -182,7 +197,9 @@ export function SummaryOptions({ choice, onChange, error }: { choice: SummaryCho
   );
 }
 
-function TemplateForm({ candidateId, permissions, selection, onDone }: { candidateId: string; permissions: Permission[]; selection: Replacement; onDone: () => void }) {
+function TemplateForm({ candidateId, permissions, formatted, selection, onDone }: {
+  candidateId: string; permissions: Permission[]; formatted: Document[]; selection: Replacement; onDone: () => void;
+}) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: cvTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/cv-templates")).items });
   const apps = useQuery({
@@ -235,6 +252,7 @@ function TemplateForm({ candidateId, permissions, selection, onDone }: { candida
       <label className="field full">Your summary for the client (optional)
         <textarea rows={4} value={form.summary} onChange={(e) => { setForm({ ...form, summary: e.target.value }); }} />
       </label>
+      <AlreadySaved formatted={formatted} blind={form.blind} />
       {selection.choice}
       <SaveError error={make.error} shown={[]} onReload={onDone} />
       <div className="row full">
