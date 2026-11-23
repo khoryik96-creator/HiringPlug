@@ -37,7 +37,7 @@ func Tables(r Report) []sheet.Table {
 	sources := sheet.Table{Name: "Sources", Columns: []sheet.Column{{Heading: "Source"}, {Heading: "Applications", Kind: sheet.Number},
 		{Heading: "Interviewed", Kind: sheet.Number}, {Heading: "Placed", Kind: sheet.Number}}}
 	for _, s := range r.Sources {
-		sources.Rows = append(sources.Rows, []string{sourceText(s.Source), strconv.Itoa(s.Applications), strconv.Itoa(s.Interviewed), strconv.Itoa(s.Placed)})
+		sources.Rows = append(sources.Rows, []string{sourceText(s.Source, r.SourceNames), strconv.Itoa(s.Applications), strconv.Itoa(s.Interviewed), strconv.Itoa(s.Placed)})
 	}
 	cols := []sheet.Column{{Heading: "Recruiter"}, {Heading: "Placements", Kind: sheet.Number}, {Heading: "Fell through", Kind: sheet.Number}}
 	if !r.FeesHidden {
@@ -66,9 +66,13 @@ func Tables(r Report) []sheet.Table {
 	return []sheet.Table{funnel, sources, recruiters, fill}
 }
 
-func sourceText(s string) string {
+// sourceText is a source as Settings names it, else its key in words.
+func sourceText(s string, names map[string]string) string {
 	if s == "" || s == "unknown" {
 		return "Not recorded"
+	}
+	if name := names[s]; name != "" {
+		return name
 	}
 	words := strings.ReplaceAll(s, "_", " ")
 	return strings.ToUpper(words[:1]) + words[1:]

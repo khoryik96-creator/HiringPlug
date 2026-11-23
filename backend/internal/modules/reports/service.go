@@ -28,6 +28,7 @@ type Report struct {
 	RecruiterNames map[string]string
 	TimeToFill     FillTimes
 	JobTitles      map[string]string
+	SourceNames    map[string]string // the sources as Settings names them
 	FeesHidden     bool
 }
 
@@ -51,6 +52,13 @@ func (s *Service) Report(ctx context.Context, p authz.Principal, from, to *time.
 			return err
 		}
 		out.Funnel, out.Sources = Funnel(apps), Sources(apps)
+		if s.deps.Labels != nil {
+			labels, err := s.deps.Labels.Labels(ctx, tx)
+			if err != nil {
+				return err
+			}
+			out.SourceNames = labels["candidate_source"]
+		}
 		if out.Recruiters, out.RecruiterNames, err = s.recruiters(ctx, tx, first, last, out.FeesHidden); err != nil {
 			return err
 		}

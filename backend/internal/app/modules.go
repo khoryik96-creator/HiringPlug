@@ -155,6 +155,7 @@ func NewModules(d Deps) *Modules {
 		Activity: reportActivity{candidates: m.Candidates, notes: m.Notes, pipeline: m.Pipeline, emails: m.Emails,
 			interviews: m.Interviews, placements: m.Placements, identity: m.Identity},
 		Forecast: reportForecast{pipeline: m.Pipeline, placements: m.Placements, jobs: m.Jobs, companies: m.Companies},
+		Labels:   m.Settings,
 	}, d.Config.TimeZone)
 	m.Offers = offers.New(d.Pool, offerApplications{m.Pipeline}, m.Identity)
 	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.AllowPrivateNetworks, d.Config.WebhookKeysSecret, d.Config.AuthJWTSecret)

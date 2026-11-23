@@ -76,6 +76,11 @@ type Deps struct {
 	// Forecast reads the open pipeline and what each placement would bring
 	// (pipeline, placements, jobs and companies modules).
 	Forecast ForecastSources
+	// Labels gives the words for the company's lists (settings module), so
+	// sources read as Settings names them. Optional.
+	Labels interface {
+		Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error)
+	}
 }
 
 // ActivitySources read, in the caller's transaction, what users did in a

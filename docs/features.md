@@ -304,7 +304,9 @@ CV Studio's check finds something the result may have lost or changed, the
 page says what, to compare before sending. It needs the AI (Settings > AI
 provider) and counts in the monthly AI allowance. Its summary box carries
 CV Studio's "ABOUT HIM / HER" heading. The summary is optional (one line:
-"AI summary" on or off, off keeps the CV's own): its length (short 4-5 points,
+"AI summary" on or off, off keeps the CV's own; a blind CV gets it too, the
+blind step anonymising each point, so it reads in points like the formatted CV
+rather than as the CV's own paragraph): its length (short 4-5 points,
 normal 6-7, detailed 8-10), what it brings out (CV Studio's General,
 Technology, Leadership or Commercial) and your own direction and tone in a
 sentence or two ("confident and concise, lead with the S/4HANA migration").
@@ -315,7 +317,11 @@ salary", "current package") is refused, since pay is never sent to the AI
 (work that only sounds like pay, "compensation and benefits design", is fine). **From their profile** is
 the template way below. Either way the file is named after the agency as CV
 Studio names it, "Hyppies CV - Siti Aisyah.docx": the agency's name is in
-Settings > General (Agency).
+Settings > General (Agency). A blind CV's bullets keep the indents of the
+bullets they were made from, even where blinding changed their words.
+**Downloading** a formatted CV (the download button above the CV) saves the
+Word file under its own name; the preview of a Word file is a PDF copy and
+hides the viewer's own download, which would save the copy under a made-up name.
 
 **Deleting a formatted CV ✅**: its "..." menu has "Delete this formatted CV"
 (after a confirmation; `documents:delete`, recruiters and up). Its Word file
