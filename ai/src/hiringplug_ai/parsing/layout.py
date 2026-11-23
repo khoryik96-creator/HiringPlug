@@ -132,7 +132,13 @@ SECTION_NAMES["experience"] += (
     "job history",
 )
 SECTION_NAMES["skills"] += ("skills and qualities", "skills and attributes")
-SECTION_NAMES["education"] += ("education and certification", "education and training", "academic profile")
+SECTION_NAMES["education"] += (
+    "education and certification",
+    "education and training",
+    "academic profile",
+    "educational qualification",
+    "educational qualifications",
+)
 SECTION_NAMES["skills"] += (
     "top skills",
     "core expertise",
@@ -203,7 +209,14 @@ def section_of(text: str) -> str | None:
     if key in _AMBIGUOUS and not (text.isupper() or text.rstrip().endswith((":", "："))):
         return None
     singular = " ".join(w[:-1] if w.endswith("s") and len(w) > 4 else w for w in key.split())
-    return _LOOKUP.get(key) or _LOOKUP.get(singular) or _LOOKUP_JOINED.get(key.replace(" ", ""))
+    found = _LOOKUP.get(key) or _LOOKUP.get(singular) or _LOOKUP_JOINED.get(key.replace(" ", ""))
+    if found is None and _FIELD_EXPERIENCE.fullmatch(key):
+        return "experience"  # "IT Experience", "Manufacturing Experience", "SAP Experience"
+    return found
+
+
+# A short heading naming the field of the experience under it.
+_FIELD_EXPERIENCE = re.compile(r"(?:[a-z0-9&/+.]+ ){1,3}experiences?")
 
 
 # Page furniture that is not part of the CV's content.

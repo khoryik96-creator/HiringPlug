@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any
 
+from .tables import work_tables
+
 BIN = 2.0  # points
 MIN_GUTTER = 8.0  # points of empty space between the columns
 MIN_ROWS = 8
@@ -140,14 +142,32 @@ def _respaced(text: str, rows: list[_Row]) -> str:
 
 
 def page_text(page: Any) -> str:
-    """The page's text, column by column when it has two columns."""
+    """The page's text, column by column when it has two columns; a
+    work-history table read row by row (tables.py), between the text above
+    and below it."""
+    tables = work_tables(page)
+    if not tables:
+        return _region_text(page)
+    x0, top, x1, bottom = (float(v) for v in page.bbox)
+    parts: list[str] = []
+    for t in tables:
+        if t.top - top > 1:
+            parts.append(_region_text(page.crop((x0, top, x1, min(t.top, bottom)))))
+        parts.append(t.text)
+        top = max(top, t.bottom)
+    if bottom - top > 1:
+        parts.append(_region_text(page.crop((x0, top, x1, bottom))))
+    return "\n".join(p for p in parts if p.strip())
+
+
+def _region_text(page: Any) -> str:
     words = page.extract_words()
     rows = _rows(words)
     return _respaced(_page_text(page, words, rows), rows)
 
 
 def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row]) -> str:
-    gutter = find_gutter(words, float(page.width), rows)
+    gutter = find_gutter(words, float(page.bbox[2]), rows)
     if gutter is None:
         return str(page.extract_text() or "")
     parts: list[str] = []
@@ -157,8 +177,8 @@ def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row]) -> str:
     def flush() -> None:
         if block_top is None:
             return
-        top, bottom = max(0.0, block_top - 1), min(float(page.height), block_bottom + 1)
-        bounds = [(0.0, gutter), (gutter, float(page.width))]
+        top, bottom = max(float(page.bbox[1]), block_top - 1), min(float(page.bbox[3]), block_bottom + 1)
+        bounds = [(float(page.bbox[0]), gutter), (gutter, float(page.bbox[2]))]
 
         def first_top(side: tuple[float, float]) -> float:
             # From the page's words, already extracted: no second pass over the column.
