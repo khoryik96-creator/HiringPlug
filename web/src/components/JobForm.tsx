@@ -17,9 +17,11 @@ import { SaveError } from "./SaveError";
  * Add a job (job = null, optionally at `company`) or edit one. Edits save
  * with the version they were opened with. The salary budget is separate.
  */
-export function JobForm({ job, company = null, onDone, onSaved }: {
+export function JobForm({ job, company = null, jdFile = null, onDone, onSaved }: {
   job: JobOrder | null;
   company?: PickedCompany | null;
+  /** A job description to read at once (from an email's attachment). */
+  jdFile?: File | null;
   onDone: () => void;
   onSaved?: (job: JobOrder) => void;
 }) {
@@ -96,7 +98,7 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
     >
       {!opened.id && (
         <div className="full">
-          <JdDrop readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => {
+          <JdDrop start={jdFile} readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => {
             const read = ++jdReads.current;
             // A company the last JD chose gives way to this JD's (kept, with its contact, when it names the same one); one chosen by hand stays.
             const companyFromJd = form.company !== null && form.company.id === jdPickedCompany;

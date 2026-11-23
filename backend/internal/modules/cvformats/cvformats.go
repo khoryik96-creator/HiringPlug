@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/cvformats/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
@@ -79,6 +80,28 @@ type Deps struct {
 type Module struct {
 	HTTP *HTTP
 	svc  *Service
+}
+
+// Finished is a CV Studio run that is done or failed.
+type Finished struct {
+	ID, CandidateID string
+	Failed, Blind   bool
+	At              time.Time
+}
+
+// FinishedBy is the CV Studio runs userID started that finished since then,
+// newest first, for their notifications (in tx: candidates they may not see
+// are left out).
+func (m *Module) FinishedBy(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]Finished, error) {
+	rows, err := store.New(tx).StudioCvsFinishedBy(ctx, store.StudioCvsFinishedByParams{UserID: userID, Since: &since})
+	out := make([]Finished, 0, len(rows))
+	for _, r := range rows {
+		if r.FinishedAt == nil {
+			continue
+		}
+		out = append(out, Finished{ID: r.ID, CandidateID: r.CandidateID, Failed: r.Status == "failed", Blind: r.Blind, At: *r.FinishedAt})
+	}
+	return out, err
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.

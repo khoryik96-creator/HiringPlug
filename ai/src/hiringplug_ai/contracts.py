@@ -5436,6 +5436,7 @@ class NotificationKind(StrEnum):
     task = "task"
     offer_approval = "offer_approval"
     interview = "interview"
+    cv_formatted = "cv_formatted"
 
 
 class Notification(BaseModel):

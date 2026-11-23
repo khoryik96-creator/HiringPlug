@@ -1,13 +1,16 @@
 // The bell in the top bar: new applicants on your jobs, your tasks due,
-// offers waiting for your approval and your interviews today and tomorrow,
-// with how many are new since you last opened it. And their settings in
+// offers waiting for your approval, your interviews today and tomorrow and
+// the CVs you had formatted (green the moment one is ready), with how many
+// are new since you last opened it. Open, it is marked as the one clicked,
+// and it closes by itself after 30 seconds. And their settings in
 // Settings › Your account: which kinds you get, and the morning email.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
+import { useTopbarPanel } from "./topbarPanel";
 
 type Kind = Schemas["NotificationKind"];
 type List = Schemas["NotificationList"];
@@ -20,14 +23,17 @@ export const KINDS: { kind: Kind; label: string; short: string; permission: Perm
   { kind: "task", label: "Your tasks due today or overdue", short: "Task", permission: "automations.tasks:read" },
   { kind: "offer_approval", label: "Offers waiting for your approval", short: "Offer", permission: "offers:approve" },
   { kind: "interview", label: "Your interviews today and tomorrow", short: "Interview", permission: "interviews:read" },
+  { kind: "cv_formatted", label: "CVs you had formatted, ready or failed", short: "CV ready", permission: "cvformats:create" },
 ];
 const SHORT = Object.fromEntries(KINDS.map((k) => [k.kind, k.short])) as Record<Kind, string>;
 
-function useNotifications() {
+/** The bell's list (shared: the open-record tabs read it too, with no request of their own). */
+export function useNotifications(enabled = true) {
   return useQuery({
     queryKey: notificationsKey,
+    enabled,
     queryFn: async () => unwrap(await api.GET("/v1/notifications")),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000, // a formatted CV is said soon after it is ready
     retry: false,
   });
 }
@@ -57,21 +63,18 @@ export function NotificationBell() {
       queryClient.setQueryData<List>(notificationsKey, (old) => old && { ...old, unseen: 0, items: old.items.map((i) => ({ ...i, new: false })) });
     },
   });
-  // A click outside closes it.
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (menu.current?.open && !menu.current.contains(e.target as Node)) menu.current.open = false;
-    };
-    document.addEventListener("click", close);
-    return () => { document.removeEventListener("click", close); };
-  }, []);
+  // Marked while open; a click elsewhere or 30 seconds closes it.
+  const { open, track } = useTopbarPanel(menu);
   const data = list.data;
   if (!data) return null;
   const unseen = data.unseen;
   const view = shown ?? data;
-  const label = unseen > 0 ? `Notifications: ${String(unseen)} new` : "Notifications";
+  // A CV formatted since last looked lights the bell green.
+  const cvReady = data.items.some((i) => i.kind === "cv_formatted" && i.new);
+  const label = unseen > 0 ? `Notifications: ${String(unseen)} new${cvReady ? ", a CV is formatted" : ""}` : "Notifications";
   return (
     <details ref={menu} className="bell" onToggle={(e) => {
+      track(e);
       if (e.currentTarget.open) {
         setShown(data);
         if (unseen > 0) seen.mutate(data.asOf);
@@ -80,7 +83,8 @@ export function NotificationBell() {
         void queryClient.invalidateQueries({ queryKey: notificationsKey });
       }
     }}>
-      <summary className={`settings-link topbar-shortcut bell-button${unseen > 0 ? " has-new" : ""}`} aria-label={label} title={label}>
+      <summary className={`settings-link topbar-shortcut bell-button${unseen > 0 ? " has-new" : ""}${cvReady ? " cv-ready" : ""}`}
+        aria-label={label} title={label} aria-expanded={open}>
         <BellIcon />
         {unseen > 0 && <span className="bell-count" aria-hidden="true">{unseen > 9 ? "9+" : unseen}</span>}
       </summary>

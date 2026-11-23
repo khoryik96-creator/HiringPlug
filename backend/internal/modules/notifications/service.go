@@ -160,6 +160,11 @@ func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state
 			return nil, err
 		}
 	}
+	if p.Can(api.PermissionCvformatsCreate) && wants(KindCVFormatted) {
+		if in.FormattedCVs, err = s.src.FormattedCVs(ctx, tx, p.UserID, w.FormattedSince); err != nil {
+			return nil, err
+		}
+	}
 	var ids []string
 	for _, r := range in.Applicants {
 		ids = append(ids, r.ApplicationID)

@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { studioCvsKey } from "./FormatCv";
+import { notificationsKey } from "./Notifications";
 
 type Run = Schemas["StudioCv"];
 
@@ -52,7 +53,10 @@ export function useStudioRun(candidateId: string, enabled: boolean): StudioRun {
   // A run just finished: its CV joins the documents.
   const finishedId = finished?.id;
   useEffect(() => {
-    if (finishedId) void queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
+    if (finishedId) {
+      void queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
+      void queryClient.invalidateQueries({ queryKey: notificationsKey }); // the bell says so at once
+    }
   }, [finishedId, candidateId, queryClient]);
   return {
     running, finished,

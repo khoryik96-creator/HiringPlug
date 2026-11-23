@@ -41,6 +41,9 @@ type Sources interface {
 	OffersToApprove(ctx context.Context, tx pgx.Tx, userID string) ([]Record, error)
 	// Interviews is the user's scheduled interviews starting in [from, to).
 	Interviews(ctx context.Context, tx pgx.Tx, userID string, from, to time.Time) ([]Interview, error)
+	// FormattedCVs is the CVs the user had formatted CV Studio's way that
+	// finished since then, with the candidate's name.
+	FormattedCVs(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]FormattedCV, error)
 	// Applications names the candidate and job of applications (missing ones are left out).
 	Applications(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
 }

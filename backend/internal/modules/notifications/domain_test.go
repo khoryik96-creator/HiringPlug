@@ -127,3 +127,16 @@ func TestShownCapsTheBellNotTheEmail(t *testing.T) {
 	assert.Equal(t, MaxItems, unseen)
 	assert.Equal(t, "iv", DigestFor(items, now.Add(-24*time.Hour))[MaxItems+5].ID, "the email is picked from all, so the interview is in it")
 }
+
+func TestAFormattedCVIsForTheBellNotTheMorningEmail(t *testing.T) {
+	now := time.Date(2026, 11, 23, 10, 0, 0, 0, time.UTC)
+	items := Build(Inputs{FormattedCVs: []FormattedCV{
+		{ID: "scv_1", CandidateID: "cand_1", CandidateName: "Siti Aisyah", Blind: true, At: now.Add(-time.Minute)},
+		{ID: "scv_2", CandidateID: "cand_2", CandidateName: "Lim Wei", Failed: true, At: now.Add(-2 * time.Minute)},
+	}}, nil, WindowAt(now, time.UTC))
+	require.Len(t, items, 2)
+	assert.Equal(t, "Blind CV formatted: Siti Aisyah", items[0].Title)
+	assert.Equal(t, "#/candidates/cand_1", items[0].Href)
+	assert.Equal(t, "CV could not be formatted: Lim Wei", items[1].Title)
+	assert.Empty(t, DigestFor(items, now.Add(-24*time.Hour)))
+}

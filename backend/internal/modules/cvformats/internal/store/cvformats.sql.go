@@ -414,3 +414,50 @@ func (q *Queries) StudioCvTokensSince(ctx context.Context, since time.Time) (int
 	err := row.Scan(&column_1)
 	return column_1, err
 }
+
+const studioCvsFinishedBy = `-- name: StudioCvsFinishedBy :many
+SELECT id, candidate_id, status, blind, finished_at FROM studio_cv
+WHERE created_by = $1 AND status IN ('done', 'failed') AND finished_at >= $2
+ORDER BY finished_at DESC LIMIT 50
+`
+
+type StudioCvsFinishedByParams struct {
+	UserID string
+	Since  *time.Time
+}
+
+type StudioCvsFinishedByRow struct {
+	ID          string
+	CandidateID string
+	Status      string
+	Blind       bool
+	FinishedAt  *time.Time
+}
+
+// The CV Studio runs a user started that finished since a moment, for their
+// notifications (row-level security leaves out candidates they may not see).
+func (q *Queries) StudioCvsFinishedBy(ctx context.Context, arg StudioCvsFinishedByParams) ([]StudioCvsFinishedByRow, error) {
+	rows, err := q.db.Query(ctx, studioCvsFinishedBy, arg.UserID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StudioCvsFinishedByRow
+	for rows.Next() {
+		var i StudioCvsFinishedByRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.Status,
+			&i.Blind,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

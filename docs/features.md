@@ -260,8 +260,12 @@ Every value carries the exact CV text it came from, and the server keeps only
 values whose quote is in the CV. A PDF CV whose work history is a table
 (Organization | Role | Location | Client | Industry | Duration, cells wrapped
 over several lines) is read row by row, so each job keeps its own title,
-employer and dates (1.38.0); a heading such as "IT Experience" or "SAP
-Experience" starts the work history. **A new CV updates the profile by itself** ✅:
+employer and dates (1.38.0); a heading naming a field of work ("IT
+Experience", "Relevant Work Experience", "Oil & Gas Experience") starts the
+work history, but not a job title, skill or tagline ("Head of Customer
+Experience", "User Experience", "10+ Years Experience"). A sidebar beside
+such a table is read as its own column, never inside the work history; a
+certificates table ("Title | Issuer | Date") is not read as jobs (1.38.3). **A new CV updates the profile by itself** ✅:
 once the candidate's newest CV is read, where it says they are now replaces
 what the profile had (job title, current employer, industry, location), empty
 fields are filled (contact details are only ever filled, never replaced; the
@@ -298,8 +302,9 @@ renderer lays it out in its template, in the background (a minute). One run
 at a time per candidate (other candidates' CVs can be formatted meanwhile): the
 button turns orange with the seconds elapsed while it runs, under it a bar
 fills, and once saved the button turns green "Done" (clicking it shows the new
-CV and turns it back to "Format a CV"). When a formatted CV is saved already,
-"Format a CV" asks before formatting again. Options: correct spelling, punctuation
+CV and turns it back to "Format a CV"). Once blind or not is chosen, the form
+says when a formatted CV of that kind is saved already (a blind one for a blind
+CV, an ordinary one otherwise) and its button reads "Format again" (1.39.0). Options: correct spelling, punctuation
 and capitals (never the meaning, numbers or dates); blind (no name or contact
 details, employers and schools described rather than named, optionally "the
 candidate" instead of he or she); paragraphs aligned left or justified. Lines
@@ -373,7 +378,10 @@ written in a template's own text, nothing is saved and you are told what
 kind of detail it was. The file name carries the reference, not the name.
 Employers, clients and their branded products are masked as whole names
 (Digi, Digi Prepaid, DigiPrepaid, Maybank2u), never inside an ordinary word:
-"Digital" stays "Digital" (CV Studio masked it as "[Company]tal").
+"Digital" stays "Digital" (CV Studio masked it as "[Company]tal"), even when
+the AI reworded the rest of the line. Only an ordinary English word is given
+back this way: a brand built on the name ("MyDigi", "Shopeepay") stays
+masked (1.38.3).
 A CV Studio blind CV keeps what CV Studio's rules made of the formatted one
 (1.38.0): the job titles, dates and last position as formatted (unless one
 names an employer), the sub-headings inside a job (not turned into bullets),
@@ -583,7 +591,11 @@ for each of their jobs, with **Score fit** / **Score again**.
   Your account › Notifications** has a switch for each kind and for the
   **morning email**: at 8:00 agency time (HP_TIME_ZONE) the same list by
   email, only on mornings when there is something (applicants since the last
-  email). It goes on while you are away and comes back with you.
+  email). It goes on while you are away and comes back with you. A CV you had
+  formatted CV Studio's way is said the moment it is ready (or could not be
+  made), by the candidate's name, for two days: the bell lights **green** with
+  the count (1.39.0; bell only, not the morning email). The bell and the CV
+  imports icon are marked while open, and close by themselves after 30 seconds.
 - **Exports and Excel import** ✅ (1.34.0): **Export** (Excel .xlsx or CSV)
   on Candidates, Companies, Contacts, Jobs, Placements and Reports gives what
   the page's search and filters find (candidates: the advanced search too),
@@ -1124,7 +1136,10 @@ lead's company (with the built-in email check).
   Muhammad and Abdul) or **Similar name** (one name inside the other, two
   words or more: "Aisyah Ahmad", "Nur Aisyah binti Ahmad"). Other contacts
   who may also be them are counted. Above the list: how many are in
-  HiringPlug, may be, or are new. Apollo's **Work email** is not offered for
+  HiringPlug, may be, or are new. Each recruiter connects their own Apollo
+  account in **Settings › Integrations** (or from Find HR), which also says how
+  the server is set up for it when it is not (docs/apollo-hr.md; 1.39.0).
+  Apollo's **Work email** is not offered for
   someone whose work address HiringPlug has at this company already. From
   Leads, a lead's company has the same Find HR. Clicking a row
   chooses it (All / None too); clicking a name opens their LinkedIn profile.
@@ -1773,6 +1788,22 @@ width of the screen; a record's page stays centred.
 Common actions on candidate, contact, and company screens use icons with labels
 on hover and keyboard focus. The forms and their save actions keep visible labels.
 
+**Open records** ✅ (1.39.0): under the top bar, a tab for each candidate,
+contact, company and job you opened (in this browser, up to 30), named after
+it (the candidate's or contact's name, the company, the job title and client)
+and grouped by kind; the one you are on is marked. Each kind shows its latest
+four (and the one you are on); **+N** lists the rest, and **All open (N)**
+finds any by typing a name (Enter opens it). Shift-click selects a run of
+tabs, Ctrl-click (Cmd on a Mac) picks several: **Close selected**, **Select
+all**, **Close all**; closing the one you are on opens the one beside it. A
+tab lights **green** when work on its record finishes while you are elsewhere
+(a CV formatted), until you open it. Drag a tab to the browser's tab bar (or
+middle-click it) to open the record in a new browser tab: a new tab takes the
+sign-in of a HiringPlug tab already open (with none open, it asks to sign in;
+closing every tab still signs out). The tabs are the signed-in user's own,
+forgotten on signing out, and the same in every window; closing the page you
+typed into asks first.
+
 ## Main settings ✅
 
 **Settings** groups the pages on the left by personal preferences, recruiting
@@ -1885,8 +1916,9 @@ Job details can be expanded or collapsed below the pipeline and start collapsed.
 
 Email composers show Cc and Bcc on demand beside To. Filled copy recipients and invalid fields stay visible.
 
-**WhatsApp** ✅: a green chat button beside a candidate's phone and a contact's
-mobile opens a message: blank, or from a **WhatsApp template** (Settings ›
+**WhatsApp** ✅: a chat button beside a candidate's phone and a contact's
+mobile, WhatsApp green when there is a number (grey, saying what it needs, when
+there is none; 1.39.0), opens a message: blank, or from a **WhatsApp template** (Settings ›
 WhatsApp templates; three to start with) filled with their name, the job
 chosen and yours. Salary fields are never filled. "Open in WhatsApp" opens the
 recruiter's own WhatsApp (app or web, a wa.me chat link) with the message
@@ -1984,7 +2016,12 @@ a stored CV or its formatted Word or PDF version when available. Send and
 Schedule wait for the selected attachment to finish uploading. The page uses the width of the screen: drag
 the bars between the folders, the list and the reading pane, or either side of
 the editor, to resize them (kept in this browser). Download attachments of up to
-20 MiB from the reading pane. **Import CV** imports a CV attachment as a candidate
+20 MiB from the reading pane. **Create job** on a job description (PDF, Word or
+text) opens Jobs with the Add job form reading it and filling itself in, as if
+the file were dropped there; the file is kept with the job (1.39.0). A folder
+Outlook will not hand over (a special or shared one) waits ten minutes while the
+others sync, so it never stops the Inbox; the mailbox warns only when nothing
+could sync, with Microsoft's reason (1.39.0). **Import CV** imports a CV attachment as a candidate
 in place (source Direct and CV parsing; the same file is not imported twice and
 a CV with a candidate's email joins them): orange
 while importing, a green outline and **Uploaded** when done (click it for the

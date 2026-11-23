@@ -192,3 +192,25 @@ def test_a_brand_named_product_stays_masked() -> None:
         "Launched [Company]Food and [Company]2u"
     )
     assert guard.unglued("[Company]gital Consultant", "Digital Consultant") == "Digital Consultant"
+
+
+def test_a_brand_inside_a_word_stays_masked() -> None:
+    """ "MyDigi" and "Shopeepay" name the employer: the mask stays, only an
+    ordinary word ("Digital") is given back."""
+    assert (
+        guard.unglued("Launched the My[Company] app", "Launched the MyDigi app")
+        == "Launched the My[Company] app"
+    )
+    assert guard.unglued("Ran [Company]pay rollout", "Ran Shopeepay rollout") == "Ran [Company]pay rollout"
+    assert guard.unglued("Booked [Company]car rides", "Booked Grabcar rides") == "Booked [Company]car rides"
+    assert guard.ordinary_word("Digitalisation")
+    assert not guard.ordinary_word("MyDigi")
+
+
+def test_a_cut_word_comes_back_though_the_ai_reworded_the_line() -> None:
+    assert (
+        guard.unglued("Led the [Company]gital Consultant team of 5", "Led Digital Consultant team of five")
+        == "Led the Digital Consultant team of 5"
+    )
+    # Two words it could be: neither is guessed.
+    assert guard.unglued("[Company]tal and Capital", "Digital and Vital") == "[Company]tal and Capital"

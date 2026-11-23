@@ -210,64 +210,37 @@ def section_of(text: str) -> str | None:
         return None
     singular = " ".join(w[:-1] if w.endswith("s") and len(w) > 4 else w for w in key.split())
     found = _LOOKUP.get(key) or _LOOKUP.get(singular) or _LOOKUP_JOINED.get(key.replace(" ", ""))
-    words = key.split()
-    if (
-        found is None
-        and 2 <= len(words) <= 3
-        and words[-1] in ("experience", "experiences")
-        and all(w in _FIELDS for w in words[:-1])
-    ):
-        return "experience"  # "IT Experience", "Manufacturing Experience", "SAP Experience"
+    if found is None and _field_experience(key.split()):
+        return "experience"  # "IT Experience", "Relevant Work Experience", "Oil & Gas Experience"
     return found
 
 
-# Fields a heading may name before "Experience" ("IT Experience"). Only these:
-# "Head of Customer Experience" is a job title, "User Experience" a skill and
-# "10+ Years Experience" a tagline, never a section.
-_FIELDS = frozenset(
+def _field_experience(words: list[str]) -> bool:
+    """A short heading naming the field of the experience under it ("Sales
+    Experience"), not a job title ("Head of Customer Experience"), a skill
+    ("User Experience") or a tagline ("10+ Years Experience")."""
+    return (
+        2 <= len(words) <= 4
+        and words[-1] in ("experience", "experiences")
+        and words[-2] not in _EXPERIENCE_SKILLS
+        and all(w.isalpha() and w not in _NOT_FIELDS for w in words[:-1])
+    )
+
+
+# Words that never name a field before "Experience": a title ("Head of"),
+# or a length ("10+ Years").
+_NOT_FIELDS = frozenset(
     [
-        "it",
-        "sap",
-        "oracle",
-        "erp",
-        "software",
-        "technical",
-        "technology",
-        "industry",
-        "industrial",
-        "manufacturing",
-        "banking",
-        "finance",
-        "financial",
-        "accounting",
-        "audit",
-        "consulting",
-        "project",
-        "projects",
-        "teaching",
-        "research",
-        "engineering",
-        "relevant",
-        "overseas",
-        "international",
-        "local",
-        "previous",
-        "other",
-        "additional",
-        "corporate",
-        "retail",
-        "hospitality",
-        "healthcare",
-        "medical",
-        "legal",
-        "logistics",
-        "operations",
-        "offshore",
-        "onshore",
-        "field",
-        "site",
-        "domain",
-        "functional",
+        *("of", "for", "in", "with", "at", "to", "on", "by"),
+        *("years", "year", "yrs", "yr", "plus", "over", "total"),
+        *("head", "director", "manager", "lead", "officer", "chief", "vp"),
+    ]
+)
+# "<word> Experience" that is a skill or a field of work, not a heading.
+_EXPERIENCE_SKILLS = frozenset(
+    [
+        *("user", "customer", "client", "candidate", "employee"),
+        *("guest", "patient", "member", "shopper", "visitor"),
     ]
 )
 

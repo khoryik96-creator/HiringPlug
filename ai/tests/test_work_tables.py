@@ -12,7 +12,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from hiringplug_ai.extraction import extract
-from hiringplug_ai.extraction.tables import rows_as_lines
+from hiringplug_ai.extraction.tables import _is_work_header, rows_as_lines
 from hiringplug_ai.parsing import parse_cv
 
 ROWS = [
@@ -160,3 +160,200 @@ def test_text_beside_a_work_table_is_kept() -> None:
 def test_a_company_job_title_dates_table_is_read_as_a_table() -> None:
     text = extract(sidebar_table_cv(["Company", "Job Title", "Dates"]), ocr=None).text or ""
     assert "Duration: 2016 - 2019\nRole: Accountant\nOrganization: Sampel Holdings" in text
+
+
+def test_a_heading_naming_any_field_of_work_starts_the_work_history() -> None:
+    for heading in ("Relevant Work Experience", "Sales Experience", "HR Experience", "Oil & Gas Experience"):
+        text = (
+            f"NUR AINA EXAMPLE\n\nSkills\nNegotiation\nCRM\n\n{heading}\n"
+            "Sales Manager\nContoh Berhad\nJan 2019 - Dec 2021\n"
+        )
+        jobs = parse_cv(text).model_dump()["experience"]
+        assert [(j["title"]["value"], j["company"]["value"]) for j in jobs] == [
+            ("Sales Manager", "Contoh Berhad")
+        ], heading
+
+
+def test_a_certificates_table_is_not_read_as_jobs() -> None:
+    text = extract(sidebar_table_cv(["Title", "Issuer", "Date"]), ocr=None).text or ""
+    assert "Role:" not in text
+    assert "Duration:" not in text
+
+
+def two_column_table_cv() -> bytes:
+    """A sidebar (its heading above the table) on the left; on the right the
+    work table under its heading, and more of the main column below it."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont("Helvetica", 9)
+    c.drawString(200, 810, "NUR AINA EXAMPLE    aina@example.com    +60 12 345 6789    Kuala Lumpur")
+    side = [
+        "SKILLS",
+        "SAP FICO",
+        "Python",
+        "Power BI",
+        "Treasury",
+        "Budgeting",
+        "Forecasting",
+        "IFRS 9",
+        "LANGUAGES",
+        "Malay",
+        "English",
+        "Mandarin",
+        "HOBBIES",
+        "Running",
+        "Reading",
+        "Chess",
+        "Cooking",
+    ]
+    for i, line in enumerate(side):
+        c.drawString(40, 780 - i * 22, line)
+    c.drawString(200, 780, "IT Experience")
+    xs = [200, 320, 450, 560]
+    rows = [
+        ["Organization", "Role", "Duration"],
+        ["Contoh Berhad", "Finance Analyst", "2019 - 2021"],
+        ["Sampel Holdings", "Accountant", "2016 - 2019"],
+    ]
+    for r, row in enumerate(rows):
+        top = 765 - r * 30
+        for k, cell in enumerate(row):
+            c.drawString(xs[k] + 4, top - 18, cell)
+        c.line(xs[0], top, xs[-1], top)
+    c.line(xs[0], 765 - len(rows) * 30, xs[-1], 765 - len(rows) * 30)
+    for x in xs:
+        c.line(x, 765, x, 765 - len(rows) * 30)
+    main = [
+        "Education",
+        "Bachelor of Accounting, Universiti Contoh (2012 - 2016)",
+        "Projects",
+        "Led the move of the general ledger to S/4HANA for three companies",
+        "Built monthly cash forecasts used by the treasury team",
+        "Automated bank reconciliations, saving two days each month",
+        "Trained twelve users on the new reporting dashboards",
+    ]
+    for i, line in enumerate(main):
+        c.drawString(200, 640 - i * 22, line)
+    c.save()
+    return buf.getvalue()
+
+
+def test_a_sidebar_beside_a_work_table_stays_out_of_the_work_history() -> None:
+    text = extract(two_column_table_cv(), ocr=None).text or ""
+    assert text.count("Mandarin") == 1
+    work = text[text.index("IT Experience") : text.index("Education")]
+    for word in ("SAP FICO", "Mandarin", "Running"):
+        assert word not in work, word
+    assert text.index("SKILLS") < text.index("SAP FICO") < text.index("LANGUAGES")
+    cv = parse_cv(text).model_dump()
+    jobs = cv["experience"]
+    assert [(j["title"]["value"], j["company"]["value"]) for j in jobs] == [
+        ("Finance Analyst", "Contoh Berhad"),
+        ("Accountant", "Sampel Holdings"),
+    ]
+    assert "SAP FICO" in [s["value"] for s in cv["skills"]]
+
+
+def test_a_row_with_no_role_or_employer_never_takes_the_row_above() -> None:
+    text = (
+        "NUR AINA EXAMPLE\n\nIT Experience\n"
+        "Duration: 11/2019 to 03/2026\nRole: Analyst\nOrganization: Contoh Berhad\nLocation: Malaysia\n\n"
+        "Duration: 06/2017 to 11/2019\nLocation: India\nIndustry: Pharmaceutical\n"
+    )
+    jobs = parse_cv(text).model_dump()["experience"]
+    assert [j["company"]["value"] for j in jobs if j["company"]].count("Contoh Berhad") == 1
+
+
+def test_a_labelled_cv_keeps_each_jobs_own_labels_above_or_below_its_dates() -> None:
+    above = (
+        "NUR AINA EXAMPLE\n\nWork Experience\n"
+        "Position: Senior Accountant\nCompany: Contoh Berhad\n"
+        "Duration: Jan 2019 - Dec 2021\nResponsibilities: Closing\n\n"
+        "Position: Accountant\nCompany: Sampel Holdings\n"
+        "Duration: Mar 2016 - Dec 2018\nResponsibilities: Payables\n"
+    )
+    below = (
+        "NUR AINA EXAMPLE\n\nWork Experience\n"
+        "Duration: Jan 2019 - Dec 2021\nPosition: Senior Accountant\nCompany: Contoh Berhad\n\n"
+        "Duration: Mar 2016 - Dec 2018\nPosition: Accountant\nCompany: Sampel Holdings\n"
+    )
+    for text in (above, below):
+        jobs = parse_cv(text).model_dump()["experience"]
+        assert [(j["title"]["value"], j["company"]["value"]) for j in jobs] == [
+            ("Senior Accountant", "Contoh Berhad"),
+            ("Accountant", "Sampel Holdings"),
+        ]
+
+
+def test_a_line_across_both_columns_below_a_table_stays_whole() -> None:
+    """A two-column page, its work table in the right column, then a heading
+    centred across the page below it."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont("Helvetica", 9)
+    side = [
+        "SKILLS",
+        "SAP FICO",
+        "Python",
+        "Power BI",
+        "Treasury",
+        "Budgeting",
+        "Forecasting",
+        "IFRS 9",
+        "LANGUAGES",
+        "Malay",
+        "English",
+        "Mandarin",
+        "HOBBIES",
+        "Running",
+        "Reading",
+        "Chess",
+        "Cooking",
+    ]
+    for i, line in enumerate(side):
+        c.drawString(40, 780 - i * 22, line)
+    c.drawString(200, 780, "IT Experience")
+    xs = [200, 320, 450, 560]
+    rows = [["Organization", "Role", "Duration"], ["Contoh Berhad", "Finance Analyst", "2019 - 2021"]]
+    for r, row in enumerate(rows):
+        top = 765 - r * 30
+        for k, cell in enumerate(row):
+            c.drawString(xs[k] + 4, top - 18, cell)
+        c.line(xs[0], top, xs[-1], top)
+    c.line(xs[0], 765 - len(rows) * 30, xs[-1], 765 - len(rows) * 30)
+    for x in xs:
+        c.line(x, 765, x, 765 - len(rows) * 30)
+    for i, line in enumerate(
+        [
+            "Led the move of the ledger to S/4HANA for three companies",
+            "Built monthly cash forecasts used by the treasury team",
+        ]
+    ):
+        c.drawString(200, 680 - i * 22, line)
+    c.drawString(100, 380, "EDUCATION AND PROFESSIONAL CERTIFICATIONS")  # across the gap at x=160
+    c.drawString(40, 350, "Bachelor of Accounting, Universiti Contoh (2012 - 2016)")
+    c.save()
+    text = extract(buf.getvalue(), ocr=None).text or ""
+    assert "EDUCATION AND PROFESSIONAL CERTIFICATIONS" in text
+    assert text.index("Duration: 2019 - 2021") < text.index("EDUCATION AND PROFESSIONAL CERTIFICATIONS")
+
+
+def test_which_headers_make_a_work_table() -> None:
+    assert not _is_work_header(["Title", "Issuer", "Date"]), "certificates"
+    assert not _is_work_header(["Course", "Title", "Year(s)"]), "courses"
+    assert _is_work_header(["Company", "Role", "Key Result", "Duration"])
+    assert _is_work_header(["Organization", "Role", "Issues Handled", "Duration"])
+
+
+def test_a_dates_first_labelled_cv_with_another_label_first_keeps_each_jobs_own() -> None:
+    text = (
+        "NUR AINA EXAMPLE\n\nWork Experience\n"
+        "Duration: Jan 2019 - Dec 2021\nLocation: Kuala Lumpur\n"
+        "Position: Senior Accountant\nCompany: Contoh Berhad\n\n"
+        "Duration: Mar 2016 - Dec 2018\nLocation: Penang\nPosition: Accountant\nCompany: Sampel Holdings\n"
+    )
+    jobs = parse_cv(text).model_dump()["experience"]
+    assert [(j["title"]["value"], j["company"]["value"]) for j in jobs] == [
+        ("Senior Accountant", "Contoh Berhad"),
+        ("Accountant", "Sampel Holdings"),
+    ]

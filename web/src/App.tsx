@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 
 import { api, ApiError, unwrap } from "./api/client";
-import { authLinkRoute, clearToken, getToken } from "./auth";
+import { askSignIn, authLinkRoute, clearToken, getToken, setToken, shareSignIn } from "./auth";
 import { AiNotice } from "./components/AiNotice";
 import { CloseIcon, DockRightIcon, IconButton, OutlookIcon } from "./components/ActionIcons";
 import { ErrorMessage } from "./components/ErrorMessage";
@@ -10,6 +10,8 @@ import { CvImportIndicator } from "./components/outlook/CvImportIndicator";
 import { NotificationBell } from "./components/Notifications";
 import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
+import { OpenTabs } from "./components/OpenTabs";
+import { forgetTabs, setTabsOwner } from "./components/openRecords";
 import { SettingsLayout } from "./components/SettingsLayout";
 import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { ClientShortlistPage, shortlistRoute } from "./pages/ClientShortlistPage";
@@ -65,6 +67,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   // (and any form being filled in) for the last loaded profile.
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
+  // The open-record tabs are this user's own.
+  setTabsOwner(`${me.data.tenant.id}:${me.data.user.id}`);
   const permissions = me.data.permissions;
   const { route, id } = resolve(hash, permissions);
   const settingsPages = menu("settings", permissions);
@@ -128,7 +132,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             <span className="avatar" aria-hidden="true">{initials(me.data.user.name)}</span>
             <span className="name"><strong>{me.data.user.name}</strong><small>{me.data.role.replace("_", " ")} · {me.data.tenant.name}</small></span>
           </a>
-          <button type="button" className="link" onClick={() => { void endSession().finally(onSignOut); }}>
+          <button type="button" className="link" onClick={() => { forgetTabs(); void endSession().finally(onSignOut); }}>
             Sign out
           </button>
         </div>
@@ -136,6 +140,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       <div className="shell-content">
         <div className="shell-page" inert={calendarModal}>
           <AiNotice permissions={permissions} />
+          <OpenTabs hash={hash} />
           <PageErrorBoundary key={pageKey}>
             <Suspense fallback={<p className="muted page-loading">Loading…</p>}>
               {route.menu?.in === "settings" ? (
@@ -185,6 +190,23 @@ function CalendarDock({ userId, modal, onClose }: { userId: string; modal: boole
 export function App() {
   useHash(); // re-render on navigation
   const [signedIn, setSignedIn] = useState(getToken() !== null);
+  // A new browser tab (a record dragged out): another signed-in tab's sign-in, if one is open.
+  // Never on a public page (careers, booking, a client's shortlist, an invitation).
+  const isPublic = () => !!(careersRoute(window.location) || bookingRoute(window.location) || shortlistRoute(window.location)
+    || authLinkRoute(window.location.hash));
+  const [asking, setAsking] = useState(() => !signedIn && !isPublic());
+  useEffect(() => {
+    if (!asking) return;
+    let live = true;
+    void askSignIn().then((token) => {
+      if (!live) return;
+      if (token) { setToken(token); setSignedIn(true); }
+      setAsking(false);
+    });
+    return () => { live = false; };
+  }, [asking]);
+  // Signed in: other new tabs may take this sign-in.
+  useEffect(() => (signedIn ? shareSignIn() : undefined), [signedIn]);
   const [queryClient, setQueryClient] = useState(newSessionQueries);
   // The public careers page: never behind sign-in. (hash re-renders on change.)
   const careers = careersRoute(window.location);
@@ -201,6 +223,8 @@ export function App() {
     setQueryClient(newSessionQueries());
     setSignedIn(signedIn);
   };
+  // (Signing out with the button also forgets the open-record tabs, so the
+  // next person on this browser never sees them; a sign-in that lapsed keeps them.)
   const signOut = () => {
     clearToken();
     changeSession(false);
@@ -218,6 +242,8 @@ export function App() {
         <ChoosePassword key={link.token} token={link.token} onSignedIn={() => { changeSession(true); }} />
       ) : signedIn ? (
         <Shell onSignOut={signOut} />
+      ) : asking ? (
+        <p className="muted page-loading" role="status">Opening…</p>
       ) : (
         <SignIn onSignedIn={() => { changeSession(true); }} />
       )}

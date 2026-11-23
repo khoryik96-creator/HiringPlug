@@ -67,6 +67,20 @@ export const ArchiveIcon = () => <Svg><path d="M4 5h16v4H4zm2 4v10h12V9m-8 4h4" 
 export const MoveFolderIcon = () => <Svg><path d="M3 8V6h6l2 2h10v11H3zm6 5h7m-3-3 3 3-3 3" /></Svg>;
 export const ConversationIcon = () => <Svg><path d="M4 5h16v12h-7l-4 4v-4H4zm4 4h8m-8 4h5" /></Svg>;
 export const LinkIcon = () => <Svg><path d="m10 14 4-4m-7 2-2 2a3.5 3.5 0 0 0 5 5l3-3m4-4 2-2a3.5 3.5 0 0 0-5-5l-3 3" /></Svg>;
+// The message editor's formatting tools.
+export const StrikeIcon = () => (
+  <Svg><path d="M4 12h16" /><path d="M16.5 7.5C16 5.9 14.3 5 12 5 9.5 5 8 6.3 8 8c0 1.2.8 2.2 2.4 2.8M8 16.5c.5 1.6 2.2 2.5 4.5 2.5 2.5 0 4-1.3 4-3 0-.8-.3-1.5-.9-2" /></Svg>
+);
+export const NumberedListIcon = () => (
+  <Svg><path d="M10 6h10M10 12h10M10 18h10M4 4.5 5.5 4v5M4 9h3" /><path d="M4 14.5a1.5 1.5 0 0 1 3 0c0 1.4-3 2-3 4.5h3" /></Svg>
+);
+export const IndentIcon = () => <Svg><path d="M4 5h16M11 10h9M11 14h9M4 19h16M4 9l3 3-3 3" /></Svg>;
+export const OutdentIcon = () => <Svg><path d="M4 5h16M11 10h9M11 14h9M4 19h16M7 9l-3 3 3 3" /></Svg>;
+export const AlignLeftIcon = () => <Svg><path d="M4 6h16M4 10h10M4 14h16M4 18h10" /></Svg>;
+export const AlignCenterIcon = () => <Svg><path d="M4 6h16M7 10h10M4 14h16M7 18h10" /></Svg>;
+export const AlignRightIcon = () => <Svg><path d="M4 6h16M10 10h10M4 14h16M10 18h10" /></Svg>;
+export const ClearFormatIcon = () => <Svg><path d="M5 5h12M11 5 8.5 17M14 14l6 6m0-6-6 6" /></Svg>;
+export const BriefcaseIcon = () => <Svg><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" /></Svg>;
 export const FlagIcon = () => <Svg><path d="M5 21V4m0 0h11l-2 4 2 4H5" /></Svg>;
 export const MoreIcon = () => <Svg><path d="M5 12h.1m7 0h.1m7 0h.1" /></Svg>;
 export const PowerIcon = () => <Svg><path d="M12 3v9m5-6a8 8 0 1 1-10 0" /></Svg>;

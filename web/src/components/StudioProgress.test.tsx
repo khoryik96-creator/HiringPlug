@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Document, type Schemas } from "../api/client";
@@ -58,18 +58,28 @@ describe("formatting a CV", () => {
     expect(screen.queryByRole("status", { name: "CV formatting" })).toBeNull();
   });
 
-  it("asks before formatting again when a formatted CV is saved", async () => {
-    serve({ docs: [doc({}), doc({ id: "doc_f", source: "formatted", fileName: "Siti - CV.docx" })], runs: [] });
+  it("says a CV of the kind being made is saved already, blind or not, once chosen", async () => {
+    serve({ docs: [doc({}), doc({ id: "doc_f", source: "formatted", fileName: "Hyppies CV - Siti Aisyah.docx" })], runs: [] });
     show();
-    await screen.findByText("Siti - CV.docx");
+    await screen.findByText("Hyppies CV - Siti Aisyah.docx");
     fireEvent.click(screen.getByRole("button", { name: "Format a CV" }));
-    expect(screen.getByRole("alert").textContent).toContain("A formatted CV is saved already: Siti - CV.docx. Format again?");
-    expect(screen.queryByRole("form", { name: "Format their CV" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("alert")).toBeNull();
+    const form = await screen.findByRole("form", { name: "Format their CV" }); // no question first
+    expect(within(form).getByRole("note").textContent).toBe("A formatted CV is saved already: Hyppies CV - Siti Aisyah.docx. This makes another one.");
+    expect(within(form).getByRole("button", { name: "Format again" })).toBeTruthy();
+    fireEvent.click(within(form).getByRole("checkbox", { name: /Blind CV/ }));
+    expect(within(form).queryByRole("note")).toBeNull(); // no blind CV yet: nothing to warn about
+    expect(within(form).getByRole("button", { name: "Format CV" })).toBeTruthy();
+  });
+
+  it("warns about a blind CV only when making another blind one", async () => {
+    serve({ docs: [doc({}), doc({ id: "doc_b", source: "formatted", fileName: "Hyppies CV - Candidate C-4F2K9Q (Blinded).docx" })], runs: [] });
+    show();
+    await screen.findByText("Hyppies CV - Candidate C-4F2K9Q (Blinded).docx");
     fireEvent.click(screen.getByRole("button", { name: "Format a CV" }));
-    fireEvent.click(screen.getByRole("button", { name: "Format again" }));
-    await waitFor(() => { expect(screen.getByRole("form", { name: "Format their CV" })).toBeTruthy(); });
+    const form = await screen.findByRole("form", { name: "Format their CV" });
+    expect(within(form).queryByRole("note")).toBeNull();
+    fireEvent.click(within(form).getByRole("checkbox", { name: /Blind CV/ }));
+    expect(within(form).getByRole("note").textContent).toContain("A blind CV is saved already");
   });
 
   it("opens the form at once when no formatted CV is saved", async () => {

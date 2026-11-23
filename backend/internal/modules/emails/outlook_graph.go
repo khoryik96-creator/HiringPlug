@@ -18,7 +18,46 @@ import (
 type outlookGraphError struct {
 	status int
 	retry  time.Time
+	code   string // Microsoft's error code ("ErrorAccessDenied"), when it gave one
+	// badLink: the folder's saved link (or the next one Outlook gave) is not
+	// one to follow: the folder starts afresh rather than retry it.
+	badLink bool
 }
+
+// outlookErrorCode is Microsoft's error code from an error response's body,
+// kept only when it is a plain code (it is shown and logged).
+var outlookErrorCode = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.]{1,79}$`)
+
+func outlookCode(body io.Reader) string {
+	var out struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	raw, _ := io.ReadAll(io.LimitReader(body, 64<<10))
+	if json.Unmarshal(raw, &out) != nil || !outlookErrorCode.MatchString(out.Error.Code) {
+		return ""
+	}
+	return out.Error.Code
+}
+
+// outlookReason is the error in words for the mailbox: Microsoft's code, or
+// what went wrong on the way.
+func outlookReason(err *outlookGraphError) string {
+	switch {
+	case err.code != "":
+		return "Microsoft said " + err.code
+	case err.status == 0:
+		return "Microsoft could not be reached"
+	case err.status == http.StatusBadGateway:
+		return "Microsoft's answer could not be read"
+	default:
+		return fmt.Sprintf("Microsoft answered HTTP %d", err.status)
+	}
+}
+
+// outlookMaxFolders is how many of a mailbox's folders are synced.
+const outlookMaxFolders = 500
 
 var outlookGraphID = regexp.MustCompile(`^[A-Za-z0-9_+=/-]{1,1000}$`)
 
@@ -77,12 +116,13 @@ func (s *Service) openOutlookResponse(ctx context.Context, token, method, target
 		return nil, &outlookGraphError{}
 	}
 	if response.StatusCode/100 != 2 {
+		code := outlookCode(response.Body)
 		_ = response.Body.Close()
 		retry, _ := http.ParseTime(response.Header.Get("Retry-After"))
 		if seconds, err := strconv.Atoi(response.Header.Get("Retry-After")); err == nil && seconds > 0 && seconds <= 86400 {
 			retry = time.Now().Add(time.Duration(seconds) * time.Second)
 		}
-		return nil, &outlookGraphError{status: response.StatusCode, retry: retry}
+		return nil, &outlookGraphError{status: response.StatusCode, retry: retry, code: code}
 	}
 	return response, nil
 }
@@ -178,7 +218,7 @@ func (s *Service) outlookFolders(ctx context.Context, token string) (map[string]
 		initial := pending[0]
 		pending = pending[1:]
 		for next := initial; next != ""; {
-			if !outlookContinuation(initial, next) || seenPages[next] || len(seenPages) >= 200 {
+			if !outlookContinuation(initial, next) || seenPages[next] || len(seenPages) >= 2*outlookMaxFolders {
 				return nil, nil, &outlookGraphError{status: 502}
 			}
 			seenPages[next] = true
@@ -190,8 +230,11 @@ func (s *Service) outlookFolders(ctx context.Context, token string) (map[string]
 				return nil, nil, &outlookGraphError{status: 502}
 			}
 			for _, folder := range *page.Value {
-				if folder.ID == "" || len(folder.ID) > 1024 || len(folders) >= 200 {
+				if folder.ID == "" || len(folder.ID) > 1024 {
 					return nil, nil, &outlookGraphError{status: 502}
+				}
+				if len(folders) >= outlookMaxFolders {
+					continue // a mailbox with very many folders: the first ones are synced
 				}
 				if _, ok := folders[folder.ID]; ok {
 					continue

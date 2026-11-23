@@ -19,7 +19,10 @@ names, joins different employers. So:
 from __future__ import annotations
 
 import copy
+import functools
+import gzip
 import re
+from importlib import resources
 from typing import Any
 
 # Extra rules for the AI, after CV Studio's blind prompt.
@@ -99,42 +102,86 @@ def finish(cv: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-# A mask inside a word: a whole name was never there ("[Company]gital" from
-# "Digital", where "Digi" is an employer). A product named after a brand is
-# masked before a capital or a digit on purpose ("[Company]Food", "[Company]2u").
-_CUT = re.compile(r"(?<=[A-Za-z])\[Company\]|\[Company\](?=[a-z])")
+# A mask inside a word ("[Company]gital" from "Digital", where "Digi" is an
+# employer): the letters stuck to it, before and after.
+_CUT = re.compile(r"([A-Za-z]*)\[Company\]([A-Za-z]*)")
+# Endings an ordinary word may add to one in the list ("digitalisation").
+_ENDINGS = (
+    "s",
+    "es",
+    "ed",
+    "d",
+    "ing",
+    "er",
+    "ers",
+    "ly",
+    "ally",
+    "al",
+    "ise",
+    "ised",
+    "ises",
+    "ize",
+    "ized",
+    "izes",
+    "isation",
+    "isations",
+    "ization",
+    "izations",
+    "ity",
+    "ness",
+    "ment",
+    "ments",
+    "ation",
+    "ations",
+)
+
+
+@functools.cache
+def _english() -> frozenset[str]:
+    """Ordinary English words, lowercase (SCOWL, see wordlists/README.md)."""
+    data = resources.files("hiringplug_ai").joinpath("wordlists/english_words.txt.gz").read_bytes()
+    return frozenset(gzip.decompress(data).decode("ascii").split())
+
+
+def ordinary_word(word: str) -> bool:
+    """Whether a word is plain English ("Digital", "Digitalisation"), not a
+    brand ("MyDigi", "Shopeepay", "Grabcar"). Pure: unit tested."""
+    low = word.casefold()
+    words = _english()
+    return low in words or any(
+        low.endswith(end) and len(low) - len(end) >= 4 and low[: -len(end)] in words for end in _ENDINGS
+    )
 
 
 def unglued(made: Any, given: Any) -> Any:
     """The AI's text with each mask that cut a word in two given back its
-    word from the given text; whole-name masks stay. Pure: unit tested."""
-    if not isinstance(made, str) or not isinstance(given, str) or not _CUT.search(made):
+    word, found in the given text: the one word there with the same letters
+    around the mask, and only when that word is ordinary English, so a brand
+    ("My[Company]" for "MyDigi") stays masked. Whole-name masks stay; the rest
+    of the line may be reworded. Pure: unit tested."""
+    if not isinstance(made, str) or not isinstance(given, str) or "[Company]" not in made:
         return made
-    parts = re.split(r"(\[Company\])", made)
-    cut: list[bool] = []
-    pattern = ""
-    for i, part in enumerate(parts):
-        if part != "[Company]":
-            pattern += re.escape(part)
-            continue
-        inside = (
-            parts[i - 1][-1:].isalpha() or parts[i + 1][:1].islower()
-            if i + 1 < len(parts)
-            else parts[i - 1][-1:].isalpha()
-        )
-        cut.append(bool(inside))
-        pattern += r"([A-Za-z]{1,40}?)" if inside else r"(.+?)"
-    m = re.fullmatch(pattern, given, re.DOTALL)
-    if not m:
-        return made
-    out, n = [], 0
-    for part in parts:
-        if part == "[Company]":
-            out.append(m.group(n + 1) if cut[n] else part)
-            n += 1
-        else:
-            out.append(part)
-    return "".join(out)
+    words: list[str] = re.findall(r"[A-Za-z]+", given)
+
+    def back(m: re.Match[str]) -> str:
+        before, after = m.group(1), m.group(2)
+        if not before and not after[:1].islower():
+            return str(m.group(0))  # a whole name, or a brand product masked on purpose ("[Company]Food")
+        found = {
+            w
+            for w in words
+            if len(w) > len(before) + len(after)
+            and w.casefold().startswith(before.casefold())
+            and w.casefold().endswith(after.casefold())
+        }
+        if len({w.casefold() for w in found}) != 1:
+            return str(m.group(0))  # none, or more than one could be meant
+        word = found.pop()
+        if not ordinary_word(word):
+            return str(m.group(0))
+        return before + word[len(before) : len(word) - len(after)] + after
+
+    return _CUT.sub(back, made)
 
 
 def _unglue_items(made: Any, given: Any) -> Any:

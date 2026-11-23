@@ -7,6 +7,7 @@ import { jobsKey } from "../api/keys";
 import { downloadExport } from "../api/files";
 import { ExportButton } from "../components/ExportButton";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { takeJd } from "../components/jdHandover";
 import { JobForm } from "../components/JobForm";
 import { Change } from "../components/heat";
 import { attention, JobProgressTable, useJobProgress } from "../components/JobProgressTable";
@@ -48,7 +49,9 @@ function JobNumbers({ jobs, progress }: { jobs: Schemas["JobOrderSummary"][]; pr
 export function JobList({ canCreate, canExport = false }: { canCreate: boolean; canExport?: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [status, setStatus] = useState<StatusFilter>(() => (hashParam("q") ? "" : "open")); // a search looks at every job
-  const [adding, setAdding] = useState(false);
+  // A job description handed over from an email ("Create job"): the Add job form opens with it.
+  const [handed] = useState(takeJd);
+  const [adding, setAdding] = useState(handed !== null);
   const [view, setView] = useState<View>("all");
   const mine = view === "mine";
   const list = useQuery({
@@ -89,7 +92,7 @@ export function JobList({ canCreate, canExport = false }: { canCreate: boolean; 
         </div>
       </div>
       {adding && (
-        <JobForm job={null} onDone={() => { setAdding(false); }} onSaved={(j) => { window.location.hash = `#/jobs/${j.id}`; }} />
+        <JobForm job={null} jdFile={handed} onDone={() => { setAdding(false); }} onSaved={(j) => { window.location.hash = `#/jobs/${j.id}`; }} />
       )}
       <div className="segmented job-views" role="group" aria-label="Which jobs">
         {views.map(([v, label]) => (

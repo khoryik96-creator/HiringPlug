@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 func enqueueOutlook(ctx context.Context, tx pgx.Tx, payload api.OutlookMailSyncJob, tenant string, at time.Time) error {
@@ -82,7 +83,8 @@ func (s *Service) syncOutlook(ctx context.Context, tx pgx.Tx, job jobqueue.Job) 
 				last = &now
 				next = now.Add(20 * time.Second)
 			} else if errors.As(err, &graph) {
-				message := "Outlook could not sync. HiringPlug will retry."
+				logx.From(ctx).Warn("outlook mail: sync failed", "mailbox_id", box.ID, "status", graph.status, "reason", outlookReason(graph))
+				message := "Outlook could not sync (" + outlookReason(graph) + "). HiringPlug will retry."
 				if graph.status == 401 || graph.status == 403 {
 					message = "Outlook denied mailbox access. Reconnect in Email connection."
 				}
@@ -129,13 +131,46 @@ func (s *Service) pullOutlook(ctx context.Context, q *store.Queries, state store
 		return false, err
 	}
 	// Collect pages before making changes so one provider failure cannot mark
-	// a partially handled page as seen.
+	// a partially handled page as seen. A folder Outlook will not hand over
+	// (a special or shared folder) waits, and the others go on: it never
+	// blocks the Inbox. The mailbox warns only when the Inbox itself fails.
+	var inboxFailed error
 	for _, folder := range due {
-		if err := s.pullOutlookFolder(ctx, q, token, folder); err != nil {
+		err := s.pullOutlookFolder(ctx, q, token, folder)
+		var graph *outlookGraphError
+		if errors.As(err, &graph) && outlookFolderOnly(graph) {
+			// What Outlook rejects as asked (not a passing fault on its side),
+			// or a link not to follow, may be the folder's saved link: it
+			// starts afresh next time. One message it cannot read does not.
+			restart := graph.badLink || (graph.status >= 400 && graph.status < 500)
+			logx.From(ctx).Warn("outlook mail: a folder could not sync; trying it again later",
+				"folder_id", folder.ID, "folder_kind", folder.Kind, "status", graph.status, "reason", outlookReason(graph), "restart", restart)
+			if err := q.DelayOutlookFolder(ctx, store.DelayOutlookFolderParams{ID: folder.ID, Restart: restart}); err != nil {
+				return false, err
+			}
+			if folder.Kind == "inbox" {
+				inboxFailed = graph
+			}
+			continue
+		}
+		if err != nil {
 			return false, err
 		}
 	}
+	if inboxFailed != nil {
+		return false, inboxFailed
+	}
 	return len(due) > 0, nil
+}
+
+// outlookFolderOnly is whether a failure concerns that one folder, not the
+// whole mailbox: not a refused sign-in, throttling or Microsoft out of reach.
+func outlookFolderOnly(err *outlookGraphError) bool {
+	switch err.status {
+	case 0, http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
+		return false
+	}
+	return true
 }
 
 func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token string, folder store.EmailOutlookFolder) error {
@@ -144,7 +179,7 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 	if folder.CursorUrl != nil {
 		target = *folder.CursorUrl
 		if !outlookContinuation(path, target) {
-			return &outlookGraphError{status: 502}
+			return &outlookGraphError{status: 502, badLink: true}
 		}
 	} else {
 		fields := "id,parentFolderId,conversationId,subject,from,sender,toRecipients,ccRecipients,replyTo,receivedDateTime,createdDateTime,lastModifiedDateTime,isRead,isDraft,hasAttachments,webLink,flag"
@@ -171,7 +206,7 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 		cursor, complete = page.Delta, true
 	}
 	if page.Value == nil || len(cursor) > 16384 || !outlookContinuation(path, cursor) || (!complete && cursor == target) {
-		return &outlookGraphError{status: 502}
+		return &outlookGraphError{status: 502, badLink: page.Value != nil}
 	}
 	for _, item := range *page.Value {
 		if item.ID == "" || len(item.ID) > 1024 {
