@@ -1,6 +1,7 @@
 package emails
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 func enqueueOutlook(ctx context.Context, tx pgx.Tx, payload api.OutlookMailSyncJob, tenant string, at time.Time) error {
@@ -82,7 +84,8 @@ func (s *Service) syncOutlook(ctx context.Context, tx pgx.Tx, job jobqueue.Job) 
 				last = &now
 				next = now.Add(20 * time.Second)
 			} else if errors.As(err, &graph) {
-				message := "Outlook could not sync. HiringPlug will retry."
+				logx.From(ctx).Warn("outlook mail: sync failed", "mailbox_id", box.ID, "status", graph.status, "reason", outlookReason(graph))
+				message := "Outlook could not sync (" + outlookReason(graph) + "). HiringPlug will retry."
 				if graph.status == 401 || graph.status == 403 {
 					message = "Outlook denied mailbox access. Reconnect in Email connection."
 				}
@@ -129,13 +132,42 @@ func (s *Service) pullOutlook(ctx context.Context, q *store.Queries, state store
 		return false, err
 	}
 	// Collect pages before making changes so one provider failure cannot mark
-	// a partially handled page as seen.
+	// a partially handled page as seen. A folder Outlook will not hand over
+	// (a special or shared folder) waits, and the others go on: it never
+	// blocks the Inbox. The mailbox shows an error only when none could sync.
+	var failed error
+	synced := 0
 	for _, folder := range due {
-		if err := s.pullOutlookFolder(ctx, q, token, folder); err != nil {
+		err := s.pullOutlookFolder(ctx, q, token, folder)
+		var graph *outlookGraphError
+		if errors.As(err, &graph) && outlookFolderOnly(graph) {
+			logx.From(ctx).Warn("outlook mail: a folder could not sync; trying it again later",
+				"folder_id", folder.ID, "folder_kind", folder.Kind, "status", graph.status, "reason", outlookReason(graph))
+			if err := q.DelayOutlookFolder(ctx, folder.ID); err != nil {
+				return false, err
+			}
+			failed = cmp.Or(failed, error(graph))
+			continue
+		}
+		if err != nil {
 			return false, err
 		}
+		synced++
+	}
+	if synced == 0 && failed != nil {
+		return false, failed
 	}
 	return len(due) > 0, nil
+}
+
+// outlookFolderOnly is whether a failure concerns that one folder, not the
+// whole mailbox: not a refused sign-in, throttling or Microsoft out of reach.
+func outlookFolderOnly(err *outlookGraphError) bool {
+	switch err.status {
+	case 0, http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
+		return false
+	}
+	return true
 }
 
 func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token string, folder store.EmailOutlookFolder) error {

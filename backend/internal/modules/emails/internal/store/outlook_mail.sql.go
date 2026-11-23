@@ -127,6 +127,17 @@ func (q *Queries) CreateOutlookScheduled(ctx context.Context, arg CreateOutlookS
 	return i, err
 }
 
+const delayOutlookFolder = `-- name: DelayOutlookFolder :exec
+UPDATE email_outlook_folder SET complete=true, checked_at=now() + interval '10 minutes' WHERE id= $1
+`
+
+// A folder Outlook would not hand over waits ten minutes, so the others are
+// synced meanwhile (it no longer counts as still syncing).
+func (q *Queries) DelayOutlookFolder(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, delayOutlookFolder, id)
+	return err
+}
+
 const finishOutlookSend = `-- name: FinishOutlookSend :execrows
 UPDATE email_outlook_send SET status= $1,error=$2,updated_at=now()
 WHERE id= $3 AND version= $4 AND status= $5
