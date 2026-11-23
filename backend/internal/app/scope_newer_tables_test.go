@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -37,11 +38,16 @@ func TestTheDatabaseScopesTheNewerCandidateTables(t *testing.T) {
 	exec(`INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, title, duration_minutes, expires_at, created_by)
 	      VALUES ($1, repeat('a', 32)||substr($2, 6), $3, $2, 'Call', 30, now() + interval '1 day', $3)`, tenant.ID, theirs.Id, sourcer.ID)
 
-	exec(`INSERT INTO formatted_cv (tenant_id, document_id, candidate_id, blind, include_salary) VALUES ($1, 'doc_x', $2, true, false)`, tenant.ID, theirs.Id)
+	// A real job, application and formatted CV (which records formatted_cv):
+	// shortlist rows go with what they point to, so they must point at something.
+	company := a.createCompany(recruiter.Token, map[string]any{"name": "Maju Bhd"})
+	job := a.createJob(recruiter.Token, map[string]any{"companyId": company.Id, "title": "Finance Manager"})
+	app := a.addToJob(recruiter.Token, job.Id, theirs.Id)
+	made, _ := a.formatCv(recruiter.Token, theirs.Id, map[string]any{"blind": true}, http.StatusCreated)
 	exec(`INSERT INTO client_shortlist (id, tenant_id, token_hash, job_id, expires_at, created_by)
-	      VALUES ('csl_'||substr($2, 6), $1, repeat('b', 32)||substr($2, 6), 'job_x', now() + interval '1 day', $3)`, tenant.ID, theirs.Id, sourcer.ID)
+	      VALUES ('csl_'||substr($2, 6), $1, repeat('b', 32)||substr($2, 6), $4, now() + interval '1 day', $3)`, tenant.ID, theirs.Id, sourcer.ID, job.Id)
 	exec(`INSERT INTO client_shortlist_candidate (tenant_id, shortlist_id, position, application_id, candidate_id, document_id, blind, label)
-	      VALUES ($1, 'csl_'||substr($2, 6), 1, 'appl_x', $2, 'doc_x', true, 'Candidate C-1')`, tenant.ID, theirs.Id)
+	      VALUES ($1, 'csl_'||substr($2, 6), 1, $3, $2, $4, true, 'Candidate C-1')`, tenant.ID, theirs.Id, app.Id, made.DocumentId)
 
 	tables := []string{"screening_call", "screening_call_salary", "booking_link", "formatted_cv", "client_shortlist_candidate"}
 	count := func(p authz.Principal, table string) int {
