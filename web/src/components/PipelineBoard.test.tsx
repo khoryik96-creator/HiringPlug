@@ -151,6 +151,24 @@ describe("pipeline board", () => {
     expect(screen.queryByText(/chosen$/)).toBeNull();
   });
 
+  it("formats the chosen candidates' CVs together, only for those who may format CVs", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei] }));
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate={false} permissions={["pipeline:read", "cvformats:create"]} />);
+    await screen.findByRole("link", { name: "Siti Aisyah" });
+    choose("Siti Aisyah");
+    fireEvent.click(screen.getByRole("button", { name: "Format CVs for 1" }));
+    const form = screen.getByRole("region", { name: "Format CVs" });
+    expect(within(form).getByText("Siti Aisyah")).toBeTruthy();
+    expect(screen.queryByText(/chosen$/), "the bar makes way for the form").toBeNull();
+    cleanup();
+
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei] }));
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read"]} />);
+    await screen.findByRole("link", { name: "Siti Aisyah" });
+    choose("Siti Aisyah");
+    expect(screen.queryByRole("button", { name: /Format CVs/ })).toBeNull();
+  });
+
   it("shows initials, the name and current title, with no tick box; Space on the name chooses the card", async () => {
     await showBoard();
     const name = screen.getByRole("link", { name: "Siti Aisyah" });

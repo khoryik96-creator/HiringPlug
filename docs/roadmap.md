@@ -61,7 +61,7 @@ five are being built now; the rest are queued in this order.
 | ✅ 1.36.0 | **Activity targets and revenue forecast**: calls, CVs sent, interviews arranged per recruiter against targets; fees expected from the pipeline, weighted by stage | Reports cover outcomes, not activity or what is coming |
 | ⬜ 9 | **Search by meaning** (embeddings) beside the keyword search for possible candidates | "Talent acquisition" and "recruitment" are different words today |
 | 🟡 10 | **Housekeeping**: in-app help and a first-run guide ✅ 1.37.0, a refreshed handover ✅ 1.37.0; old branches tidied (the Leads workspace merged or closed): left to the owner | The feature list is 1,800 lines; some notes are out of date |
-| ⬜ | Batch CV formatting | One CV at a time today |
+| ✅ 1.38.0 | Batch CV formatting | One CV at a time today |
 | ⬜ | Find HR for a lead not yet linked to a company | A lead must be linked first |
 | ⬜ | Gmail replies and bounces read back (needs Google's restricted scope) | Gmail can only send |
 | ⬜ | AI usage and cost per month, with a limit | Tokens are counted, not shown |

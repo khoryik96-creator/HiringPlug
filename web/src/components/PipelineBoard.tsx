@@ -1,3 +1,4 @@
+import { BATCH_MAX, BatchFormat, type BatchPerson } from "./BatchFormat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
@@ -76,7 +77,9 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
   const [shortlist, setShortlist] = useState<Shortlisted[] | null>(null);
   const [separately, setSeparately] = useState<Person[] | null>(null);
   const canEmail = permissions.includes("emails:send");
-  const canPick = canEmail || canUpdate || Boolean(onClientLink);
+  const canFormat = permissions.includes("cvformats:create");
+  const [formatting, setFormatting] = useState<BatchPerson[] | null>(null);
+  const canPick = canEmail || canUpdate || canFormat || Boolean(onClientLink);
   const chosenApps = apps.filter((a) => picked.includes(a.id));
   const setSelected = (selected: Application[], on: boolean) => {
     const ids = new Set(selected.map((a) => a.id));
@@ -190,7 +193,8 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
         </div>
       </div>
       {separately && <SeparateEmail people={separately} onClose={() => { setSeparately(null); setPicked([]); }} />}
-      {canPick && picked.length > 0 && !shortlist && !separately && !emailing && (
+      {formatting && <BatchFormat people={formatting} onClose={() => { setFormatting(null); setPicked([]); }} />}
+      {canPick && picked.length > 0 && !shortlist && !separately && !emailing && !formatting && (
         <div className="pick-bar" role="status">
           <span>{picked.length} chosen</span>
           {canEmail && <>
@@ -207,6 +211,12 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
                 onClientLink(chosenApps.map((a) => ({ applicationId: a.id, candidateId: a.candidateId, name: a.candidateName, stage: a.stage })));
                 setPicked([]);
               }}>Client link for {picked.length}</button>
+          )}
+          {canFormat && (
+            <button type="button" disabled={picked.length > BATCH_MAX} title="Format their CVs CV Studio's way, with the same options"
+              onClick={() => { setFormatting(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName }))); }}>
+              Format CVs for {picked.length}
+            </button>
           )}
           {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} columns={columns} />}
           <IconButton label="Clear" tip="Clear selection" icon={<CloseIcon />} onClick={() => { setPicked([]); }} />

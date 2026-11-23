@@ -19,6 +19,7 @@ import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, 
 import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
 import { useRowPicking } from "../components/useRowPicking";
 import { useDebounced } from "../components/useDebounced";
+import { BATCH_MAX, BatchFormat } from "../components/BatchFormat";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { PinnedScroll } from "../components/StickyScrollbar";
 import { usePicked } from "../components/usePicked";
@@ -27,11 +28,13 @@ import { type ColumnWidths, useColumnWidths } from "../components/useColumnWidth
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, canExport = false, meId = "" }: {
+export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, canExport = false, canFormat = false, meId = "" }: {
   canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean;
   /** May add candidates from CVs (the drop box). */
   canImport?: boolean;
   canExport?: boolean;
+  /** May format CVs CV Studio's way (several at once from the chosen rows). */
+  canFormat?: boolean;
   meId?: string;
 }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
@@ -50,7 +53,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const pick = usePicked();
   const folders = useFolderView("candidate", canFolders, meId, pick.clear);
   const folder = folders.filter;
-  const canPick = canEmail || canFolders; // rows are chosen to email or to put in a folder
+  const [formatting, setFormatting] = useState(false);
+  const canPick = canEmail || canFolders || canFormat; // rows are chosen to email, to put in a folder or to format
   const [emailing, setEmailing] = useState(false);
   const [openAs, setOpenAs] = useOpenAs();
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set()); // resumes read, while on this page
@@ -182,9 +186,18 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
           <PickBar count={pick.picked.size} onEmail={canEmail ? () => { setEmailing(true); } : undefined} onClear={pick.clear}
             shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }}>
             {folders.actions([...pick.ids])}
+            {canFormat && (
+              <button type="button" disabled={pick.picked.size > BATCH_MAX} title="Format their CVs CV Studio's way, with the same options"
+                onClick={() => { setFormatting(true); }}>Format CVs</button>
+            )}
+            {canFormat && pick.picked.size > BATCH_MAX && <span className="pick-warning small">At most {BATCH_MAX} CVs at a time.</span>}
           </PickBar>
         )}
       </div>
+      {formatting && (
+        <BatchFormat people={pick.people.flatMap((p) => (p.candidateId ? [{ candidateId: p.candidateId, name: p.name }] : []))}
+          onClose={() => { setFormatting(false); pick.clear(); }} />
+      )}
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {openAs === "resume" && (
         <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder])} hits={hits} highlight={advanced ? effective.boolean.trim() : ""} seen={seen} onSeen={markSeen}

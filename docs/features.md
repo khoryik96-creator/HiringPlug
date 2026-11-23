@@ -323,6 +323,19 @@ bullets they were made from, even where blinding changed their words.
 Word file under its own name; the preview of a Word file is a PDF copy and
 hides the viewer's own download, which would save the copy under a made-up name.
 
+**Formatting several CVs at once ✅ (1.38.0)**: choose candidates on a job's
+pipeline (or rows on the candidate list) and press **Format CVs** in the bar
+that appears: up to 20 at a time, with the same options as one CV (blind,
+"the candidate", spelling, alignment, the AI summary with its length, focus
+and direction). Each candidate's newest CV they sent (PDF or Word; their CV
+before other files) is formatted CV Studio's way, exactly as if started on
+their own page, in the background; each new formatted CV appears on the
+candidate's page when ready. Anyone who cannot be formatted now is listed
+afterwards with the reason and a link to their page: no PDF or Word CV, one
+being formatted already, as many formatted CVs as they can keep (format theirs
+on their page to choose one to replace), or not one you may see. With no AI
+set up, nothing starts and the form says so. `POST /v1/studio-cvs/batch`.
+
 **Deleting a formatted CV ✅**: its "..." menu has "Delete this formatted CV"
 (after a confirmation; `documents:delete`, recruiters and up). Its Word file
 and PDF copy are removed and the deletion is in the audit log. Only CVs
