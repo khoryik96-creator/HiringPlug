@@ -31,6 +31,10 @@ export const ShareIcon = () => (
   <Svg><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" /></Svg>
 );
 export const LeaveIcon = () => <Svg><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="M10 16l-4-4 4-4" /><path d="M6 12h10" /></Svg>;
+/** Several emails: one to each person. */
+export const MailManyIcon = () => (
+  <Svg><rect x="6" y="8" width="15" height="11" rx="2" /><path d="m6 10 7.5 5 7.5-5M3 15V7a2 2 0 0 1 2-2h12" /></Svg>
+);
 export const MailCheckIcon = () => (
   <Svg><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7" /><path d="m3 7 9 6 9-6" /><path d="m16 19 2 2 4-4" /></Svg>
 );

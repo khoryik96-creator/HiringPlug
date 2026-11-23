@@ -257,7 +257,11 @@ The file's name is a hint to the candidate's name ("TAN WEI LING CV.pdf").
 worker reads the profile details out of it: name, email, phone, LinkedIn,
 location, nationality, notice period, skills, work history and education.
 Every value carries the exact CV text it came from, and the server keeps only
-values whose quote is in the CV. **A new CV updates the profile by itself** ✅:
+values whose quote is in the CV. A PDF CV whose work history is a table
+(Organization | Role | Location | Client | Industry | Duration, cells wrapped
+over several lines) is read row by row, so each job keeps its own title,
+employer and dates (1.38.0); a heading such as "IT Experience" or "SAP
+Experience" starts the work history. **A new CV updates the profile by itself** ✅:
 once the candidate's newest CV is read, where it says they are now replaces
 what the profile had (job title, current employer, industry, location), empty
 fields are filled (contact details are only ever filled, never replaced; the
@@ -325,7 +329,8 @@ hides the viewer's own download, which would save the copy under a made-up name.
 
 **Formatting several CVs at once ✅ (1.38.0)**: choose candidates on a job's
 pipeline (or rows on the candidate list) and press **Format CVs** in the bar
-that appears: up to 20 at a time, with the same options as one CV (blind,
+that appears (on the pipeline the bar's actions are icons with a tip on hover:
+email the client, email each candidate, client link, format CVs): up to 20 at a time, with the same options as one CV (blind,
 "the candidate", spelling, alignment, the AI summary with its length, focus
 and direction). Each candidate's newest CV they sent (PDF or Word; their CV
 before other files) is formatted CV Studio's way, exactly as if started on
@@ -369,6 +374,13 @@ kind of detail it was. The file name carries the reference, not the name.
 Employers, clients and their branded products are masked as whole names
 (Digi, Digi Prepaid, DigiPrepaid, Maybank2u), never inside an ordinary word:
 "Digital" stays "Digital" (CV Studio masked it as "[Company]tal").
+A CV Studio blind CV keeps what CV Studio's rules made of the formatted one
+(1.38.0): the job titles, dates and last position as formatted (unless one
+names an employer), the sub-headings inside a job (not turned into bullets),
+and one entry per employer: two employers both shown as "[Company]" are never
+joined into one. The AI is also told to keep the structure exactly and to use
+"[Company]" only for an organisation or brand, never ordinary words or tax
+terms (GST, TDS, TCS).
 
 ## 3.5 AI assistant sidebar ✅ (off until an AI provider is set up)
 

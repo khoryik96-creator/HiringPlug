@@ -6,7 +6,7 @@ import { ApiError, type Application, type Permission, type Schemas } from "../ap
 import { completePipelineStage, usePipelinePages } from "./pipelinePages";
 import { applicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
-import { BoardIcon, CloseIcon, IconButton, StepsIcon } from "./ActionIcons";
+import { BoardIcon, CloseIcon, FileIcon, IconButton, LinkIcon, MailIcon, MailManyIcon, StepsIcon } from "./ActionIcons";
 import { MoveChosen, MoveMenu } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
@@ -198,25 +198,23 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
         <div className="pick-bar" role="status">
           <span>{picked.length} chosen</span>
           {canEmail && <>
-            <button type="button" className="primary" disabled={picked.length > 10} onClick={startShortlist}>
-              Email client about {picked.length} candidate{picked.length === 1 ? "" : "s"}
-            </button>
-            <button type="button" onClick={() => {
-              setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
-            }}>Email each candidate separately</button>
+            <IconButton label={`Email client about ${String(picked.length)} candidate${picked.length === 1 ? "" : "s"}`} tip="Email the client about them"
+              icon={<MailIcon />} className="icon-outline" disabled={picked.length > 10} onClick={startShortlist} />
+            <IconButton label="Email each candidate separately" tip="Email each candidate separately" icon={<MailManyIcon />} className="icon-outline"
+              onClick={() => { setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName }))); }} />
           </>}
           {onClientLink && (
-            <button type="button" disabled={chosenApps.some((a) => a.stage === "rejected" || a.stage === "withdrawn") || picked.length > 20}
-              title="A link for the client to approve or reject them" onClick={() => {
+            <IconButton label={`Client link for ${String(picked.length)}`} tip="Client link: the client approves or rejects them" icon={<LinkIcon />}
+              className="icon-outline" disabled={chosenApps.some((a) => a.stage === "rejected" || a.stage === "withdrawn") || picked.length > 20}
+              onClick={() => {
                 onClientLink(chosenApps.map((a) => ({ applicationId: a.id, candidateId: a.candidateId, name: a.candidateName, stage: a.stage })));
                 setPicked([]);
-              }}>Client link for {picked.length}</button>
+              }} />
           )}
           {canFormat && (
-            <button type="button" disabled={picked.length > BATCH_MAX} title="Format their CVs CV Studio's way, with the same options"
-              onClick={() => { setFormatting(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName }))); }}>
-              Format CVs for {picked.length}
-            </button>
+            <IconButton label={`Format CVs for ${String(picked.length)}`} tip="Format their CVs CV Studio's way" icon={<FileIcon />} className="icon-outline"
+              disabled={picked.length > BATCH_MAX}
+              onClick={() => { setFormatting(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName }))); }} />
           )}
           {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} columns={columns} />}
           <IconButton label="Clear" tip="Clear selection" icon={<CloseIcon />} onClick={() => { setPicked([]); }} />
