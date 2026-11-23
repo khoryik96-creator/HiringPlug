@@ -7756,6 +7756,28 @@ class StudioCvInput(BaseModel):
     ] = None
 
 
+class StudioCvBatchInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateIds: Annotated[list[CandidateId], Field(max_length=20, min_length=1)]
+    blind: Annotated[bool | None, Field(description="As for one CV: each a blind CV.")] = None
+    neutralGender: Annotated[
+        bool | None, Field(description='With blind: "the candidate" rather than he or she.')
+    ] = None
+    correctLanguage: bool | None = None
+    alignment: StudioCvAlignment | None = None
+    summary: StudioCvSummary | None = None
+    summaryFocus: StudioCvSummaryFocus | None = None
+    summaryDirection: Annotated[
+        str | None,
+        Field(
+            description="As for one CV; the same direction for every candidate. Never about pay.",
+            max_length=500,
+        ),
+    ] = None
+
+
 class StudioCv(BaseModel):
     id: StudioCvId
     candidateId: CandidateId
@@ -9062,6 +9084,15 @@ class Contact(BaseModel):
     updatedAt: AwareDatetime
 
 
+class StudioCvBatchItem(BaseModel):
+    candidateId: CandidateId
+    started: bool
+    studioCv: Annotated[StudioCv | None, Field(description="The run, when started.")] = None
+    reason: Annotated[
+        str | None, Field(description="Why it was not started, in words for the recruiter.")
+    ] = None
+
+
 class DocumentMatchList(BaseModel):
     items: list[DocumentMatchResult]
 
@@ -9195,6 +9226,12 @@ class ClientShortlistCreated(BaseModel):
 class CandidateFind(BaseModel):
     searches: list[CandidateFindSearch]
     skipped: Annotated[int, Field(description="Searches past the sixth that were left out.")]
+
+
+class StudioCvBatch(BaseModel):
+    items: Annotated[
+        list[StudioCvBatchItem], Field(description="One per candidate asked for, in the same order.")
+    ]
 
 
 class JdFileList(BaseModel):
