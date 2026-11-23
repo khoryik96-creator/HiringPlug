@@ -105,7 +105,7 @@ export const ROUTES: Route[] = [
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)$/,
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates/, menu: { in: "main", label: "Candidates", href: "#/candidates" },
-    render: (c) => <CandidateList canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} canAddToJob={can(c, "pipeline:update")} canFolders={can(c, "folders:use")} canImport={can(c, "intake:create")} canExport={can(c, "candidates:export")} meId={c.me.user.id} /> },
+    render: (c) => <CandidateList canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} canAddToJob={can(c, "pipeline:update")} canFolders={can(c, "folders:use")} canImport={can(c, "intake:create")} canExport={can(c, "candidates:export")} canFormat={can(c, "cvformats:create")} meId={c.me.user.id} /> },
   { section: "companies", path: /^#\/companies\/duplicates$/, render: () => <Duplicates kind="companies" /> },
   { section: "companies", path: /^#\/companies\/(comp_[0-9a-z]+)$/,
     render: (c) => <CompanyDetail key={c.id} id={c.id} permissions={c.permissions} /> },

@@ -1979,6 +1979,9 @@ def _cv_company_names_groupable(left, right):
     right_key = _cv_match_key(right)
     if not left_key or not right_key:
         return False
+    # A hidden name ("[Company]") says nothing about which employer it was.
+    if "[" in str(left or "") or "[" in str(right or ""):
+        return False
     if left_key == right_key:
         return True
     return (
@@ -2077,6 +2080,10 @@ def _merge_adjacent_continuous_company_stints(experiences):
             # A source subsection heading starts a new semantic group even when
             # the employer and dates happen to touch the preceding entry.
             and not str(exp.get("section_heading") or "").strip()
+            # A blind CV's entries were grouped before the names were hidden:
+            # two employers both shown as "[Company]" are never one employer.
+            and not previous.get("_keep_apart")
+            and not exp.get("_keep_apart")
             and _cv_company_names_groupable(
                 previous.get("company"), exp.get("company")
             )

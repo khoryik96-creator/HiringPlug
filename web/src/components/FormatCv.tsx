@@ -87,7 +87,7 @@ export function loadSummaryChoice(): SummaryChoice {
   } catch { return SUMMARY_DEFAULT; }
 }
 
-function saveSummaryChoice(choice: SummaryChoice) {
+export function saveSummaryChoice(choice: SummaryChoice) {
   const { write, length, focus } = choice;
   try { localStorage.setItem(SUMMARY_KEY, JSON.stringify({ write, length, focus })); } catch { /* private window: not remembered */ }
 }
@@ -158,7 +158,7 @@ function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: stri
 }
 
 /** The About Him / Her summary: whether the AI writes one, and how (CV Studio's lengths and focus, and your own direction and tone). */
-function SummaryOptions({ choice, onChange, error }: { choice: SummaryChoice; onChange: (c: SummaryChoice) => void; error?: string }) {
+export function SummaryOptions({ choice, onChange, error }: { choice: SummaryChoice; onChange: (c: SummaryChoice) => void; error?: string }) {
   return (
     <div className="full summary-options">
       <label className="row">

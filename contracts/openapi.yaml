@@ -3132,6 +3132,29 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/StudioCvOff'}
         '422': {$ref: '#/components/responses/StudioCvSource'}
+  /v1/studio-cvs/batch:
+    post:
+      operationId: startStudioCvBatch
+      tags: [cvformats]
+      summary: Format several candidates' CVs CV Studio's way, with the same options (done in the background)
+      description: >-
+        Each candidate's newest CV they sent (PDF or Word) is formatted, one run each, as if started one by one. A candidate who cannot be formatted now (no such CV, one being formatted already, no room for another formatted CV, or not one the user may see) is skipped, with the reason; the others go ahead.
+      x-permission: cvformats:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StudioCvBatchInput'}
+      responses:
+        '202':
+          description: Queued, candidate by candidate
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StudioCvBatch'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/StudioCvOff'}
   /v1/candidates/{candidateId}/documents:
     parameters:
       - $ref: '#/components/parameters/CandidateIdPath'
@@ -12323,6 +12346,45 @@ components:
           maxLength: 500
           nullable: true
           description: "The recruiter's own direction for the summary, in their words: what to bring out and the tone (e.g. confident and concise, lead with the S/4HANA migration). Never about pay: the summary never mentions it."
+    StudioCvBatchInput:
+      type: object
+      additionalProperties: false
+      required: [candidateIds]
+      properties:
+        candidateIds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: '#/components/schemas/CandidateId'}
+        blind: {type: boolean, description: "As for one CV: each a blind CV."}
+        neutralGender: {type: boolean, description: "With blind: \"the candidate\" rather than he or she."}
+        correctLanguage: {type: boolean}
+        alignment: {$ref: '#/components/schemas/StudioCvAlignment'}
+        summary: {$ref: '#/components/schemas/StudioCvSummary'}
+        summaryFocus: {$ref: '#/components/schemas/StudioCvSummaryFocus'}
+        summaryDirection:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: As for one CV; the same direction for every candidate. Never about pay.
+    StudioCvBatch:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: One per candidate asked for, in the same order.
+          items: {$ref: '#/components/schemas/StudioCvBatchItem'}
+    StudioCvBatchItem:
+      type: object
+      required: [candidateId, started]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        started: {type: boolean}
+        studioCv:
+          description: The run, when started.
+          allOf: [{$ref: '#/components/schemas/StudioCv'}]
+        reason: {type: string, description: "Why it was not started, in words for the recruiter."}
     StudioCvSummary:
       type: string
       description: "The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). A blind CV gets it too: the blind step then anonymises it bullet by bullet."

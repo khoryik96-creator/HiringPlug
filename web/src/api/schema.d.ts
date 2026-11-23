@@ -1908,6 +1908,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/studio-cvs/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Format several candidates' CVs CV Studio's way, with the same options (done in the background)
+         * @description Each candidate's newest CV they sent (PDF or Word) is formatted, one run each, as if started one by one. A candidate who cannot be formatted now (no such CV, one being formatted already, no room for another formatted CV, or not one the user may see) is skipped, with the reason; the others go ahead.
+         */
+        post: operations["startStudioCvBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/documents": {
         parameters: {
             query?: never;
@@ -7862,6 +7882,31 @@ export interface components {
             summaryFocus?: components["schemas"]["StudioCvSummaryFocus"];
             /** @description The recruiter's own direction for the summary, in their words: what to bring out and the tone (e.g. confident and concise, lead with the S/4HANA migration). Never about pay: the summary never mentions it. */
             summaryDirection?: string | null;
+        };
+        StudioCvBatchInput: {
+            candidateIds: components["schemas"]["CandidateId"][];
+            /** @description As for one CV: each a blind CV. */
+            blind?: boolean;
+            /** @description With blind: "the candidate" rather than he or she. */
+            neutralGender?: boolean;
+            correctLanguage?: boolean;
+            alignment?: components["schemas"]["StudioCvAlignment"];
+            summary?: components["schemas"]["StudioCvSummary"];
+            summaryFocus?: components["schemas"]["StudioCvSummaryFocus"];
+            /** @description As for one CV; the same direction for every candidate. Never about pay. */
+            summaryDirection?: string | null;
+        };
+        StudioCvBatch: {
+            /** @description One per candidate asked for, in the same order. */
+            items: components["schemas"]["StudioCvBatchItem"][];
+        };
+        StudioCvBatchItem: {
+            candidateId: components["schemas"]["CandidateId"];
+            started: boolean;
+            /** @description The run, when started. */
+            studioCv?: components["schemas"]["StudioCv"];
+            /** @description Why it was not started, in words for the recruiter. */
+            reason?: string;
         };
         /**
          * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). A blind CV gets it too: the blind step then anonymises it bullet by bullet.
@@ -15553,6 +15598,34 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["StudioCvOff"];
             422: components["responses"]["StudioCvSource"];
+        };
+    };
+    startStudioCvBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudioCvBatchInput"];
+            };
+        };
+        responses: {
+            /** @description Queued, candidate by candidate */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioCvBatch"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["StudioCvOff"];
         };
     };
     listCandidateDocuments: {

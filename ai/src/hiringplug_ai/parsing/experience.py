@@ -50,6 +50,7 @@ _OTHER_LABEL = re.compile(
     re.I,
 )
 _NUMBERING = re.compile(r"^\(?\d{1,2}[.)]\s+")
+_DURATION_LABEL = re.compile(r"^(?:duration|period)\s*[:：]", re.I)
 # Neither an employer nor a title: a client or customer served, a team or its
 # size, vendors, a career break, or a bracketed aside ("(Solutioned from KL Hub)").
 _NOT_A_JOB_PART = re.compile(
@@ -351,7 +352,17 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
     unknown: list[str] = []
     if not _OTHER_LABEL.match(rest.strip()) and headline(_clean(rest) or "x"):
         title, company, unknown = from_text(rest)
-    lt, lc = _labelled(section[max(start, i - 4) : min(end, i + 5)])
+    # Labelled lines on the job's own side first ("Duration:" above "Role:" and
+    # "Organization:" in a table row): never the neighbouring job's.
+    before = section[max(start, i - 4) : i][::-1]  # nearest first
+    after = section[i + 1 : min(end, i + 5)]
+    # A labelled "Duration:" line (a table row) always has its role and
+    # employer below it, whatever the rest of the CV does.
+    below_dates = dates_first or bool(_DURATION_LABEL.match(section[i].strip()))
+    near, far = (after, before) if below_dates else (before, after)
+    lt, lc = _labelled([section[i], *near])
+    ft, fc = _labelled(far)
+    lt, lc = lt or ft, lc or fc
     title, company = title or lt, company or lc
     above = _joined(_headlines(section, range(i - 1, start - 1, -1))[::-1])[::-1]  # nearest first
     below = _joined(_headlines(section, range(i + 1, end)))

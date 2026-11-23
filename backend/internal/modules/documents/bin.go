@@ -30,6 +30,16 @@ func (m *Module) CVTextOf(ctx context.Context, tx pgx.Tx, documentID string) (ca
 	return row.CandidateID, row.Source, row.Text, err
 }
 
+// NewestCVOf is the candidate's newest CV they sent of some content types
+// (their CV first): "" when they have none.
+func (m *Module) NewestCVOf(ctx context.Context, tx pgx.Tx, candidateID string, contentTypes []string) (string, error) {
+	id, err := store.New(tx).NewestCVOfTypes(ctx, store.NewestCVOfTypesParams{CandidateID: candidateID, ContentTypes: contentTypes})
+	if database.IsNoRows(err) {
+		return "", nil
+	}
+	return id, err
+}
+
 // NewestCV is the candidate's newest CV (not one the app made, not in the
 // bin): "" when they have none.
 func (m *Module) NewestCV(ctx context.Context, tx pgx.Tx, candidateID string) (string, error) {

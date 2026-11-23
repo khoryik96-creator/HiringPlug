@@ -60,6 +60,9 @@ type Deps struct {
 	// SourceCVs gives a CV to format CV Studio's way and a signed link to it (documents module).
 	SourceCVs interface {
 		SourceCV(ctx context.Context, tx pgx.Tx, id string) (SourceCV, string, error)
+		// NewestCV is the candidate's newest CV they sent of these content
+		// types (their CV first); "" when none.
+		NewestCV(ctx context.Context, tx pgx.Tx, candidateID string, contentTypes []string) (string, error)
 	}
 	// Files reads a document's file, to check it before it goes to a client
 	// (documents module; NOT_FOUND when the user may not see it).
