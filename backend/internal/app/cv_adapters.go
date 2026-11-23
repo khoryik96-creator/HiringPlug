@@ -73,6 +73,10 @@ func (a cvFiles) FormattedFile(ctx context.Context, tx pgx.Tx, id string) (cvfor
 // cvSources gives cvformats a CV to format CV Studio's way (documents module).
 type cvSources struct{ documents *documents.Module }
 
+func (a cvSources) NewestCV(ctx context.Context, tx pgx.Tx, candidateID string, contentTypes []string) (string, error) {
+	return a.documents.NewestCVOf(ctx, tx, candidateID, contentTypes)
+}
+
 func (a cvSources) SourceCV(ctx context.Context, tx pgx.Tx, id string) (cvformats.SourceCV, string, error) {
 	d, url, err := a.documents.SourceCV(ctx, tx, id)
 	return cvformats.SourceCV{ID: d.ID, CandidateID: d.CandidateID, Source: d.Source, FileName: d.FileName,

@@ -591,6 +591,27 @@ func (q *Queries) NewestCVID(ctx context.Context, candidateID string) (string, e
 	return id, err
 }
 
+const newestCVOfTypes = `-- name: NewestCVOfTypes :one
+SELECT id FROM document
+WHERE candidate_id = $1 AND source <> 'formatted' AND binned_at IS NULL AND content_type = ANY($2::text[])
+ORDER BY (source = 'original') DESC, id DESC
+LIMIT 1
+`
+
+type NewestCVOfTypesParams struct {
+	CandidateID  string
+	ContentTypes []string
+}
+
+// The candidate's newest CV of some types that they sent (not one the app
+// made, not in the bin): their CV first, then any other of their files.
+func (q *Queries) NewestCVOfTypes(ctx context.Context, arg NewestCVOfTypesParams) (string, error) {
+	row := q.db.QueryRow(ctx, newestCVOfTypes, arg.CandidateID, arg.ContentTypes)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const purgeBinnedDocument = `-- name: PurgeBinnedDocument :one
 DELETE FROM document WHERE id = $1 AND binned_at IS NOT NULL RETURNING storage_key,pdf_key
 `
