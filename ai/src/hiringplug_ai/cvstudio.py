@@ -20,6 +20,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from . import cvstudio_blind_guard as blind_guard
 from . import docx_repair
 
 ROOT = Path(os.environ.get("HP_AI_CVSTUDIO_DIR") or Path(__file__).resolve().parents[2] / "cvstudio")
@@ -61,11 +62,11 @@ def parse_prompt(correct_language: bool) -> str:
 
 
 def blind_prompt(neutral_gender: bool) -> str:
+    """CV Studio's blind prompt, then HiringPlug's structure and masking guardrails."""
+    prompt = str(BLIND_SYSTEM_PROMPT)
     if neutral_gender:
-        return (
-            str(BLIND_SYSTEM_PROMPT) + "\n\n" + str(BLIND_CANDIDATE_GENDER_NEUTRALIZATION_INSTRUCTION).strip()
-        )
-    return str(BLIND_SYSTEM_PROMPT)
+        prompt += "\n\n" + str(BLIND_CANDIDATE_GENDER_NEUTRALIZATION_INSTRUCTION).strip()
+    return prompt + blind_guard.GUARDRAILS
 
 
 def without_pay(text: str) -> tuple[str, int]:
@@ -145,8 +146,12 @@ def blind_refusal(exc: Exception) -> str | None:
 
 def after_blind(blinded: dict[str, Any], prepared: dict[str, Any]) -> dict[str, Any]:
     """CV Studio's five checks after the AI's anonymised answer, in its order,
-    against the prepared CV it was given (never copying the original back)."""
-    return dict(pipeline.postprocess_blind(blinded, prepared))
+    against the prepared CV it was given; around them HiringPlug's guardrails
+    (cvstudio_blind_guard): titles and dates as given, jobs kept apart. No
+    other wording is copied back from the reading the AI was given."""
+    return blind_guard.finish(
+        dict(pipeline.postprocess_blind(blind_guard.steady(blinded, prepared), prepared))
+    )
 
 
 def _work_bullets(cv: dict[str, Any]) -> list[str]:
