@@ -74,10 +74,10 @@ describe("formatted CVs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/studio-cvs");
-    expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: true, neutralGender: true, correctLanguage: true, alignment: "justify", summary: "none" });
+    expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: true, neutralGender: true, correctLanguage: true, alignment: "justify", summary: "normal", summaryFocus: "general" });
   });
 
-  it("writes the About Him / Her summary as asked: length, focus, your direction and tone; never for a blind CV", async () => {
+  it("writes the About Him / Her summary as asked: length, focus, your direction and tone; a blind CV too", async () => {
     localStorage.removeItem("hiringplug.studio.summary");
     studioReads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
@@ -95,7 +95,7 @@ describe("formatted CVs", () => {
     expect(localStorage.getItem("hiringplug.studio.summary"), "the direction is about this candidate only").not.toContain("Confident");
 
     fireEvent.click(screen.getByLabelText(/Blind CV/));
-    expect(screen.queryByLabelText("AI summary"), "a blind CV keeps its own summary").toBeNull();
+    expect(screen.getByLabelText("AI summary"), "a blind CV gets the same bullet summary, anonymised").toBeTruthy();
   });
 
   it("remembers the choice for the next CV, and makes the summary optional", async () => {

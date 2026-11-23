@@ -31,6 +31,7 @@ import cvstudio_blind_mask as blind_mask  # type: ignore[import-not-found]  # no
 import cvstudio_cv_normalize as normal  # type: ignore[import-not-found]  # noqa: E402
 import portable_pipeline as pipeline  # type: ignore[import-not-found]  # noqa: E402
 from cvstudio_docx_extract import (  # type: ignore[import-not-found]  # noqa: E402
+    _cv_bullet_match_key,
     _extract_docx_bullet_levels,
     _merge_bullet_level_lists,
 )
@@ -146,6 +147,42 @@ def after_blind(blinded: dict[str, Any], prepared: dict[str, Any]) -> dict[str, 
     """CV Studio's five checks after the AI's anonymised answer, in its order,
     against the prepared CV it was given (never copying the original back)."""
     return dict(pipeline.postprocess_blind(blinded, prepared))
+
+
+def _work_bullets(cv: dict[str, Any]) -> list[str]:
+    """Every role bullet of a CV in order (a group's bullets after its heading)."""
+    out: list[str] = []
+    for exp in cv.get("work_experiences") or []:
+        if not isinstance(exp, dict):
+            continue
+        for role in exp.get("roles") or []:
+            if not isinstance(role, dict):
+                continue
+            for item in role.get("bullets") or []:
+                if isinstance(item, str):
+                    out.append(item)
+                elif isinstance(item, dict):
+                    out.extend(sub for sub in item.get("bullets") or [] if isinstance(sub, str))
+    return out
+
+
+def blind_levels(levels: list[Any], prepared: dict[str, Any], blinded: dict[str, Any]) -> list[Any]:
+    """The indent levels for a blind CV's bullets. Levels are looked up by a
+    bullet's words, and blinding changes some of them ("Laureate" becomes
+    "[Company]"), so each blinded bullet takes the level of the bullet it was
+    made from (the blind step keeps them one for one). A bullet whose source
+    had no level gets none, so a list is never half indented."""
+    by_key = {str(e.get("text")): e.get("level") for e in levels if isinstance(e, dict)}
+    before, after = _work_bullets(prepared), _work_bullets(blinded)
+    if len(before) != len(after):
+        return list(levels)  # not one for one: the words still match where they were kept
+    out: list[Any] = []
+    for source, made in zip(before, after, strict=True):
+        level = by_key.get(_cv_bullet_match_key(source))
+        key = _cv_bullet_match_key(made)
+        if key and level:
+            out.append({"text": key, "level": level})
+    return out
 
 
 def render(data: dict[str, Any], *, alignment: str, bullet_levels: list[Any]) -> bytes:

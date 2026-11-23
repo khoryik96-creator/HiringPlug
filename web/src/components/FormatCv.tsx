@@ -101,7 +101,7 @@ function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: stri
   });
   const [summary, setSummary] = useState(loadSummaryChoice);
   const documentId = form.documentId || cvs[0]?.id || "";
-  const writes = summary.write && !form.blind;
+  const writes = summary.write;
   const start = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/studio-cvs", {
       params: { path: { candidateId } },
@@ -114,7 +114,7 @@ function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: stri
     })),
     onError: selection.refresh,
     onSuccess: async () => {
-      if (!form.blind) saveSummaryChoice(summary);
+      saveSummaryChoice(summary);
       await queryClient.invalidateQueries({ queryKey: studioCvsKey(candidateId) });
       onDone();
     },
@@ -140,7 +140,7 @@ function StudioForm({ candidateId, cvs, selection, onDone }: { candidateId: stri
           &ldquo;The candidate&rdquo; instead of he or she
         </label>
       )}
-      {!form.blind && <SummaryOptions choice={summary} onChange={setSummary} error={fieldErrors(start.error).summaryDirection} />}
+      <SummaryOptions choice={summary} onChange={setSummary} error={fieldErrors(start.error).summaryDirection} />
       <label className="field">Paragraphs
         <select value={form.alignment} onChange={(e) => { setForm({ ...form, alignment: e.target.value === "justify" ? "justify" : "left" }); }}>
           <option value="left">Aligned left</option>

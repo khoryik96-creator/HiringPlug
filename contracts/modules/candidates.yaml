@@ -4,6 +4,9 @@ x-module:
   name: candidates
   description: Candidate profiles. Salary details are stored and permissioned separately.
   permissions:
+    candidates:export:
+      description: Export candidates (what a search finds) to Excel or CSV; salaries only with candidates.compensation:read.
+      roles: [owner, admin]
     candidates:read:
       description: View candidate profiles (salary details need candidates.compensation:read).
       roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
@@ -34,6 +37,36 @@ x-module:
   jobs: {}
 
 paths:
+  /v1/candidates/export:
+    post:
+      operationId: exportCandidates
+      tags: [candidates]
+      summary: Everyone an advanced search finds, as Excel or CSV (at most 10,000); salaries only for roles that may see them
+      x-permission: candidates:export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CandidateExport' }
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /v1/salary-calculations:
     post:
       operationId: calculateSalary
@@ -860,6 +893,15 @@ components:
           nullable: true
         tags: { type: array, items: { type: string } }
         updatedAt: { type: string, format: date-time }
+    CandidateExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: { $ref: '#/components/schemas/ExportFormat' }
+        search:
+          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone.
+          allOf: [{ $ref: '#/components/schemas/CandidateSearch' }]
     CandidateSearch:
       type: object
       additionalProperties: false

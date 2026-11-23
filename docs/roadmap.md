@@ -56,11 +56,11 @@ five are being built now; the rest are queued in this order.
 | ✅ 1.33.0 | **Notifications**: a bell for new applicants, tasks, offers to approve and tomorrow's interviews, each kind switchable in Settings, and an optional morning email | Today these are found only by opening the dashboard |
 | ✅ 1.29.0 | **Two-step sign-in** with an authenticator app, recovery codes, owners able to require it | Email and password alone; needed before selling it as a service |
 | ✅ 1.32.0 | **Merge duplicate companies and contacts**, with a list of possible duplicates | Only candidates could be merged |
-| ⬜ 6 | **Exports and Excel import**: CSV/Excel from every list and report; .xlsx imports | No list or report can be exported |
-| ⬜ 7 | **Client shortlist link**: the client sees the shortlist (blind or formatted CVs), approves or rejects with a comment; the stage moves and the answer is logged | Client feedback comes back by email and is typed in |
-| ⬜ 8 | **Activity targets and revenue forecast**: calls, CVs sent, interviews arranged per recruiter against targets; fees expected from the pipeline, weighted by stage | Reports cover outcomes, not activity or what is coming |
+| ✅ 1.34.0 | **Exports and Excel import**: CSV/Excel from every list and report; .xlsx imports | No list or report can be exported |
+| ✅ 1.35.0 | **Client shortlist link**: the client sees the shortlist (blind or formatted CVs), approves or rejects with a comment; the stage moves and the answer is logged | Client feedback comes back by email and is typed in |
+| ✅ 1.36.0 | **Activity targets and revenue forecast**: calls, CVs sent, interviews arranged per recruiter against targets; fees expected from the pipeline, weighted by stage | Reports cover outcomes, not activity or what is coming |
 | ⬜ 9 | **Search by meaning** (embeddings) beside the keyword search for possible candidates | "Talent acquisition" and "recruitment" are different words today |
-| ⬜ 10 | **Housekeeping**: in-app help and a first-run guide, a refreshed handover, old branches tidied (the Leads workspace merged or closed) | The feature list is 1,800 lines; some notes are out of date |
+| 🟡 10 | **Housekeeping**: in-app help and a first-run guide ✅ 1.37.0, a refreshed handover ✅ 1.37.0; old branches tidied (the Leads workspace merged or closed): left to the owner | The feature list is 1,800 lines; some notes are out of date |
 | ⬜ | Batch CV formatting | One CV at a time today |
 | ⬜ | Find HR for a lead not yet linked to a company | A lead must be linked first |
 | ⬜ | Gmail replies and bounces read back (needs Google's restricted scope) | Gmail can only send |

@@ -138,3 +138,12 @@ dd { margin: 0; }
 .topbar .menu-list a { display: block; padding: 0.45rem 0.7rem; border-radius: 6px; color: var(--text); text-decoration: none; font-weight: 550; }
 .topbar .menu-list a:hover { background: var(--soft); }
 .topbar .menu-list a[aria-current="page"] { color: var(--accent-dark); background: var(--accent-soft); }
+
+/* Laptops: Settings is its gear alone (its name kept for screen readers and
+   its tooltip), so the pages beside it, More included, fit on the bar. */
+@media (min-width: 701px) and (max-width: 1500px) {
+  .topbar .settings-link:not(.topbar-shortcut) { width: 34px; height: 34px; padding: 0; justify-content: center; }
+  .topbar .settings-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .topbar { gap: 1rem; }
+  .topbar nav a, .topbar nav .menu > summary.more-pages { padding-inline: 0.6rem; }
+}

@@ -304,7 +304,9 @@ CV Studio's check finds something the result may have lost or changed, the
 page says what, to compare before sending. It needs the AI (Settings > AI
 provider) and counts in the monthly AI allowance. Its summary box carries
 CV Studio's "ABOUT HIM / HER" heading. The summary is optional (one line:
-"AI summary" on or off, off keeps the CV's own): its length (short 4-5 points,
+"AI summary" on or off, off keeps the CV's own; a blind CV gets it too, the
+blind step anonymising each point, so it reads in points like the formatted CV
+rather than as the CV's own paragraph): its length (short 4-5 points,
 normal 6-7, detailed 8-10), what it brings out (CV Studio's General,
 Technology, Leadership or Commercial) and your own direction and tone in a
 sentence or two ("confident and concise, lead with the S/4HANA migration").
@@ -315,7 +317,11 @@ salary", "current package") is refused, since pay is never sent to the AI
 (work that only sounds like pay, "compensation and benefits design", is fine). **From their profile** is
 the template way below. Either way the file is named after the agency as CV
 Studio names it, "Hyppies CV - Siti Aisyah.docx": the agency's name is in
-Settings > General (Agency).
+Settings > General (Agency). A blind CV's bullets keep the indents of the
+bullets they were made from, even where blinding changed their words.
+**Downloading** a formatted CV (the download button above the CV) saves the
+Word file under its own name; the preview of a Word file is a PDF copy and
+hides the viewer's own download, which would save the copy under a made-up name.
 
 **Deleting a formatted CV ✅**: its "..." menu has "Delete this formatted CV"
 (after a confirmation; `documents:delete`, recruiters and up). Its Word file
@@ -553,6 +559,45 @@ for each of their jobs, with **Score fit** / **Score again**.
   **morning email**: at 8:00 agency time (HP_TIME_ZONE) the same list by
   email, only on mornings when there is something (applicants since the last
   email). It goes on while you are away and comes back with you.
+- **Exports and Excel import** ✅ (1.34.0): **Export** (Excel .xlsx or CSV)
+  on Candidates, Companies, Contacts, Jobs, Placements and Reports gives what
+  the page's search and filters find (candidates: the advanced search too),
+  at most 10,000 rows (on Jobs and Placements, the rows the page shows after
+  its filters). The server builds the file, so salaries are in it only
+  for roles that may see them (candidates.compensation:read; placement
+  salaries and fees with placements.fees:read); exporting needs its own
+  permission (candidates:export, companies:export, contacts:export and
+  placements:export: owners and admins by default; jobs:export: recruiters too);
+  every list export is in the audit log, against the person (how many, never a salary); reports, which are counts and totals, are not. Text that
+  would start a formula is written as text (phone numbers are left as they are); dates are the agency's, and list keys are shown as Settings' words. Reports come one sheet each.
+  **Import** reads Excel (.xlsx, its first sheet; dates as dates) as well as
+  CSV; an old .xls is asked to be saved as .xlsx.
+- **In-app help and a getting-started checklist** ✅ (1.37.0): the **?** in
+  the top bar opens **Help** (`#/help`, also found by Settings' search): short
+  topics in plain words on adding and importing candidates (CVs, LinkedIn
+  PDFs, CSV and Excel), searching (quick, boolean, advanced, AI), jobs and the
+  pipeline, interviews and the calendar, offers, placements and invoices,
+  email and templates, WhatsApp, folders, duplicates, notifications, exports,
+  reports, AI, automations, claims, leads, your account, and settings, team
+  and roles. A search box finds topics by any of their words (every word
+  must match; accents and words like "how" and "to" ignored), showing the
+  sentence that matched; the search stays in the address so Back returns to
+  it. Each topic links to the screens it describes. Topics, their parts and
+  their links follow the person's permissions (a viewer reads nothing about
+  exporting, and no link opens a page they would not be shown). The topics
+  are a typed data file in the web app (`web/src/help/`), versioned with it.
+  **Getting started** on the Dashboard, for a new company: add your company's
+  details (Settings › Invoicing), invite your team, connect your email, add
+  your first job, import candidates and set up the AI provider, each with a
+  button to its screen, only the steps the person's role can do. Each ticks
+  itself from the records (the invoice template saved, more than one person
+  on the team, a mailbox connected, a job, a candidate, an AI provider on); it
+  disappears once all are done, so an agency already set up never sees it.
+  **Hide checklist** hides it for that person (`guideDismissed` in
+  `/v1/me/preferences`); "Show the getting-started checklist" at the foot of
+  Help brings it back. On laptop widths (701 to 1500px) Settings in the top
+  bar is its gear alone (named for screen readers and in a tooltip) and the
+  page links sit closer, so More fits on a 1366px screen.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,
   what it offers and what it checks before an offer, recorded from the
   agency's template (Hyppies' Benefits & Pre-Offer Process to start with:
@@ -1186,6 +1231,44 @@ lead's company (with the built-in email check).
 - **Later**: connecting Google or Microsoft accounts directly (OAuth), to
   write the event straight into the calendar and read busy times live.
 
+## Client shortlist links ✅ (1.35.0)
+
+Client feedback used to come back by email and be typed in. Now the client
+answers on a page of their own (module `shortlists`, permission
+`shortlists:share`: owners, admins and recruiters).
+
+- **Making a link** (a job's page): tick cards on the pipeline and press
+  **Client link for N**, or **New link for those at Submitted** under
+  **Client links**. For each candidate choose one of their formatted CVs
+  (blind ones first) and, if you like, a note for the client; add a message
+  for the top of the page, and how long the link works (7 to 90 days, 14
+  unless chosen). The link is shown once, to copy (only a hash of its secret
+  is kept). With `emails:send`, **Also email it to <hiring contact>** sends it
+  from your connected mailbox (else the server's) through the emails module.
+- **Only what you chose reaches the client**: the label (a blind CV shows
+  "Candidate C-4F2K9Q", a formatted one the name), your note and the CV, as a
+  PDF when it has one (named after the label, never the stored file name).
+  Never salary, email or phone: a CV made with salary, or one whose text still
+  shows the candidate's email or phone, is refused, saying which and why
+  (cvformats keeps how each formatted CV was made in `formatted_cv`; CVs made
+  before are filled in from the audit log). Uploaded CVs cannot be shared.
+- **Consent**: a candidate who withdrew consent (Data protection) cannot be put
+  on a link, and one who withdraws later drops off every link at once.
+- **The client's page** (`/shortlist/<link>`, no sign-in, fits a phone): the
+  CV opens on the page (or downloads), then **Approve for interview** or
+  **Reject**, with an optional comment, once per candidate. Approving moves the
+  application to Interview (the job's first interview stage with custom
+  stages; one that is already further along stays); rejecting closes it as
+  Rejected, reason *Client said no*, the comment as the note (a placed or
+  closed one stays). Answers and CV downloads are limited per address (120 an
+  hour).
+- **What the recruiter sees** (Client links on the job): each link's status
+  (open, expired, revoked), whether and when the client opened it, and each
+  candidate's answer and comment. **Revoke** stops a link at once.
+- **Activity**: making a link (job, and each candidate), the client's first
+  visit, every answer (job and candidate, "The client approved …") and
+  revoking are in the audit log and on the timelines; salary never is.
+
 ## Offers ✅
 
 On a candidate's job (from submitted on), **Make offer** drafts an offer:
@@ -1529,6 +1612,40 @@ zone:
 Every stage change is recorded (by the database, whatever made it), so these
 figures come from what happened, not from where applications are now; the
 history before this was rebuilt from the audit log.
+
+### Activity targets and revenue forecast ✅ (1.36.0)
+
+- **Activity against targets:** each recruiter's **calls** (screening calls,
+  reference checks and notes of a call; a screening call's own note is not a
+  second call), **CVs sent** to clients (candidates moved to Submitted, and CVs
+  attached to an email to anyone but that candidate; the same candidate on the
+  same day counts once), **interviews arranged** (scheduled by them) and
+  **placements** (recorded and credited to them; not cancelled or backed out),
+  **this week** (Monday to Sunday) or **this month**, in the company's time
+  zone. A recruiter sees their own, as cards with a bar towards each target,
+  on the dashboard (**Your activity**, a block that can be moved) and on the
+  Reports page; owners and admins (`reports.team:read`) see everyone who
+  recruits (roles that may move candidates) in a table. Emails sent before
+  1.36.0 did not record their CVs, so they count only from then on.
+- **Targets** are set in **Settings, Targets & forecast** by owners and admins
+  (`reports.settings:manage`): per week and per month, one row for everyone
+  and a row per person (a person's own target replaces everyone's); an empty
+  box means no target for that activity.
+- **Revenue forecast** (owners and admins: `reports.forecast:read` and
+  `placements.fees:read`): the fees expected from candidates now at
+  Submitted, Interview, Offer and Placed (a placement until it is invoiced),
+  each counted at its stage's weight (10%, 30%, 70% and 100% unless changed in
+  Settings, Targets & forecast) in a month: this month plus the stage's months
+  ahead (2, 1, 0 unless changed), a placement in the month it starts. The fee
+  is the one recorded on the placement, else the client's terms of business
+  applied to the job's salary budget (the middle of its range, a monthly
+  salary 12 times, the rate whose range holds it). Shown per month and per
+  recruiter (the placement's recruiter, else the job's owner), with each
+  candidate counted and those without a fee (no budget, no terms, no rate
+  that fits) listed apart. Fees are never written to the audit log or logs.
+- **Export:** the Reports export adds an **Activity** sheet (the report's
+  period, per person you may see) and, for those who may see the forecast,
+  **Forecast by month**, **Forecast by recruiter** and **Forecast detail**.
 
 ## Market map ✅
 

@@ -122,3 +122,35 @@ func TestEachPersonKeepsTheirOwnDropdownFavourites(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodPut, "/v1/me/preferences", me,
 		map[string]any{"favourites": map[string]any{"colour": []string{"red"}}}).Status, "only the dropdowns that have favourites")
 }
+
+func TestEachPersonHidesTheirOwnGettingStartedChecklist(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	me, other := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	dismissed := func(token string) bool {
+		var p api.Preferences
+		res := a.request(http.MethodGet, "/v1/me/preferences", token, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&p)
+		require.NotNil(t, p.GuideDismissed, "always answered")
+		return *p.GuideDismissed
+	}
+	assert.False(t, dismissed(me), "shown until hidden")
+
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"candidateColumns": []string{"status"}}).Status)
+	res := a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"guideDismissed": true})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.True(t, dismissed(me))
+	assert.False(t, dismissed(other), "someone else's checklist is theirs")
+
+	// Other settings saved later leave it hidden; the help page shows it again.
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"dashboardBlocks": []string{"numbers"}}).Status)
+	assert.True(t, dismissed(me), "left out: kept")
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"guideDismissed": false}).Status)
+	assert.False(t, dismissed(me))
+
+	var p api.Preferences
+	a.request(http.MethodGet, "/v1/me/preferences", me, nil).JSON(&p)
+	assert.Equal(t, []api.CandidateColumn{"status"}, p.CandidateColumns.MustGet(), "the columns stay as chosen")
+}

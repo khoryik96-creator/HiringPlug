@@ -24,9 +24,11 @@ const report = (over: Partial<Schemas["Report"]> = {}): Schemas["Report"] => ({
   ...over,
 });
 
-/** The report for the summary, the company's settings for source names. */
+const noActivity: Schemas["ActivityReport"] = { period: "week", from: "2026-11-16", to: "2026-11-22", team: false, rows: [] };
+
+/** The report for the summary, the company's settings for source names, no activity. */
 const reads = (summary: unknown) => vi.spyOn(api, "GET").mockImplementation(((path: string) =>
-  Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(summary))) as never);
+  Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : path === "/v1/reports/activity" ? ok(noActivity) : ok(summary))) as never);
 
 describe("reports", () => {
   it("shows conversion, sources, recruiters' fees and time to fill", async () => {
@@ -63,9 +65,22 @@ describe("reports", () => {
     const settings = testFieldSettings() as unknown as Schemas["FieldSettings"];
     settings.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hint: null, color: null, hidden: false, builtIn: false });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(settings)
+      : path === "/v1/reports/activity" ? ok(noActivity)
       : ok(report({ sources: [{ source: "job_fair", applications: 2, interviewed: 1, placed: 0 }] })))) as never);
     renderWithClient(<Reports />);
     expect(await screen.findByRole("cell", { name: "Job fair" })).toBeTruthy();
+  });
+
+  it("shows activity to everyone, and the revenue forecast only to those who may see fees", async () => {
+    const forecast: Schemas["Forecast"] = { months: [], recruiters: [], lines: [], gaps: [], stageWeights: [] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings())
+      : path === "/v1/reports/activity" ? ok(noActivity) : path === "/v1/reports/forecast" ? ok(forecast) : ok(report()))) as never);
+    renderWithClient(<Reports permissions={["reports:read", "placements.fees:read"]} />);
+    expect(await screen.findByRole("region", { name: "Activity against targets" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Revenue forecast" })).toBeNull();
+    cleanup();
+    renderWithClient(<Reports permissions={["reports:read", "reports.forecast:read", "placements.fees:read"]} />);
+    expect(await screen.findByText(/Nothing expected yet/)).toBeTruthy();
   });
 
   it("names sources from either list", () => {

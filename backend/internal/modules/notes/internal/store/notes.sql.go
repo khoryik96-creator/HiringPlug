@@ -7,7 +7,53 @@ package store
 
 import (
 	"context"
+	"time"
 )
+
+const callNotesBetween = `-- name: CallNotesBetween :many
+SELECT id, kind, author_id, created_at FROM note
+WHERE kind IN ('screening', 'reference', 'call') AND created_at >= $1 AND created_at < $2
+LIMIT 50000
+`
+
+type CallNotesBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type CallNotesBetweenRow struct {
+	ID        string
+	Kind      string
+	AuthorID  string
+	CreatedAt time.Time
+}
+
+// Calls logged in a period (reports: each user's activity): screening calls,
+// reference checks and notes of a call.
+func (q *Queries) CallNotesBetween(ctx context.Context, arg CallNotesBetweenParams) ([]CallNotesBetweenRow, error) {
+	rows, err := q.db.Query(ctx, callNotesBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CallNotesBetweenRow
+	for rows.Next() {
+		var i CallNotesBetweenRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.AuthorID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const deleteNote = `-- name: DeleteNote :execrows
 DELETE FROM note WHERE id = $1

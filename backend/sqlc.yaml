@@ -231,3 +231,15 @@ sql:
       go:
         <<: *go
         out: internal/modules/notifications/internal/store
+  - <<: *module
+    queries: db/queries/shortlists.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/shortlists/internal/store
+  - <<: *module
+    queries: db/queries/reports.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/reports/internal/store

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
 import { failure, invalidField, ok, sentBody } from "../test-utils";
-import { parseCsv, toCsv } from "./csv";
+import { parseCsv, rowsToFix, toCsv, toFixName } from "./csv";
 import { autoMap, candidateBody, countryCode, mappingProblems, sourceValue, splitName } from "./mapping";
 import { nameKey, runImport } from "./runImport";
 
@@ -78,5 +78,17 @@ describe("running an import", () => {
     expect(calls.filter(([path]) => path === "/v1/companies")).toHaveLength(1);
     expect(calls).toContainEqual(["/v1/contacts", expect.objectContaining({ companyId: "comp_a", firstName: "Aina" })]);
     expect(calls).toContainEqual(["/v1/contacts", expect.objectContaining({ companyId: "comp_new", firstName: "Mei" })]);
+  });
+});
+
+describe("the rows to fix", () => {
+  it("puts each problem under Problem, even when the row from Excel is short", () => {
+    expect(rowsToFix(["First Name", "Last Name", "Email", "Phone"], [["Siti", "Nur"]], [{ line: 2, message: "Email is required" }]))
+      .toEqual([["First Name", "Last Name", "Email", "Phone", "Problem"], ["Siti", "Nur", "", "", "Email is required"]]);
+  });
+
+  it("is always a CSV file", () => {
+    expect(toFixName("Candidates.xlsx")).toBe("to-fix-Candidates.csv");
+    expect(toFixName("current.csv")).toBe("to-fix-current.csv");
   });
 });

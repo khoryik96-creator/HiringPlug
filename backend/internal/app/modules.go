@@ -52,6 +52,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/reports"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/scheduling"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/shortlists"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	// scaffold:imports
 )
@@ -91,6 +92,7 @@ type Modules struct {
 	Claims        *claims.Module
 	InterviewPrep *interviewprep.Module
 	Notifications *notifications.Module
+	Shortlists    *shortlists.Module
 	// scaffold:fields
 }
 
@@ -106,7 +108,6 @@ func NewModules(d Deps) *Modules {
 	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
-	m.Candidates.UseTimeZone(d.Config.TimeZone) // a call's date is the agency's day
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks, d.Files, d.Config.MaxUploadBytes, m.Identity)
@@ -114,7 +115,7 @@ func NewModules(d Deps) *Modules {
 	m.Contacts.ConfigureApollo(d.Config.Apollo, nil)
 	m.Contacts.CheckApolloUsersWith(m.Identity) // a paid lookup re-checks the recruiter's access
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
-	m.Jobs.UseTimeZone(d.Config.TimeZone) // intake dates and ad closing days are the agency's
+	m.useAgencyTime(d.Config.TimeZone)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
 	m.Pipeline.NameUsersWith(m.Identity)
 	m.Notes = notes.New(d.Pool, notes.Subjects{
@@ -151,13 +152,17 @@ func NewModules(d Deps) *Modules {
 	m.Reports = reports.New(d.Pool, reports.Deps{
 		Applications: reportApplications{m.Pipeline}, Sources: reportSources{m.Candidates}, Jobs: reportJobs{m.Jobs},
 		Placements: reportPlacements{m.Placements}, Users: m.Identity,
+		Activity: reportActivity{candidates: m.Candidates, notes: m.Notes, pipeline: m.Pipeline, emails: m.Emails,
+			interviews: m.Interviews, placements: m.Placements, identity: m.Identity},
+		Forecast: reportForecast{pipeline: m.Pipeline, placements: m.Placements, jobs: m.Jobs, companies: m.Companies},
+		Labels:   m.Settings,
 	}, d.Config.TimeZone)
 	m.Offers = offers.New(d.Pool, offerApplications{m.Pipeline}, m.Identity)
 	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.AllowPrivateNetworks, d.Config.WebhookKeysSecret, d.Config.AuthJWTSecret)
 	m.Leads = leads.New(d.Pool, m.Companies, d.Config.AllowPrivateNetworks)
 	m.Cvformats = cvformats.New(d.Pool, cvformats.Deps{
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
-		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents},
+		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents}, Files: cvFiles{m.Documents},
 		AI: cvReadingAI{
 			all: aiUse{func() []tokensSince {
 				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
@@ -241,9 +246,10 @@ func NewModules(d Deps) *Modules {
 		},
 	}, d.Config.TimeZone)
 	m.Notifications = notifications.New(d.Pool, notificationSources{m}, m.Identity, notificationMailer{m}, notifications.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
+	m.Shortlists = newShortlists(d, m)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
-	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims)
+	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims, m.Shortlists)
 	// A merged duplicate company's contacts, jobs, notes and the rest follow it;
 	// a merged contact's emails, jobs, invoices and notes follow them.
 	m.Companies.MoveRecordsWith(m.Contacts, m.Jobs, m.Notes, m.Folders, m.Leads, m.Automations, m.Industries)
@@ -251,24 +257,16 @@ func NewModules(d Deps) *Modules {
 	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
-	m.Documents.UseAI(cvReadingAI{
+	// CVs read, blind ad rewrites and a new company's industry: one monthly allowance.
+	reading := cvReadingAI{
 		all: aiUse{func() []tokensSince {
 			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
 		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
-	})
-	m.Jobs.UseAI(cvReadingAI{ // blind ad rewrites, in the same monthly allowance
-		all: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-		}},
-		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
-	})
-	m.Companies.UseAI(cvReadingAI{ // a new company's industry, in the same monthly allowance
-		all: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-		}},
-		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
-	})
+	}
+	m.Documents.UseAI(reading)
+	m.Jobs.UseAI(reading)
+	m.Companies.UseAI(reading)
 	return m
 }
 
@@ -308,6 +306,7 @@ type (
 	claimsHTTP        = claims.HTTP
 	interviewprepHTTP = interviewprep.HTTP
 	notificationsHTTP = notifications.HTTP
+	shortlistsHTTP    = shortlists.HTTP
 	// scaffold:aliases
 )
 
@@ -348,6 +347,7 @@ type Server struct {
 	*claimsHTTP
 	*interviewprepHTTP
 	*notificationsHTTP
+	*shortlistsHTTP
 	// scaffold:embeds
 }
 
@@ -389,6 +389,7 @@ func (m *Modules) Server() *Server {
 		claimsHTTP:        m.Claims.HTTP,
 		interviewprepHTTP: m.InterviewPrep.HTTP,
 		notificationsHTTP: m.Notifications.HTTP,
+		shortlistsHTTP:    m.Shortlists.HTTP,
 		// scaffold:server-fields
 	}
 }

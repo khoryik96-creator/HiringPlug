@@ -61,6 +61,11 @@ type Deps struct {
 	SourceCVs interface {
 		SourceCV(ctx context.Context, tx pgx.Tx, id string) (SourceCV, string, error)
 	}
+	// Files reads a document's file, to check it before it goes to a client
+	// (documents module; NOT_FOUND when the user may not see it).
+	Files interface {
+		FormattedFile(ctx context.Context, tx pgx.Tx, documentID string) (FormattedFile, error)
+	}
 	// AI is the company's AI provider, if it has one and allowance left this month.
 	AI interface {
 		Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)

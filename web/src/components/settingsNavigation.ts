@@ -6,7 +6,7 @@ export const settingsGroups = [
   { label: "Recruiting setup", sections: ["settings-stages", "settings-lists", "industries", "settings-salary", "cv-templates"] },
   { label: "Email & scheduling", sections: ["email-connection", "email-templates", "whatsapp-templates", "booking-calendars", "automations"] },
   { label: "Team & agency", sections: ["settings", "team", "access", "privacy"] },
-  { label: "Finance", sections: ["invoicing", "settings-claims-storage"] },
+  { label: "Finance", sections: ["invoicing", "settings-targets", "settings-claims-storage"] },
   { label: "System & integrations", sections: ["integrations", "ai-provider", "companion", "system", "backups", "bin"] },
 ];
 
@@ -28,6 +28,7 @@ const aliases: Record<string, string> = {
   access: "permissions user access admin roles visibility",
   privacy: "privacy consent retention data deletion do not contact",
   invoicing: "invoice billing placement fees finance",
+  "settings-targets": "activity targets KPI goals calls CVs sent interviews placements recruiter revenue forecast pipeline weights",
   "settings-claims-storage": "receipt files scans expenses claim uploads OneDrive Google Drive Dropbox",
   integrations: "connections API service webhooks third party",
   "ai-provider": "AI assistant model API key OpenAI Claude DeepSeek",
@@ -58,6 +59,7 @@ const features = [
   { section: "outlook", label: "Outlook Mail", href: "#/outlook", words: "inbox messages drafts forwarding schedule mail reply" },
   { section: "calendar", label: "Calendar", href: "#/calendar", words: "day week month agenda events outlook calendar dock" },
   { section: "import", label: "Import profiles", href: "#/import", words: "upload CV CVs resume resumes bulk parse documents create candidates", permission: "intake:create" },
+  { section: "help", label: "Help", href: "#/help", words: "help guide how to question support getting started checklist" },
 ] satisfies { section: string; label: string; href: string; words: string; permission?: Permission }[];
 
 export function groupSettings(pages: Route[]) {

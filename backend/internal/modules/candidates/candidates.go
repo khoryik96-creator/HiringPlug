@@ -36,7 +36,7 @@ type Module struct {
 // New wires the module. phoneRegion is the country assumed for local phone
 // numbers, e.g. "MY".
 func New(pool *pgxpool.Pool, phoneRegion string, users Users, settings Settings) *Module {
-	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users, rules: settings, salaryRules: settings}
+	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users, rules: settings, salaryRules: settings, labels: settings}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 
@@ -45,6 +45,13 @@ func New(pool *pgxpool.Pool, phoneRegion string, users Users, settings Settings)
 type Settings interface {
 	FieldRules
 	SalaryRules
+	Labeler
+}
+
+// Labeler gives the words for the company's lists (list -> key -> label),
+// in the caller's transaction: exports show a source's words, not its key.
+type Labeler interface {
+	Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error)
 }
 
 // FormatSalaryBreakdown writes a stored salary breakdown for an email

@@ -30,3 +30,4 @@ Thumbs.db
 
 # Codespaces sign-in link (.devcontainer/start.sh)
 CODESPACE-SIGN-IN.txt
+.claude/worktrees/

@@ -796,6 +796,47 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 	return items, nil
 }
 
+const jobSalaries = `-- name: JobSalaries :many
+SELECT job_order_id, min_amount, max_amount, currency, period FROM job_order_salary
+WHERE job_order_id = ANY($1::text[])
+`
+
+type JobSalariesRow struct {
+	JobOrderID string
+	MinAmount  pgtype.Numeric
+	MaxAmount  pgtype.Numeric
+	Currency   string
+	Period     string
+}
+
+// The salary budgets of some jobs (reports: the fee a placement would
+// bring); none without jobs.salary:read (row-level security).
+func (q *Queries) JobSalaries(ctx context.Context, ids []string) ([]JobSalariesRow, error) {
+	rows, err := q.db.Query(ctx, jobSalaries, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JobSalariesRow
+	for rows.Next() {
+		var i JobSalariesRow
+		if err := rows.Scan(
+			&i.JobOrderID,
+			&i.MinAmount,
+			&i.MaxAmount,
+			&i.Currency,
+			&i.Period,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const linkJdFileToJob = `-- name: LinkJdFileToJob :execrows
 UPDATE job_description_file SET job_id = $1 WHERE id = $2 AND job_id IS NULL
 `

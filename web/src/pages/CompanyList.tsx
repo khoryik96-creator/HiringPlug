@@ -3,6 +3,8 @@ import { useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
+import { ExportButton } from "../components/ExportButton";
+import { downloadExport } from "../api/files";
 import { IconButton, PlusIcon } from "../components/ActionIcons";
 import { CompanyForm } from "../components/CompanyForm";
 import { chipStyle, UNKNOWN_CATEGORY } from "../components/companyCategory";
@@ -40,7 +42,7 @@ const CELLS = {
   ) },
 };
 
-export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canCreate: boolean; canFolders?: boolean; meId?: string }) {
+export function CompanyList({ canCreate, canExport = false, canFolders = false, meId = "" }: { canCreate: boolean; canExport?: boolean; canFolders?: boolean; meId?: string }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [type, setType] = useState<TypeFilter>("");
   const [category, setCategory] = useState("");
@@ -97,6 +99,14 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
           </select>
         </BooleanSearchBox>
         <a className="dupes-link" href="#/companies/duplicates">Possible duplicates</a>
+        {canExport && <ExportButton what="companies" run={(format) => {
+          const query = new URLSearchParams({ format });
+          if (folder) query.set("folder", folder);
+          if (typed.trim()) query.set(looksBoolean(typed) ? "boolean" : "q", typed.trim());
+          if (type) query.set("type", type);
+          if (category) query.set("category", category);
+          return downloadExport(`/v1/companies/export?${query.toString()}`);
+        }} />}
         {canCreate && !adding && <IconButton label="Add company" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (

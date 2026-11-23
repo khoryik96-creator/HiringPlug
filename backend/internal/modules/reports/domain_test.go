@@ -77,3 +77,14 @@ func TestPeriod(t *testing.T) {
 	_, _, errs = Period(ptr(today.AddDate(-4, 0, 0)), &today, today)
 	assert.Equal(t, "from", errs[0].Field)
 }
+
+// The export names sources as Settings does, else in words.
+func TestExportedSourcesUseSettingsNames(t *testing.T) {
+	r := Report{
+		Sources:     []SourceRow{{Source: "jobstreet", Applications: 2}, {Source: "walk_in", Applications: 1}, {Source: "unknown", Applications: 1}},
+		SourceNames: map[string]string{"jobstreet": "JobStreet (SEEK)"},
+	}
+	sources := Tables(r)[1]
+	assert.Equal(t, "Sources", sources.Name)
+	assert.Equal(t, []string{"JobStreet (SEEK)", "Walk in", "Not recorded"}, []string{sources.Rows[0][0], sources.Rows[1][0], sources.Rows[2][0]})
+}

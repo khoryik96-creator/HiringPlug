@@ -79,3 +79,22 @@ export async function downloadDocument(doc: Pick<Document, "id" | "contentType" 
   a.click();
   setTimeout(() => { URL.revokeObjectURL(url); }, 10_000);
 }
+
+/**
+ * Downloads an export (a GET with the list's filters, or a POST with a
+ * search) and saves it under the name the API gives (Content-Disposition).
+ */
+export async function downloadExport(path: string, body?: unknown): Promise<void> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${getToken() ?? ""}` };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const res = await fetch(path, { method: body === undefined ? "GET" : "POST", headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!res.ok) await throwFor(res);
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const named = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const plain = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+  const fileName = named ? decodeURIComponent(named) : plain ?? "export";
+  const url = URL.createObjectURL(new Blob([await res.arrayBuffer()], { type: res.headers.get("Content-Type") ?? "application/octet-stream" }));
+  const a = Object.assign(window.document.createElement("a"), { href: url, download: fileName });
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); }, 10_000);
+}

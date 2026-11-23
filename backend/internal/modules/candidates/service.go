@@ -24,6 +24,7 @@ const emailUniqueIndex = "candidate_tenant_email_uq"
 
 // Service holds the candidate use cases.
 type Service struct {
+	labels      Labeler // the words for the company's lists (exports)
 	industries  IndustryCatalogue
 	pool        *pgxpool.Pool
 	phoneRegion string

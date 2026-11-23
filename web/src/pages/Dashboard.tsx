@@ -3,10 +3,12 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
+import { ActivityProgress } from "../components/ActivityProgress";
 import { CvImports } from "../components/CvImports";
 import { DashboardBlocks } from "../components/DashboardBlocks";
 import { Change, Heat, HeatLegend, lastActivity } from "../components/heat";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { FirstRunGuide } from "../components/FirstRunGuide";
 import { MyInterviews } from "../components/Interviews";
 import { useJobProgress } from "../components/JobProgressTable";
 import { MyTasks } from "../components/MyTasks";
@@ -20,7 +22,7 @@ type Counts = Schemas["StageCounts"];
 const active = (c: Counts) => c.applied + c.screening + c.submitted + c.interview + c.offer;
 
 /** The home page: search, what needs you today, importing CVs, open jobs and their pipelines. */
-export function Dashboard({ permissions }: { permissions: Permission[] }) {
+export function Dashboard({ permissions, meId }: { permissions: Permission[]; meId?: string }) {
   const summary = useQuery({
     queryKey: summaryKey,
     queryFn: async () => unwrap(await api.GET("/v1/pipeline/summary")),
@@ -33,6 +35,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
   return (
     <main>
       <h2>Dashboard</h2>
+      <FirstRunGuide permissions={permissions} />
       <QuickSearch permissions={permissions} />
       <DashboardBlocks blocks={[
         { id: "numbers", label: "the numbers", node: (
@@ -43,6 +46,8 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
         <div className="kpi"><span className="kpi-label">Placed in 30 days</span><strong>{s.placedLast30Days}</strong></div>
       </div>
         ) },
+        ...(permissions.includes("reports:read") && meId
+          ? [{ id: "activity" as const, label: "Your activity", node: <ActivityProgress onlyUser={meId} title="Your activity" /> }] : []),
         { id: "needsYou", label: "Needs you today", node: <NeedsYouToday permissions={permissions} jobs={s.jobs} progress={progress.data} /> },
         ...(permissions.includes("intake:create") ? [{ id: "import" as const, label: "Import profiles", node: <CvImports foldedHistory /> }] : []),
         ...(permissions.includes("automations.tasks:read")

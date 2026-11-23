@@ -38,6 +38,43 @@ func (q *Queries) ApplicationsWithInterviews(ctx context.Context, ids []string) 
 	return items, nil
 }
 
+const arrangedBetween = `-- name: ArrangedBetween :many
+SELECT created_by, created_at FROM interview
+WHERE created_at >= $1 AND created_at < $2
+LIMIT 50000
+`
+
+type ArrangedBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type ArrangedBetweenRow struct {
+	CreatedBy string
+	CreatedAt time.Time
+}
+
+// Interviews arranged in a period, by whom (reports: each user's activity).
+func (q *Queries) ArrangedBetween(ctx context.Context, arg ArrangedBetweenParams) ([]ArrangedBetweenRow, error) {
+	rows, err := q.db.Query(ctx, arrangedBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ArrangedBetweenRow
+	for rows.Next() {
+		var i ArrangedBetweenRow
+		if err := rows.Scan(&i.CreatedBy, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const busyFor = `-- name: BusyFor :many
 SELECT starts_at, ends_at FROM interview
 WHERE status = 'scheduled' AND $1::text = ANY (interviewer_ids) AND ends_at > $2::timestamptz AND starts_at < $3::timestamptz

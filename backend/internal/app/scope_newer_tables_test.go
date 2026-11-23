@@ -37,7 +37,13 @@ func TestTheDatabaseScopesTheNewerCandidateTables(t *testing.T) {
 	exec(`INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, title, duration_minutes, expires_at, created_by)
 	      VALUES ($1, repeat('a', 32)||substr($2, 6), $3, $2, 'Call', 30, now() + interval '1 day', $3)`, tenant.ID, theirs.Id, sourcer.ID)
 
-	tables := []string{"screening_call", "screening_call_salary", "booking_link"}
+	exec(`INSERT INTO formatted_cv (tenant_id, document_id, candidate_id, blind, include_salary) VALUES ($1, 'doc_x', $2, true, false)`, tenant.ID, theirs.Id)
+	exec(`INSERT INTO client_shortlist (id, tenant_id, token_hash, job_id, expires_at, created_by)
+	      VALUES ('csl_'||substr($2, 6), $1, repeat('b', 32)||substr($2, 6), 'job_x', now() + interval '1 day', $3)`, tenant.ID, theirs.Id, sourcer.ID)
+	exec(`INSERT INTO client_shortlist_candidate (tenant_id, shortlist_id, position, application_id, candidate_id, document_id, blind, label)
+	      VALUES ($1, 'csl_'||substr($2, 6), 1, 'appl_x', $2, 'doc_x', true, 'Candidate C-1')`, tenant.ID, theirs.Id)
+
+	tables := []string{"screening_call", "screening_call_salary", "booking_link", "formatted_cv", "client_shortlist_candidate"}
 	count := func(p authz.Principal, table string) int {
 		t.Helper()
 		var n int

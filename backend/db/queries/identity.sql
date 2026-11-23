@@ -144,7 +144,7 @@ SELECT EXISTS (SELECT 1 FROM revoked_session WHERE id = @id);
 
 -- The signed-in person's own settings (none until they change one).
 -- name: GetPreferences :one
-SELECT candidate_columns, dashboard_blocks, favourites FROM user_preference WHERE user_id = app_current_user();
+SELECT candidate_columns, dashboard_blocks, favourites, guide_dismissed FROM user_preference WHERE user_id = app_current_user();
 
 -- name: SetCandidateColumns :exec
 INSERT INTO user_preference (tenant_id, user_id, candidate_columns)
@@ -161,6 +161,12 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET dashboard_blocks = EXCLUDED.dashb
 INSERT INTO user_preference (tenant_id, user_id, favourites)
 VALUES (app_current_tenant(), app_current_user(), @favourites::jsonb)
 ON CONFLICT (tenant_id, user_id) DO UPDATE SET favourites = EXCLUDED.favourites, updated_at = now();
+
+-- The dashboard's getting-started checklist hidden (or shown again).
+-- name: SetGuideDismissed :exec
+INSERT INTO user_preference (tenant_id, user_id, guide_dismissed)
+VALUES (app_current_tenant(), app_current_user(), @guide_dismissed::boolean)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET guide_dismissed = EXCLUDED.guide_dismissed, updated_at = now();
 
 -- name: ResetCandidateColumns :exec
 UPDATE user_preference SET candidate_columns = NULL, updated_at = now() WHERE user_id = app_current_user();

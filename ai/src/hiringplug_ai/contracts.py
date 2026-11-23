@@ -31,6 +31,7 @@ class Permission(StrEnum):
     candidates_compensation_update = "candidates.compensation:update"
     candidates_status_update = "candidates.status:update"
     candidates_create = "candidates:create"
+    candidates_export = "candidates:export"
     candidates_merge = "candidates:merge"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
@@ -40,12 +41,14 @@ class Permission(StrEnum):
     companies_category_update = "companies.category:update"
     companies_documents_delete = "companies.documents:delete"
     companies_create = "companies:create"
+    companies_export = "companies:export"
     companies_merge = "companies:merge"
     companies_read = "companies:read"
     companies_update = "companies:update"
     contacts_apollo_use = "contacts.apollo:use"
     contacts_role_update = "contacts.role:update"
     contacts_create = "contacts:create"
+    contacts_export = "contacts:export"
     contacts_merge = "contacts:merge"
     contacts_read = "contacts:read"
     contacts_update = "contacts:update"
@@ -73,6 +76,7 @@ class Permission(StrEnum):
     jobs_salary_read = "jobs.salary:read"
     jobs_salary_update = "jobs.salary:update"
     jobs_create = "jobs:create"
+    jobs_export = "jobs:export"
     jobs_read = "jobs:read"
     jobs_update = "jobs:update"
     leads_manage = "leads:manage"
@@ -96,17 +100,22 @@ class Permission(StrEnum):
     pipeline_update = "pipeline:update"
     placements_fees_read = "placements.fees:read"
     placements_fees_update = "placements.fees:update"
+    placements_export = "placements:export"
     placements_manage = "placements:manage"
     placements_read = "placements:read"
     privacy_manage = "privacy:manage"
     privacy_read = "privacy:read"
     privacy_record = "privacy:record"
+    reports_forecast_read = "reports.forecast:read"
+    reports_settings_manage = "reports.settings:manage"
+    reports_team_read = "reports.team:read"
     reports_read = "reports:read"
     scheduling_team_read = "scheduling.team:read"
     scheduling_use = "scheduling:use"
     settings_backups_manage = "settings.backups:manage"
     settings_manage = "settings:manage"
     settings_read = "settings:read"
+    shortlists_share = "shortlists:share"
 
 
 class ErrorCode(StrEnum):
@@ -141,6 +150,7 @@ class ErrorCode(StrEnum):
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
     EMAIL_UNDELIVERABLE = "EMAIL_UNDELIVERABLE"
+    EXPORT_TOO_LARGE = "EXPORT_TOO_LARGE"
     FOLDER_OWNER_ONLY = "FOLDER_OWNER_ONLY"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
@@ -172,6 +182,11 @@ class ErrorCode(StrEnum):
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
     SCHEDULING_NOT_SET_UP = "SCHEDULING_NOT_SET_UP"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+    SHORTLIST_ALREADY_ANSWERED = "SHORTLIST_ALREADY_ANSWERED"
+    SHORTLIST_CLOSED = "SHORTLIST_CLOSED"
+    SHORTLIST_CV_NOT_SHAREABLE = "SHORTLIST_CV_NOT_SHAREABLE"
+    SHORTLIST_DO_NOT_CONTACT = "SHORTLIST_DO_NOT_CONTACT"
+    SHORTLIST_TOO_MANY_TRIES = "SHORTLIST_TOO_MANY_TRIES"
     SIGN_IN_CHOOSE_COMPANY = "SIGN_IN_CHOOSE_COMPANY"
     SIGN_IN_FAILED = "SIGN_IN_FAILED"
     STAGE_MOVE_NOT_ALLOWED = "STAGE_MOVE_NOT_ALLOWED"
@@ -271,6 +286,11 @@ class UserId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["usr_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^usr_[0-9a-hjkmnp-tv-z]{26}$")
     ]
+
+
+class ExportFormat(StrEnum):
+    xlsx = "xlsx"
+    csv = "csv"
 
 
 class CountryCode(RootModel[str]):
@@ -3643,6 +3663,7 @@ class DashboardBlock(StrEnum):
     tasks = "tasks"
     offersToApprove = "offersToApprove"
     interviews = "interviews"
+    activity = "activity"
     openJobs = "openJobs"
 
 
@@ -5953,6 +5974,22 @@ class PlacementId(RootModel[str]):
     ]
 
 
+class PlacementExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    ids: Annotated[
+        list[PlacementId] | None,
+        Field(
+            description="The placements to export (what the dashboard shows after its search, filters and card); none for every placement in the dates.",
+            max_length=10000,
+        ),
+    ] = None
+    startFrom: Annotated[date | None, Field(description="Started on or after this day.")] = None
+    startTo: Annotated[date | None, Field(description="Started on or before this day.")] = None
+
+
 class PlacementStatus(StrEnum):
     active = "active"
     fell_through = "fell_through"
@@ -6230,6 +6267,194 @@ class JobFill(BaseModel):
         int, Field(description="From the job being opened to its first placement in the period.")
     ]
     placements: int
+
+
+class ActivityPeriod(StrEnum):
+    week = "week"
+    month = "month"
+
+
+class ActivityCounts(BaseModel):
+    calls: Annotated[
+        int, Field(description="Calls logged: screening calls, reference checks and notes of a call.")
+    ]
+    cvsSent: Annotated[
+        int,
+        Field(
+            description="CVs sent to clients: applications moved to submitted, and CVs attached to an email to anyone but the candidate (the same candidate on the same day counts once)."
+        ),
+    ]
+    interviews: Annotated[int, Field(description="Interviews arranged (scheduled by the user).")]
+    placements: Annotated[
+        int, Field(description="Placements recorded and credited to the user (not cancelled).")
+    ]
+
+
+class ActivityGoal(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    calls: Annotated[int | None, Field(ge=0, le=100000)]
+    cvsSent: Annotated[int | None, Field(ge=0, le=100000)]
+    interviews: Annotated[int | None, Field(ge=0, le=100000)]
+    placements: Annotated[int | None, Field(ge=0, le=100000)]
+
+
+class ActivityRow(BaseModel):
+    userId: UserId
+    userName: str
+    done: ActivityCounts
+    target: Annotated[
+        ActivityGoal | None,
+        Field(
+            description="The user's own target for the period, else the one for everyone; null when neither is set."
+        ),
+    ]
+
+
+class ActivityReport(BaseModel):
+    period: ActivityPeriod
+    from_: Annotated[date, Field(alias="from")]
+    to: Annotated[date, Field(description="The last day of the week or month.")]
+    team: Annotated[
+        bool,
+        Field(
+            description="Every active user who recruits (whose role may move candidates) is listed, and anyone else who did something (reports.team:read); else only you."
+        ),
+    ]
+    rows: Annotated[list[ActivityRow], Field(description="By name.")]
+
+
+class ActivityTarget(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    userId: Annotated[
+        UserId | None, Field(description="The user it is for; null for everyone without their own.")
+    ]
+    period: ActivityPeriod
+    goal: ActivityGoal
+
+
+class ForecastStage(StrEnum):
+    submitted = "submitted"
+    interview = "interview"
+    offer = "offer"
+    placed = "placed"
+
+
+class StageWeight(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    stage: ForecastStage
+    percent: Annotated[
+        int,
+        Field(
+            description="How likely an application at this stage is to be placed (and the fee paid).",
+            ge=0,
+            le=100,
+        ),
+    ]
+    monthsAhead: Annotated[
+        int,
+        Field(
+            description="The month its fee is expected in: this month (0), next month (1), ... Placements go by their start date.",
+            ge=0,
+            le=12,
+        ),
+    ]
+
+
+class ReportSettings(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    targets: Annotated[
+        list[ActivityTarget],
+        Field(description="At most one per user (or everyone) and period.", max_length=500),
+    ]
+    stageWeights: Annotated[
+        list[StageWeight],
+        Field(description="One for each forecast stage (stages left out keep their weight).", max_length=4),
+    ]
+
+
+class ForecastTotal(BaseModel):
+    currency: CurrencyCode
+    expected: DecimalAmount
+    full: Annotated[DecimalAmount, Field(description="The fees before weighting.")]
+
+
+class ForecastMonth(BaseModel):
+    month: Annotated[str, Field(examples=["2026-11"], pattern="^[0-9]{4}-[0-9]{2}$")]
+    totals: list[ForecastTotal]
+
+
+class ForecastRecruiter(BaseModel):
+    recruiterId: Annotated[UserId | None, Field(...)]
+    recruiterName: Annotated[
+        str | None, Field(description="null when no recruiter is credited and the job has no owner.")
+    ]
+    totals: list[ForecastTotal]
+
+
+class FeeFrom(StrEnum):
+    placement = "placement"
+    terms = "terms"
+
+
+class ForecastLine(BaseModel):
+    applicationId: ApplicationId
+    candidateName: str
+    jobTitle: str
+    companyName: str
+    stage: ForecastStage
+    recruiterId: Annotated[UserId | None, Field(...)]
+    recruiterName: Annotated[str | None, Field(...)]
+    month: Annotated[str, Field(pattern="^[0-9]{4}-[0-9]{2}$")]
+    currency: CurrencyCode
+    fee: DecimalAmount
+    percent: int
+    expected: DecimalAmount
+    feeFrom: Annotated[
+        FeeFrom,
+        Field(
+            description="placement: the fee recorded on the placement; terms: the client's rate applied to the job's salary budget."
+        ),
+    ]
+
+
+class Reason3(StrEnum):
+    no_salary_budget = "no_salary_budget"
+    no_terms = "no_terms"
+    no_rate = "no_rate"
+
+
+class ForecastGap(BaseModel):
+    applicationId: ApplicationId
+    candidateName: str
+    jobTitle: str
+    stage: ForecastStage
+    reason: Annotated[
+        Reason3,
+        Field(
+            description="no_salary_budget: the job has none (or one per hour or day); no_terms: the client has no terms of business; no_rate: none of the client's rates fits the salary."
+        ),
+    ]
+
+
+class Forecast(BaseModel):
+    months: Annotated[list[ForecastMonth], Field(description="From this month on, in order.")]
+    recruiters: Annotated[list[ForecastRecruiter], Field(description="Most expected first.")]
+    lines: Annotated[
+        list[ForecastLine], Field(description="Each application counted, most expected first (at most 2000).")
+    ]
+    gaps: Annotated[
+        list[ForecastGap],
+        Field(description="Applications whose fee could not be worked out, so not counted (at most 500)."),
+    ]
+    stageWeights: list[StageWeight]
 
 
 class BookingLinkId(RootModel[str]):
@@ -6558,6 +6783,76 @@ class SalaryCalculationRules(BaseModel):
     bonus: bool
     bonusOnAllowances: bool
     cents: bool
+
+
+class ClientShortlistId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^csl_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class ClientShortlistCandidateId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^cslc_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class ClientShortlistStatus(StrEnum):
+    open = "open"
+    expired = "expired"
+    revoked = "revoked"
+
+
+class ClientShortlistDecision(StrEnum):
+    approved = "approved"
+    rejected = "rejected"
+
+
+class ClientShortlistPick(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    applicationId: ApplicationId
+    documentId: Annotated[
+        DocumentId, Field(description="One of the candidate's formatted CVs (blind or with the name).")
+    ]
+    note: Annotated[
+        str | None, Field(description="Your words about the candidate, shown to the client.", max_length=1000)
+    ] = None
+
+
+class ClientShortlistCandidate(BaseModel):
+    id: ClientShortlistCandidateId
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    label: Annotated[
+        str,
+        Field(description='The name the client sees: a reference ("Candidate C-4F2K9Q") with a blind CV.'),
+    ]
+    blind: bool
+    documentId: DocumentId
+    note: Annotated[str | None, Field(...)]
+    decision: Annotated[ClientShortlistDecision | None, Field(...)]
+    comment: Annotated[str | None, Field(...)]
+    answeredAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class ClientShortlistAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    decision: ClientShortlistDecision
+    comment: Annotated[str | None, Field(max_length=2000)] = None
+
+
+class PublicShortlistCandidate(BaseModel):
+    id: ClientShortlistCandidateId
+    label: str
+    blind: bool
+    note: Annotated[str | None, Field(...)]
+    cvFileName: Annotated[
+        str | None, Field(description="The name the CV downloads as (the label, never the stored file name).")
+    ]
+    decision: Annotated[ClientShortlistDecision | None, Field(...)]
+    comment: Annotated[str | None, Field(...)]
+    answeredAt: Annotated[AwareDatetime | None, Field(...)]
 
 
 class AiProviderEntry(BaseModel):
@@ -8547,6 +8842,52 @@ class Backups(BaseModel):
     ]
 
 
+class ClientShortlistInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidates: Annotated[list[ClientShortlistPick], Field(max_length=20, min_length=1)]
+    expiresInDays: Annotated[int, Field(description="How long the link works.", ge=1, le=90)] = 14
+    message: Annotated[
+        str | None,
+        Field(description="Shown to the client at the top of the page (and in the email).", max_length=2000),
+    ] = None
+    emailHiringContact: Annotated[
+        bool | None, Field(description="Also email the link to the job's hiring contact (needs emails:send).")
+    ] = None
+
+
+class ClientShortlist(BaseModel):
+    id: ClientShortlistId
+    jobId: JobOrderId
+    status: ClientShortlistStatus
+    message: Annotated[str | None, Field(...)]
+    expiresAt: AwareDatetime
+    revokedAt: Annotated[AwareDatetime | None, Field(...)]
+    openedAt: Annotated[
+        AwareDatetime | None, Field(description="The client's first visit; null while not opened.")
+    ]
+    lastOpenedAt: Annotated[AwareDatetime | None, Field(...)]
+    emailedTo: Annotated[str | None, Field(description="The hiring contact it was emailed to.")]
+    createdByName: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    candidates: list[ClientShortlistCandidate]
+
+
+class ClientShortlistList(BaseModel):
+    items: list[ClientShortlist]
+
+
+class PublicClientShortlist(BaseModel):
+    agencyName: str
+    jobTitle: str
+    recruiterName: Annotated[str | None, Field(...)]
+    message: Annotated[str | None, Field(...)]
+    status: ClientShortlistStatus
+    expiresAt: AwareDatetime
+    candidates: list[PublicShortlistCandidate]
+
+
 class AiProviders(BaseModel):
     active: AiProviderChoice
     serverAvailable: Annotated[
@@ -8559,6 +8900,19 @@ class AiProviders(BaseModel):
         list[AiProviderEntry],
         Field(description="Every provider, in the order deepseek, claude, openai, qwen."),
     ]
+
+
+class CandidateExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    search: Annotated[
+        CandidateSearch | None,
+        Field(
+            description="The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone."
+        ),
+    ] = None
 
 
 class ScreeningCallResult(BaseModel):
@@ -8756,6 +9110,12 @@ class Preferences(BaseModel):
         ),
     ] = None
     favourites: Favourites | None = None
+    guideDismissed: Annotated[
+        bool | None,
+        Field(
+            description="You hid the dashboard's getting-started checklist (false: it shows while a step you can do is left)."
+        ),
+    ] = None
 
 
 class JdFile(BaseModel):
@@ -8823,6 +9183,13 @@ class Report(BaseModel):
     ]
     timeToFill: TimeToFill
     feesHidden: Annotated[bool, Field(description="Fees are left out (placements.fees:read is needed).")]
+
+
+class ClientShortlistCreated(BaseModel):
+    shortlist: ClientShortlist
+    url: Annotated[
+        str, Field(description="The address to give the client. Shown only now: only a hash of it is kept.")
+    ]
 
 
 class CandidateFind(BaseModel):

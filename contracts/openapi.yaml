@@ -157,6 +157,10 @@ x-error-codes:
     module: emails
     status: 409
     description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
+  EXPORT_TOO_LARGE:
+    module: shared
+    status: 422
+    description: 'An export holds at most 10,000 rows: narrow the search. `details.limit` is the most.'
   FOLDER_OWNER_ONLY:
     module: folders
     status: 403
@@ -281,6 +285,27 @@ x-error-codes:
     module: shared
     status: 503
     description: A dependency is temporarily unavailable. Retry later.
+  SHORTLIST_ALREADY_ANSWERED:
+    module: shortlists
+    status: 409
+    description: The client has already answered about this candidate.
+  SHORTLIST_CLOSED:
+    module: shortlists
+    status: 409
+    description: The link was revoked or has expired.
+  SHORTLIST_CV_NOT_SHAREABLE:
+    module: shortlists
+    status: 422
+    description: |
+      The CV chosen for a candidate cannot go to a client: it is not a formatted CV made by HiringPlug, it includes the salary, or it shows the candidate's email or phone. `details.candidateId` names them.
+  SHORTLIST_DO_NOT_CONTACT:
+    module: shortlists
+    status: 422
+    description: A candidate withdrew consent (see Data protection on their page), so they cannot be put on a link. `details.candidateId` names them.
+  SHORTLIST_TOO_MANY_TRIES:
+    module: shortlists
+    status: 429
+    description: Too many answers or downloads from one address in a short time; try again later.
   SIGN_IN_CHOOSE_COMPANY:
     module: identity
     status: 409
@@ -1077,6 +1102,35 @@ paths:
             Referrer-Policy:
               schema:
                 type: string
+  /v1/candidates/export:
+    post:
+      operationId: exportCandidates
+      tags: [candidates]
+      summary: Everyone an advanced search finds, as Excel or CSV (at most 10,000); salaries only for roles that may see them
+      x-permission: candidates:export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CandidateExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/salary-calculations:
     post:
       operationId: calculateSalary
@@ -1913,6 +1967,56 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/companies/export:
+    get:
+      operationId: exportCompanies
+      tags: [companies]
+      summary: Companies matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: companies:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - name: q
+          in: query
+          description: "Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written."
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: boolean
+          in: query
+          description: >-
+            A boolean search of the name, website, industries and subindustries (and the industry LinkedIn gives), city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks).
+          schema: {type: string, minLength: 1, maxLength: 1000}
+        - name: type
+          in: query
+          schema: {$ref: '#/components/schemas/CompanyType'}
+        - name: category
+          in: query
+          description: Only companies in this category (a key of the company_category list).
+          schema: {type: string, pattern: '^[a-z0-9_]{1,40}$'}
+        - name: linkedinCompany
+          in: query
+          description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
+          schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/companies:
     get:
       operationId: listCompanies
@@ -2325,6 +2429,61 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/contacts/export:
+    get:
+      operationId: exportContacts
+      tags: [contacts]
+      summary: Contacts matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: contacts:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - name: q
+          in: query
+          description: "Every word must appear in the name, email or job title (ignoring case and accents); or a phone or mobile number, however it is written."
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: boolean
+          in: query
+          description: >-
+            A boolean search of the name, job title and email: (HR OR "talent acquisition") AND manager NOT intern*, word NEAR/3 word. Words match their other forms (manager, managers).
+          schema: {type: string, minLength: 1, maxLength: 1000}
+        - name: companyId
+          in: query
+          description: Only this company's contacts.
+          schema: {$ref: '#/components/schemas/CompanyId'}
+        - name: role
+          in: query
+          description: Only contacts with this role (a key of the contact_role list, e.g. hr or hiring_manager).
+          schema: {$ref: '#/components/schemas/ContactRole'}
+        - name: roleNotSet
+          in: query
+          description: Only contacts whose role is not set yet (ignored with role).
+          schema: {type: boolean, default: false}
+        - name: status
+          in: query
+          description: Only contacts who still work there (active) or have left.
+          schema: {$ref: '#/components/schemas/ContactStatus'}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/contacts:
     get:
       operationId: listContacts
@@ -5208,7 +5367,7 @@ paths:
     get:
       operationId: getMyPreferences
       tags: [identity]
-      summary: Your own settings, such as the columns of your candidate list and your dashboard's order
+      summary: Your own settings, such as the columns of your candidate list, your dashboard's order and its getting-started checklist
       x-permission: authenticated
       responses:
         '200':
@@ -6181,6 +6340,57 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/jobs/export:
+    get:
+      operationId: exportJobs
+      tags: [jobs]
+      summary: Jobs matching the list's filters, as Excel or CSV (at most 10,000)
+      x-permission: jobs:export
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - name: ids
+          in: query
+          description: Only these jobs (e.g. the ones that need attention), as the list shows them.
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/JobOrderId'}}
+        - name: q
+          in: query
+          description: "Every word must appear in the title, location or client company's name (ignoring case and accents)."
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/JobStatus'}
+        - name: companyId
+          in: query
+          description: Only this company's jobs.
+          schema: {$ref: '#/components/schemas/CompanyId'}
+        - name: contactId
+          in: query
+          description: Only jobs with this hiring contact.
+          schema: {$ref: '#/components/schemas/ContactId'}
+        - name: mine
+          in: query
+          description: Only the jobs you own.
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/jobs:
     get:
       operationId: listJobs
@@ -7529,6 +7739,35 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/placements/export:
+    post:
+      operationId: exportPlacements
+      tags: [placements]
+      summary: Placements as Excel or CSV (the rows the dashboard shows); fees only with placements.fees:read
+      x-permission: placements:export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PlacementExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/placements:
     get:
       operationId: listPlacements
@@ -7912,6 +8151,103 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/reports/activity:
+    get:
+      operationId: getActivity
+      tags: [reports]
+      summary: Activity per user in a week or month, against their targets (your own only, unless you may see the team's)
+      x-permission: reports:read
+      parameters:
+        - {name: period, in: query, required: false, description: week (Monday to Sunday) or month; week unless given., schema: {$ref: '#/components/schemas/ActivityPeriod'}}
+        - {name: day, in: query, required: false, description: Any day in the week or month (today unless given)., schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ActivityReport'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/reports/settings:
+    get:
+      operationId: getReportSettings
+      tags: [reports]
+      summary: The activity targets and the forecast's stage weights
+      x-permission: reports.settings:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSettings'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: putReportSettings
+      tags: [reports]
+      summary: Replace the activity targets and the forecast's stage weights
+      x-permission: reports.settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReportSettings'}
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSettings'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/reports/forecast:
+    get:
+      operationId: getForecast
+      tags: [reports]
+      summary: Fees expected from the open pipeline and placements not yet invoiced, weighted by stage, per month and per recruiter
+      description: Needs placements.fees:read as well as reports.forecast:read.
+      x-permission: reports.forecast:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Forecast'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/reports/summary/export:
+    get:
+      operationId: exportReport
+      tags: [reports]
+      summary: The reports for a period as Excel (a sheet each) or CSV
+      description: >
+        With the activity in the period per user (your own only, unless you may see the team's) and, with reports.forecast:read and placements.fees:read, today's revenue forecast.
+
+      x-permission: reports:read
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/ExportFormat'}}
+        - {name: from, in: query, required: false, description: First day of the period., schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, description: Last day of the period (today unless given)., schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/reports/summary:
     get:
       operationId: getReport
@@ -8367,6 +8703,148 @@ paths:
               schema: {type: string, format: binary}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/jobs/{jobId}/client-shortlists:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: listClientShortlists
+      tags: [shortlists]
+      summary: The job's client shortlist links, newest first, with the client's answers
+      x-permission: shortlists:share
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClientShortlistList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: createClientShortlist
+      tags: [shortlists]
+      summary: Make a link to some of the job's candidates for the client (the address is in the answer only)
+      description: >
+        Each candidate must be on this job (not rejected or withdrawn), must not have withdrawn consent, and comes with one of their formatted CVs that has no salary and shows no email or phone. With `emailHiringContact` the link is also emailed to the job's hiring contact (needs emails:send).
+
+      x-permission: shortlists:share
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClientShortlistInput'}
+      responses:
+        '201':
+          description: Made
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClientShortlistCreated'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422':
+          description: A candidate withdrew consent (SHORTLIST_DO_NOT_CONTACT) or their CV cannot go to a client (SHORTLIST_CV_NOT_SHAREABLE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/client-shortlists/{shortlistId}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistIdPath'
+    post:
+      operationId: revokeClientShortlist
+      tags: [shortlists]
+      summary: Revoke a link at once (the client then sees that it no longer works)
+      x-permission: shortlists:share
+      responses:
+        '200':
+          description: Revoked (or already revoked)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClientShortlist'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/public/client-shortlists/{shortlistToken}:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistTokenPath'
+    get:
+      operationId: getPublicClientShortlist
+      tags: [shortlists]
+      summary: The client's page (no sign-in); the first visit is recorded
+      description: A revoked or expired link answers with its status and no candidates.
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicClientShortlist'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/public/client-shortlists/{shortlistToken}/candidates/{shortlistCandidateId}/answer:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistTokenPath'
+      - $ref: '#/components/parameters/ClientShortlistCandidateIdPath'
+    post:
+      operationId: answerPublicClientShortlist
+      tags: [shortlists]
+      summary: The client approves or rejects a candidate (once), with an optional comment
+      x-permission: public
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClientShortlistAnswer'}
+      responses:
+        '200':
+          description: Answered
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicClientShortlist'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: The link is closed (SHORTLIST_CLOSED) or the candidate was answered already (SHORTLIST_ALREADY_ANSWERED).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '429':
+          description: Too many tries from this address (SHORTLIST_TOO_MANY_TRIES).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/public/client-shortlists/{shortlistToken}/candidates/{shortlistCandidateId}/cv:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistTokenPath'
+      - $ref: '#/components/parameters/ClientShortlistCandidateIdPath'
+    get:
+      operationId: getPublicClientShortlistCv
+      tags: [shortlists]
+      summary: The candidate's CV as the recruiter chose it (PDF when there is one, else the Word file)
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Disposition:
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: The link is closed (SHORTLIST_CLOSED).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '429':
+          description: Too many tries from this address (SHORTLIST_TOO_MANY_TRIES).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
 components:
   securitySchemes:
     bearerAuth:
@@ -8565,6 +9043,7 @@ components:
         - candidates.compensation:update
         - candidates.status:update
         - candidates:create
+        - candidates:export
         - candidates:merge
         - candidates:read
         - candidates:update
@@ -8574,12 +9053,14 @@ components:
         - companies.category:update
         - companies.documents:delete
         - companies:create
+        - companies:export
         - companies:merge
         - companies:read
         - companies:update
         - contacts.apollo:use
         - contacts.role:update
         - contacts:create
+        - contacts:export
         - contacts:merge
         - contacts:read
         - contacts:update
@@ -8607,6 +9088,7 @@ components:
         - jobs.salary:read
         - jobs.salary:update
         - jobs:create
+        - jobs:export
         - jobs:read
         - jobs:update
         - leads:manage
@@ -8630,17 +9112,22 @@ components:
         - pipeline:update
         - placements.fees:read
         - placements.fees:update
+        - placements:export
         - placements:manage
         - placements:read
         - privacy:manage
         - privacy:read
         - privacy:record
+        - reports.forecast:read
+        - reports.settings:manage
+        - reports.team:read
         - reports:read
         - scheduling.team:read
         - scheduling:use
         - settings.backups:manage
         - settings:manage
         - settings:read
+        - shortlists:share
     ErrorCode:
       type: string
       enum:
@@ -8675,6 +9162,7 @@ components:
         - DOCUMENT_NOT_DELETABLE
         - EMAIL_DO_NOT_CONTACT
         - EMAIL_UNDELIVERABLE
+        - EXPORT_TOO_LARGE
         - FOLDER_OWNER_ONLY
         - FORBIDDEN
         - INTERNAL
@@ -8706,6 +9194,11 @@ components:
         - ROUTE_NOT_FOUND
         - SCHEDULING_NOT_SET_UP
         - SERVICE_UNAVAILABLE
+        - SHORTLIST_ALREADY_ANSWERED
+        - SHORTLIST_CLOSED
+        - SHORTLIST_CV_NOT_SHAREABLE
+        - SHORTLIST_DO_NOT_CONTACT
+        - SHORTLIST_TOO_MANY_TRIES
         - SIGN_IN_CHOOSE_COMPANY
         - SIGN_IN_FAILED
         - STAGE_MOVE_NOT_ALLOWED
@@ -8807,6 +9300,10 @@ components:
       type: string
       pattern: '^usr_[0-9a-hjkmnp-tv-z]{26}$'
       example: usr_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ExportFormat:
+      type: string
+      enum: [xlsx, csv]
+      description: An Excel workbook, or CSV (UTF-8) for any spreadsheet.
     CountryCode:
       type: string
       description: ISO 3166-1 alpha-2 country code, e.g. MY, SG.
@@ -10041,6 +10538,15 @@ components:
           nullable: true
         tags: {type: array, items: {type: string}}
         updatedAt: {type: string, format: date-time}
+    CandidateExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        search:
+          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone.
+          allOf: [{$ref: '#/components/schemas/CandidateSearch'}]
     CandidateSearch:
       type: object
       additionalProperties: false
@@ -11819,7 +12325,7 @@ components:
           description: "The recruiter's own direction for the summary, in their words: what to bring out and the tone (e.g. confident and concise, lead with the S/4HANA migration). Never about pay: the summary never mentions it."
     StudioCvSummary:
       type: string
-      description: "The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). Never for a blind CV: it keeps the CV's own summary."
+      description: "The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). A blind CV gets it too: the blind step then anonymises it bullet by bullet."
       enum: [none, short, normal, detailed]
     StudioCvSummaryFocus:
       type: string
@@ -13495,6 +14001,9 @@ components:
           description: "The candidate list's columns, in order, after the name (null: the default ones)."
           items: {$ref: '#/components/schemas/CandidateColumn'}
         favourites: {$ref: '#/components/schemas/Favourites'}
+        guideDismissed:
+          type: boolean
+          description: "You hid the dashboard's getting-started checklist (false: it shows while a step you can do is left)."
     Favourites:
       type: object
       additionalProperties: false
@@ -13525,7 +14034,7 @@ components:
     DashboardBlock:
       type: string
       description: A block of the dashboard that can be moved.
-      enum: [numbers, needsYou, import, tasks, offersToApprove, interviews, openJobs]
+      enum: [numbers, needsYou, import, tasks, offersToApprove, interviews, activity, openJobs]
     CandidateColumn:
       type: string
       description: A column the candidate list can show.
@@ -16024,6 +16533,19 @@ components:
       type: string
       pattern: '^plc_[0-9a-hjkmnp-tv-z]{26}$'
       example: plc_01jbz6w0m0k8q9x2r3s4t5v6w7
+    PlacementExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        ids:
+          type: array
+          maxItems: 10000
+          description: The placements to export (what the dashboard shows after its search, filters and card); none for every placement in the dates.
+          items: {$ref: '#/components/schemas/PlacementId'}
+        startFrom: {type: string, format: date, description: Started on or after this day.}
+        startTo: {type: string, format: date, description: Started on or before this day.}
     PlacementStatus:
       type: string
       description: >
@@ -16453,6 +16975,164 @@ components:
         jobTitle: {type: string}
         daysToFill: {type: integer, description: From the job being opened to its first placement in the period.}
         placements: {type: integer}
+    ActivityPeriod:
+      type: string
+      enum: [week, month]
+    ActivityCounts:
+      type: object
+      required: [calls, cvsSent, interviews, placements]
+      properties:
+        calls: {type: integer, description: "Calls logged: screening calls, reference checks and notes of a call."}
+        cvsSent: {type: integer, description: "CVs sent to clients: applications moved to submitted, and CVs attached to an email to anyone but the candidate (the same candidate on the same day counts once)."}
+        interviews: {type: integer, description: Interviews arranged (scheduled by the user).}
+        placements: {type: integer, description: Placements recorded and credited to the user (not cancelled).}
+    ActivityGoal:
+      type: object
+      additionalProperties: false
+      description: A target for each activity; null when none is set for it.
+      required: [calls, cvsSent, interviews, placements]
+      properties:
+        calls: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+        cvsSent: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+        interviews: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+        placements: {type: integer, nullable: true, minimum: 0, maximum: 100000}
+    ActivityRow:
+      type: object
+      required: [userId, userName, done, target]
+      properties:
+        userId: {$ref: '#/components/schemas/UserId'}
+        userName: {type: string}
+        done: {$ref: '#/components/schemas/ActivityCounts'}
+        target:
+          description: The user's own target for the period, else the one for everyone; null when neither is set.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/ActivityGoal'}]
+    ActivityReport:
+      type: object
+      required: [period, from, to, team, rows]
+      properties:
+        period: {$ref: '#/components/schemas/ActivityPeriod'}
+        from: {type: string, format: date}
+        to: {type: string, format: date, description: The last day of the week or month.}
+        team: {type: boolean, description: "Every active user who recruits (whose role may move candidates) is listed, and anyone else who did something (reports.team:read); else only you."}
+        rows:
+          type: array
+          description: By name.
+          items: {$ref: '#/components/schemas/ActivityRow'}
+    ActivityTarget:
+      type: object
+      additionalProperties: false
+      required: [userId, period, goal]
+      properties:
+        userId:
+          description: The user it is for; null for everyone without their own.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        period: {$ref: '#/components/schemas/ActivityPeriod'}
+        goal: {$ref: '#/components/schemas/ActivityGoal'}
+    ForecastStage:
+      type: string
+      enum: [submitted, interview, offer, placed]
+    StageWeight:
+      type: object
+      additionalProperties: false
+      required: [stage, percent, monthsAhead]
+      properties:
+        stage: {$ref: '#/components/schemas/ForecastStage'}
+        percent: {type: integer, minimum: 0, maximum: 100, description: How likely an application at this stage is to be placed (and the fee paid).}
+        monthsAhead: {type: integer, minimum: 0, maximum: 12, description: "The month its fee is expected in: this month (0), next month (1), ... Placements go by their start date."}
+    ReportSettings:
+      type: object
+      additionalProperties: false
+      required: [targets, stageWeights]
+      properties:
+        targets:
+          type: array
+          maxItems: 500
+          description: At most one per user (or everyone) and period.
+          items: {$ref: '#/components/schemas/ActivityTarget'}
+        stageWeights:
+          type: array
+          description: One for each forecast stage (stages left out keep their weight).
+          maxItems: 4
+          items: {$ref: '#/components/schemas/StageWeight'}
+    ForecastTotal:
+      type: object
+      required: [currency, expected, full]
+      properties:
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        expected: {$ref: '#/components/schemas/DecimalAmount'}
+        full: {allOf: [{$ref: '#/components/schemas/DecimalAmount'}], description: The fees before weighting.}
+    ForecastMonth:
+      type: object
+      required: [month, totals]
+      properties:
+        month: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$', example: '2026-11'}
+        totals: {type: array, items: {$ref: '#/components/schemas/ForecastTotal'}}
+    ForecastRecruiter:
+      type: object
+      required: [recruiterId, recruiterName, totals]
+      properties:
+        recruiterId:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        recruiterName: {type: string, nullable: true, description: null when no recruiter is credited and the job has no owner.}
+        totals: {type: array, items: {$ref: '#/components/schemas/ForecastTotal'}}
+    ForecastLine:
+      type: object
+      required: [applicationId, candidateName, jobTitle, companyName, stage, recruiterId, recruiterName, month, currency, fee, percent, expected, feeFrom]
+      properties:
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        candidateName: {type: string}
+        jobTitle: {type: string}
+        companyName: {type: string}
+        stage: {$ref: '#/components/schemas/ForecastStage'}
+        recruiterId:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        recruiterName: {type: string, nullable: true}
+        month: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$'}
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        fee: {$ref: '#/components/schemas/DecimalAmount'}
+        percent: {type: integer}
+        expected: {$ref: '#/components/schemas/DecimalAmount'}
+        feeFrom:
+          type: string
+          enum: [placement, terms]
+          description: "placement: the fee recorded on the placement; terms: the client's rate applied to the job's salary budget."
+    ForecastGap:
+      type: object
+      required: [applicationId, candidateName, jobTitle, stage, reason]
+      properties:
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        candidateName: {type: string}
+        jobTitle: {type: string}
+        stage: {$ref: '#/components/schemas/ForecastStage'}
+        reason:
+          type: string
+          enum: [no_salary_budget, no_terms, no_rate]
+          description: "no_salary_budget: the job has none (or one per hour or day); no_terms: the client has no terms of business; no_rate: none of the client's rates fits the salary."
+    Forecast:
+      type: object
+      required: [months, recruiters, lines, gaps, stageWeights]
+      properties:
+        months:
+          type: array
+          description: From this month on, in order.
+          items: {$ref: '#/components/schemas/ForecastMonth'}
+        recruiters:
+          type: array
+          description: Most expected first.
+          items: {$ref: '#/components/schemas/ForecastRecruiter'}
+        lines:
+          type: array
+          description: Each application counted, most expected first (at most 2000).
+          items: {$ref: '#/components/schemas/ForecastLine'}
+        gaps:
+          type: array
+          description: Applications whose fee could not be worked out, so not counted (at most 500).
+          items: {$ref: '#/components/schemas/ForecastGap'}
+        stageWeights: {type: array, items: {$ref: '#/components/schemas/StageWeight'}}
     BookingLinkId:
       type: string
       pattern: '^bkl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -16788,6 +17468,125 @@ components:
         bonus: {type: boolean}
         bonusOnAllowances: {type: boolean}
         cents: {type: boolean}
+    ClientShortlistId:
+      type: string
+      pattern: '^csl_[0-9a-hjkmnp-tv-z]{26}$'
+    ClientShortlistCandidateId:
+      type: string
+      pattern: '^cslc_[0-9a-hjkmnp-tv-z]{26}$'
+    ClientShortlistStatus:
+      type: string
+      description: open (the client can answer), expired or revoked.
+      enum: [open, expired, revoked]
+    ClientShortlistDecision:
+      type: string
+      enum: [approved, rejected]
+    ClientShortlistInput:
+      type: object
+      additionalProperties: false
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: '#/components/schemas/ClientShortlistPick'}
+        expiresInDays: {type: integer, minimum: 1, maximum: 90, default: 14, description: How long the link works.}
+        message: {type: string, maxLength: 2000, description: Shown to the client at the top of the page (and in the email).}
+        emailHiringContact: {type: boolean, description: 'Also email the link to the job''s hiring contact (needs emails:send).'}
+    ClientShortlistPick:
+      type: object
+      additionalProperties: false
+      required: [applicationId, documentId]
+      properties:
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        documentId:
+          allOf: [{$ref: '#/components/schemas/DocumentId'}]
+          description: One of the candidate's formatted CVs (blind or with the name).
+        note: {type: string, maxLength: 1000, description: "Your words about the candidate, shown to the client."}
+    ClientShortlistCreated:
+      type: object
+      required: [shortlist, url]
+      properties:
+        shortlist: {$ref: '#/components/schemas/ClientShortlist'}
+        url: {type: string, description: "The address to give the client. Shown only now: only a hash of it is kept."}
+    ClientShortlist:
+      type: object
+      required: [id, jobId, status, message, expiresAt, revokedAt, openedAt, lastOpenedAt, emailedTo, createdByName, createdAt, candidates]
+      properties:
+        id: {$ref: '#/components/schemas/ClientShortlistId'}
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        status: {$ref: '#/components/schemas/ClientShortlistStatus'}
+        message: {type: string, nullable: true}
+        expiresAt: {type: string, format: date-time}
+        revokedAt: {type: string, format: date-time, nullable: true}
+        openedAt: {type: string, format: date-time, nullable: true, description: "The client's first visit; null while not opened."}
+        lastOpenedAt: {type: string, format: date-time, nullable: true}
+        emailedTo: {type: string, nullable: true, description: The hiring contact it was emailed to.}
+        createdByName: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+        candidates:
+          type: array
+          items: {$ref: '#/components/schemas/ClientShortlistCandidate'}
+    ClientShortlistCandidate:
+      type: object
+      required: [id, applicationId, candidateId, candidateName, label, blind, documentId, note, decision, comment, answeredAt]
+      properties:
+        id: {$ref: '#/components/schemas/ClientShortlistCandidateId'}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        label: {type: string, description: 'The name the client sees: a reference ("Candidate C-4F2K9Q") with a blind CV.'}
+        blind: {type: boolean}
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        note: {type: string, nullable: true}
+        decision:
+          allOf: [{$ref: '#/components/schemas/ClientShortlistDecision'}]
+          nullable: true
+        comment: {type: string, nullable: true}
+        answeredAt: {type: string, format: date-time, nullable: true}
+    ClientShortlistList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ClientShortlist'}
+    ClientShortlistAnswer:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {$ref: '#/components/schemas/ClientShortlistDecision'}
+        comment: {type: string, maxLength: 2000}
+    PublicClientShortlist:
+      type: object
+      description: What the client sees; nothing else about the candidates.
+      required: [agencyName, jobTitle, recruiterName, message, status, expiresAt, candidates]
+      properties:
+        agencyName: {type: string}
+        jobTitle: {type: string}
+        recruiterName: {type: string, nullable: true}
+        message: {type: string, nullable: true}
+        status: {$ref: '#/components/schemas/ClientShortlistStatus'}
+        expiresAt: {type: string, format: date-time}
+        candidates:
+          type: array
+          items: {$ref: '#/components/schemas/PublicShortlistCandidate'}
+    PublicShortlistCandidate:
+      type: object
+      required: [id, label, blind, note, cvFileName, decision, comment, answeredAt]
+      properties:
+        id: {$ref: '#/components/schemas/ClientShortlistCandidateId'}
+        label: {type: string}
+        blind: {type: boolean}
+        note: {type: string, nullable: true}
+        cvFileName: {type: string, nullable: true, description: "The name the CV downloads as (the label, never the stored file name)."}
+        decision:
+          allOf: [{$ref: '#/components/schemas/ClientShortlistDecision'}]
+          nullable: true
+        comment: {type: string, nullable: true}
+        answeredAt: {type: string, format: date-time, nullable: true}
   parameters:
     AiProviderPath:
       name: aiProvider
@@ -16946,6 +17745,21 @@ components:
       in: path
       required: true
       schema: {type: string, pattern: '^hiringplug-[0-9]{8}-[0-9]{6}$'}
+    ClientShortlistIdPath:
+      name: shortlistId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ClientShortlistId'}
+    ClientShortlistCandidateIdPath:
+      name: shortlistCandidateId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ClientShortlistCandidateId'}
+    ClientShortlistTokenPath:
+      name: shortlistToken
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[A-Za-z0-9_-]{43}$'}
 x-permissions:
   aiproviders:manage:
     module: aiproviders
@@ -17012,6 +17826,11 @@ x-permissions:
     description: Add candidates.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  candidates:export:
+    module: candidates
+    description: Export candidates (what a search finds) to Excel or CSV; salaries only with candidates.compensation:read.
+    sensitive: false
+    roles: [owner, admin]
   candidates:merge:
     module: candidates
     description: Merge a duplicate candidate into another (needs to see salaries, so nothing is lost unseen).
@@ -17057,6 +17876,11 @@ x-permissions:
     description: Add companies.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  companies:export:
+    module: companies
+    description: Export the company list (what a search finds) to Excel or CSV.
+    sensitive: false
+    roles: [owner, admin]
   companies:merge:
     module: companies
     description: Merge a duplicate company into another (its contacts, jobs, notes and documents move over).
@@ -17087,6 +17911,11 @@ x-permissions:
     description: Add contacts.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  contacts:export:
+    module: contacts
+    description: Export the contact list (what a search finds) to Excel or CSV.
+    sensitive: false
+    roles: [owner, admin]
   contacts:merge:
     module: contacts
     description: Merge a duplicate contact into another (their emails, jobs, notes and checks move over).
@@ -17222,6 +18051,11 @@ x-permissions:
     description: Add jobs.
     sensitive: false
     roles: [owner, admin, recruiter]
+  jobs:export:
+    module: jobs
+    description: Export the job list (what a search finds) to Excel or CSV.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   jobs:read:
     module: jobs
     description: View jobs (the salary budget needs jobs.salary:read).
@@ -17337,6 +18171,11 @@ x-permissions:
     description: Set or change a placement's agreed salary and fee.
     sensitive: false
     roles: [owner, admin, recruiter]
+  placements:export:
+    module: placements
+    description: Export placements to Excel or CSV (fees in it need placements.fees:read).
+    sensitive: false
+    roles: [owner, admin]
   placements:manage:
     module: placements
     description: Record placements and change them (start date, guarantee, status, invoice).
@@ -17362,9 +18201,24 @@ x-permissions:
     description: Record a candidate's consent (given or withdrawn) and log a request they made.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  reports.forecast:read:
+    module: reports
+    description: See the revenue forecast (fees expected from the pipeline); it also needs placements.fees:read.
+    sensitive: true
+    roles: [owner, admin]
+  reports.settings:manage:
+    module: reports
+    description: Set activity targets (per user, or one for everyone) and the forecast's weight for each stage.
+    sensitive: false
+    roles: [owner, admin]
+  reports.team:read:
+    module: reports
+    description: See every user's activity against their targets, not only your own.
+    sensitive: false
+    roles: [owner, admin]
   reports:read:
     module: reports
-    description: See the reports (fees in them need placements.fees:read).
+    description: See the reports and your own activity against your targets (fees in them need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter]
   scheduling.team:read:
@@ -17393,6 +18247,11 @@ x-permissions:
     description: See the company's dropdown options and mandatory fields (every form needs them).
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  shortlists:share:
+    module: shortlists
+    description: Send clients a link to a job's shortlist, see their answers, and revoke links.
+    sensitive: false
+    roles: [owner, admin, recruiter]
 x-jobs:
   aiprovider.check:
     module: aiproviders
@@ -17798,8 +18657,10 @@ x-modules:
   - name: privacy
     description: 'Data protection (Malaysia''s PDPA). Each candidate''s consent (given on the careers form, or recorded by a recruiter; withdrawn means do not contact, and emails to them are refused), the requests candidates make about their data with how long each has been open, and a copy of everything held about a candidate for access requests. Nothing is ever deleted or anonymised by the app: people decide each request and record what they did.'
   - name: reports
-    description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill. Reports keep no data of their own: they read other modules'' records.'
+    description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill; each recruiter''s activity (calls, CVs sent, interviews arranged, placements) against the targets set for them; and the fees expected from the open pipeline, weighted by stage. Reports read other modules'' records; they keep only the targets and the forecast''s stage weights.'
   - name: scheduling
     description: Booking links. Each user sets when they take calls (weekly hours in their time zone) and may give the private calendar address Google Calendar or Outlook offers, so their own meetings count as busy. A booking link, inserted into an email to a candidate, opens a public page with the free times; the candidate picks one, and both get a calendar invitation (an .ics invite that Gmail and Outlook add to the calendar), which blocks the time. Interviews the user is on and their other bookings count as busy too. The candidate can move the time with the same link; the user can cancel it.
   - name: settings
     description: 'Main settings. Dropdown lists a company can change: open lists (candidate source, notice period, industry) take new options; fixed lists (work type, work arrangement) can be renamed, reordered and hidden only, because other systems (job boards, Google for Jobs) need their values. Fields a company makes mandatory must be filled in when a person adds a record, and cannot be emptied later.'
+  - name: shortlists
+    description: 'Client shortlist links. From a job''s pipeline a recruiter picks candidates, each with one of their formatted CVs (a blind one, or one with the name), and gets a link to send the client (copied, or emailed to the job''s hiring contact). The client needs no account: the link opens a page with only those candidates and CVs (never the candidate''s salary, email or phone), and they approve or reject each one with an optional comment. Approving moves the application to interview (the job''s first interview stage); rejecting moves it to rejected (client rejected, the comment as the note). Links expire (14 days unless the recruiter chooses) and can be revoked. Creating, the first opening, every answer and revoking are on the job''s and the candidate''s activity.'

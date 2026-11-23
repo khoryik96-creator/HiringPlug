@@ -73,6 +73,24 @@ func (q *Queries) FinishStudioCv(ctx context.Context, arg FinishStudioCvParams) 
 	return i, err
 }
 
+const getFormattedCv = `-- name: GetFormattedCv :one
+SELECT tenant_id, document_id, candidate_id, blind, include_salary, created_at FROM formatted_cv WHERE document_id = $1
+`
+
+func (q *Queries) GetFormattedCv(ctx context.Context, documentID string) (FormattedCv, error) {
+	row := q.db.QueryRow(ctx, getFormattedCv, documentID)
+	var i FormattedCv
+	err := row.Scan(
+		&i.TenantID,
+		&i.DocumentID,
+		&i.CandidateID,
+		&i.Blind,
+		&i.IncludeSalary,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getStudioCv = `-- name: GetStudioCv :one
 SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at, replace_document_ids FROM studio_cv WHERE id = $1
 `
@@ -285,6 +303,20 @@ func (q *Queries) LockStudioCandidate(ctx context.Context, candidateID string) e
 	return err
 }
 
+const moveFormattedCvs = `-- name: MoveFormattedCvs :exec
+UPDATE formatted_cv SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveFormattedCvsParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveFormattedCvs(ctx context.Context, arg MoveFormattedCvsParams) error {
+	_, err := q.db.Exec(ctx, moveFormattedCvs, arg.ToID, arg.FromID)
+	return err
+}
+
 const moveStudioCvs = `-- name: MoveStudioCvs :exec
 UPDATE studio_cv SET candidate_id = $1 WHERE candidate_id = $2
 `
@@ -320,6 +352,30 @@ func (q *Queries) NewTemplateID(ctx context.Context) (string, error) {
 	var column_1 string
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const recordFormattedCv = `-- name: RecordFormattedCv :exec
+INSERT INTO formatted_cv (tenant_id, document_id, candidate_id, blind, include_salary)
+VALUES (app_current_tenant(), $1, $2, $3, $4)
+ON CONFLICT (tenant_id, document_id) DO NOTHING
+`
+
+type RecordFormattedCvParams struct {
+	DocumentID    string
+	CandidateID   string
+	Blind         bool
+	IncludeSalary bool
+}
+
+// How a formatted CV was made (blind, with salary): only those without salary go to clients.
+func (q *Queries) RecordFormattedCv(ctx context.Context, arg RecordFormattedCvParams) error {
+	_, err := q.db.Exec(ctx, recordFormattedCv,
+		arg.DocumentID,
+		arg.CandidateID,
+		arg.Blind,
+		arg.IncludeSalary,
+	)
+	return err
 }
 
 const recordStudioCvAIUse = `-- name: RecordStudioCvAIUse :exec

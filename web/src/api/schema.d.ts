@@ -517,6 +517,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Everyone an advanced search finds, as Excel or CSV (at most 10,000); salaries only for roles that may see them */
+        post: operations["exportCandidates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/salary-calculations": {
         parameters: {
             query?: never;
@@ -1116,6 +1133,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/companies/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Companies matching the list's filters, as Excel or CSV (at most 10,000) */
+        get: operations["exportCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/companies": {
         parameters: {
             query?: never;
@@ -1384,6 +1418,23 @@ export interface paths {
         };
         /** Download a document kept with the client's terms or benefits */
         get: operations["getCompanyDocumentFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Contacts matching the list's filters, as Excel or CSV (at most 10,000) */
+        get: operations["exportContacts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3135,7 +3186,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your own settings, such as the columns of your candidate list and your dashboard's order */
+        /** Your own settings, such as the columns of your candidate list, your dashboard's order and its getting-started checklist */
         get: operations["getMyPreferences"];
         /** Change your own settings (no one else's) */
         put: operations["putMyPreferences"];
@@ -3779,6 +3830,23 @@ export interface paths {
         };
         /** The interview as a calendar file (Outlook, Google Calendar, Apple Calendar) */
         get: operations["getInterviewCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jobs matching the list's filters, as Excel or CSV (at most 10,000) */
+        get: operations["exportJobs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4694,6 +4762,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/placements/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Placements as Excel or CSV (the rows the dashboard shows); fees only with placements.fees:read */
+        post: operations["exportPlacements"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/placements": {
         parameters: {
             query?: never;
@@ -5019,6 +5104,81 @@ export interface paths {
         };
         /** A copy of everything held about a candidate (for an access request), as you may see it */
         get: operations["exportCandidateData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activity per user in a week or month, against their targets (your own only, unless you may see the team's) */
+        get: operations["getActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The activity targets and the forecast's stage weights */
+        get: operations["getReportSettings"];
+        /** Replace the activity targets and the forecast's stage weights */
+        put: operations["putReportSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fees expected from the open pipeline and placements not yet invoiced, weighted by stage, per month and per recruiter
+         * @description Needs placements.fees:read as well as reports.forecast:read.
+         */
+        get: operations["getForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The reports for a period as Excel (a sheet each) or CSV
+         * @description With the activity in the period per user (your own only, unless you may see the team's) and, with reports.forecast:read and placements.fees:read, today's revenue forecast.
+         */
+        get: operations["exportReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5381,6 +5541,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/client-shortlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The job's client shortlist links, newest first, with the client's answers */
+        get: operations["listClientShortlists"];
+        put?: never;
+        /**
+         * Make a link to some of the job's candidates for the client (the address is in the answer only)
+         * @description Each candidate must be on this job (not rejected or withdrawn), must not have withdrawn consent, and comes with one of their formatted CVs that has no salary and shows no email or phone. With `emailHiringContact` the link is also emailed to the job's hiring contact (needs emails:send).
+         */
+        post: operations["createClientShortlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/client-shortlists/{shortlistId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistId: components["parameters"]["ClientShortlistIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke a link at once (the client then sees that it no longer works) */
+        post: operations["revokeClientShortlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/client-shortlists/{shortlistToken}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistToken: components["parameters"]["ClientShortlistTokenPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The client's page (no sign-in); the first visit is recorded
+         * @description A revoked or expired link answers with its status and no candidates.
+         */
+        get: operations["getPublicClientShortlist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/client-shortlists/{shortlistToken}/candidates/{shortlistCandidateId}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistToken: components["parameters"]["ClientShortlistTokenPath"];
+                shortlistCandidateId: components["parameters"]["ClientShortlistCandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The client approves or rejects a candidate (once), with an optional comment */
+        post: operations["answerPublicClientShortlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/client-shortlists/{shortlistToken}/candidates/{shortlistCandidateId}/cv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistToken: components["parameters"]["ClientShortlistTokenPath"];
+                shortlistCandidateId: components["parameters"]["ClientShortlistCandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The candidate's CV as the recruiter chose it (PDF when there is one, else the Word file) */
+        get: operations["getPublicClientShortlistCv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5388,9 +5652,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
@@ -5410,6 +5674,11 @@ export interface components {
         TenantId: string;
         /** @example usr_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         UserId: string;
+        /**
+         * @description An Excel workbook, or CSV (UTF-8) for any spreadsheet.
+         * @enum {string}
+         */
+        ExportFormat: "xlsx" | "csv";
         /**
          * @description ISO 3166-1 alpha-2 country code, e.g. MY, SG.
          * @example MY
@@ -6208,6 +6477,11 @@ export interface components {
             tags: string[];
             /** Format: date-time */
             updatedAt: string;
+        };
+        CandidateExport: {
+            format: components["schemas"]["ExportFormat"];
+            /** @description The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone. */
+            search?: components["schemas"]["CandidateSearch"];
         };
         CandidateSearch: {
             /** @description Name, email, phone, title or company, as the quick search. */
@@ -7590,7 +7864,7 @@ export interface components {
             summaryDirection?: string | null;
         };
         /**
-         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). Never for a blind CV: it keeps the CV's own summary.
+         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). A blind CV gets it too: the blind step then anonymises it bullet by bullet.
          * @enum {string}
          */
         StudioCvSummary: "none" | "short" | "normal" | "detailed";
@@ -8539,6 +8813,8 @@ export interface components {
             /** @description The candidate list's columns, in order, after the name (null: the default ones). */
             candidateColumns?: components["schemas"]["CandidateColumn"][] | null;
             favourites?: components["schemas"]["Favourites"];
+            /** @description You hid the dashboard's getting-started checklist (false: it shows while a step you can do is left). */
+            guideDismissed?: boolean;
         };
         /** @description Your favourites in the dropdowns, shown first for you only. Saving sends the kinds it changes; a kind left out keeps its favourites. Nothing is removed from the lists themselves, and every item can still be chosen. */
         Favourites: {
@@ -8556,7 +8832,7 @@ export interface components {
          * @description A block of the dashboard that can be moved.
          * @enum {string}
          */
-        DashboardBlock: "numbers" | "needsYou" | "import" | "tasks" | "offersToApprove" | "interviews" | "openJobs";
+        DashboardBlock: "numbers" | "needsYou" | "import" | "tasks" | "offersToApprove" | "interviews" | "activity" | "openJobs";
         /**
          * @description A column the candidate list can show.
          * @enum {string}
@@ -10521,6 +10797,21 @@ export interface components {
         };
         /** @example plc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         PlacementId: string;
+        PlacementExport: {
+            format: components["schemas"]["ExportFormat"];
+            /** @description The placements to export (what the dashboard shows after its search, filters and card); none for every placement in the dates. */
+            ids?: components["schemas"]["PlacementId"][];
+            /**
+             * Format: date
+             * @description Started on or after this day.
+             */
+            startFrom?: string;
+            /**
+             * Format: date
+             * @description Started on or before this day.
+             */
+            startTo?: string;
+        };
         /**
          * @description active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start; backed_out = the candidate or the client pulled out after it was recorded (the sheet stays, its fee no longer counts). Moving a placed application back to offer or to withdrawn backs its placement out; recording the placement again makes it active.
          * @enum {string}
@@ -10874,6 +11165,125 @@ export interface components {
             daysToFill: number;
             placements: number;
         };
+        /** @enum {string} */
+        ActivityPeriod: "week" | "month";
+        ActivityCounts: {
+            /** @description Calls logged: screening calls, reference checks and notes of a call. */
+            calls: number;
+            /** @description CVs sent to clients: applications moved to submitted, and CVs attached to an email to anyone but the candidate (the same candidate on the same day counts once). */
+            cvsSent: number;
+            /** @description Interviews arranged (scheduled by the user). */
+            interviews: number;
+            /** @description Placements recorded and credited to the user (not cancelled). */
+            placements: number;
+        };
+        /** @description A target for each activity; null when none is set for it. */
+        ActivityGoal: {
+            calls: number | null;
+            cvsSent: number | null;
+            interviews: number | null;
+            placements: number | null;
+        };
+        ActivityRow: {
+            userId: components["schemas"]["UserId"];
+            userName: string;
+            done: components["schemas"]["ActivityCounts"];
+            /** @description The user's own target for the period, else the one for everyone; null when neither is set. */
+            target: components["schemas"]["ActivityGoal"] | null;
+        };
+        ActivityReport: {
+            period: components["schemas"]["ActivityPeriod"];
+            /** Format: date */
+            from: string;
+            /**
+             * Format: date
+             * @description The last day of the week or month.
+             */
+            to: string;
+            /** @description Every active user who recruits (whose role may move candidates) is listed, and anyone else who did something (reports.team:read); else only you. */
+            team: boolean;
+            /** @description By name. */
+            rows: components["schemas"]["ActivityRow"][];
+        };
+        ActivityTarget: {
+            /** @description The user it is for; null for everyone without their own. */
+            userId: components["schemas"]["UserId"] | null;
+            period: components["schemas"]["ActivityPeriod"];
+            goal: components["schemas"]["ActivityGoal"];
+        };
+        /** @enum {string} */
+        ForecastStage: "submitted" | "interview" | "offer" | "placed";
+        StageWeight: {
+            stage: components["schemas"]["ForecastStage"];
+            /** @description How likely an application at this stage is to be placed (and the fee paid). */
+            percent: number;
+            /** @description The month its fee is expected in: this month (0), next month (1), ... Placements go by their start date. */
+            monthsAhead: number;
+        };
+        ReportSettings: {
+            /** @description At most one per user (or everyone) and period. */
+            targets: components["schemas"]["ActivityTarget"][];
+            /** @description One for each forecast stage (stages left out keep their weight). */
+            stageWeights: components["schemas"]["StageWeight"][];
+        };
+        ForecastTotal: {
+            currency: components["schemas"]["CurrencyCode"];
+            expected: components["schemas"]["DecimalAmount"];
+            /** @description The fees before weighting. */
+            full: components["schemas"]["DecimalAmount"];
+        };
+        ForecastMonth: {
+            /** @example 2026-11 */
+            month: string;
+            totals: components["schemas"]["ForecastTotal"][];
+        };
+        ForecastRecruiter: {
+            recruiterId: components["schemas"]["UserId"] | null;
+            /** @description null when no recruiter is credited and the job has no owner. */
+            recruiterName: string | null;
+            totals: components["schemas"]["ForecastTotal"][];
+        };
+        ForecastLine: {
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateName: string;
+            jobTitle: string;
+            companyName: string;
+            stage: components["schemas"]["ForecastStage"];
+            recruiterId: components["schemas"]["UserId"] | null;
+            recruiterName: string | null;
+            month: string;
+            currency: components["schemas"]["CurrencyCode"];
+            fee: components["schemas"]["DecimalAmount"];
+            percent: number;
+            expected: components["schemas"]["DecimalAmount"];
+            /**
+             * @description placement: the fee recorded on the placement; terms: the client's rate applied to the job's salary budget.
+             * @enum {string}
+             */
+            feeFrom: "placement" | "terms";
+        };
+        ForecastGap: {
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateName: string;
+            jobTitle: string;
+            stage: components["schemas"]["ForecastStage"];
+            /**
+             * @description no_salary_budget: the job has none (or one per hour or day); no_terms: the client has no terms of business; no_rate: none of the client's rates fits the salary.
+             * @enum {string}
+             */
+            reason: "no_salary_budget" | "no_terms" | "no_rate";
+        };
+        Forecast: {
+            /** @description From this month on, in order. */
+            months: components["schemas"]["ForecastMonth"][];
+            /** @description Most expected first. */
+            recruiters: components["schemas"]["ForecastRecruiter"][];
+            /** @description Each application counted, most expected first (at most 2000). */
+            lines: components["schemas"]["ForecastLine"][];
+            /** @description Applications whose fee could not be worked out, so not counted (at most 500). */
+            gaps: components["schemas"]["ForecastGap"][];
+            stageWeights: components["schemas"]["StageWeight"][];
+        };
         /** @example bkl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         BookingLinkId: string;
         WeeklyHours: {
@@ -11195,6 +11605,107 @@ export interface components {
             bonus: boolean;
             bonusOnAllowances: boolean;
             cents: boolean;
+        };
+        ClientShortlistId: string;
+        ClientShortlistCandidateId: string;
+        /**
+         * @description open (the client can answer), expired or revoked.
+         * @enum {string}
+         */
+        ClientShortlistStatus: "open" | "expired" | "revoked";
+        /** @enum {string} */
+        ClientShortlistDecision: "approved" | "rejected";
+        ClientShortlistInput: {
+            candidates: components["schemas"]["ClientShortlistPick"][];
+            /**
+             * @description How long the link works.
+             * @default 14
+             */
+            expiresInDays: number;
+            /** @description Shown to the client at the top of the page (and in the email). */
+            message?: string;
+            /** @description Also email the link to the job's hiring contact (needs emails:send). */
+            emailHiringContact?: boolean;
+        };
+        ClientShortlistPick: {
+            applicationId: components["schemas"]["ApplicationId"];
+            /** @description One of the candidate's formatted CVs (blind or with the name). */
+            documentId: components["schemas"]["DocumentId"];
+            /** @description Your words about the candidate, shown to the client. */
+            note?: string;
+        };
+        ClientShortlistCreated: {
+            shortlist: components["schemas"]["ClientShortlist"];
+            /** @description The address to give the client. Shown only now: only a hash of it is kept. */
+            url: string;
+        };
+        ClientShortlist: {
+            id: components["schemas"]["ClientShortlistId"];
+            jobId: components["schemas"]["JobOrderId"];
+            status: components["schemas"]["ClientShortlistStatus"];
+            message: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            revokedAt: string | null;
+            /**
+             * Format: date-time
+             * @description The client's first visit; null while not opened.
+             */
+            openedAt: string | null;
+            /** Format: date-time */
+            lastOpenedAt: string | null;
+            /** @description The hiring contact it was emailed to. */
+            emailedTo: string | null;
+            createdByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            candidates: components["schemas"]["ClientShortlistCandidate"][];
+        };
+        ClientShortlistCandidate: {
+            id: components["schemas"]["ClientShortlistCandidateId"];
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            /** @description The name the client sees: a reference ("Candidate C-4F2K9Q") with a blind CV. */
+            label: string;
+            blind: boolean;
+            documentId: components["schemas"]["DocumentId"];
+            note: string | null;
+            decision: components["schemas"]["ClientShortlistDecision"] | null;
+            comment: string | null;
+            /** Format: date-time */
+            answeredAt: string | null;
+        };
+        ClientShortlistList: {
+            items: components["schemas"]["ClientShortlist"][];
+        };
+        ClientShortlistAnswer: {
+            decision: components["schemas"]["ClientShortlistDecision"];
+            comment?: string;
+        };
+        /** @description What the client sees; nothing else about the candidates. */
+        PublicClientShortlist: {
+            agencyName: string;
+            jobTitle: string;
+            recruiterName: string | null;
+            message: string | null;
+            status: components["schemas"]["ClientShortlistStatus"];
+            /** Format: date-time */
+            expiresAt: string;
+            candidates: components["schemas"]["PublicShortlistCandidate"][];
+        };
+        PublicShortlistCandidate: {
+            id: components["schemas"]["ClientShortlistCandidateId"];
+            label: string;
+            blind: boolean;
+            note: string | null;
+            /** @description The name the CV downloads as (the label, never the stored file name). */
+            cvFileName: string | null;
+            decision: components["schemas"]["ClientShortlistDecision"] | null;
+            comment: string | null;
+            /** Format: date-time */
+            answeredAt: string | null;
         };
     };
     responses: {
@@ -11531,6 +12042,9 @@ export interface components {
         PlacementIdPath: components["schemas"]["PlacementId"];
         BookingTokenPath: string;
         BackupNamePath: string;
+        ClientShortlistIdPath: components["schemas"]["ClientShortlistId"];
+        ClientShortlistCandidateIdPath: components["schemas"]["ClientShortlistCandidateId"];
+        ClientShortlistTokenPath: string;
     };
     requestBodies: never;
     headers: never;
@@ -12458,6 +12972,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    exportCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateExport"];
+            };
+        };
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -13543,6 +14095,53 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    exportCompanies: {
+        parameters: {
+            query: {
+                format: components["schemas"]["ExportFormat"];
+                /** @description Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written. */
+                q?: string;
+                /** @description A boolean search of the name, website, industries and subindustries (and the industry LinkedIn gives), city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks). */
+                boolean?: string;
+                type?: components["schemas"]["CompanyType"];
+                /** @description Only companies in this category (a key of the company_category list). */
+                category?: string;
+                /** @description Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case). */
+                linkedinCompany?: string;
+                /** @description Only the records in this folder (yours, or shared with you). */
+                folder?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listCompanies: {
         parameters: {
             query?: {
@@ -14078,6 +14677,56 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    exportContacts: {
+        parameters: {
+            query: {
+                format: components["schemas"]["ExportFormat"];
+                /** @description Every word must appear in the name, email or job title (ignoring case and accents); or a phone or mobile number, however it is written. */
+                q?: string;
+                /** @description A boolean search of the name, job title and email: (HR OR "talent acquisition") AND manager NOT intern*, word NEAR/3 word. Words match their other forms (manager, managers). */
+                boolean?: string;
+                /** @description Only this company's contacts. */
+                companyId?: components["schemas"]["CompanyId"];
+                /** @description Only contacts with this role (a key of the contact_role list, e.g. hr or hiring_manager). */
+                role?: components["schemas"]["ContactRole"];
+                /** @description Only contacts whose role is not set yet (ignored with role). */
+                roleNotSet?: boolean;
+                /** @description Only contacts who still work there (active) or have left. */
+                status?: components["schemas"]["ContactStatus"];
+                /** @description Only the records in this folder (yours, or shared with you). */
+                folder?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listContacts: {
@@ -19055,6 +19704,53 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    exportJobs: {
+        parameters: {
+            query: {
+                format: components["schemas"]["ExportFormat"];
+                /** @description Only these jobs (e.g. the ones that need attention), as the list shows them. */
+                ids?: components["schemas"]["JobOrderId"][];
+                /** @description Every word must appear in the title, location or client company's name (ignoring case and accents). */
+                q?: string;
+                status?: components["schemas"]["JobStatus"];
+                /** @description Only this company's jobs. */
+                companyId?: components["schemas"]["CompanyId"];
+                /** @description Only jobs with this hiring contact. */
+                contactId?: components["schemas"]["ContactId"];
+                /** @description Only the jobs you own. */
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listJobs: {
         parameters: {
             query?: {
@@ -20813,6 +21509,44 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    exportPlacements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlacementExport"];
+            };
+        };
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listPlacements: {
         parameters: {
             query?: {
@@ -21310,6 +22044,145 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getActivity: {
+        parameters: {
+            query?: {
+                /** @description week (Monday to Sunday) or month; week unless given. */
+                period?: components["schemas"]["ActivityPeriod"];
+                /** @description Any day in the week or month (today unless given). */
+                day?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityReport"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getReportSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putReportSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSettings"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getForecast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Forecast"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    exportReport: {
+        parameters: {
+            query: {
+                format: components["schemas"]["ExportFormat"];
+                /** @description First day of the period. */
+                from?: string;
+                /** @description Last day of the period (today unless given). */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getReport: {
@@ -21926,6 +22799,208 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listClientShortlists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientShortlistList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createClientShortlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientShortlistInput"];
+            };
+        };
+        responses: {
+            /** @description Made */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientShortlistCreated"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description A candidate withdrew consent (SHORTLIST_DO_NOT_CONTACT) or their CV cannot go to a client (SHORTLIST_CV_NOT_SHAREABLE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    revokeClientShortlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistId: components["parameters"]["ClientShortlistIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked (or already revoked) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientShortlist"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicClientShortlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistToken: components["parameters"]["ClientShortlistTokenPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicClientShortlist"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    answerPublicClientShortlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistToken: components["parameters"]["ClientShortlistTokenPath"];
+                shortlistCandidateId: components["parameters"]["ClientShortlistCandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientShortlistAnswer"];
+            };
+        };
+        responses: {
+            /** @description Answered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicClientShortlist"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["NotFound"];
+            /** @description The link is closed (SHORTLIST_CLOSED) or the candidate was answered already (SHORTLIST_ALREADY_ANSWERED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many tries from this address (SHORTLIST_TOO_MANY_TRIES). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getPublicClientShortlistCv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortlistToken: components["parameters"]["ClientShortlistTokenPath"];
+                shortlistCandidateId: components["parameters"]["ClientShortlistCandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description The link is closed (SHORTLIST_CLOSED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many tries from this address (SHORTLIST_TOO_MANY_TRIES). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
 }

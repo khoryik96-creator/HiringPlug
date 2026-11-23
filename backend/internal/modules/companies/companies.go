@@ -15,6 +15,7 @@ package companies
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -116,3 +117,16 @@ func (m *Module) ProfileOf(ctx context.Context, tx pgx.Tx, companyID string) (Pr
 func (m *Module) Terms(ctx context.Context, tx pgx.Tx, companyID string) (Terms, error) {
 	return termsIn(ctx, tx, companyID, false)
 }
+
+// UseTimeZone sets the agency's time zone (dates in exports).
+func (m *Module) UseTimeZone(loc *time.Location) { m.service.zone = loc }
+
+// Labeler gives the words for the company's lists (list -> key -> label),
+// in the caller's transaction: exports show a category's words, not its key.
+type Labeler interface {
+	Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error)
+}
+
+// UseLabels sets where exports find the words for the company's lists
+// (settings module).
+func (m *Module) UseLabels(l Labeler) { m.service.labels = l }

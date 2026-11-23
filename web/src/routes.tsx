@@ -63,9 +63,11 @@ const Industries = page(() => import("./pages/Industries"), "Industries");
 const Settings = page(() => import("./pages/Settings"), "Settings");
 const SalarySettings = page(() => import("./pages/Settings"), "SalarySettings");
 const ListSettings = page(() => import("./pages/Settings"), "ListSettings");
+const TargetSettings = page(() => import("./pages/TargetSettings"), "TargetSettings");
 const System = page(() => import("./pages/System"), "System");
 const BackupsPage = page(() => import("./pages/Backups"), "BackupsPage");
 const Team = page(() => import("./pages/Team"), "Team");
+const Help = page(() => import("./pages/Help"), "Help");
 
 /** What a page is given: who is signed in, and the record its address names. */
 export type PageContext = { permissions: Permission[]; me: Me; id: string };
@@ -89,10 +91,10 @@ const can = (c: PageContext, p: Permission) => c.permissions.includes(p);
 export const ROUTES: Route[] = [
   // The top bar, in order.
   { section: "dashboard", path: /^(#\/?)?$/, permission: "pipeline:read", menu: { in: "main", label: "Dashboard", href: "#/" },
-    render: (c) => <Dashboard permissions={c.permissions} /> },
+    render: (c) => <Dashboard permissions={c.permissions} meId={c.me.user.id} /> },
   { section: "jobs", path: /^#\/jobs\/(jo_[0-9a-z]+)$/, render: (c) => <JobDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "jobs", path: /^#\/jobs/, menu: { in: "main", label: "Jobs", href: "#/jobs" },
-    render: (c) => <JobList canCreate={can(c, "jobs:create")} /> },
+    render: (c) => <JobList canCreate={can(c, "jobs:create")} canExport={can(c, "jobs:export")} /> },
   { section: "candidates", path: /^#\/candidates\/ai-search$/, permission: "matching:create",
     render: (c) => <AiSearch canSeeSalary={can(c, "candidates.compensation:read")} canReadJd={can(c, "jobs:create")} /> },
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/,
@@ -103,26 +105,28 @@ export const ROUTES: Route[] = [
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)$/,
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates/, menu: { in: "main", label: "Candidates", href: "#/candidates" },
-    render: (c) => <CandidateList canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} canAddToJob={can(c, "pipeline:update")} canFolders={can(c, "folders:use")} canImport={can(c, "intake:create")} meId={c.me.user.id} /> },
+    render: (c) => <CandidateList canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} canAddToJob={can(c, "pipeline:update")} canFolders={can(c, "folders:use")} canImport={can(c, "intake:create")} canExport={can(c, "candidates:export")} meId={c.me.user.id} /> },
   { section: "companies", path: /^#\/companies\/duplicates$/, render: () => <Duplicates kind="companies" /> },
   { section: "companies", path: /^#\/companies\/(comp_[0-9a-z]+)$/,
     render: (c) => <CompanyDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "companies", path: /^#\/companies/, menu: { in: "main", label: "Companies", href: "#/companies" },
-    render: (c) => <CompanyList canCreate={can(c, "companies:create")} canFolders={can(c, "folders:use")} meId={c.me.user.id} /> },
+    render: (c) => <CompanyList canCreate={can(c, "companies:create")} canExport={can(c, "companies:export")} canFolders={can(c, "folders:use")} meId={c.me.user.id} /> },
   { section: "contacts", path: /^#\/contacts\/duplicates$/, render: () => <Duplicates kind="contacts" /> },
   { section: "contacts", path: /^#\/contacts\/(cont_[0-9a-z]+)$/,
     render: (c) => <ContactDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "contacts", path: /^#\/contacts/, menu: { in: "main", label: "Contacts", href: "#/contacts" },
-    render: (c) => <ContactList canCreate={can(c, "contacts:create")} canEmail={can(c, "emails:send")} canFolders={can(c, "folders:use")} meId={c.me.user.id} /> },
+    render: (c) => <ContactList canCreate={can(c, "contacts:create")} canExport={can(c, "contacts:export")} canEmail={can(c, "emails:send")} canFolders={can(c, "folders:use")} meId={c.me.user.id} /> },
   { section: "placements", path: /^#\/placements/, permission: "placements:read", menu: { in: "main", label: "Placements", href: "#/placements" },
     render: (c) => <Placements permissions={c.permissions} /> },
   { section: "leads", path: /^#\/leads/, permission: "leads:read", menu: { in: "main", label: "Leads", href: "#/leads", more: true },
     render: (c) => <Leads permissions={c.permissions} /> },
   { section: "reports", path: /^#\/reports/, permission: "reports:read", menu: { in: "main", label: "Reports", href: "#/reports", more: true },
-    render: () => <Reports /> },
+    render: (c) => <Reports permissions={c.permissions} /> },
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
+  // Help: for everyone, from the ? in the top bar; a topic at #/help/<topic>.
+  { section: "help", path: /^#\/help(?:\/([a-z-]+))?$/, render: (c) => <Help key={c.id} permissions={c.permissions} topicId={c.id} /> },
   { section: "outlook", path: /^#\/outlook$/, permission: "emails:send",
     render: (c) => <OutlookMail canImportCv={can(c, "intake:create")} userId={c.me.user.id}
       permissions={c.permissions} /> },
@@ -141,6 +145,8 @@ export const ROUTES: Route[] = [
     render: () => <SalarySettings /> },
   { section: "settings-lists", path: /^#\/settings\/lists/, permission: "settings:manage", menu: { in: "settings", label: "Dropdowns & categories", href: "#/settings/lists" },
     render: () => <ListSettings /> },
+  { section: "settings-targets", path: /^#\/settings\/targets/, permission: "reports.settings:manage",
+    menu: { in: "settings", label: "Targets & forecast", href: "#/settings/targets" }, render: () => <TargetSettings /> },
   { section: "settings-stages", path: /^#\/settings\/stages/, permission: "pipeline.templates:manage", menu: { in: "settings", label: "Pipeline stages", href: "#/settings/stages" },
     render: () => <StageTemplates /> },
   { section: "settings-claims-storage", path: /^#\/settings\/claims-storage/, permission: "claims.storage:manage",

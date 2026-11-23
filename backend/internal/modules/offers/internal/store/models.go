@@ -10,6 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ActivityTarget struct {
+	ID         string
+	TenantID   string
+	UserID     *string
+	Period     string
+	Calls      *int32
+	CvsSent    *int32
+	Interviews *int32
+	Placements *int32
+	UpdatedBy  string
+	UpdatedAt  time.Time
+}
+
 type AiProvider struct {
 	TenantID     string
 	Provider     string
@@ -482,6 +495,38 @@ type ClaimStorageState struct {
 	ExpiresAt      time.Time
 }
 
+type ClientShortlist struct {
+	ID           string
+	TenantID     string
+	TokenHash    string
+	JobID        string
+	Message      *string
+	ExpiresAt    time.Time
+	RevokedAt    *time.Time
+	RevokedBy    *string
+	OpenedAt     *time.Time
+	LastOpenedAt *time.Time
+	EmailedTo    *string
+	CreatedBy    string
+	CreatedAt    time.Time
+}
+
+type ClientShortlistCandidate struct {
+	ID            string
+	TenantID      string
+	ShortlistID   string
+	Position      int16
+	ApplicationID string
+	CandidateID   string
+	DocumentID    string
+	Blind         bool
+	Label         string
+	Note          *string
+	Decision      *string
+	Comment       *string
+	AnsweredAt    *time.Time
+}
+
 type Company struct {
 	ID                  string
 	TenantID            string
@@ -760,6 +805,7 @@ type Email struct {
 	BouncedTo           []string
 	BouncedAt           *time.Time
 	DeliveryAttemptedAt *time.Time
+	CvCandidateIds      []string
 }
 
 type EmailAttachment struct {
@@ -974,6 +1020,24 @@ type FolderShare struct {
 	TenantID  string
 	UserID    string
 	CreatedAt time.Time
+}
+
+type ForecastStageWeight struct {
+	TenantID    string
+	Stage       string
+	Percent     int32
+	MonthsAhead int32
+	UpdatedBy   string
+	UpdatedAt   time.Time
+}
+
+type FormattedCv struct {
+	TenantID      string
+	DocumentID    string
+	CandidateID   string
+	Blind         bool
+	IncludeSalary bool
+	CreatedAt     time.Time
 }
 
 type HrApolloConnection struct {
@@ -1696,6 +1760,7 @@ type UserPreference struct {
 	UpdatedAt        time.Time
 	DashboardBlocks  []string
 	Favourites       []byte
+	GuideDismissed   bool
 }
 
 type UserTwoStep struct {

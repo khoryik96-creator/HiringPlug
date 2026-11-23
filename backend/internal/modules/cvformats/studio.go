@@ -49,14 +49,11 @@ type StudioOptions struct {
 	SummaryDirection                      string // the recruiter's direction and tone, in their words
 }
 
-// summaryOptions settles the summary's options: a blind CV keeps its own
-// summary; no summary, no focus or direction; a direction is one tidy line,
+// summaryOptions settles the summary's options (a blind CV gets one too:
+// the blind step anonymises it bullet by bullet); no summary, no focus or direction; a direction is one tidy line,
 // and never about pay (pay never goes to the AI, and the summary never says it).
 func summaryOptions(o StudioOptions) (StudioOptions, error) {
-	switch {
-	case o.Blind: // CV Studio keeps a blind CV's own summary, never writes one
-		o.Summary = "none"
-	case o.Summary != "none" && o.Summary != "short" && o.Summary != "detailed":
+	if o.Summary != "none" && o.Summary != "short" && o.Summary != "detailed" {
 		o.Summary = "normal"
 	}
 	if o.SummaryFocus != "technology" && o.SummaryFocus != "leadership" && o.SummaryFocus != "commercial" {
@@ -247,6 +244,11 @@ func (s *Service) saveStudio(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	if _, err := q.FinishStudioCv(ctx, store.FinishStudioCvParams{
 		ID: run.ID, Status: "done", DocumentID: &docID, FileName: &name, Warning: warning, PayRemoved: int32(r.PayStatementsRemoved), //nolint:gosec // a small count
 	}); err != nil {
+		undo()
+		return err
+	}
+	// CV Studio takes the candidate's pay out: never with salary.
+	if err := q.RecordFormattedCv(ctx, store.RecordFormattedCvParams{DocumentID: docID, CandidateID: run.CandidateID, Blind: run.Blind}); err != nil {
 		undo()
 		return err
 	}
