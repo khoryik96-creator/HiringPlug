@@ -26,6 +26,7 @@ type Service struct {
 	deps      Deps
 	publicURL string
 	now       func() time.Time
+	loc       *time.Location // the agency's time zone: the dates in emails
 	limiter   *ratelimit.Limiter
 }
 
@@ -90,7 +91,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, jobID string, i
 			if err != nil {
 				return err
 			}
-			subject, body := LinkEmail(job.ContactName, job.Title, s.URL(token), len(picked), in.Message, expires, p.Name, agency)
+			subject, body := LinkEmail(job.ContactName, job.Title, s.URL(token), len(picked), in.Message, expires.In(s.loc), p.Name, agency)
 			if err := s.deps.Mailer.Send(ctx, tx, p.TenantID, Mail{To: *emailTo, Subject: subject, Body: body, From: p.UserID, FromName: p.Name}); err != nil {
 				return err
 			}

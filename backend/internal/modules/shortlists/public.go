@@ -77,8 +77,12 @@ func (s *Service) page(ctx context.Context, tx pgx.Tx, agency string, row store.
 		if no {
 			continue
 		}
+		stored, err := s.deps.CVs.FileName(ctx, tx, it.DocumentID) // the PDF, or the Word file while it has none
+		if err != nil {
+			return Page{}, err
+		}
 		out.Candidates = append(out.Candidates, PublicCandidate{
-			ID: it.ID, Label: it.Label, CVFileName: CVFileName(it.Label, ".pdf"), Blind: it.Blind, Note: it.Note,
+			ID: it.ID, Label: it.Label, CVFileName: CVFileName(it.Label, stored), Blind: it.Blind, Note: it.Note,
 			Decision: it.Decision, Comment: it.Comment, AnsweredAt: it.AnsweredAt,
 		})
 	}

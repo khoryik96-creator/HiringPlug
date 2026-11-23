@@ -133,6 +133,7 @@ func TestClientShortlistLink(t *testing.T) {
 	msgs := mailServer.To(sj.contact)
 	require.Len(t, msgs, 1)
 	assert.Contains(t, msgs[0].Data, "Finance Manager")
+	assert.Contains(t, msgs[0].Data, "works until "+s.ExpiresAt.In(a.deps.Config.TimeZone).Format("2 January 2006"), "the agency's day, not UTC's")
 
 	page, raw := a.clientPage(token)
 	assert.Equal(t, "Finance Manager", page.JobTitle)
@@ -140,7 +141,7 @@ func TestClientShortlistLink(t *testing.T) {
 	assert.Equal(t, "Two for the finance role.", page.Message.MustGet())
 	require.Len(t, page.Candidates, 2)
 	assert.Equal(t, siti.Label, page.Candidates[0].Label)
-	assert.Equal(t, siti.Label+" CV.pdf", page.Candidates[0].CvFileName.MustGet())
+	assert.Equal(t, siti.Label+" CV.docx", page.Candidates[0].CvFileName.MustGet(), "as the download is named: no PDF is made in tests")
 	for _, hidden := range []string{"Siti", "siti.", "+60123456789", "123456789", "8513", sj.candidates["Siti"].Id, sj.apps["Siti"].Id} {
 		assert.NotContains(t, raw, hidden, "the client sees only the label, the note and the CV")
 	}

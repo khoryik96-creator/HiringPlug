@@ -414,11 +414,13 @@ def test_a_blinded_bullet_keeps_the_indent_of_the_bullet_it_was_made_from() -> N
     levels = [
         {"text": "led audits at laureate group", "level": 1},
         {"text": "built laureate's ledger", "level": 2},
+        {"text": "power bi dashboards", "level": 1},  # a nested skill, outside the roles
     ]
-    assert cvstudio.blind_levels(levels, prepared, blinded) == [
-        {"text": "led audits at [company]", "level": 1},
-        {"text": "built [company]'s ledger", "level": 2},
-    ], "an unindented bullet stays unindented"
+    made = cvstudio.blind_levels(levels, prepared, blinded)
+    assert {"text": "led audits at [company]", "level": 1} in made
+    assert {"text": "built [company]'s ledger", "level": 2} in made
+    assert {"text": "power bi dashboards", "level": 1} in made, "bullets outside the roles keep it"
+    assert all(e["text"] != "closed books" for e in made), "an unindented bullet stays so"
     shorter = cv("Led audits at [Company]")
     assert cvstudio.blind_levels(levels, prepared, shorter) == levels, (
         "not one for one: the levels as they were"

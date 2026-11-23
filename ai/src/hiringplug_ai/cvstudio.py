@@ -171,12 +171,13 @@ def blind_levels(levels: list[Any], prepared: dict[str, Any], blinded: dict[str,
     bullet's words, and blinding changes some of them ("Laureate" becomes
     "[Company]"), so each blinded bullet takes the level of the bullet it was
     made from (the blind step keeps them one for one). A bullet whose source
-    had no level gets none, so a list is never half indented."""
+    had no level gets none, so a list is never half indented. The levels of
+    every other bullet (skills, projects and the rest) are kept as they are."""
     by_key = {str(e.get("text")): e.get("level") for e in levels if isinstance(e, dict)}
     before, after = _work_bullets(prepared), _work_bullets(blinded)
     if len(before) != len(after):
         return list(levels)  # not one for one: the words still match where they were kept
-    out: list[Any] = []
+    out: list[Any] = list(levels)
     for source, made in zip(before, after, strict=True):
         level = by_key.get(_cv_bullet_match_key(source))
         key = _cv_bullet_match_key(made)
