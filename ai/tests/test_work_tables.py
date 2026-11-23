@@ -8,6 +8,7 @@ import io
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from hiringplug_ai.extraction import extract
@@ -97,3 +98,65 @@ def test_a_field_named_experience_heading_starts_the_work_history() -> None:
     )
     jobs = parse_cv(text).model_dump()["experience"]
     assert [(j["title"]["value"], j["company"]["value"]) for j in jobs] == [("Analyst", "Contoh Berhad")]
+
+
+def test_a_title_or_skill_ending_in_experience_is_not_a_heading() -> None:
+    text = (
+        "NUR AINA EXAMPLE\n\nWork Experience\nHead of Customer Experience\n"
+        "Contoh Berhad\nJan 2019 - Dec 2021\n\n"
+        "Skills\nUser Experience\n10+ Years Experience\n"
+    )
+    jobs = parse_cv(text).model_dump()["experience"]
+    assert jobs[0]["title"]["value"] == "Head of Customer Experience"
+
+
+def test_an_empty_cell_never_takes_the_row_above() -> None:
+    text = (
+        "NUR AINA EXAMPLE\n\nIT Experience\n"
+        "Duration: 11/2019 to 03/2026\nRole: Analyst\nOrganization: Contoh Berhad\n\n"
+        "Duration: 06/2017 to 11/2019\nOrganization: Sampel Holdings\n"
+    )
+    jobs = parse_cv(text).model_dump()["experience"]
+    assert jobs[1]["company"]["value"] == "Sampel Holdings"
+    assert jobs[1]["title"] is None, "not the first row's Analyst"
+
+
+def sidebar_table_cv(head: list[str]) -> bytes:
+    """A work table on the right, a skills sidebar on the left of it."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont("Helvetica", 9)
+    y = 800
+    for line in ["NUR AINA EXAMPLE", "aina@example.com", "IT Experience"]:
+        c.drawString(40, y, line)
+        y -= 14
+    for i, line in enumerate(["SKILLS", "SAP FICO", "Python", "LANGUAGES", "Malay", "English", "Mandarin"]):
+        c.drawString(40, 740 - i * 14, line)
+    xs = [180, 300, 450, 560]
+    rows = [
+        head,
+        ["Contoh Berhad", "Finance Analyst", "2019 - 2021"],
+        ["Sampel Holdings", "Accountant", "2016 - 2019"],
+    ]
+    for r, row in enumerate(rows):
+        top = 750 - r * 30
+        for k, cell in enumerate(row):
+            c.drawString(xs[k] + 4, top - 18, cell)
+        c.line(xs[0], top, xs[-1], top)
+    c.line(xs[0], 750 - len(rows) * 30, xs[-1], 750 - len(rows) * 30)
+    for x in xs:
+        c.line(x, 750, x, 750 - len(rows) * 30)
+    c.save()
+    return buf.getvalue()
+
+
+def test_text_beside_a_work_table_is_kept() -> None:
+    text = extract(sidebar_table_cv(["Organization", "Role", "Duration"]), ocr=None).text or ""
+    assert "Duration: 2019 - 2021\nRole: Finance Analyst\nOrganization: Contoh Berhad" in text
+    for word in ("SAP FICO", "Python", "Mandarin"):
+        assert word in text, "the sidebar beside the table"
+
+
+def test_a_company_job_title_dates_table_is_read_as_a_table() -> None:
+    text = extract(sidebar_table_cv(["Company", "Job Title", "Dates"]), ocr=None).text or ""
+    assert "Duration: 2016 - 2019\nRole: Accountant\nOrganization: Sampel Holdings" in text

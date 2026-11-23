@@ -20,12 +20,18 @@ _ROLE = re.compile(r"^(?:role|position|designation|job\s*title|title|jawatan)$",
 _ORG = re.compile(r"^(?:organi[sz]ation|company(?:\s+name)?|employer|syarikat)$", re.I)
 _DATES = re.compile(r"^(?:duration|period|dates?|tenure|from\s*[-\u2013/]\s*to|year\(?s\)?)$", re.I)
 # A cheap look at the page's words before asking pdfplumber for tables.
-_HINT = re.compile(r"^(?:role|position|designation|duration|period|organi[sz]ation|employer)$", re.I)
+_HINT = re.compile(
+    r"^(?:role|position|designation|title|jawatan|duration|period|dates?|tenure|years?|"
+    r"organi[sz]ation|company|employer|syarikat)$",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
 class WorkTable:
+    left: float
     top: float
+    right: float
     bottom: float
     text: str
 
@@ -105,5 +111,6 @@ def work_tables(page: Any) -> list[WorkTable]:
         ]
         text = rows_as_lines(header, rows)
         if text:
-            found.append(WorkTable(top=float(table.bbox[1]), bottom=float(table.bbox[3]), text=text))
+            x0, top, x1, bottom = (float(v) for v in table.bbox)
+            found.append(WorkTable(left=x0, top=top, right=x1, bottom=bottom, text=text))
     return sorted(found, key=lambda t: t.top)

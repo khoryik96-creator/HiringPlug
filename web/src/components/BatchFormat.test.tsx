@@ -46,3 +46,13 @@ describe("BatchFormat", () => {
     expect(screen.getByText("At most 20 at a time.")).toBeTruthy();
   });
 });
+
+describe("BatchFormat with nobody chosen", () => {
+  it("cannot be sent", () => {
+    const post = vi.spyOn(api, "POST");
+    renderWithClient(<BatchFormat people={[]} onClose={vi.fn()} />);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Format 0 CVs" }).disabled).toBe(true);
+    expect(screen.getByText("Choose the candidates again: none are chosen now.")).toBeTruthy();
+    expect(post).not.toHaveBeenCalled();
+  });
+});

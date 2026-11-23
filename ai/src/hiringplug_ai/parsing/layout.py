@@ -210,13 +210,66 @@ def section_of(text: str) -> str | None:
         return None
     singular = " ".join(w[:-1] if w.endswith("s") and len(w) > 4 else w for w in key.split())
     found = _LOOKUP.get(key) or _LOOKUP.get(singular) or _LOOKUP_JOINED.get(key.replace(" ", ""))
-    if found is None and _FIELD_EXPERIENCE.fullmatch(key):
+    words = key.split()
+    if (
+        found is None
+        and 2 <= len(words) <= 3
+        and words[-1] in ("experience", "experiences")
+        and all(w in _FIELDS for w in words[:-1])
+    ):
         return "experience"  # "IT Experience", "Manufacturing Experience", "SAP Experience"
     return found
 
 
-# A short heading naming the field of the experience under it.
-_FIELD_EXPERIENCE = re.compile(r"(?:[a-z0-9&/+.]+ ){1,3}experiences?")
+# Fields a heading may name before "Experience" ("IT Experience"). Only these:
+# "Head of Customer Experience" is a job title, "User Experience" a skill and
+# "10+ Years Experience" a tagline, never a section.
+_FIELDS = frozenset(
+    [
+        "it",
+        "sap",
+        "oracle",
+        "erp",
+        "software",
+        "technical",
+        "technology",
+        "industry",
+        "industrial",
+        "manufacturing",
+        "banking",
+        "finance",
+        "financial",
+        "accounting",
+        "audit",
+        "consulting",
+        "project",
+        "projects",
+        "teaching",
+        "research",
+        "engineering",
+        "relevant",
+        "overseas",
+        "international",
+        "local",
+        "previous",
+        "other",
+        "additional",
+        "corporate",
+        "retail",
+        "hospitality",
+        "healthcare",
+        "medical",
+        "legal",
+        "logistics",
+        "operations",
+        "offshore",
+        "onshore",
+        "field",
+        "site",
+        "domain",
+        "functional",
+    ]
+)
 
 
 # Page furniture that is not part of the CV's content.

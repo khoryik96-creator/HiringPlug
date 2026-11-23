@@ -37,6 +37,7 @@ export function BatchFormat({ people, onClose }: { people: BatchPerson[]; onClos
 
   if (start.data) return <BatchResult items={start.data.items} nameOf={nameOf} onClose={onClose} />;
   const tooMany = people.length > BATCH_MAX;
+  const none = people.length === 0; // the selection was cleared meanwhile
   return (
     <section className="panel batch-format" aria-label="Format CVs">
       <div className="row spread">
@@ -48,7 +49,7 @@ export function BatchFormat({ people, onClose }: { people: BatchPerson[]; onClos
         formatted now (no CV, one being made already, no room for another formatted CV) is listed afterwards with the reason.
       </p>
       <p className="small batch-names">{people.map((p) => p.name).join(", ")}</p>
-      <form className="form-grid" onSubmit={(e) => { e.preventDefault(); if (!tooMany) start.mutate(); }}>
+      <form className="form-grid" onSubmit={(e) => { e.preventDefault(); if (!tooMany && !none) start.mutate(); }}>
         <label className="row full">
           <input type="checkbox" checked={form.correctLanguage} onChange={(e) => { setForm({ ...form, correctLanguage: e.target.checked }); }} />{" "}
           Correct spelling, punctuation and capitals (never the meaning, numbers or dates)
@@ -72,10 +73,11 @@ export function BatchFormat({ people, onClose }: { people: BatchPerson[]; onClos
         </label>
         <ErrorMessage error={fieldErrors(start.error).summaryDirection ? null : start.error} />
         <div className="row full">
-          <button type="submit" className="primary" disabled={start.isPending || tooMany}>
+          <button type="submit" className="primary" disabled={start.isPending || tooMany || none}>
             {start.isPending ? "Starting…" : `Format ${people.length} CV${people.length === 1 ? "" : "s"}`}
           </button>
           {tooMany && <span className="warning small">At most {BATCH_MAX} at a time.</span>}
+          {none && <span className="warning small">Choose the candidates again: none are chosen now.</span>}
         </div>
       </form>
     </section>

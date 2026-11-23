@@ -169,6 +169,17 @@ describe("pipeline board", () => {
     expect(screen.queryByRole("button", { name: /Format CVs/ })).toBeNull();
   });
 
+  it("gives each bar icon its tip", async () => {
+    const wei2: Application = { ...wei, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w9", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w9", candidateName: "Wei Rejected" };
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei2] }));
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate={false} permissions={["pipeline:read"]} onClientLink={vi.fn()} />);
+    await screen.findByRole("link", { name: "Siti Aisyah" });
+    choose("Siti Aisyah");
+    const link = screen.getByRole<HTMLButtonElement>("button", { name: "Client link for 1" });
+    expect(link.disabled).toBe(false);
+    expect(link.getAttribute("data-tip")).toBe("Client link: the client approves or rejects them");
+  });
+
   it("shows initials, the name and current title, with no tick box; Space on the name chooses the card", async () => {
     await showBoard();
     const name = screen.getByRole("link", { name: "Siti Aisyah" });

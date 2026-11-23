@@ -74,11 +74,12 @@ ORDER BY id DESC
 LIMIT 1;
 
 -- The candidate's newest CV of some types that they sent (not one the app
--- made, not in the bin): their CV first, then any other of their files.
+-- made, not in the bin): their CV first, then a LinkedIn or JobStreet one,
+-- then any other of their files.
 -- name: NewestCVOfTypes :one
 SELECT id FROM document
 WHERE candidate_id = @candidate_id AND source <> 'formatted' AND binned_at IS NULL AND content_type = ANY(@content_types::text[])
-ORDER BY (source = 'original') DESC, id DESC
+ORDER BY CASE source WHEN 'original' THEN 0 WHEN 'linkedin' THEN 1 WHEN 'jobstreet' THEN 1 ELSE 2 END, id DESC
 LIMIT 1;
 
 -- A candidate's documents with their text, for a copy of their data.
