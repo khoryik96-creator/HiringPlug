@@ -7,7 +7,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { preferencesKey } from "./candidateColumns";
 import { stepsFor } from "../help/firstRun";
-import "../help/help.css";
+import "../help/help-screens.css";
 
 /** Saves whether the checklist is hidden, showing the change at once. */
 export function useHideGuide() {

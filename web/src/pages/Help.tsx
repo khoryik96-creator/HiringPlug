@@ -9,7 +9,7 @@ import { useHideGuide } from "../components/FirstRunGuide";
 import { searchTopics, visibleTopics, type HelpTopic } from "../help/help";
 import { HELP_TOPICS } from "../help/topics";
 import { hashParam } from "../hashQuery";
-import "../help/help.css";
+import "../help/help-screens.css";
 
 export function Help({ permissions, topicId }: { permissions: readonly Permission[]; topicId: string }) {
   const topics = visibleTopics(HELP_TOPICS, permissions);
