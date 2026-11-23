@@ -22,6 +22,31 @@ sql:
             go_type:
               type: time.Time
               pointer: true
+          # Meaning vectors go in as text and are compared in the database; Go never reads them.
+          - column: meaning_role.field
+            go_type: string
+          - column: meaning_role.work
+            go_type: string
+          - column: meaning_passage.vec
+            go_type: string
+          - column: meaning_query_need.vec
+            go_type: string
+          - column: meaning_candidate.profile
+            go_type:
+              type: string
+              pointer: true
+          - column: meaning_query.role
+            go_type:
+              type: string
+              pointer: true
+          - column: meaning_query.whole
+            go_type:
+              type: string
+              pointer: true
+          - column: meaning_query.context
+            go_type:
+              type: string
+              pointer: true
   - <<: *module
     queries: db/queries/candidates.sql
     gen:
@@ -94,6 +119,14 @@ sql:
           - db_type: date
             nullable: true
             go_type: { type: time.Time, pointer: true }
+          - { column: meaning_role.field, go_type: string }
+          - { column: meaning_role.work, go_type: string }
+          - { column: meaning_passage.vec, go_type: string }
+          - { column: meaning_query_need.vec, go_type: string }
+          - { column: meaning_candidate.profile, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.role, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.whole, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.context, go_type: { type: string, pointer: true } }
   - <<: *module
     queries: db/queries/offers.sql
     gen:
@@ -111,6 +144,14 @@ sql:
           - db_type: date
             nullable: true
             go_type: { type: time.Time, pointer: true }
+          - { column: meaning_role.field, go_type: string }
+          - { column: meaning_role.work, go_type: string }
+          - { column: meaning_passage.vec, go_type: string }
+          - { column: meaning_query_need.vec, go_type: string }
+          - { column: meaning_candidate.profile, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.role, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.whole, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.context, go_type: { type: string, pointer: true } }
   - <<: *module
     queries: db/queries/integrations.sql
     gen:
@@ -195,6 +236,14 @@ sql:
           - db_type: date
             nullable: true
             go_type: { type: time.Time, pointer: true }
+          - { column: meaning_role.field, go_type: string }
+          - { column: meaning_role.work, go_type: string }
+          - { column: meaning_passage.vec, go_type: string }
+          - { column: meaning_query_need.vec, go_type: string }
+          - { column: meaning_candidate.profile, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.role, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.whole, go_type: { type: string, pointer: true } }
+          - { column: meaning_query.context, go_type: { type: string, pointer: true } }
   - <<: *module
     queries: db/queries/folders.sql
     gen:
@@ -243,3 +292,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/reports/internal/store
+  - <<: *module
+    queries: db/queries/meaning.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/meaning/internal/store

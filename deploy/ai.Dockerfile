@@ -10,6 +10,10 @@ COPY ai/pyproject.toml ai/uv.lock ai/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY ai/src ./src
 RUN uv sync --frozen --no-dev
+# Search by meaning's model, pinned and checked (SHA-256), part of the image:
+# the worker never downloads anything while it runs.
+ENV HP_AI_MEANING_MODEL_DIR=/app/meaning-model
+RUN /app/.venv/bin/python -m hiringplug_ai.meaning.fetch /app/meaning-model
 # CV Studio's engine (rules, prompts, renderer and template), unchanged.
 COPY ai/cvstudio ./cvstudio
 RUN npm ci --omit=dev --prefix cvstudio/engine

@@ -95,7 +95,7 @@ jobs:
     timeout-minutes: 30 # tests ~11 min, lint ~3, the generated-module check ~4: 20 was reached
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16 # PostgreSQL 16 with pgvector (search by meaning)
         env: { POSTGRES_PASSWORD: postgres }
         ports: ["5432:5432"]
         options: >-
@@ -151,7 +151,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16 # PostgreSQL 16 with pgvector (search by meaning)
         env: { POSTGRES_PASSWORD: postgres }
         ports: ["5432:5432"]
         options: >-
@@ -169,6 +169,13 @@ jobs:
       - run: uv sync --frozen
       - name: CV Studio's Word renderer (Node)
         run: npm ci --prefix cvstudio/engine
+      # Search by meaning's model: pinned and checked by fetch.py, kept between runs.
+      - uses: actions/cache@v4
+        with:
+          path: ai/.models
+          key: meaning-model-${{ hashFiles('ai/src/hiringplug_ai/meaning/fetch.py') }}
+      - name: Search by meaning's model
+        run: uv run python -m hiringplug_ai.meaning.fetch
       - name: Generated models are up to date
         run: task gen:py && git diff --exit-code -- src/hiringplug_ai/contracts.py
       - run: task lint:py
@@ -206,7 +213,7 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16 # PostgreSQL 16 with pgvector (search by meaning)
         env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: hiringplug }
         ports: ["5432:5432"]
         options: >-
@@ -228,6 +235,13 @@ jobs:
         timeout-minutes: 6
         uses: ./.github/actions/document-tools
       - uses: astral-sh/setup-uv@v5
+      - uses: actions/cache@v4
+        with:
+          path: ai/.models
+          key: meaning-model-${{ hashFiles('ai/src/hiringplug_ai/meaning/fetch.py') }}
+      - name: Search by meaning's model
+        working-directory: ai
+        run: uv sync --frozen && uv run python -m hiringplug_ai.meaning.fetch
       - name: Build and prepare the database
         working-directory: backend
         run: |

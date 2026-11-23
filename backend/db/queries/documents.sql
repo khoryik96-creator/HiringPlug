@@ -225,3 +225,13 @@ UPDATE document SET binned_at = NULL, updated_at = now() WHERE id = @id AND binn
 
 -- name: PurgeBinnedDocument :one
 DELETE FROM document WHERE id = @id AND binned_at IS NOT NULL RETURNING storage_key,pdf_key;
+
+-- Search by meaning: each candidate's newest CV with text that they sent
+-- (their CV first, then a LinkedIn or JobStreet one; not one the app made,
+-- not in the bin).
+-- name: NewestCVTexts :many
+SELECT DISTINCT ON (candidate_id) candidate_id, id, extracted_text::text AS text
+FROM document
+WHERE candidate_id = ANY(@candidate_ids::text[]) AND source <> 'formatted' AND binned_at IS NULL
+  AND extracted_text IS NOT NULL AND extracted_text <> '' AND source IN ('original', 'linkedin', 'jobstreet')
+ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC;

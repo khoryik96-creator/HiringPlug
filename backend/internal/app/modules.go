@@ -43,6 +43,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/market"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/meaning"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notifications"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
@@ -78,6 +79,7 @@ type Modules struct {
 	Cvformats     *cvformats.Module
 	Assistant     *assistant.Module
 	Matching      *matching.Module
+	Meaning       *meaning.Module
 	Privacy       *privacy.Module
 	Settings      *settings.Module
 	Intake        *intake.Module
@@ -180,6 +182,8 @@ func NewModules(d Deps) *Modules {
 			return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	// Search by meaning: candidates read by the AI worker's meaning model, ranked here.
+	m.Meaning = meaning.New(d.Pool, meaning.Deps{Candidates: meaningCandidates{m.Candidates}, CVs: meaningCVs{m.Documents}})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
@@ -191,7 +195,9 @@ func NewModules(d Deps) *Modules {
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
 	}, d.Config.MaxUploadBytes)
 	// Imported CVs fill their candidates in; every CV read suggests a work authorization.
-	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone, profileFromNewestCV{m.Documents, m.Candidates}.ReadDone)
+	// Last: search by meaning reads the candidate as the CV left them.
+	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone,
+		profileFromNewestCV{m.Documents, m.Candidates}.ReadDone, m.Meaning.ReadDone)
 	m.Market = market.New(d.Pool, market.Deps{
 		Jobs: marketJobs{m.Jobs}, Candidates: marketCandidates{m.Candidates}, Insights: marketInsights{m.Assistant},
 	})
@@ -292,6 +298,7 @@ type (
 	cvformatsHTTP     = cvformats.HTTP
 	assistantHTTP     = assistant.HTTP
 	matchingHTTP      = matching.HTTP
+	meaningHTTP       = meaning.HTTP
 	privacyHTTP       = privacy.HTTP
 	settingsHTTP      = settings.HTTP
 	intakeHTTP        = intake.HTTP
@@ -333,6 +340,7 @@ type Server struct {
 	*cvformatsHTTP
 	*assistantHTTP
 	*matchingHTTP
+	*meaningHTTP
 	*privacyHTTP
 	*settingsHTTP
 	*intakeHTTP
@@ -375,6 +383,7 @@ func (m *Modules) Server() *Server {
 		cvformatsHTTP:     m.Cvformats.HTTP,
 		assistantHTTP:     m.Assistant.HTTP,
 		matchingHTTP:      m.Matching.HTTP,
+		meaningHTTP:       m.Meaning.HTTP,
 		privacyHTTP:       m.Privacy.HTTP,
 		settingsHTTP:      m.Settings.HTTP,
 		intakeHTTP:        m.Intake.HTTP,
@@ -430,6 +439,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Contacts.JobHandlers(),
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),
+		m.Meaning.JobHandlers(),
 		m.AIProviders.JobHandlers(),
 		m.Scheduling.JobHandlers(),
 		m.Calendars.JobHandlers(),

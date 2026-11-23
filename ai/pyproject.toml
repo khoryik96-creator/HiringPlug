@@ -16,6 +16,10 @@ dependencies = [
   "lxml>=6,<7",  # Word file repair (docx_repair.py); python-docx brings it too
   "cryptography>=50,<51",
   "anthropic>=1,<2",
+  # Search by meaning: a small sentence model run on the CPU (meaning/model.py).
+  "onnxruntime>=1.20,<2",
+  "tokenizers>=0.21,<1",
+  "numpy>=2,<3",
 ]
 
 [project.scripts]
@@ -57,8 +61,10 @@ ignore = [
 "tests/**" = ["S101", "PLR2004", "S105", "S106", "S608"]
 # CVs use en dashes, curly quotes and bullets; the parser must match them.
 "src/hiringplug_ai/parsing/**" = ["RUF001", "RUF002"]
+"src/hiringplug_ai/meaning/**" = ["RUF001", "RUF002"]
 "tests/test_parsing.py" = ["RUF001"]
 "tests/test_parsing_layouts.py" = ["RUF001", "E501"]  # whole CV lines as test data
+"tests/meaning_bench_*.py" = ["E501"]  # one candidate or search per line
 
 [tool.mypy]
 strict = true

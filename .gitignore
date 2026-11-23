@@ -1,6 +1,8 @@
 # Dependencies and builds
 node_modules/
 .venv/
+# The meaning model (downloaded and checked by `task setup`; ai/src/hiringplug_ai/meaning/fetch.py)
+ai/.models/
 dist/
 build/
 *.tsbuildinfo

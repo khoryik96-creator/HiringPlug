@@ -1,0 +1,245 @@
+# Module contract: meaning (search by meaning: candidates found by what they
+# do, not only by the words their CVs use). See contracts/README.md for the format.
+x-module:
+  name: meaning
+  description: >
+    A small meaning model, run by the Python AI worker on this server (no AI
+    provider, no allowance, nothing leaves the server), reads each
+    candidate's titles, work and newest CV, and each search, the way a
+    recruiter reads them: abbreviations spelt out (TA, AR/AP, HRBP), a title
+    split into what the person does (its job family) and how senior they
+    are, misleading titles explained ("Account Executive" sells, "Accounts
+    Executive" keeps the books), and a title that cannot say placed by the
+    work under it. The database compares the vectors; Go ranks by the title
+    (newest counts most, the level asked for first), the CV passages, the
+    whole profile and the exact words, and says why each one was found.
+    The candidates search, possible candidates and the AI search use it.
+  errorCodes:
+    MEANING_UNAVAILABLE:
+      status: 409
+      description: Search by meaning is not set up on this server (the AI worker has no meaning model).
+  jobs:
+    meaning.sweep:
+      queue: core
+      payload: MeaningSweepJob
+      priority: low
+      description: Find the candidates whose meaning is missing or out of date and queue them to be read; keeps itself going (Go worker).
+    meaning.read_candidates:
+      queue: ai
+      payload: MeaningReadCandidatesJob
+      priority: low
+      description: Read a few candidates' titles, work and CV passages with the meaning model (Python AI worker).
+    meaning.candidates_read:
+      queue: core
+      payload: MeaningCandidatesReadJob
+      description: Save what the meaning model read of the candidates (Go worker).
+    meaning.read_query:
+      queue: ai
+      payload: MeaningReadQueryJob
+      priority: high
+      description: Read a search or a job the way a recruiter does, with the meaning model (Python AI worker).
+    meaning.query_read:
+      queue: core
+      payload: MeaningQueryReadJob
+      priority: high
+      description: Save how the search or job was read (Go worker).
+
+paths:
+  /v1/meaning/status:
+    get:
+      operationId: getMeaningStatus
+      tags: [meaning]
+      summary: Whether search by meaning is ready, and how many candidates it has read
+      x-permission: candidates:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeaningStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  schemas:
+    MeaningStatus:
+      type: object
+      required: [available, read, total]
+      properties:
+        available: { type: boolean, description: False when the AI worker has no meaning model. }
+        read: { type: integer, description: Candidates read so far (those with a title or a CV). }
+        total: { type: integer, description: Candidates with a title or a CV to read. }
+    MeaningOutcome:
+      type: object
+      required: [status, understood]
+      description: How a search by meaning went.
+      properties:
+        status:
+          type: string
+          enum: [ready, reading, unavailable]
+          description: "reading: the words are being read (ask again in a moment); unavailable: no meaning model on this server."
+        understood:
+          description: How the search was read, in words.
+          allOf: [{ $ref: '#/components/schemas/MeaningUnderstood' }]
+          nullable: true
+        read: { type: integer, description: Candidates read so far. }
+        total: { type: integer, description: Candidates to read. }
+    MeaningUnderstood:
+      type: object
+      required: [describes]
+      properties:
+        role: { type: string, description: 'The role asked for, abbreviations spelt out ("talent acquisition").' }
+        family: { type: string, description: 'Its job family ("recruitment").' }
+        level: { type: integer, minimum: 0, maximum: 7 }
+        levelName: { type: string, description: '"Manager", "Senior", ...' }
+        context: { type: string, description: 'What else the search says ("finance roles").' }
+        describes: { type: boolean, description: The search describes work rather than naming a title. }
+    MeaningWhy:
+      type: object
+      required: [score, strength, words]
+      description: Why a candidate was found by meaning.
+      properties:
+        score: { type: number, description: "0 to 1, best first." }
+        strength: { type: string, enum: [strong, good, possible] }
+        title: { type: string, description: The title of theirs that matched. }
+        titleWhen: { type: string, description: '"now", or "until 2019".' }
+        family: { type: string, description: The title's job family. }
+        level: { type: string, description: Their level in that title. }
+        passage: { type: string, description: The part of their CV that matched (for roles that may read CVs). }
+        words:
+          type: array
+          description: The search's own words found in their CV.
+          items: { type: string }
+    MeaningVector:
+      type: array
+      description: A meaning, as the model's 384 numbers.
+      minItems: 384
+      maxItems: 384
+      items: { type: number }
+    MeaningSweepJob:
+      type: object
+      additionalProperties: false
+      required: [chain]
+      properties:
+        chain: { type: integer, description: Which run of the company's read-through this is; an older one stops. }
+    MeaningRoleSource:
+      type: object
+      additionalProperties: false
+      required: [ordinal, title, current]
+      properties:
+        ordinal: { type: integer, minimum: 0, maximum: 30, description: 0 is the newest. }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 4000, description: What they did in it. }
+        endYear: { type: integer, nullable: true }
+        current: { type: boolean }
+    MeaningCVSource:
+      type: object
+      additionalProperties: false
+      required: [documentId, text]
+      properties:
+        documentId: { type: string }
+        text: { type: string, maxLength: 30000, description: "The CV's text, without salary." }
+    MeaningCandidateSource:
+      type: object
+      additionalProperties: false
+      required: [candidateId, fingerprint, roles]
+      properties:
+        candidateId: { type: string }
+        fingerprint: { type: string, maxLength: 100 }
+        roles:
+          type: array
+          maxItems: 31
+          items: { $ref: '#/components/schemas/MeaningRoleSource' }
+        cv: { $ref: '#/components/schemas/MeaningCVSource' }
+    MeaningReadCandidatesJob:
+      type: object
+      additionalProperties: false
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/MeaningCandidateSource' }
+    MeaningRoleRead:
+      type: object
+      additionalProperties: false
+      required: [ordinal, title, field, work]
+      properties:
+        ordinal: { type: integer, minimum: 0, maximum: 30 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        family: { type: string, maxLength: 60 }
+        level: { type: integer, minimum: 0, maximum: 7 }
+        endYear: { type: integer, nullable: true }
+        field: { $ref: '#/components/schemas/MeaningVector' }
+        work: { $ref: '#/components/schemas/MeaningVector' }
+    MeaningPassageRead:
+      type: object
+      additionalProperties: false
+      required: [ordinal, documentId, passage, vec]
+      properties:
+        ordinal: { type: integer, minimum: 0, maximum: 40 }
+        documentId: { type: string }
+        passage: { type: string, minLength: 1, maxLength: 1500 }
+        vec: { $ref: '#/components/schemas/MeaningVector' }
+    MeaningCandidateRead:
+      type: object
+      additionalProperties: false
+      required: [candidateId, fingerprint, roles, passages]
+      properties:
+        candidateId: { type: string }
+        fingerprint: { type: string, maxLength: 100 }
+        profile: { $ref: '#/components/schemas/MeaningVector' }
+        roles:
+          type: array
+          maxItems: 31
+          items: { $ref: '#/components/schemas/MeaningRoleRead' }
+        passages:
+          type: array
+          maxItems: 41
+          items: { $ref: '#/components/schemas/MeaningPassageRead' }
+    MeaningCandidatesReadJob:
+      type: object
+      additionalProperties: false
+      required: [model, candidates]
+      properties:
+        model: { type: string, maxLength: 100, description: The meaning model that read them. }
+        unavailable: { type: boolean, description: The AI worker has no meaning model; nothing was read. }
+        candidates:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/MeaningCandidateRead' }
+    MeaningReadQueryJob:
+      type: object
+      additionalProperties: false
+      required: [queryId, body]
+      properties:
+        queryId: { type: string }
+        title: { type: string, maxLength: 300, description: A job's title (a job is read as its title and its description). }
+        body: { type: string, maxLength: 20000, description: "The search's words, or the job's description." }
+    MeaningNeedRead:
+      type: object
+      additionalProperties: false
+      required: [need, vec]
+      properties:
+        need: { type: string, minLength: 1, maxLength: 600 }
+        vec: { $ref: '#/components/schemas/MeaningVector' }
+    MeaningQueryReadJob:
+      type: object
+      additionalProperties: false
+      required: [queryId, model, describes, needs]
+      properties:
+        queryId: { type: string }
+        model: { type: string, maxLength: 100 }
+        unavailable: { type: boolean, description: The AI worker has no meaning model; nothing was read. }
+        role: { $ref: '#/components/schemas/MeaningVector' }
+        whole: { $ref: '#/components/schemas/MeaningVector' }
+        context: { $ref: '#/components/schemas/MeaningVector' }
+        level: { type: integer, minimum: 0, maximum: 7 }
+        describes: { type: boolean }
+        exact: { type: boolean, description: "The search names a tool, qualification or code (S/4HANA, ACCA): those who name it count most." }
+        understood: { $ref: '#/components/schemas/MeaningUnderstood' }
+        needs:
+          type: array
+          maxItems: 12
+          items: { $ref: '#/components/schemas/MeaningNeedRead' }

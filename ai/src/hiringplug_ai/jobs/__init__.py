@@ -37,9 +37,12 @@ from ..contracts import (
     JobKind,
     JobReadJdJob,
     MatchScoreJob,
+    MeaningReadCandidatesJob,
+    MeaningReadQueryJob,
     TalentRankJob,
 )
 from ..extraction import Limits, OcrEngine
+from ..meaning.model import MeaningModel
 from ..providers import Completion, Provider, ProviderError
 from ..queue import FollowUp
 from . import (
@@ -52,6 +55,7 @@ from . import (
     format_studio,
     interview_prep,
     match_score,
+    meaning_read,
     parse_cv,
     read_jd,
     read_linkedin,
@@ -154,6 +158,8 @@ class Deps:
     keep_alive: Callable[[], None] = lambda: None
     # Where this job's provider calls are noted (the worker sets it per job).
     log: ProviderLog | None = None
+    # Search by meaning's model (loaded on first use); None when not installed.
+    meaning: Callable[[], MeaningModel | None] = lambda: None
 
     def _chosen(self, access: AiAccess | None) -> Provider | None:
         if access is None:
@@ -209,4 +215,10 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.company_industry: Handler(CompanyIndustryJob, company_industry.run),
     JobKind.claim_read_receipt: Handler(ClaimReadReceiptJob, read_receipt.run),
     JobKind.interview_prep_write: Handler(InterviewPrepWriteJob, interview_prep.run),
+    JobKind.meaning_read_candidates: Handler(MeaningReadCandidatesJob, meaning_read.run_candidates),
+    JobKind.meaning_read_query: Handler(MeaningReadQueryJob, meaning_read.run_query),
 }
+
+# The jobs the worker's own meaning slot takes (searches first: a recruiter
+# waits on them), so they never wait behind a long AI call on the other slots.
+MEANING_KINDS = (JobKind.meaning_read_query, JobKind.meaning_read_candidates)

@@ -613,6 +613,43 @@ func (q *Queries) NewestCVOfTypes(ctx context.Context, arg NewestCVOfTypesParams
 	return id, err
 }
 
+const newestCVTexts = `-- name: NewestCVTexts :many
+SELECT DISTINCT ON (candidate_id) candidate_id, id, extracted_text::text AS text
+FROM document
+WHERE candidate_id = ANY($1::text[]) AND source <> 'formatted' AND binned_at IS NULL
+  AND extracted_text IS NOT NULL AND extracted_text <> '' AND source IN ('original', 'linkedin', 'jobstreet')
+ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC
+`
+
+type NewestCVTextsRow struct {
+	CandidateID string
+	ID          string
+	Text        string
+}
+
+// Search by meaning: each candidate's newest CV with text that they sent
+// (their CV first, then a LinkedIn or JobStreet one; not one the app made,
+// not in the bin).
+func (q *Queries) NewestCVTexts(ctx context.Context, candidateIds []string) ([]NewestCVTextsRow, error) {
+	rows, err := q.db.Query(ctx, newestCVTexts, candidateIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NewestCVTextsRow
+	for rows.Next() {
+		var i NewestCVTextsRow
+		if err := rows.Scan(&i.CandidateID, &i.ID, &i.Text); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const purgeBinnedDocument = `-- name: PurgeBinnedDocument :one
 DELETE FROM document WHERE id = $1 AND binned_at IS NOT NULL RETURNING storage_key,pdf_key
 `
