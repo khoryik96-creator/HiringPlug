@@ -14,6 +14,7 @@ import "./candidate-workspace.css";
 import "./search-reader.css";
 import "./folders.css";
 import "./listTop.css";
+import "./shortlists.css";
 
 guardNumberFields();
 guardRequiredFields();

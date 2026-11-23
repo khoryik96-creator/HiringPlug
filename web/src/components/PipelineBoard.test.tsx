@@ -140,6 +140,17 @@ describe("pipeline board", () => {
     expect(within(email).getByRole("heading", { name: "Email client" })).toBeTruthy(); // about this application, not a list
   });
 
+  it("starts a client link for the chosen candidates", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei] }));
+    const onClientLink = vi.fn();
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate={false} permissions={["pipeline:read"]} onClientLink={onClientLink} />);
+    await screen.findByRole("link", { name: "Siti Aisyah" });
+    choose("Siti Aisyah");
+    fireEvent.click(screen.getByRole("button", { name: "Client link for 1" }));
+    expect(onClientLink).toHaveBeenCalledWith([{ applicationId: siti.id, candidateId: siti.candidateId, name: "Siti Aisyah", stage: "screening" }]);
+    expect(screen.queryByText(/chosen$/)).toBeNull();
+  });
+
   it("shows initials, the name and current title, with no tick box; Space on the name chooses the card", async () => {
     await showBoard();
     const name = screen.getByRole("link", { name: "Siti Aisyah" });

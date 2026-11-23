@@ -235,6 +235,11 @@ func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID str
 		if err != nil {
 			return err
 		}
+		if err := store.New(tx).RecordFormattedCv(ctx, store.RecordFormattedCvParams{
+			DocumentID: docID, CandidateID: candidateID, Blind: o.Blind, IncludeSalary: o.IncludeSalary,
+		}); err != nil {
+			return err
+		}
 		// What was chosen, never the values (salary stays out of the log).
 		return audit.Record(ctx, tx, audit.Entry{Action: "cv.formatted", EntityType: "candidate", EntityID: candidateID, Changes: map[string]any{
 			"documentId": docID, "templateId": o.TemplateID, "showContact": o.ShowContact, "includeSalary": o.IncludeSalary, "blind": o.Blind,

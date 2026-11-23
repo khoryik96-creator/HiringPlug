@@ -247,6 +247,11 @@ func (s *Service) saveStudio(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		undo()
 		return err
 	}
+	// CV Studio takes the candidate's pay out: never with salary.
+	if err := q.RecordFormattedCv(ctx, store.RecordFormattedCvParams{DocumentID: docID, CandidateID: run.CandidateID, Blind: run.Blind}); err != nil {
+		undo()
+		return err
+	}
 	logx.From(ctx).Info("studio cv saved", "studio_cv_id", run.ID, "document_id", docID, "warning", warning != nil)
 	return audit.Record(ctx, tx, audit.Entry{Action: "cv.formatted", EntityType: "candidate", EntityID: run.CandidateID, Changes: map[string]any{
 		"documentId": docID, "studioCvId": run.ID, "blind": run.Blind,

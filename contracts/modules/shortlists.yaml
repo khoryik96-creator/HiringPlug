@@ -1,0 +1,326 @@
+# Module contract: shortlists (client shortlist links). See contracts/README.md.
+x-module:
+  name: shortlists
+  description: >
+    Client shortlist links. From a job's pipeline a recruiter picks
+    candidates, each with one of their formatted CVs (a blind one, or one
+    with the name), and gets a link to send the client (copied, or emailed
+    to the job's hiring contact). The client needs no account: the link
+    opens a page with only those candidates and CVs (never the candidate's
+    salary, email or phone), and they approve or reject each one with an
+    optional comment. Approving moves the application to interview (the
+    job's first interview stage); rejecting moves it to rejected (client
+    rejected, the comment as the note). Links expire (14 days unless the
+    recruiter chooses) and can be revoked. Creating, the first opening,
+    every answer and revoking are on the job's and the candidate's activity.
+  permissions:
+    shortlists:share:
+      description: Send clients a link to a job's shortlist, see their answers, and revoke links.
+      roles: [owner, admin, recruiter]
+  errorCodes:
+    SHORTLIST_DO_NOT_CONTACT:
+      status: 422
+      description: A candidate withdrew consent (see Data protection on their page), so they cannot be put on a link. `details.candidateId` names them.
+    SHORTLIST_CV_NOT_SHAREABLE:
+      status: 422
+      description: >
+        The CV chosen for a candidate cannot go to a client: it is not a formatted CV made by HiringPlug,
+        it includes the salary, or it shows the candidate's email or phone. `details.candidateId` names them.
+    SHORTLIST_CLOSED:
+      status: 409
+      description: The link was revoked or has expired.
+    SHORTLIST_ALREADY_ANSWERED:
+      status: 409
+      description: The client has already answered about this candidate.
+    SHORTLIST_TOO_MANY_TRIES:
+      status: 429
+      description: Too many answers or downloads from one address in a short time; try again later.
+  jobs: {}
+
+paths:
+  /v1/jobs/{jobId}/client-shortlists:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: listClientShortlists
+      tags: [shortlists]
+      summary: The job's client shortlist links, newest first, with the client's answers
+      x-permission: shortlists:share
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientShortlistList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: createClientShortlist
+      tags: [shortlists]
+      summary: Make a link to some of the job's candidates for the client (the address is in the answer only)
+      description: >
+        Each candidate must be on this job (not rejected or withdrawn), must not have withdrawn consent, and comes
+        with one of their formatted CVs that has no salary and shows no email or phone. With `emailHiringContact`
+        the link is also emailed to the job's hiring contact (needs emails:send).
+      x-permission: shortlists:share
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientShortlistInput' }
+      responses:
+        '201':
+          description: Made
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientShortlistCreated' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          description: A candidate withdrew consent (SHORTLIST_DO_NOT_CONTACT) or their CV cannot go to a client (SHORTLIST_CV_NOT_SHAREABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/client-shortlists/{shortlistId}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistIdPath'
+    post:
+      operationId: revokeClientShortlist
+      tags: [shortlists]
+      summary: Revoke a link at once (the client then sees that it no longer works)
+      x-permission: shortlists:share
+      responses:
+        '200':
+          description: Revoked (or already revoked)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientShortlist' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/public/client-shortlists/{shortlistToken}:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistTokenPath'
+    get:
+      operationId: getPublicClientShortlist
+      tags: [shortlists]
+      summary: The client's page (no sign-in); the first visit is recorded
+      description: A revoked or expired link answers with its status and no candidates.
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicClientShortlist' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/public/client-shortlists/{shortlistToken}/candidates/{shortlistCandidateId}/answer:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistTokenPath'
+      - $ref: '#/components/parameters/ClientShortlistCandidateIdPath'
+    post:
+      operationId: answerPublicClientShortlist
+      tags: [shortlists]
+      summary: The client approves or rejects a candidate (once), with an optional comment
+      x-permission: public
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientShortlistAnswer' }
+      responses:
+        '200':
+          description: Answered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicClientShortlist' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The link is closed (SHORTLIST_CLOSED) or the candidate was answered already (SHORTLIST_ALREADY_ANSWERED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many tries from this address (SHORTLIST_TOO_MANY_TRIES).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/public/client-shortlists/{shortlistToken}/candidates/{shortlistCandidateId}/cv:
+    parameters:
+      - $ref: '#/components/parameters/ClientShortlistTokenPath'
+      - $ref: '#/components/parameters/ClientShortlistCandidateIdPath'
+    get:
+      operationId: getPublicClientShortlistCv
+      tags: [shortlists]
+      summary: The candidate's CV as the recruiter chose it (PDF when there is one, else the Word file)
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The link is closed (SHORTLIST_CLOSED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many tries from this address (SHORTLIST_TOO_MANY_TRIES).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  parameters:
+    ClientShortlistIdPath:
+      name: shortlistId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ClientShortlistId' }
+    ClientShortlistCandidateIdPath:
+      name: shortlistCandidateId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ClientShortlistCandidateId' }
+    ClientShortlistTokenPath:
+      name: shortlistToken
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+
+  schemas:
+    ClientShortlistId:
+      type: string
+      pattern: '^csl_[0-9a-hjkmnp-tv-z]{26}$'
+    ClientShortlistCandidateId:
+      type: string
+      pattern: '^cslc_[0-9a-hjkmnp-tv-z]{26}$'
+    ClientShortlistStatus:
+      type: string
+      description: open (the client can answer), expired or revoked.
+      enum: [open, expired, revoked]
+    ClientShortlistDecision:
+      type: string
+      enum: [approved, rejected]
+    ClientShortlistInput:
+      type: object
+      additionalProperties: false
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ClientShortlistPick' }
+        expiresInDays: { type: integer, minimum: 1, maximum: 90, default: 14, description: How long the link works. }
+        message: { type: string, maxLength: 2000, description: Shown to the client at the top of the page (and in the email). }
+        emailHiringContact: { type: boolean, description: Also email the link to the job's hiring contact (needs emails:send). }
+    ClientShortlistPick:
+      type: object
+      additionalProperties: false
+      required: [applicationId, documentId]
+      properties:
+        applicationId: { $ref: '#/components/schemas/ApplicationId' }
+        documentId:
+          allOf: [{ $ref: '#/components/schemas/DocumentId' }]
+          description: One of the candidate's formatted CVs (blind or with the name).
+        note: { type: string, maxLength: 1000, description: "Your words about the candidate, shown to the client." }
+    ClientShortlistCreated:
+      type: object
+      required: [shortlist, url]
+      properties:
+        shortlist: { $ref: '#/components/schemas/ClientShortlist' }
+        url: { type: string, description: "The address to give the client. Shown only now: only a hash of it is kept." }
+    ClientShortlist:
+      type: object
+      required: [id, jobId, status, message, expiresAt, revokedAt, openedAt, lastOpenedAt, emailedTo, createdByName, createdAt, candidates]
+      properties:
+        id: { $ref: '#/components/schemas/ClientShortlistId' }
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        status: { $ref: '#/components/schemas/ClientShortlistStatus' }
+        message: { type: string, nullable: true }
+        expiresAt: { type: string, format: date-time }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        openedAt: { type: string, format: date-time, nullable: true, description: "The client's first visit; null while not opened." }
+        lastOpenedAt: { type: string, format: date-time, nullable: true }
+        emailedTo: { type: string, nullable: true, description: The hiring contact it was emailed to. }
+        createdByName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/ClientShortlistCandidate' }
+    ClientShortlistCandidate:
+      type: object
+      required: [id, applicationId, candidateId, candidateName, label, blind, documentId, note, decision, comment, answeredAt]
+      properties:
+        id: { $ref: '#/components/schemas/ClientShortlistCandidateId' }
+        applicationId: { $ref: '#/components/schemas/ApplicationId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        candidateName: { type: string }
+        label: { type: string, description: 'The name the client sees: a reference ("Candidate C-4F2K9Q") with a blind CV.' }
+        blind: { type: boolean }
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        note: { type: string, nullable: true }
+        decision:
+          allOf: [{ $ref: '#/components/schemas/ClientShortlistDecision' }]
+          nullable: true
+        comment: { type: string, nullable: true }
+        answeredAt: { type: string, format: date-time, nullable: true }
+    ClientShortlistList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ClientShortlist' }
+    ClientShortlistAnswer:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { $ref: '#/components/schemas/ClientShortlistDecision' }
+        comment: { type: string, maxLength: 2000 }
+    PublicClientShortlist:
+      type: object
+      description: What the client sees; nothing else about the candidates.
+      required: [agencyName, jobTitle, recruiterName, message, status, expiresAt, candidates]
+      properties:
+        agencyName: { type: string }
+        jobTitle: { type: string }
+        recruiterName: { type: string, nullable: true }
+        message: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ClientShortlistStatus' }
+        expiresAt: { type: string, format: date-time }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/PublicShortlistCandidate' }
+    PublicShortlistCandidate:
+      type: object
+      required: [id, label, blind, note, cvFileName, decision, comment, answeredAt]
+      properties:
+        id: { $ref: '#/components/schemas/ClientShortlistCandidateId' }
+        label: { type: string }
+        blind: { type: boolean }
+        note: { type: string, nullable: true }
+        cvFileName: { type: string, nullable: true, description: "The name the CV downloads as (the label, never the stored file name)." }
+        decision:
+          allOf: [{ $ref: '#/components/schemas/ClientShortlistDecision' }]
+          nullable: true
+        comment: { type: string, nullable: true }
+        answeredAt: { type: string, format: date-time, nullable: true }

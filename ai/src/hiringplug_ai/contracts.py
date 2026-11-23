@@ -112,6 +112,7 @@ class Permission(StrEnum):
     settings_backups_manage = "settings.backups:manage"
     settings_manage = "settings:manage"
     settings_read = "settings:read"
+    shortlists_share = "shortlists:share"
 
 
 class ErrorCode(StrEnum):
@@ -178,6 +179,11 @@ class ErrorCode(StrEnum):
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
     SCHEDULING_NOT_SET_UP = "SCHEDULING_NOT_SET_UP"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+    SHORTLIST_ALREADY_ANSWERED = "SHORTLIST_ALREADY_ANSWERED"
+    SHORTLIST_CLOSED = "SHORTLIST_CLOSED"
+    SHORTLIST_CV_NOT_SHAREABLE = "SHORTLIST_CV_NOT_SHAREABLE"
+    SHORTLIST_DO_NOT_CONTACT = "SHORTLIST_DO_NOT_CONTACT"
+    SHORTLIST_TOO_MANY_TRIES = "SHORTLIST_TOO_MANY_TRIES"
     SIGN_IN_CHOOSE_COMPANY = "SIGN_IN_CHOOSE_COMPANY"
     SIGN_IN_FAILED = "SIGN_IN_FAILED"
     STAGE_MOVE_NOT_ALLOWED = "STAGE_MOVE_NOT_ALLOWED"
@@ -6587,6 +6593,76 @@ class SalaryCalculationRules(BaseModel):
     cents: bool
 
 
+class ClientShortlistId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^csl_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class ClientShortlistCandidateId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^cslc_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class ClientShortlistStatus(StrEnum):
+    open = "open"
+    expired = "expired"
+    revoked = "revoked"
+
+
+class ClientShortlistDecision(StrEnum):
+    approved = "approved"
+    rejected = "rejected"
+
+
+class ClientShortlistPick(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    applicationId: ApplicationId
+    documentId: Annotated[
+        DocumentId, Field(description="One of the candidate's formatted CVs (blind or with the name).")
+    ]
+    note: Annotated[
+        str | None, Field(description="Your words about the candidate, shown to the client.", max_length=1000)
+    ] = None
+
+
+class ClientShortlistCandidate(BaseModel):
+    id: ClientShortlistCandidateId
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    label: Annotated[
+        str,
+        Field(description='The name the client sees: a reference ("Candidate C-4F2K9Q") with a blind CV.'),
+    ]
+    blind: bool
+    documentId: DocumentId
+    note: Annotated[str | None, Field(...)]
+    decision: Annotated[ClientShortlistDecision | None, Field(...)]
+    comment: Annotated[str | None, Field(...)]
+    answeredAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class ClientShortlistAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    decision: ClientShortlistDecision
+    comment: Annotated[str | None, Field(max_length=2000)] = None
+
+
+class PublicShortlistCandidate(BaseModel):
+    id: ClientShortlistCandidateId
+    label: str
+    blind: bool
+    note: Annotated[str | None, Field(...)]
+    cvFileName: Annotated[
+        str | None, Field(description="The name the CV downloads as (the label, never the stored file name).")
+    ]
+    decision: Annotated[ClientShortlistDecision | None, Field(...)]
+    comment: Annotated[str | None, Field(...)]
+    answeredAt: Annotated[AwareDatetime | None, Field(...)]
+
+
 class AiProviderEntry(BaseModel):
     provider: AiProviderName
     model: Annotated[str | None, Field(...)]
@@ -8574,6 +8650,52 @@ class Backups(BaseModel):
     ]
 
 
+class ClientShortlistInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidates: Annotated[list[ClientShortlistPick], Field(max_length=20, min_length=1)]
+    expiresInDays: Annotated[int, Field(description="How long the link works.", ge=1, le=90)] = 14
+    message: Annotated[
+        str | None,
+        Field(description="Shown to the client at the top of the page (and in the email).", max_length=2000),
+    ] = None
+    emailHiringContact: Annotated[
+        bool | None, Field(description="Also email the link to the job's hiring contact (needs emails:send).")
+    ] = None
+
+
+class ClientShortlist(BaseModel):
+    id: ClientShortlistId
+    jobId: JobOrderId
+    status: ClientShortlistStatus
+    message: Annotated[str | None, Field(...)]
+    expiresAt: AwareDatetime
+    revokedAt: Annotated[AwareDatetime | None, Field(...)]
+    openedAt: Annotated[
+        AwareDatetime | None, Field(description="The client's first visit; null while not opened.")
+    ]
+    lastOpenedAt: Annotated[AwareDatetime | None, Field(...)]
+    emailedTo: Annotated[str | None, Field(description="The hiring contact it was emailed to.")]
+    createdByName: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    candidates: list[ClientShortlistCandidate]
+
+
+class ClientShortlistList(BaseModel):
+    items: list[ClientShortlist]
+
+
+class PublicClientShortlist(BaseModel):
+    agencyName: str
+    jobTitle: str
+    recruiterName: Annotated[str | None, Field(...)]
+    message: Annotated[str | None, Field(...)]
+    status: ClientShortlistStatus
+    expiresAt: AwareDatetime
+    candidates: list[PublicShortlistCandidate]
+
+
 class AiProviders(BaseModel):
     active: AiProviderChoice
     serverAvailable: Annotated[
@@ -8863,6 +8985,13 @@ class Report(BaseModel):
     ]
     timeToFill: TimeToFill
     feesHidden: Annotated[bool, Field(description="Fees are left out (placements.fees:read is needed).")]
+
+
+class ClientShortlistCreated(BaseModel):
+    shortlist: ClientShortlist
+    url: Annotated[
+        str, Field(description="The address to give the client. Shown only now: only a hash of it is kept.")
+    ]
 
 
 class CandidateFind(BaseModel):

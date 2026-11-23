@@ -61,6 +61,15 @@ func (a cvApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (ma
 	return out, err
 }
 
+// cvFiles gives cvformats a document's file, to check it before it goes to a
+// client (documents module).
+type cvFiles struct{ documents *documents.Module }
+
+func (a cvFiles) FormattedFile(ctx context.Context, tx pgx.Tx, id string) (cvformats.FormattedFile, error) {
+	d, data, err := a.documents.CVFile(ctx, tx, id, false)
+	return cvformats.FormattedFile{CandidateID: d.CandidateID, Source: d.Source, Data: data}, err
+}
+
 // cvSources gives cvformats a CV to format CV Studio's way (documents module).
 type cvSources struct{ documents *documents.Module }
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { activityKey, notesKey, screeningCallsKey } from "../api/keys";
 import { formatDay, keysOf, NOTE_KIND } from "../labels";
-import { describe } from "./activityText";
+import { actorOf, describe } from "./activityText";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
 import { CallQA } from "./callLines";
@@ -80,7 +80,7 @@ export function Timeline({ subjectType, subjectId, permissions, compact = false 
     ...allNotes.map((n) => ({ key: n.id, at: n.createdAt, note: n, text: null as string | null, who: n.authorName, kind: filterOf(n) })),
     ...(activity.data?.items ?? []).flatMap((a) => {
       const text = describe(a);
-      return text ? [{ key: a.id, at: a.at, note: null, text, who: a.actorName, kind: "changes" }] : [];
+      return text ? [{ key: a.id, at: a.at, note: null, text, who: actorOf(a), kind: "changes" }] : [];
     }),
   ].sort((x, y) => y.at.localeCompare(x.at));
   const counts = Object.fromEntries(FILTERS.map((f) => [f.key, f.key === "all" ? items.length : items.filter((i) => i.kind === f.key).length])) as Record<Filter, number>;

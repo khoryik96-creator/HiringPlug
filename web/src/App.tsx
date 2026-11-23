@@ -12,6 +12,7 @@ import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { SettingsLayout } from "./components/SettingsLayout";
 import { BookingPage, bookingRoute } from "./pages/BookingPage";
+import { ClientShortlistPage, shortlistRoute } from "./pages/ClientShortlistPage";
 import { Careers } from "./pages/Careers";
 import { ChoosePassword } from "./pages/ChoosePassword";
 import { SignIn } from "./pages/SignIn";
@@ -181,6 +182,8 @@ export function App() {
   const careers = careersRoute(window.location);
   // A booking page: also public.
   const booking = bookingRoute(window.location);
+  // A client's shortlist page: also public.
+  const shortlist = shortlistRoute(window.location);
   // Invitation and password reset links: also never behind sign-in.
   const link = authLinkRoute(window.location.hash);
   const changeSession = (signedIn: boolean) => {
@@ -198,6 +201,8 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       {booking ? (
         <BookingPage key={booking} token={booking} />
+      ) : shortlist ? (
+        <ClientShortlistPage key={shortlist} token={shortlist} />
       ) : careers ? (
         // Public: candidates are never asked to sign in.
         <Careers key={careers.slug} route={careers} pathStyle={!window.location.hash.startsWith("#/careers/")} />

@@ -55,3 +55,15 @@ SELECT coalesce(sum(tokens), 0)::bigint FROM studio_cv_ai_use WHERE created_at >
 -- Merging candidates: the duplicate's formatting runs follow it.
 -- name: MoveStudioCvs :exec
 UPDATE studio_cv SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- How a formatted CV was made (blind, with salary): only those without salary go to clients.
+-- name: RecordFormattedCv :exec
+INSERT INTO formatted_cv (tenant_id, document_id, candidate_id, blind, include_salary)
+VALUES (app_current_tenant(), @document_id, @candidate_id, @blind, @include_salary)
+ON CONFLICT (tenant_id, document_id) DO NOTHING;
+
+-- name: GetFormattedCv :one
+SELECT * FROM formatted_cv WHERE document_id = @document_id;
+
+-- name: MoveFormattedCvs :exec
+UPDATE formatted_cv SET candidate_id = @to_id WHERE candidate_id = @from_id;
