@@ -36,7 +36,7 @@ describe("the candidate's CV", () => {
     const fetchFile = serve([doc("doc_w", WORD, "ready")]);
     renderWithClient(<CandidateCv candidateId="cand_1" />);
     const frame = await screen.findByTitle("cv.docx");
-    expect(frame.getAttribute("src")).toBe("blob:cv");
+    expect(frame.getAttribute("src")).toBe("blob:cv#toolbar=0&navpanes=0"); // the PDF copy, without the viewer's own download
     expect(fetchFile).toHaveBeenCalledWith("/v1/documents/doc_w/pdf", expect.anything());
   });
 

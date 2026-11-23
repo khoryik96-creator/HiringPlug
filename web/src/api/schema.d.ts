@@ -7702,7 +7702,7 @@ export interface components {
             summaryDirection?: string | null;
         };
         /**
-         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). Never for a blind CV: it keeps the CV's own summary.
+         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). A blind CV gets it too: the blind step then anonymises it bullet by bullet.
          * @enum {string}
          */
         StudioCvSummary: "none" | "short" | "normal" | "detailed";

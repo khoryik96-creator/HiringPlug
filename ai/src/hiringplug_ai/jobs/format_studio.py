@@ -114,6 +114,10 @@ def _format(
     warning = checked.get("warning") if checked.get("degraded") else None
     removed += _with_summary(payload, cv, checked, ask_text, text)
 
+    levels = checked.get("bullet_levels") or []
+    if payload.contentType.endswith("wordprocessingml.document"):  # the Word file's own list depth first
+        levels = cvstudio.merge_levels(cvstudio.docx_bullet_levels(data), levels)
+
     identity: dict[str, object] | None = None
     if payload.blind:
         prepared, pay = cvstudio.prepare_blind(cv)
@@ -123,10 +127,8 @@ def _format(
             prepared,
             ask(cvstudio.blind_prompt(payload.neutralGender), cvstudio.blind_request(prepared), BLIND_TOKENS),
         )
-
-    levels = checked.get("bullet_levels") or []
-    if payload.contentType.endswith("wordprocessingml.document"):  # the Word file's own list depth first
-        levels = cvstudio.merge_levels(cvstudio.docx_bullet_levels(data), levels)
+        # Blinding changes some bullets' words: each keeps its source bullet's depth.
+        levels = cvstudio.blind_levels(list(levels), prepared, cv)
     deps.keep_alive()
     try:
         docx = cvstudio.render(cv, alignment=payload.alignment.value, bullet_levels=list(levels))
@@ -162,9 +164,11 @@ def _with_summary(
     cv_text: str,
 ) -> int:
     """CV Studio's About Him / Her, written from the CV (its pay already
-    removed), replacing the summary read from it; never for a blind CV.
+    removed), replacing the summary read from it. A blind CV gets the same
+    bullets (the blind step then anonymises them, one for one), so it reads
+    like the formatted CV rather than as the CV's own paragraph.
     Returns the lines stating pay removed from the summary."""
-    if payload.summary.value == "none" or payload.blind:
+    if payload.summary.value == "none":
         return int(str(checked.get("summary_pay_removed") or 0))
     focus = payload.summaryFocus.value if payload.summaryFocus else "general"
     cv["summary_bullets"], pay = _summary(

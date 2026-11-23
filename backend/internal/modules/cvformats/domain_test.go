@@ -182,4 +182,8 @@ func TestSummaryDirectionRefusesPayButNotOrdinaryWork(t *testing.T) {
 	o, err := summaryOptions(StudioOptions{Summary: "none", SummaryFocus: "commercial", SummaryDirection: "salary"})
 	require.NoError(t, err, "no summary: the direction is dropped, not judged")
 	assert.Empty(t, o.SummaryDirection)
+	o, err = summaryOptions(StudioOptions{Blind: true, Summary: "short", SummaryFocus: "leadership"})
+	require.NoError(t, err)
+	assert.Equal(t, "short", o.Summary, "a blind CV gets the written summary too, as bullets, not the CV's own paragraph")
+	assert.Equal(t, "leadership", o.SummaryFocus)
 }

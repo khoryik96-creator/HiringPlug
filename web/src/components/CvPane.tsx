@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 
 import { api, type Document, unwrap } from "../api/client";
 import { downloadDocument, fetchDocumentFile, fetchDocumentPdf } from "../api/files";
-import { FileIcon, IconButton, TextIcon } from "./ActionIcons";
+import { DownloadIcon, FileIcon, IconButton, TextIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 
 export const SOURCE: Record<Document["source"], string> = {
@@ -65,9 +65,15 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", u
   const viewButton = isPdf && (unified
     ? <IconButton label={viewLabel} icon={view === "original" ? <TextIcon /> : <FileIcon />} onClick={showOtherView} />
     : <button type="button" className="link" onClick={showOtherView}>{viewLabel}</button>);
+  // The file itself, under its own name: a formatted CV is a Word file, and
+  // the preview is only a PDF copy of it.
+  const downloadButton = unified && doc && (
+    <IconButton label={isWord(doc) ? `Download the Word file, ${doc.fileName}` : `Download ${doc.fileName}`}
+      tip={isWord(doc) ? "Download the Word file" : "Download"} icon={<DownloadIcon />} onClick={() => { void downloadDocument(doc); }} />
+  );
   return (
     <section className="panel" aria-label={doc ? label(doc) : "CV"}>
-      {toolbar?.target && createPortal(<>{viewButton}{toolbar.details}</>, toolbar.target)}
+      {toolbar?.target && createPortal(<>{viewButton}{downloadButton}{toolbar.details}</>, toolbar.target)}
       <div className="row">
         {title && <h3 className="cv-pane-title">{title}</h3>}
         {unified && doc && <strong className="cv-selected-name">{doc.fileName}</strong>}
@@ -75,6 +81,7 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", u
           {docs.map((d) => <option key={d.id} value={d.id}>{label(d)}</option>)}
         </select>}
         {!toolbar && viewButton}
+        {!toolbar && downloadButton}
         {!unified && doc && <button type="button" className="link" onClick={() => { void downloadDocument(doc); }}>Download</button>}
         {actions}
       </div>
@@ -113,8 +120,13 @@ function Original({ doc }: { doc: Document }) {
   if (!url) return <p className="muted">Loading…</p>;
   return isImage(doc)
     ? <div className="cv-picture"><img src={url} alt={doc.fileName} /></div>
-    : <iframe className="cv-frame" title={doc.fileName} src={url} />;
+    // A Word file's PDF copy hides the viewer's own toolbar: its download
+    // would save the copy as a PDF under a made-up name, not the Word file.
+    : <iframe className="cv-frame" title={doc.fileName} src={contentType === "application/pdf" ? url : `${url}#toolbar=0&navpanes=0`} />;
 }
+
+/** A Word file (.docx or .doc), such as every formatted CV. */
+const isWord = (doc: Document) => /wordprocessingml|msword/.test(doc.contentType);
 
 /** A picture of a CV (read with OCR): shown as it is. */
 const isImage = (doc: Document | undefined) => Boolean(doc?.contentType.startsWith("image/"));

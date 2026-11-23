@@ -196,7 +196,7 @@ def test_only_statements_of_the_candidates_own_pay_are_left_out(line: str, dropp
     assert text.endswith("Senior Accountant")
 
 
-def test_a_blind_cv_keeps_the_cvs_own_summary_without_pay_as_cv_studio_does() -> None:
+def test_a_blind_cv_without_a_written_summary_keeps_the_cvs_own_without_pay() -> None:
     ai = FakeAI(json.dumps(PARSED), anonymise)
     result = run(ai, job(blind=True))
     assert result.error is None
@@ -385,10 +385,44 @@ def test_the_summary_brings_out_the_focus_and_follows_the_recruiters_direction()
     assert "Strongly emphasise technical skills" in tech.calls[1][1]
 
 
-def test_a_blind_cv_never_gets_a_written_summary() -> None:
-    ai = FakeAI(json.dumps(PARSED), anonymise)
-    assert run(ai, job(blind=True, summary="normal")).error is None
-    assert len(ai.calls) == 2, "read, then anonymised: no summary call"
+def test_a_blind_cv_gets_the_written_summary_as_bullets_anonymised_one_for_one() -> None:
+    ai = FakeAI(json.dumps(PARSED), SUMMARY, anonymise)
+    result = run(ai, job(blind=True, summary="normal"))
+    assert result.error is None
+    assert len(ai.calls) == 3, "read, the summary, then anonymised"
+    sent = sent_cv(ai.calls[2][1])["summary_bullets"]
+    assert len(sent) == 2, "the written bullets, not the CV's own paragraph"
+    assert "9,000" not in json.dumps(sent)
+    assert result.docxBase64 is not None
+    assert "disaster recovery" in word_text(result.docxBase64)
+
+
+def test_a_blinded_bullet_keeps_the_indent_of_the_bullet_it_was_made_from() -> None:
+    def cv(*bullets: object) -> dict[str, Any]:
+        return {"work_experiences": [{"roles": [{"bullets": list(bullets)}]}]}
+
+    prepared = cv(
+        "Led audits at Laureate Group",
+        {"heading": "Projects", "bullets": ["Built Laureate's ledger"]},
+        "Closed books",
+    )
+    blinded = cv(
+        "Led audits at [Company]",
+        {"heading": "Projects", "bullets": ["Built [Company]'s ledger"]},
+        "Closed books",
+    )
+    levels = [
+        {"text": "led audits at laureate group", "level": 1},
+        {"text": "built laureate's ledger", "level": 2},
+    ]
+    assert cvstudio.blind_levels(levels, prepared, blinded) == [
+        {"text": "led audits at [company]", "level": 1},
+        {"text": "built [company]'s ledger", "level": 2},
+    ], "an unindented bullet stays unindented"
+    shorter = cv("Led audits at [Company]")
+    assert cvstudio.blind_levels(levels, prepared, shorter) == levels, (
+        "not one for one: the levels as they were"
+    )
 
 
 def test_an_empty_summary_fails_as_cv_studios_does() -> None:
