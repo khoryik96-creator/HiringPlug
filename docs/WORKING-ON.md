@@ -20,10 +20,10 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Batch CV formatting
+### Code review of 1.38.0
 - Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v
-- Touches: cvformats module (CV Studio runs), the job pipeline's pick bar, the candidate list's selection, FormatCv
+- Touches: review only (fixes, if any, on the branch)
 - Started: 23 Nov 2026    Last update: 23 Nov 2026
 - State: in progress
-- Next: design, build, tests, screenshots; version 1.38.0
+- Next: review e38a52c..1.38.0, report, fix what the owner asks
