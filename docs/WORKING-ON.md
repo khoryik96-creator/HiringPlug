@@ -20,10 +20,10 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Code review of 1.38.0
+### Code review of 1.38.1; meeting editor toolbar
 - Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v
-- Touches: review only (fixes, if any, on the branch)
+- Touches: review only; then web/src/components/clientEmail/RichEditor.tsx and web/src/components/calendar/ComposeBody.tsx (the toolbar's buttons in the new-meeting window)
 - Started: 23 Nov 2026    Last update: 23 Nov 2026
 - State: in progress
-- Next: review e38a52c..1.38.0, report, fix what the owner asks
+- Next: report the review of bddbe0d..1.38.1; fix the toolbar's squashed labels in the meeting window; fix what the owner asks
