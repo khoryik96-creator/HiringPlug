@@ -10,15 +10,7 @@ import { CvImportIndicator } from "./components/outlook/CvImportIndicator";
 import { NotificationBell } from "./components/Notifications";
 import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
-import { OpenTabs, type TabsStyle } from "./components/OpenTabs";
-
-/** The open-records strip's look, while the designs are compared. */
-function tabsLook(): TabsStyle {
-  try {
-    const v = localStorage.getItem("hp.openTabsLook");
-    return v === "pills" || v === "grouped" ? v : "tabs";
-  } catch { return "tabs"; }
-}
+import { OpenTabs } from "./components/OpenTabs";
 import { SettingsLayout } from "./components/SettingsLayout";
 import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { ClientShortlistPage, shortlistRoute } from "./pages/ClientShortlistPage";
@@ -145,7 +137,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       <div className="shell-content">
         <div className="shell-page" inert={calendarModal}>
           <AiNotice permissions={permissions} />
-          <OpenTabs hash={hash} look={tabsLook()} />
+          <OpenTabs hash={hash} />
           <PageErrorBoundary key={pageKey}>
             <Suspense fallback={<p className="muted page-loading">Loading…</p>}>
               {route.menu?.in === "settings" ? (

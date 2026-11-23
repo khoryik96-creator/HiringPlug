@@ -17,7 +17,7 @@ import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { useTabName } from "../components/openTabs";
+import { useTabName } from "../components/openRecords";
 import { QuickIndustries, QuickSpecialization, QuickWords } from "../components/ProfileQuickEdit";
 import { History } from "../components/History";
 import { Owner } from "../components/Owner";

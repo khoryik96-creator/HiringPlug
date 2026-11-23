@@ -6,7 +6,7 @@ import { applicationsKey, jobKey } from "../api/keys";
 import { BuildingIcon, EditIcon, IconActions, IconButton, PersonIcon } from "../components/ActionIcons";
 import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { useTabName } from "../components/openTabs";
+import { useTabName } from "../components/openRecords";
 import { Timeline } from "../components/Timeline";
 import { InterviewPrepPanel } from "../components/interviewprep/InterviewPrepPanel";
 import { InterviewQuestions } from "../components/interviewprep/InterviewQuestions";

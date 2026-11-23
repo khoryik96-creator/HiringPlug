@@ -16,7 +16,7 @@ import { JobsNeedingContact } from "../components/FollowLeaver";
 import { LinkedinCheckResult, LinkedinChecks } from "../components/LinkedinChecks";
 import { MailboxBadge } from "../components/MailboxBadge";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { useTabName } from "../components/openTabs";
+import { useTabName } from "../components/openRecords";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { roleLabel } from "../components/contactRole";
 import { Timeline } from "../components/Timeline";

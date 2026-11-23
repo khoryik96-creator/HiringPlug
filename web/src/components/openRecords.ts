@@ -4,10 +4,11 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 export type TabKind = "candidate" | "contact" | "company" | "job";
-export type OpenTab = { href: string; kind: TabKind; label: string };
+/** done: something finished on it (a CV formatted) since you last had it open. */
+export type OpenTab = { href: string; kind: TabKind; label: string; done?: boolean };
 
 /** At most this many tabs: opening another closes the one least recently opened. */
-export const MAX_TABS = 12;
+export const MAX_TABS = 30;
 const KEY = "hp.openTabs";
 const ROUTES: [RegExp, TabKind, string][] = [
   [/^#\/candidates\/(cand_[0-9a-z]+)(?:\/(?:screening|reference-check|compare))?(?:\?.*)?$/, "candidate", "#/candidates/"],
@@ -55,8 +56,37 @@ export function nameTab(href: string, label: string) {
   set(tabs.map((t) => (t.href === href ? { ...t, label: name } : t)));
 }
 
-export function closeTab(href: string) {
-  set(tabs.filter((t) => t.href !== href));
+export function closeTabs(hrefs: string[]) {
+  set(tabs.filter((t) => !hrefs.includes(t.href)));
+}
+
+export function closeTab(href: string) { closeTabs([href]); }
+
+// What has lit a tab already (a notification's id): never twice.
+const LIT_KEY = "hp.openTabsLit";
+let lit: string[] = (() => {
+  try { const v = JSON.parse(localStorage.getItem(LIT_KEY) ?? "[]") as unknown; return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+})();
+
+function remember(event: string) {
+  lit = [...lit, event].slice(-200);
+  try { localStorage.setItem(LIT_KEY, JSON.stringify(lit)); } catch { /* private window */ }
+}
+
+/** Lights a record's tab green: something finished on it (once per event).
+ * On the record's own page (looking) it is seen there and never lights;
+ * with no tab open for it, it waits until one is. */
+export function markTabDone(href: string, event: string, looking = false) {
+  if (lit.includes(event)) return;
+  if (looking) { remember(event); return; }
+  if (!tabs.some((t) => t.href === href)) return;
+  remember(event);
+  set(tabs.map((t) => (t.href === href ? { ...t, done: true } : t)));
+}
+
+/** The record is open again: its tab is no longer lit. */
+export function seenTab(href: string) {
+  if (tabs.some((t) => t.href === href && t.done)) set(tabs.map((t) => (t.href === href ? { ...t, done: false } : t)));
 }
 
 export function useOpenTabs(): OpenTab[] {
@@ -69,4 +99,4 @@ export function useTabName(href: string, label: string | undefined) {
 }
 
 /** For tests: start with no tabs. */
-export function resetTabs() { set([]); }
+export function resetTabs() { lit = []; set([]); }

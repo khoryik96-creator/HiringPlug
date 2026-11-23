@@ -27,7 +27,8 @@ export const KINDS: { kind: Kind; label: string; short: string; permission: Perm
 ];
 const SHORT = Object.fromEntries(KINDS.map((k) => [k.kind, k.short])) as Record<Kind, string>;
 
-function useNotifications() {
+/** The bell's list (shared: the open-record tabs read it too, with no request of their own). */
+export function useNotifications() {
   return useQuery({
     queryKey: notificationsKey,
     queryFn: async () => unwrap(await api.GET("/v1/notifications")),

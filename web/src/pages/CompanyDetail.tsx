@@ -16,7 +16,7 @@ import { CompanyContacts } from "../components/CompanyContacts";
 import { CompanyForm } from "../components/CompanyForm";
 import { CompanyJobs } from "../components/CompanyJobs";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { useTabName } from "../components/openTabs";
+import { useTabName } from "../components/openRecords";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { Timeline } from "../components/Timeline";
 
