@@ -132,7 +132,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             <span className="avatar" aria-hidden="true">{initials(me.data.user.name)}</span>
             <span className="name"><strong>{me.data.user.name}</strong><small>{me.data.role.replace("_", " ")} · {me.data.tenant.name}</small></span>
           </a>
-          <button type="button" className="link" onClick={() => { void endSession().finally(onSignOut); }}>
+          <button type="button" className="link" onClick={() => { forgetTabs(); void endSession().finally(onSignOut); }}>
             Sign out
           </button>
         </div>
@@ -191,7 +191,10 @@ export function App() {
   useHash(); // re-render on navigation
   const [signedIn, setSignedIn] = useState(getToken() !== null);
   // A new browser tab (a record dragged out): another signed-in tab's sign-in, if one is open.
-  const [asking, setAsking] = useState(!signedIn);
+  // Never on a public page (careers, booking, a client's shortlist, an invitation).
+  const isPublic = () => !!(careersRoute(window.location) || bookingRoute(window.location) || shortlistRoute(window.location)
+    || authLinkRoute(window.location.hash));
+  const [asking, setAsking] = useState(() => !signedIn && !isPublic());
   useEffect(() => {
     if (!asking) return;
     let live = true;
@@ -220,8 +223,9 @@ export function App() {
     setQueryClient(newSessionQueries());
     setSignedIn(signedIn);
   };
+  // (Signing out with the button also forgets the open-record tabs, so the
+  // next person on this browser never sees them; a sign-in that lapsed keeps them.)
   const signOut = () => {
-    forgetTabs(); // the next person on this browser never sees them
     clearToken();
     changeSession(false);
   };

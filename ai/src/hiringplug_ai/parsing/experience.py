@@ -377,19 +377,6 @@ def _owns_labels(text: str) -> bool:
     return bool(_TITLE_LABEL.match(text) or _COMPANY_LABEL.match(text))
 
 
-def _labels_above(section: list[str], i: int, start: int) -> list[str]:
-    """The labelled lines right above line i, nearest first, back to the job
-    line before ("Position: ...", "Company: ..." above "Duration: ...")."""
-    out: list[str] = []
-    j = i - 1
-    while (
-        j >= start and _ANY_LABEL.match(section[j].strip()) and not _DURATION_LABEL.match(section[j].strip())
-    ):
-        out.append(section[j].strip())
-        j -= 1
-    return out
-
-
 def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool) -> Job | None:
     dates = find_range(section[i])
     if dates is None:
@@ -406,17 +393,11 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
     # A table row (tables.py) has its role and employer below its "Duration:"
     # line, whatever the rest of the CV does.
     table_row = _table_row(section, i, start)
-    # A labelled CV with the labels above the dates ("Position:", "Company:",
-    # then "Duration:" and "Responsibilities:"): those above are this job's,
-    # the ones below the next job's.
-    above_labels = [] if table_row else _labels_above(section, i, start)
-    own_above = any(_owns_labels(t) for t in above_labels) and not (after and _owns_labels(after[0].strip()))
-    below_dates = (dates_first or table_row) and not own_above
-    near, far = (after, before) if below_dates else (above_labels if own_above else before, after)
+    below_dates = dates_first or table_row
+    near, far = (after, before) if below_dates else (before, after)
     lt, lc = _labelled([section[i], *near])
-    # A table row left a cell empty: the neighbouring row never fills it;
-    # nor does the next job fill one a labelled job left out.
-    ft, fc = _labelled(far) if not (table_row or own_above) else (None, None)
+    # A table row left a cell empty: the neighbouring row never fills it.
+    ft, fc = _labelled(far) if not table_row else (None, None)
     lt, lc = lt or ft, lc or fc
     title, company = title or lt, company or lc
     above = _joined(_headlines(section, range(i - 1, start - 1, -1))[::-1])[::-1]  # nearest first

@@ -40,8 +40,10 @@ export function OpenTabs({ hash }: { hash: string }) {
       const field = e.target as HTMLElement | null;
       if (field?.closest("form") && !field.closest(".open-tabs") && (field as HTMLInputElement).type !== "search") typed.current = true;
     };
+    const onSave = () => { typed.current = false; }; // saved: nothing left unsaved
     document.addEventListener("input", onInput, true);
-    return () => { document.removeEventListener("input", onInput, true); };
+    document.addEventListener("submit", onSave, true);
+    return () => { document.removeEventListener("input", onInput, true); document.removeEventListener("submit", onSave, true); };
   }, [hash]);
   // Something finished on an open record you are not looking at: its tab lights green.
   useEffect(() => {

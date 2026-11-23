@@ -19,6 +19,9 @@ type outlookGraphError struct {
 	status int
 	retry  time.Time
 	code   string // Microsoft's error code ("ErrorAccessDenied"), when it gave one
+	// badLink: the folder's saved link (or the next one Outlook gave) is not
+	// one to follow: the folder starts afresh rather than retry it.
+	badLink bool
 }
 
 // outlookErrorCode is Microsoft's error code from an error response's body,

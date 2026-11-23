@@ -38,15 +38,20 @@ export function shareSignIn(): () => void {
   return () => { channel.close(); };
 }
 
-/** Asks the tabs already signed in for their sign-in; null when none answers in time. */
+/** Asks the tabs already signed in for their sign-in; null when none
+ * answers in time, or when tabs signed in as different people answer (the
+ * new tab cannot tell whose it should be: it asks to sign in). */
 export function askSignIn(waitMs = 500): Promise<string | null> {
   if (typeof BroadcastChannel !== "function") return Promise.resolve(null);
   return new Promise((done) => {
     const channel = new BroadcastChannel(CHANNEL);
-    const finish = (token: string | null) => { window.clearTimeout(timer); channel.close(); done(token); };
-    const timer = window.setTimeout(() => { finish(null); }, waitMs);
+    const answers = new Set<string>();
+    window.setTimeout(() => {
+      channel.close();
+      done(answers.size === 1 ? [...answers][0] ?? null : null);
+    }, waitMs);
     channel.onmessage = (e: MessageEvent<Message>) => {
-      if (e.data.kind === "token" && typeof e.data.token === "string" && e.data.token) finish(e.data.token);
+      if (e.data.kind === "token" && typeof e.data.token === "string" && e.data.token) answers.add(e.data.token);
     };
     channel.postMessage({ kind: "ask" } satisfies Message);
   });

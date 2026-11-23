@@ -139,9 +139,10 @@ func (s *Service) pullOutlook(ctx context.Context, q *store.Queries, state store
 		err := s.pullOutlookFolder(ctx, q, token, folder)
 		var graph *outlookGraphError
 		if errors.As(err, &graph) && outlookFolderOnly(graph) {
-			// What Outlook rejects as asked (not a passing fault on its side)
-			// may be the folder's saved link: it starts afresh next time.
-			restart := graph.status < 500 || graph.status == http.StatusBadGateway
+			// What Outlook rejects as asked (not a passing fault on its side),
+			// or a link not to follow, may be the folder's saved link: it
+			// starts afresh next time. One message it cannot read does not.
+			restart := graph.badLink || (graph.status >= 400 && graph.status < 500)
 			logx.From(ctx).Warn("outlook mail: a folder could not sync; trying it again later",
 				"folder_id", folder.ID, "folder_kind", folder.Kind, "status", graph.status, "reason", outlookReason(graph), "restart", restart)
 			if err := q.DelayOutlookFolder(ctx, store.DelayOutlookFolderParams{ID: folder.ID, Restart: restart}); err != nil {
@@ -178,7 +179,7 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 	if folder.CursorUrl != nil {
 		target = *folder.CursorUrl
 		if !outlookContinuation(path, target) {
-			return &outlookGraphError{status: 502}
+			return &outlookGraphError{status: 502, badLink: true}
 		}
 	} else {
 		fields := "id,parentFolderId,conversationId,subject,from,sender,toRecipients,ccRecipients,replyTo,receivedDateTime,createdDateTime,lastModifiedDateTime,isRead,isDraft,hasAttachments,webLink,flag"
@@ -205,7 +206,7 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 		cursor, complete = page.Delta, true
 	}
 	if page.Value == nil || len(cursor) > 16384 || !outlookContinuation(path, cursor) || (!complete && cursor == target) {
-		return &outlookGraphError{status: 502}
+		return &outlookGraphError{status: 502, badLink: page.Value != nil}
 	}
 	for _, item := range *page.Value {
 		if item.ID == "" || len(item.ID) > 1024 {

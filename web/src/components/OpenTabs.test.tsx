@@ -154,6 +154,18 @@ describe("open records", () => {
     expect(screen.getByRole("link", { name: /Aina/ })).toBeTruthy(); // kept: said no
   });
 
+  it("closes without asking once what you typed is saved", () => {
+    bell();
+    const ask = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderWithClient(<><OpenTabs hash="#/candidates/cand_01a" /><form onSubmit={(e) => { e.preventDefault(); }}><input aria-label="Notes" /></form></>);
+    act(() => { nameTab("#/candidates/cand_01a", "Aina"); });
+    fireEvent.input(screen.getByRole("textbox", { name: "Notes" }), { target: { value: "Wants 15k" } });
+    fireEvent.submit(screen.getByRole("textbox", { name: "Notes" }).closest("form") as HTMLFormElement);
+    fireEvent.click(screen.getByRole("button", { name: "Close Aina" }));
+    expect(ask).not.toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: /Aina/ })).toBeNull();
+  });
+
   it("asks nobody for the bell's list without the permission", async () => {
     const get = bell([], []);
     renderWithClient(<OpenTabs hash="#/candidates/cand_01a" />);

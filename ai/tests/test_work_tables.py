@@ -343,3 +343,17 @@ def test_which_headers_make_a_work_table() -> None:
     assert not _is_work_header(["Course", "Title", "Year(s)"]), "courses"
     assert _is_work_header(["Company", "Role", "Key Result", "Duration"])
     assert _is_work_header(["Organization", "Role", "Issues Handled", "Duration"])
+
+
+def test_a_dates_first_labelled_cv_with_another_label_first_keeps_each_jobs_own() -> None:
+    text = (
+        "NUR AINA EXAMPLE\n\nWork Experience\n"
+        "Duration: Jan 2019 - Dec 2021\nLocation: Kuala Lumpur\n"
+        "Position: Senior Accountant\nCompany: Contoh Berhad\n\n"
+        "Duration: Mar 2016 - Dec 2018\nLocation: Penang\nPosition: Accountant\nCompany: Sampel Holdings\n"
+    )
+    jobs = parse_cv(text).model_dump()["experience"]
+    assert [(j["title"]["value"], j["company"]["value"]) for j in jobs] == [
+        ("Senior Accountant", "Contoh Berhad"),
+        ("Accountant", "Sampel Holdings"),
+    ]

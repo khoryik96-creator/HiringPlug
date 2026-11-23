@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -127,4 +128,44 @@ func TestTheInboxFailingIsSaidWithMicrosoftsReason(t *testing.T) {
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
 		"SELECT cursor_url FROM email_outlook_folder WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID).Scan(&cursor))
 	assert.Nil(t, cursor, "the rejected link is dropped: the Inbox starts afresh")
+}
+
+// One message Outlook sends that cannot be read (no change date) does not
+// send its folder back to the start: it keeps its place and tries again.
+func TestABadMessageDoesNotRestartItsFolder(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	f := &outlookMailFixture{folder: "inbox"}
+	connectTestOutlook(t, a, token, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "inbox") && strings.HasSuffix(r.URL.Path, "/messages/delta") {
+			w.Header().Set("Content-Type", "application/json")
+			now := time.Now().UTC()
+			if r.URL.Query().Has("$skiptoken") { // the second page: a message with no change date
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"value":            []any{map[string]any{"id": "broken", "parentFolderId": "inbox", "receivedDateTime": now}},
+					"@odata.deltaLink": "http://" + r.Host + "/me/mailFolders/inbox/messages/delta?$deltatoken=three",
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"value":           []any{map[string]any{"id": "fine", "parentFolderId": "inbox", "subject": "First", "receivedDateTime": now, "lastModifiedDateTime": now}},
+				"@odata.nextLink": "http://" + r.Host + "/me/mailFolders/inbox/messages/delta?$skiptoken=two",
+			})
+			return
+		}
+		f.serve(w, r)
+	}))
+	require.Equal(t, 204, a.request("POST", "/v1/outlook/mail", token, nil).Status)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	runPostponedCalendarJobs(t, a, tenant.ID)
+	_, err := testutil.Current.Admin.Exec(t.Context(), "UPDATE email_outlook_folder SET checked_at=now()-interval '20 minutes' WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID)
+	require.NoError(t, err)
+	runPostponedCalendarJobs(t, a, tenant.ID)
+	var cursor *string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT cursor_url FROM email_outlook_folder WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID).Scan(&cursor))
+	require.NotNil(t, cursor, "it keeps its place")
+	assert.Contains(t, *cursor, "skiptoken=two")
 }
