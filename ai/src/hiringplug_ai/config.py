@@ -9,6 +9,9 @@ import os
 import socket
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
+
+from .meaning.model import default_folder
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,8 @@ class Config:
     # Opens the API keys companies save in Settings (the API seals them with
     # the same secret). Empty: those keys cannot be used.
     ai_keys_secret: str = field(default="", repr=False)  # never printed
+    # Search by meaning's model (HP_AI_MEANING_MODEL_DIR; empty: ai/.models in a checkout).
+    meaning_model_dir: Path = field(default_factory=default_folder)
 
 
 class ConfigError(ValueError):
@@ -98,6 +103,7 @@ def load_config(env: Mapping[str, str]) -> Config:
         ai_timeout_seconds=number("HP_AI_TIMEOUT_SECONDS", 90.0),
         ai_long_timeout_seconds=number("HP_AI_LONG_TIMEOUT_SECONDS", 300.0),
         ai_keys_secret=env.get("HP_AI_KEYS_SECRET", "").strip(),
+        meaning_model_dir=default_folder(dict(env)),
     )
     _check_limits(config, problems)
     if problems:

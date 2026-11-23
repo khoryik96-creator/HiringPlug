@@ -4317,8 +4317,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Possible candidates for a job - people not on it whose CVs share the most words with the job's text
-         * @description A keyword search of CVs (not the AI, so it works without one), best first, at most 20. Leaves out candidates already on the job, those who withdrew consent, and those you may not see. A job without text yet gets an empty list marked needsText, not an error, as the job page asks for it on every visit.
+         * Possible candidates for a job - people not on it whose work matches the job, by meaning and by its words
+         * @description By meaning (the job's title and the needs its description lists, read as a recruiter reads them: titles that differ but mean the same job, CVs that describe the work without the words) and by the job's distinctive words in CVs; neither needs the AI provider. Best first, at most 20, each with why. Leaves out candidates already on the job, those who withdrew consent, and those you may not see. While the job is being read by meaning (a moment, after it changes) the list is by its words and meaning says reading. A job without text yet gets an empty list marked needsText, not an error, as the job page asks for it on every visit.
          */
         get: operations["suggestCandidates"];
         put?: never;
@@ -4379,6 +4379,23 @@ export interface paths {
         };
         /** An AI candidate search, and once done its ranking */
         get: operations["getTalentSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/meaning/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether search by meaning is ready, and how many candidates it has read */
+        get: operations["getMeaningStatus"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5674,9 +5691,9 @@ export interface components {
         /** @enum {string} */
         Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "meaning.candidates_read" | "meaning.query_read" | "meaning.read_candidates" | "meaning.read_query" | "meaning.sweep" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -6506,6 +6523,8 @@ export interface components {
         CandidateSearch: {
             /** @description Name, email, phone, title or company, as the quick search. */
             q?: string;
+            /** @description Search by meaning: a role or what the person did ("talent acquisition", "headhunter for finance roles", "someone who hired engineers"). Those found are the best matches by meaning that pass the other filters, best first (at most 100; sort and paging do not apply), each with why. */
+            meaning?: string;
             /** @description Only the candidates in this folder (yours, or shared with you). */
             folderId?: string;
             /** @description AND, OR, NOT (or -word), ( ), "phrases", word*; words side by side must all appear. */
@@ -6560,6 +6579,8 @@ export interface components {
             matchedIn: ("cv" | "profile")[];
             /** @description Where the CV matches, the words found between [[ and ]] ("... led [[SAP]] [[BW]] upgrades ..."). */
             cvSnippet: string | null;
+            /** @description With a search by meaning, why they were found. */
+            why?: components["schemas"]["MeaningWhy"] | null;
         };
         /**
          * @description Use nextCursor for any sort. nextOffset remains available for older clients and as a fallback. name is A to Z (accents ignored), notice shortest first; unknown notice periods and salaries come last. Salary sorts use monthly equivalents, ringgit first and each other currency together, and only for roles that may see salaries.
@@ -6573,6 +6594,8 @@ export interface components {
             nextCursor: components["schemas"]["CandidateId"] | null;
             /** @description The boolean's words and phrases to highlight (not those left out with NOT). */
             terms: string[];
+            /** @description With a search by meaning, how it went and how it was read. */
+            meaning?: components["schemas"]["MeaningOutcome"] | null;
         };
         CandidatePage: {
             /** @description With a sort other than newest, pass as offset for the next page. */
@@ -10229,13 +10252,17 @@ export interface components {
             candidateId: components["schemas"]["CandidateId"];
             candidateName: string;
             currentTitle: string | null;
-            /** @description How much the CV shares the job's words, 0 to 1 (only for ordering). */
+            /** @description How well they match the job, 0 to 1 (only for ordering). */
             rank: number;
-            /** @description Where the CV mentions the job's words, which are marked [[like this]]. */
+            /** @description Where the CV mentions the job's words, which are marked [[like this]] (empty when found by meaning only). */
             snippet: string;
+            /** @description Why they match by meaning (null when found only by the job's words). */
+            why?: components["schemas"]["MeaningWhy"] | null;
         };
         MatchSuggestionList: {
             items: components["schemas"]["MatchSuggestion"][];
+            /** @description How the job was read by meaning (null for a job without text). */
+            meaning?: components["schemas"]["MeaningOutcome"] | null;
             /** @description The job has no description or ad text to search with yet, so there are no suggestions (items is empty). */
             needsText: boolean;
         };
@@ -10270,6 +10297,147 @@ export interface components {
             model: string | null;
             inputTokens: number;
             outputTokens: number;
+        };
+        MeaningStatus: {
+            /** @description False when the AI worker has no meaning model. */
+            available: boolean;
+            /** @description Candidates read so far (those with a title or a CV). */
+            read: number;
+            /** @description Candidates with a title or a CV to read. */
+            total: number;
+        };
+        /** @description How a search by meaning went. */
+        MeaningOutcome: {
+            /**
+             * @description reading: the words are being read (ask again in a moment); unavailable: no meaning model on this server.
+             * @enum {string}
+             */
+            status: "ready" | "reading" | "unavailable";
+            /** @description How the search was read, in words. */
+            understood: components["schemas"]["MeaningUnderstood"] | null;
+            /** @description Candidates read so far. */
+            read?: number;
+            /** @description Candidates to read. */
+            total?: number;
+        };
+        MeaningUnderstood: {
+            /** @description The role asked for, abbreviations spelt out ("talent acquisition"). */
+            role?: string;
+            /** @description Its job family ("recruitment"). */
+            family?: string;
+            /** @description The families a recruiter also looks at for it ("hr" for recruitment). A candidate whose best-matching title is in any other family counts for less. */
+            near?: string[];
+            /** @description The level the search names (none when it names only the job). */
+            level?: number;
+            /** @description "Manager", "Senior", ... */
+            levelName?: string;
+            /** @description What else the search says ("finance roles"). */
+            context?: string;
+            /** @description The search describes work rather than naming a title. */
+            describes: boolean;
+        };
+        /** @description Why a candidate was found by meaning. */
+        MeaningWhy: {
+            /** @description 0 to 1, best first. */
+            score: number;
+            /** @enum {string} */
+            strength: "strong" | "good" | "possible";
+            /** @description The title of theirs that matched. */
+            title?: string;
+            /** @description "now", or "until 2019". */
+            titleWhen?: string;
+            /** @description The title's job family. */
+            family?: string;
+            /** @description Their level in that title. */
+            level?: string;
+            /** @description The part of their CV that matched (for roles that may read CVs). */
+            passage?: string;
+            /** @description The search's own words found in their CV. */
+            words: string[];
+        };
+        /** @description A meaning, as the model's 384 numbers. */
+        MeaningVector: number[];
+        MeaningSweepJob: {
+            /** @description Which run of the company's read-through this is; an older one stops. */
+            chain: number;
+        };
+        MeaningRoleSource: {
+            /** @description 0 is the newest. */
+            ordinal: number;
+            title: string;
+            /** @description What they did in it. */
+            description?: string;
+            endYear?: number | null;
+            current: boolean;
+        };
+        MeaningCVSource: {
+            documentId: string;
+            /** @description The CV's text, without salary. */
+            text: string;
+        };
+        MeaningCandidateSource: {
+            candidateId: string;
+            fingerprint: string;
+            roles: components["schemas"]["MeaningRoleSource"][];
+            cv?: components["schemas"]["MeaningCVSource"];
+        };
+        MeaningReadCandidatesJob: {
+            candidates: components["schemas"]["MeaningCandidateSource"][];
+        };
+        MeaningRoleRead: {
+            ordinal: number;
+            title: string;
+            family?: string;
+            level?: number;
+            endYear?: number | null;
+            field: components["schemas"]["MeaningVector"];
+            work: components["schemas"]["MeaningVector"];
+        };
+        MeaningPassageRead: {
+            ordinal: number;
+            documentId: string;
+            passage: string;
+            vec: components["schemas"]["MeaningVector"];
+        };
+        MeaningCandidateRead: {
+            candidateId: string;
+            fingerprint: string;
+            profile?: components["schemas"]["MeaningVector"];
+            roles: components["schemas"]["MeaningRoleRead"][];
+            passages: components["schemas"]["MeaningPassageRead"][];
+        };
+        MeaningCandidatesReadJob: {
+            /** @description The meaning model that read them. */
+            model: string;
+            /** @description The AI worker has no meaning model; nothing was read. */
+            unavailable?: boolean;
+            candidates: components["schemas"]["MeaningCandidateRead"][];
+        };
+        MeaningReadQueryJob: {
+            queryId: string;
+            /** @description A job's title (a job is read as its title and its description). */
+            title?: string;
+            /** @description The search's words, or the job's description. */
+            body: string;
+        };
+        MeaningNeedRead: {
+            need: string;
+            vec: components["schemas"]["MeaningVector"];
+        };
+        MeaningQueryReadJob: {
+            queryId: string;
+            model: string;
+            /** @description The AI worker has no meaning model; nothing was read. */
+            unavailable?: boolean;
+            role?: components["schemas"]["MeaningVector"];
+            whole?: components["schemas"]["MeaningVector"];
+            context?: components["schemas"]["MeaningVector"];
+            level?: number;
+            describes: boolean;
+            /** @description The search names a tool, qualification or code (S/4HANA, ACCA): those who name it count most. */
+            exact?: boolean;
+            understood?: components["schemas"]["MeaningUnderstood"];
+            needs: components["schemas"]["MeaningNeedRead"][];
         };
         /** @example note_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         NoteId: string;
@@ -20883,6 +21051,28 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getMeaningStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeaningStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listNotes: {

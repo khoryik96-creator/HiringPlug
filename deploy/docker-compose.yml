@@ -63,7 +63,8 @@ x-backend-env: &backend-env
 
 services:
   postgres:
-    image: postgres:16
+    # PostgreSQL 16 with pgvector (search by meaning compares vectors in the database).
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${HP_DB_ADMIN_PASSWORD:-postgres}

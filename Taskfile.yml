@@ -37,6 +37,7 @@ tasks:
     cmds:
       - uv sync
       - npm ci --prefix cvstudio/engine  # CV Studio's Word renderer (Node)
+      - uv run python -m hiringplug_ai.meaning.fetch  # search by meaning's model, pinned and checked (ai/.models)
 
   setup:web:
     dir: web

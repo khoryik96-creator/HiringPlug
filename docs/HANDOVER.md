@@ -111,7 +111,7 @@ queue. Every module's API is a contract in `contracts/modules/*.yaml`.
 
 1. Client shortlist link (7) and activity targets and revenue forecast (8),
    if not merged yet.
-2. Search by meaning (embeddings) for possible candidates (9).
+2. Search by meaning (9): done in 1.40.0 (docs/ai-worker.md, "Search by meaning").
 3. Housekeeping (10): help, checklist and this handover are done; **tidying
    old branches (the Leads workspace merged or closed) is left to the owner**.
 4. Then: batch CV formatting, Find HR for unlinked leads, Gmail replies and

@@ -9,14 +9,11 @@ package app
 // and the worker refuses to start if a job kind has none.
 
 import (
-	"context"
 	"fmt"
 	"maps"
 	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
@@ -43,6 +40,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/market"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/meaning"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notifications"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
@@ -78,6 +76,7 @@ type Modules struct {
 	Cvformats     *cvformats.Module
 	Assistant     *assistant.Module
 	Matching      *matching.Module
+	Meaning       *meaning.Module
 	Privacy       *privacy.Module
 	Settings      *settings.Module
 	Intake        *intake.Module
@@ -180,9 +179,12 @@ func NewModules(d Deps) *Modules {
 			return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	// Search by meaning: candidates read by the AI worker's meaning model, ranked here.
+	m.Meaning = meaning.New(d.Pool, meaning.Deps{Candidates: meaningCandidates{m.Candidates}, CVs: meaningCVs{m.Documents}})
+	m.Candidates.SearchByMeaningWith(candidatesMeaning{m.Meaning})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
-		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
+		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders, Meaning: matchingMeaning{m.Meaning},
 		OtherAIUse: aiUse{func() []tokensSince {
 			return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},
@@ -191,7 +193,9 @@ func NewModules(d Deps) *Modules {
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
 	}, d.Config.MaxUploadBytes)
 	// Imported CVs fill their candidates in; every CV read suggests a work authorization.
-	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone, profileFromNewestCV{m.Documents, m.Candidates}.ReadDone)
+	// Last: search by meaning reads the candidate as the CV left them.
+	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone,
+		profileFromNewestCV{m.Documents, m.Candidates}.ReadDone, m.Meaning.ReadDone)
 	m.Market = market.New(d.Pool, market.Deps{
 		Jobs: marketJobs{m.Jobs}, Candidates: marketCandidates{m.Candidates}, Insights: marketInsights{m.Assistant},
 	})
@@ -292,6 +296,7 @@ type (
 	cvformatsHTTP     = cvformats.HTTP
 	assistantHTTP     = assistant.HTTP
 	matchingHTTP      = matching.HTTP
+	meaningHTTP       = meaning.HTTP
 	privacyHTTP       = privacy.HTTP
 	settingsHTTP      = settings.HTTP
 	intakeHTTP        = intake.HTTP
@@ -333,6 +338,7 @@ type Server struct {
 	*cvformatsHTTP
 	*assistantHTTP
 	*matchingHTTP
+	*meaningHTTP
 	*privacyHTTP
 	*settingsHTTP
 	*intakeHTTP
@@ -375,6 +381,7 @@ func (m *Modules) Server() *Server {
 		cvformatsHTTP:     m.Cvformats.HTTP,
 		assistantHTTP:     m.Assistant.HTTP,
 		matchingHTTP:      m.Matching.HTTP,
+		meaningHTTP:       m.Meaning.HTTP,
 		privacyHTTP:       m.Privacy.HTTP,
 		settingsHTTP:      m.Settings.HTTP,
 		intakeHTTP:        m.Intake.HTTP,
@@ -430,6 +437,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Contacts.JobHandlers(),
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),
+		m.Meaning.JobHandlers(),
 		m.AIProviders.JobHandlers(),
 		m.Scheduling.JobHandlers(),
 		m.Calendars.JobHandlers(),
@@ -447,50 +455,4 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		}
 	}
 	return all, nil
-}
-
-// jobContacts gives the jobs module what it needs from contacts, in its own
-// types, so neither module imports the other.
-type jobContacts struct{ contacts *contacts.Module }
-
-func (a jobContacts) Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]jobs.ContactInfo, error) {
-	briefs, err := a.contacts.Briefs(ctx, tx, ids)
-	out := make(map[string]jobs.ContactInfo, len(briefs))
-	for id, b := range briefs {
-		out[id] = jobs.ContactInfo{Name: b.Name, CompanyID: b.CompanyID}
-	}
-	return out, err
-}
-
-// pipelineCandidates and pipelineJobs give the pipeline module what it needs,
-// in its own types.
-type pipelineCandidates struct{ *candidates.Module }
-
-func (a pipelineCandidates) Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]pipeline.CandidateInfo, error) {
-	briefs, err := a.Briefs(ctx, tx, ids)
-	out := make(map[string]pipeline.CandidateInfo, len(briefs))
-	for id, b := range briefs {
-		out[id] = pipeline.CandidateInfo{Name: b.Name, Title: b.CurrentTitle, Availability: b.Availability}
-	}
-	return out, err
-}
-
-type pipelineJobs struct{ *jobs.Module }
-
-func (a pipelineJobs) OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]pipeline.OpenJob, error) {
-	open, err := a.Open(ctx, tx, limit)
-	out := make([]pipeline.OpenJob, len(open))
-	for i, j := range open {
-		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID, CreatedAt: j.CreatedAt}
-	}
-	return out, err
-}
-
-func (a pipelineJobs) Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]pipeline.JobInfo, error) {
-	briefs, err := a.Briefs(ctx, tx, ids)
-	out := make(map[string]pipeline.JobInfo, len(briefs))
-	for id, b := range briefs {
-		out[id] = pipeline.JobInfo{Title: b.Title, CompanyID: b.CompanyID}
-	}
-	return out, err
 }

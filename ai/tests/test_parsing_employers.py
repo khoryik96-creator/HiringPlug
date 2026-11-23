@@ -50,3 +50,14 @@ def test_team_lead_and_project_manager_are_titles() -> None:
         ("Team Lead, Market Risk", "Contoh Bank Berhad"),
         ("Project Manager", "Sistem Contoh Sdn Bhd"),
     ]
+
+
+def test_a_headhunter_at_an_executive_search_firm() -> None:
+    text = HEAD + (
+        "Headhunter | Sampel Executive Search | Aug 2017 - Present\n"
+        "Executive Search Consultant | Contoh Partners Sdn Bhd | Jan 2014 - Jul 2017\n"
+    )
+    assert [(t, c) for t, c, *_ in jobs(parse_cv(text))] == [
+        ("Headhunter", "Sampel Executive Search"),  # the firm's name, not a title for its "Executive"
+        ("Executive Search Consultant", "Contoh Partners Sdn Bhd"),
+    ]

@@ -1190,6 +1190,71 @@ func (q *Queries) MarketPool(ctx context.Context, words string) ([]MarketPoolRow
 	return items, nil
 }
 
+const meaningSourcesAfter = `-- name: MeaningSourcesAfter :many
+SELECT id, current_title FROM candidate WHERE id > $1::text ORDER BY id LIMIT $2
+`
+
+type MeaningSourcesAfterParams struct {
+	CursorID string
+	RowLimit int32
+}
+
+type MeaningSourcesAfterRow struct {
+	ID           string
+	CurrentTitle *string
+}
+
+// Search by meaning: candidates in id order after a cursor, with what the
+// meaning model reads of them (their title now; their work below).
+func (q *Queries) MeaningSourcesAfter(ctx context.Context, arg MeaningSourcesAfterParams) ([]MeaningSourcesAfterRow, error) {
+	rows, err := q.db.Query(ctx, meaningSourcesAfter, arg.CursorID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MeaningSourcesAfterRow
+	for rows.Next() {
+		var i MeaningSourcesAfterRow
+		if err := rows.Scan(&i.ID, &i.CurrentTitle); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const meaningSourcesOf = `-- name: MeaningSourcesOf :many
+SELECT id, current_title FROM candidate WHERE id = ANY($1::text[])
+`
+
+type MeaningSourcesOfRow struct {
+	ID           string
+	CurrentTitle *string
+}
+
+func (q *Queries) MeaningSourcesOf(ctx context.Context, ids []string) ([]MeaningSourcesOfRow, error) {
+	rows, err := q.db.Query(ctx, meaningSourcesOf, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MeaningSourcesOfRow
+	for rows.Next() {
+		var i MeaningSourcesOfRow
+		if err := rows.Scan(&i.ID, &i.CurrentTitle); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveCompensation = `-- name: MoveCompensation :execrows
 UPDATE candidate_compensation SET candidate_id = $1 WHERE candidate_id = $2
 `
@@ -2197,6 +2262,51 @@ func (q *Queries) UsedValues(ctx context.Context) ([]UsedValuesRow, error) {
 	for rows.Next() {
 		var i UsedValuesRow
 		if err := rows.Scan(&i.Kind, &i.Value, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const workOf = `-- name: WorkOf :many
+SELECT candidate_id, position, title, company, start_date, end_date, is_current, description
+FROM candidate_work WHERE candidate_id = ANY($1::text[]) ORDER BY candidate_id, position
+`
+
+type WorkOfRow struct {
+	CandidateID string
+	Position    int32
+	Title       *string
+	Company     *string
+	StartDate   *string
+	EndDate     *string
+	IsCurrent   bool
+	Description *string
+}
+
+func (q *Queries) WorkOf(ctx context.Context, ids []string) ([]WorkOfRow, error) {
+	rows, err := q.db.Query(ctx, workOf, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkOfRow
+	for rows.Next() {
+		var i WorkOfRow
+		if err := rows.Scan(
+			&i.CandidateID,
+			&i.Position,
+			&i.Title,
+			&i.Company,
+			&i.StartDate,
+			&i.EndDate,
+			&i.IsCurrent,
+			&i.Description,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

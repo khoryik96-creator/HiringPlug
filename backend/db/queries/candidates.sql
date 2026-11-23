@@ -514,3 +514,15 @@ LIMIT 50000;
 -- note is the call, not another one).
 -- name: ScreeningCallNoteIDs :many
 SELECT note_id::text FROM screening_call WHERE note_id = ANY(@note_ids::text[]);
+
+-- Search by meaning: candidates in id order after a cursor, with what the
+-- meaning model reads of them (their title now; their work below).
+-- name: MeaningSourcesAfter :many
+SELECT id, current_title FROM candidate WHERE id > @cursor_id::text ORDER BY id LIMIT @row_limit;
+
+-- name: MeaningSourcesOf :many
+SELECT id, current_title FROM candidate WHERE id = ANY(@ids::text[]);
+
+-- name: WorkOf :many
+SELECT candidate_id, position, title, company, start_date, end_date, is_current, description
+FROM candidate_work WHERE candidate_id = ANY(@ids::text[]) ORDER BY candidate_id, position;

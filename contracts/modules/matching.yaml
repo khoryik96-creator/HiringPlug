@@ -98,13 +98,18 @@ paths:
     get:
       operationId: suggestCandidates
       tags: [matching]
-      summary: Possible candidates for a job - people not on it whose CVs share the most words with the job's text
+      summary: Possible candidates for a job - people not on it whose work matches the job, by meaning and by its words
       description: >
-        A keyword search of CVs (not the AI, so it works without one), best
-        first, at most 20. Leaves out candidates already on the job, those who
-        withdrew consent, and those you may not see. A job without text yet
-        gets an empty list marked needsText, not an error, as the job page
-        asks for it on every visit.
+        By meaning (the job's title and the needs its description lists,
+        read as a recruiter reads them: titles that differ but mean the same
+        job, CVs that describe the work without the words) and by the job's
+        distinctive words in CVs; neither needs the AI provider. Best first,
+        at most 20, each with why. Leaves out candidates already on the job,
+        those who withdrew consent, and those you may not see. While the job
+        is being read by meaning (a moment, after it changes) the list is by
+        its words and meaning says reading. A job without text yet gets an
+        empty list marked needsText, not an error, as the job page asks for it
+        on every visit.
       x-permission: matching:read
       parameters:
         - { name: jobId, in: query, required: true, schema: { type: string, maxLength: 40 } }
@@ -447,8 +452,12 @@ components:
         candidateId: { $ref: '#/components/schemas/CandidateId' }
         candidateName: { type: string }
         currentTitle: { type: string, nullable: true }
-        rank: { type: number, minimum: 0, maximum: 1, description: "How much the CV shares the job's words, 0 to 1 (only for ordering)." }
-        snippet: { type: string, description: "Where the CV mentions the job's words, which are marked [[like this]]." }
+        rank: { type: number, minimum: 0, maximum: 1, description: "How well they match the job, 0 to 1 (only for ordering)." }
+        snippet: { type: string, description: "Where the CV mentions the job's words, which are marked [[like this]] (empty when found by meaning only)." }
+        why:
+          description: Why they match by meaning (null when found only by the job's words).
+          allOf: [{ $ref: '#/components/schemas/MeaningWhy' }]
+          nullable: true
     MatchSuggestionList:
       type: object
       required: [items, needsText]
@@ -456,6 +465,10 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/MatchSuggestion' }
+        meaning:
+          description: How the job was read by meaning (null for a job without text).
+          allOf: [{ $ref: '#/components/schemas/MeaningOutcome' }]
+          nullable: true
         needsText:
           type: boolean
           description: The job has no description or ad text to search with yet, so there are no suggestions (items is empty).

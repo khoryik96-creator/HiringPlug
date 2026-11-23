@@ -1,0 +1,40 @@
+/* Search by meaning (components/search/MeaningSearch.tsx): the switch, the
+   line saying how a search was read, and why each candidate was found. */
+.meaning-pill span[aria-hidden="true"] { font-size: 1rem; line-height: 1; }
+
+.meaning-banner {
+  margin: 0.5rem 0 0.25rem; padding: 0.55rem 0.8rem; border-radius: 10px;
+  background: var(--accent-soft); color: var(--ink); font-size: 0.88rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem;
+}
+.meaning-banner.warning { background: #fff7e6; color: #7a4b00; }
+.meaning-banner .muted { margin-left: 0.25rem; }
+.meaning-banner .spinner {
+  width: 0.85rem; height: 0.85rem; margin-right: 0.35rem; border-radius: 50%;
+  border: 2px solid var(--accent); border-right-color: transparent; animation: meaning-spin 0.8s linear infinite;
+}
+@keyframes meaning-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .meaning-banner .spinner { animation: none; } }
+
+.why-row td { padding-top: 0; }
+.why-row:has(+ .snippet-row) td { border-bottom: 0; } /* the CV's words, when shown, belong to the same candidate */
+.why-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; font-size: 0.85rem; color: var(--text); }
+.why-strength {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  border-radius: 4px; padding: 0.08rem 0.4rem; white-space: nowrap;
+}
+.why-strength.strong { background: #dcf5e6; color: #116b3a; }
+.why-strength.good { background: var(--accent-soft); color: var(--accent-dark); }
+.why-strength.possible { background: #f1eff6; color: var(--muted); }
+.why-title strong { color: var(--ink); }
+.why-passage { color: var(--muted); font-style: italic; flex-basis: 100%; overflow-wrap: anywhere; }
+.why-passage::before { content: "“"; }
+.why-passage::after { content: "”"; }
+.why-words { white-space: nowrap; }
+
+/* Phones (lists as cards): why, and the CV's words, are part of the candidate's card. */
+@media (max-width: 700px) {
+  table.pick-table tr.has-snippet { border-bottom: 0; padding-bottom: 0.35rem; }
+  table.pick-table tr:is(.why-row, .snippet-row) { padding-top: 0; }
+  table.pick-table tr.why-row:has(+ .snippet-row) { border-bottom: 0; }
+}

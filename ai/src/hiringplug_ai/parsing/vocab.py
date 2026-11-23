@@ -26,9 +26,12 @@ ROLE_RE = re.compile(
     r"controller|planner|buyer|merchandiser|tester|writer|editor|founder|owner|secretary|dba|devops|sre|"
     r"receptionist|agent|attendant|worker|support|president|chairman|pharmacist|doctor|surgeon|"
     r"therapist|researcher|instructor|trainer|strategist|investigator|inspector|surveyor|draughtsman|"
-    r"principal|sme|expert|professional|commercial|sales|marketing)\b",
+    r"principal|sme|expert|professional|commercial|sales|marketing|headhunter|sourcer)\b",
     re.IGNORECASE,
 )
+# A firm's name that has a title word in it: "Sampel Executive Search" is a
+# headhunting firm, not an executive (but "Executive Search Consultant" is a title).
+FIRM_NAME_RE = re.compile(r"\bexecutive search\b", re.IGNORECASE)
 QUALIFICATION_RE = re.compile(
     r"\b(?:bachelor'?s?|degree|ijazah|diploma|master'?s?|mba|phd|ph\.d|doctor(?:ate)?|certificate|"
     r"sijil|spm|stpm|uec|a-levels?|o-levels?|igcse|foundation|asasi|matriculation|matrikulasi|b\.?sc|b\.?a\b|"

@@ -167,6 +167,7 @@ class ErrorCode(StrEnum):
     MATCHING_OFF = "MATCHING_OFF"
     MATCH_CONSENT_WITHDRAWN = "MATCH_CONSENT_WITHDRAWN"
     MATCH_NEEDS_TEXT = "MATCH_NEEDS_TEXT"
+    MEANING_UNAVAILABLE = "MEANING_UNAVAILABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
@@ -255,6 +256,11 @@ class JobKind(StrEnum):
     lead_source_check = "lead_source.check"
     match_score = "match.score"
     match_scored = "match.scored"
+    meaning_candidates_read = "meaning.candidates_read"
+    meaning_query_read = "meaning.query_read"
+    meaning_read_candidates = "meaning.read_candidates"
+    meaning_read_query = "meaning.read_query"
+    meaning_sweep = "meaning.sweep"
     notifications_digest = "notifications.digest"
     placement_invoice = "placement.invoice"
     scheduling_refresh_calendar = "scheduling.refresh_calendar"
@@ -1246,19 +1252,6 @@ class MatchedInEnum(StrEnum):
     profile = "profile"
 
 
-class CandidateSearchHit(BaseModel):
-    candidate: CandidateSummary
-    matchedIn: Annotated[
-        list[MatchedInEnum], Field(description="Where the boolean was found (empty without one).")
-    ]
-    cvSnippet: Annotated[
-        str | None,
-        Field(
-            description='Where the CV matches, the words found between [[ and ]] ("... led [[SAP]] [[BW]] upgrades ...").'
-        ),
-    ]
-
-
 class CandidateSort(StrEnum):
     newest = "newest"
     name = "name"
@@ -1269,18 +1262,6 @@ class CandidateSort(StrEnum):
     current_salary_desc = "current_salary_desc"
     expected_salary_asc = "expected_salary_asc"
     expected_salary_desc = "expected_salary_desc"
-
-
-class CandidateSearchPage(BaseModel):
-    nextOffset: Annotated[
-        int | None, Field(description="With a sort other than newest, pass as offset for the next page.")
-    ] = None
-    items: list[CandidateSearchHit]
-    nextCursor: Annotated[CandidateId | None, Field(...)]
-    terms: Annotated[
-        list[str],
-        Field(description="The boolean's words and phrases to highlight (not those left out with NOT)."),
-    ]
 
 
 class CandidatePage(BaseModel):
@@ -5263,31 +5244,6 @@ class MatchJobResult(BaseModel):
     consentWithdrawn: Annotated[int, Field(description="Candidates who withdrew consent (left out).")]
 
 
-class MatchSuggestion(BaseModel):
-    candidateId: CandidateId
-    candidateName: str
-    currentTitle: Annotated[str | None, Field(...)]
-    rank: Annotated[
-        float,
-        Field(
-            description="How much the CV shares the job's words, 0 to 1 (only for ordering).", ge=0.0, le=1.0
-        ),
-    ]
-    snippet: Annotated[
-        str, Field(description="Where the CV mentions the job's words, which are marked [[like this]].")
-    ]
-
-
-class MatchSuggestionList(BaseModel):
-    items: list[MatchSuggestion]
-    needsText: Annotated[
-        bool,
-        Field(
-            description="The job has no description or ad text to search with yet, so there are no suggestions (items is empty)."
-        ),
-    ]
-
-
 class MatchScoreJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -5350,6 +5306,198 @@ class MatchScoredJob(BaseModel):
     model: Annotated[str | None, Field(...)]
     inputTokens: Annotated[int, Field(ge=0)]
     outputTokens: Annotated[int, Field(ge=0)]
+
+
+class MeaningStatus(BaseModel):
+    available: Annotated[bool, Field(description="False when the AI worker has no meaning model.")]
+    read: Annotated[int, Field(description="Candidates read so far (those with a title or a CV).")]
+    total: Annotated[int, Field(description="Candidates with a title or a CV to read.")]
+
+
+class Status9(StrEnum):
+    ready = "ready"
+    reading = "reading"
+    unavailable = "unavailable"
+
+
+class MeaningUnderstood(BaseModel):
+    role: Annotated[
+        str | None, Field(description='The role asked for, abbreviations spelt out ("talent acquisition").')
+    ] = None
+    family: Annotated[str | None, Field(description='Its job family ("recruitment").')] = None
+    near: Annotated[
+        list[str] | None,
+        Field(
+            description='The families a recruiter also looks at for it ("hr" for recruitment). A candidate whose best-matching title is in any other family counts for less.'
+        ),
+    ] = None
+    level: Annotated[
+        int | None,
+        Field(description="The level the search names (none when it names only the job).", ge=0, le=7),
+    ] = None
+    levelName: Annotated[str | None, Field(description='"Manager", "Senior", ...')] = None
+    context: Annotated[str | None, Field(description='What else the search says ("finance roles").')] = None
+    describes: Annotated[bool, Field(description="The search describes work rather than naming a title.")]
+
+
+class Strength1(StrEnum):
+    strong = "strong"
+    good = "good"
+    possible = "possible"
+
+
+class MeaningWhy(BaseModel):
+    score: Annotated[float, Field(description="0 to 1, best first.")]
+    strength: Strength1
+    title: Annotated[str | None, Field(description="The title of theirs that matched.")] = None
+    titleWhen: Annotated[str | None, Field(description='"now", or "until 2019".')] = None
+    family: Annotated[str | None, Field(description="The title's job family.")] = None
+    level: Annotated[str | None, Field(description="Their level in that title.")] = None
+    passage: Annotated[
+        str | None, Field(description="The part of their CV that matched (for roles that may read CVs).")
+    ] = None
+    words: Annotated[list[str], Field(description="The search's own words found in their CV.")]
+
+
+class MeaningVector(RootModel[list[float]]):
+    root: Annotated[
+        list[float],
+        Field(description="A meaning, as the model's 384 numbers.", max_length=384, min_length=384),
+    ]
+
+
+class MeaningSweepJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    chain: Annotated[
+        int, Field(description="Which run of the company's read-through this is; an older one stops.")
+    ]
+
+
+class MeaningRoleSource(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ordinal: Annotated[int, Field(description="0 is the newest.", ge=0, le=30)]
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    description: Annotated[str | None, Field(description="What they did in it.", max_length=4000)] = None
+    endYear: int | None = None
+    current: bool
+
+
+class MeaningCVSource(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: str
+    text: Annotated[str, Field(description="The CV's text, without salary.", max_length=30000)]
+
+
+class MeaningCandidateSource(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: str
+    fingerprint: Annotated[str, Field(max_length=100)]
+    roles: Annotated[list[MeaningRoleSource], Field(max_length=31)]
+    cv: MeaningCVSource | None = None
+
+
+class MeaningReadCandidatesJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidates: Annotated[list[MeaningCandidateSource], Field(max_length=10, min_length=1)]
+
+
+class MeaningRoleRead(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ordinal: Annotated[int, Field(ge=0, le=30)]
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    family: Annotated[str | None, Field(max_length=60)] = None
+    level: Annotated[int | None, Field(ge=0, le=7)] = None
+    endYear: int | None = None
+    field: MeaningVector
+    work: MeaningVector
+
+
+class MeaningPassageRead(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ordinal: Annotated[int, Field(ge=0, le=40)]
+    documentId: str
+    passage: Annotated[str, Field(max_length=1500, min_length=1)]
+    vec: MeaningVector
+
+
+class MeaningCandidateRead(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: str
+    fingerprint: Annotated[str, Field(max_length=100)]
+    profile: MeaningVector | None = None
+    roles: Annotated[list[MeaningRoleRead], Field(max_length=31)]
+    passages: Annotated[list[MeaningPassageRead], Field(max_length=41)]
+
+
+class MeaningCandidatesReadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    model: Annotated[str, Field(description="The meaning model that read them.", max_length=100)]
+    unavailable: Annotated[
+        bool | None, Field(description="The AI worker has no meaning model; nothing was read.")
+    ] = None
+    candidates: Annotated[list[MeaningCandidateRead], Field(max_length=10)]
+
+
+class MeaningReadQueryJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    queryId: str
+    title: Annotated[
+        str | None,
+        Field(description="A job's title (a job is read as its title and its description).", max_length=300),
+    ] = None
+    body: Annotated[str, Field(description="The search's words, or the job's description.", max_length=20000)]
+
+
+class MeaningNeedRead(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    need: Annotated[str, Field(max_length=600, min_length=1)]
+    vec: MeaningVector
+
+
+class MeaningQueryReadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    queryId: str
+    model: Annotated[str, Field(max_length=100)]
+    unavailable: Annotated[
+        bool | None, Field(description="The AI worker has no meaning model; nothing was read.")
+    ] = None
+    role: MeaningVector | None = None
+    whole: MeaningVector | None = None
+    context: MeaningVector | None = None
+    level: Annotated[int | None, Field(ge=0, le=7)] = None
+    describes: bool
+    exact: Annotated[
+        bool | None,
+        Field(
+            description="The search names a tool, qualification or code (S/4HANA, ACCA): those who name it count most."
+        ),
+    ] = None
+    understood: MeaningUnderstood | None = None
+    needs: Annotated[list[MeaningNeedRead], Field(max_length=12)]
 
 
 class NoteId(RootModel[str]):
@@ -6475,7 +6623,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status9(StrEnum):
+class Status10(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -6488,7 +6636,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status9
+    status: Status10
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -6596,7 +6744,7 @@ class OffsiteStatus(StrEnum):
     off = "off"
 
 
-class Status10(StrEnum):
+class Status11(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -6616,7 +6764,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status10
+    status: Status11
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -7097,6 +7245,13 @@ class CandidateSearch(BaseModel):
         str | None,
         Field(description="Name, email, phone, title or company, as the quick search.", max_length=200),
     ] = None
+    meaning: Annotated[
+        str | None,
+        Field(
+            description='Search by meaning: a role or what the person did ("talent acquisition", "headhunter for finance roles", "someone who hired engineers"). Those found are the best matches by meaning that pass the other filters, best first (at most 100; sort and paging do not apply), each with why.',
+            max_length=500,
+        ),
+    ] = None
     folderId: Annotated[
         str | None,
         Field(
@@ -7160,6 +7315,22 @@ class CandidateSearch(BaseModel):
             le=1000000,
         ),
     ] = None
+
+
+class CandidateSearchHit(BaseModel):
+    candidate: CandidateSummary
+    matchedIn: Annotated[
+        list[MatchedInEnum], Field(description="Where the boolean was found (empty without one).")
+    ]
+    cvSnippet: Annotated[
+        str | None,
+        Field(
+            description='Where the CV matches, the words found between [[ and ]] ("... led [[SAP]] [[BW]] upgrades ...").'
+        ),
+    ]
+    why: Annotated[MeaningWhy | None, Field(description="With a search by meaning, why they were found.")] = (
+        None
+    )
 
 
 class ScreeningCallInput(BaseModel):
@@ -8500,6 +8671,37 @@ class TalentRankedJob(BaseModel):
     outputTokens: Annotated[int, Field(ge=0)]
 
 
+class MatchSuggestion(BaseModel):
+    candidateId: CandidateId
+    candidateName: str
+    currentTitle: Annotated[str | None, Field(...)]
+    rank: Annotated[
+        float, Field(description="How well they match the job, 0 to 1 (only for ordering).", ge=0.0, le=1.0)
+    ]
+    snippet: Annotated[
+        str,
+        Field(
+            description="Where the CV mentions the job's words, which are marked [[like this]] (empty when found by meaning only)."
+        ),
+    ]
+    why: Annotated[
+        MeaningWhy | None,
+        Field(description="Why they match by meaning (null when found only by the job's words)."),
+    ] = None
+
+
+class MeaningOutcome(BaseModel):
+    status: Annotated[
+        Status9,
+        Field(
+            description="reading: the words are being read (ask again in a moment); unavailable: no meaning model on this server."
+        ),
+    ]
+    understood: Annotated[MeaningUnderstood | None, Field(description="How the search was read, in words.")]
+    read: Annotated[int | None, Field(description="Candidates read so far.")] = None
+    total: Annotated[int | None, Field(description="Candidates to read.")] = None
+
+
 class Offer(BaseModel):
     id: OfferId
     version: int
@@ -8938,6 +9140,21 @@ class CandidateExport(BaseModel):
     ] = None
 
 
+class CandidateSearchPage(BaseModel):
+    nextOffset: Annotated[
+        int | None, Field(description="With a sort other than newest, pass as offset for the next page.")
+    ] = None
+    items: list[CandidateSearchHit]
+    nextCursor: Annotated[CandidateId | None, Field(...)]
+    terms: Annotated[
+        list[str],
+        Field(description="The boolean's words and phrases to highlight (not those left out with NOT)."),
+    ]
+    meaning: Annotated[
+        MeaningOutcome | None, Field(description="With a search by meaning, how it went and how it was read.")
+    ] = None
+
+
 class ScreeningCallResult(BaseModel):
     candidate: Candidate
     noteId: Annotated[NoteId | None, Field(...)]
@@ -9192,6 +9409,20 @@ class MarketPool(BaseModel):
         ),
     ]
     salaryRestricted: Annotated[bool, Field(description="Your role may not see salaries.")]
+
+
+class MatchSuggestionList(BaseModel):
+    items: list[MatchSuggestion]
+    meaning: Annotated[
+        MeaningOutcome | None,
+        Field(description="How the job was read by meaning (null for a job without text)."),
+    ] = None
+    needsText: Annotated[
+        bool,
+        Field(
+            description="The job has no description or ad text to search with yet, so there are no suggestions (items is empty)."
+        ),
+    ]
 
 
 class Report(BaseModel):

@@ -1431,6 +1431,81 @@ type LeadSource struct {
 	UpdatedAt     time.Time
 }
 
+type MeaningCandidate struct {
+	TenantID    string
+	CandidateID string
+	Fingerprint string
+	Model       string
+	Profile     *string
+	ReadAt      time.Time
+}
+
+type MeaningPassage struct {
+	TenantID    string
+	CandidateID string
+	Ordinal     int16
+	DocumentID  string
+	Passage     string
+	Vec         string
+}
+
+type MeaningPending struct {
+	TenantID    string
+	CandidateID string
+	Fingerprint string
+	QueuedAt    time.Time
+}
+
+type MeaningQuery struct {
+	ID         string
+	TenantID   string
+	TextHash   string
+	Title      *string
+	Body       string
+	Status     string
+	Role       *string
+	Whole      *string
+	Context    *string
+	Level      *int16
+	Describes  bool
+	Exact      bool
+	Understood []byte
+	CreatedAt  time.Time
+	ReadAt     *time.Time
+	UsedAt     time.Time
+}
+
+type MeaningQueryNeed struct {
+	TenantID string
+	QueryID  string
+	Ordinal  int16
+	Need     string
+	Vec      string
+}
+
+type MeaningRole struct {
+	TenantID    string
+	CandidateID string
+	Ordinal     int16
+	Title       string
+	Family      *string
+	Level       *int16
+	EndYear     *int16
+	Field       string
+	Work        string
+}
+
+type MeaningSweep struct {
+	TenantID         string
+	Chain            int32
+	CursorID         string
+	Passes           int32
+	DueAt            time.Time
+	RanAt            *time.Time
+	Model            *string
+	UnavailableUntil *time.Time
+}
+
 type Note struct {
 	ID          string
 	TenantID    string

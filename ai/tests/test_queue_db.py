@@ -214,3 +214,36 @@ def test_a_long_job_keeps_its_claim_until_another_worker_takes_it(database: dict
     with pytest.raises(LeaseLostError):
         queue.extend(job, 600)
     queue.close()
+
+
+def test_the_meaning_slot_takes_only_meaning_jobs_searches_first(database: dict[str, str]) -> None:
+    with psycopg.connect(database["admin"], autocommit=True) as admin:  # a queue of only these three
+        admin.execute("DELETE FROM job")
+        long_job = enqueue_ai_job(database["admin"], database["tenant"], priority=1)
+        ids = []
+        for kind, payload, priority in (
+            (
+                "meaning.read_candidates",
+                {"candidates": [{"candidateId": "c", "fingerprint": "f", "roles": []}]},
+                9,
+            ),
+            ("meaning.read_query", {"queryId": "mnq_x", "body": "recruiter"}, 1),
+        ):
+            row = admin.execute(
+                "SELECT job_enqueue(%s, 'ai', %s, %s::jsonb, NULL, now() - interval '1 minute',"
+                " p_priority => %s::smallint)",
+                (database["tenant"], kind, json.dumps(payload), priority),
+            ).fetchone()
+            assert row is not None
+            ids.append(str(row[0]))
+    queue = Queue(database["ai"], "pytest-meaning")
+    kinds = ["meaning.read_query", "meaning.read_candidates"]
+    first, second = queue.claim_kinds(60, kinds), queue.claim_kinds(60, kinds)
+    assert first is not None
+    assert second is not None
+    assert (first.kind, second.kind) == ("meaning.read_query", "meaning.read_candidates"), "a search first"
+    assert queue.claim_kinds(60, kinds) is None, "never another kind of job, however urgent"
+    other = queue.claim(60)
+    assert other is not None
+    assert other.id == long_job
+    queue.close()
