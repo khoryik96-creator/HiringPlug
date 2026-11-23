@@ -117,13 +117,33 @@ def ai_answer() -> dict[str, Any]:
     }
 
 
-def test_titles_and_dates_come_back_as_given_unless_one_names_an_employer() -> None:
+def test_a_title_comes_back_only_when_the_ai_kept_its_words() -> None:
     steady = guard.steady(ai_answer(), reading())
-    assert steady["candidate"]["current_position"] == "Finance Lead", "the last position as formatted"
     roles = [e["roles"][0] for e in steady["work_experiences"]]
-    assert roles[0]["title"] == "Finance Lead, GST, FM", "no stray full stop"
-    assert roles[1]["title"] == "[Company] Liaison", "a title naming an employer stays masked"
+    assert roles[0]["title"] == "Finance Lead, GST, FM", "only a stray full stop: as formatted"
+    assert roles[1]["title"] == "[Company] Liaison", "a masked employer stays masked"
+    assert steady["candidate"]["current_position"] == "Senior Finance Leader", "reworded: the AI's stays"
     assert steady["candidate"]["name"] == "Candidate", "nothing else is copied back"
+
+
+def test_a_client_or_employer_the_ai_hid_in_a_title_never_comes_back() -> None:
+    given, answer = reading(), ai_answer()
+    given["work_experiences"][2]["roles"][0]["title"] = "SAP Lead for Kopi Example"  # a client
+    answer["work_experiences"][2]["roles"][0]["title"] = "SAP Lead for [Company]"
+    given["work_experiences"][1]["roles"][0]["title"] = "Analyst (Sampel)"  # the employer's short name
+    answer["work_experiences"][1]["roles"][0]["title"] = "Analyst (Leading Bank)"
+    given["candidate"]["current_position"] = "Kopi Example Lead"
+    answer["candidate"]["current_position"] = "F&B Chain Lead"
+    cv = cvstudio.after_blind(answer, given)
+    titles = [e["roles"][0]["title"] for e in cv["work_experiences"]]
+    assert "Kopi Example" not in " ".join(titles) + cv["candidate"]["current_position"]
+    assert "Sampel" not in " ".join(titles)
+
+
+def test_same_words_ignores_only_punctuation_case_and_spacing() -> None:
+    assert guard.same_words("Finance Lead, GST", "finance lead GST.")
+    assert not guard.same_words("SAP Lead for Kopi", "SAP Lead for [Company]")
+    assert not guard.same_words("", "")
 
 
 def test_the_checked_blind_cv_keeps_its_sub_headings_and_its_employers_apart() -> None:
@@ -149,5 +169,26 @@ def test_two_employers_both_hidden_are_never_joined_in_the_word_file() -> None:
 def test_the_blind_prompt_carries_the_guardrails() -> None:
     for neutral in (False, True):
         prompt = cvstudio.blind_prompt(neutral)
-        assert "Titles are never masked" in prompt
+        assert "except an organisation, brand, school or person named in one" in prompt
         assert 'Use "[Company]" only where an organisation or brand name stood' in prompt
+
+
+def test_a_mask_never_cuts_a_word_in_two() -> None:
+    """ "Digital Consultant" at an employer named Digi stays "Digital Consultant"."""
+    given, answer = reading(), ai_answer()
+    given["work_experiences"][0]["company"] = "Digi Example Berhad"
+    given["work_experiences"][0]["roles"][0]["title"] = "Digital Consultant"
+    answer["work_experiences"][0]["roles"][0]["title"] = "[Company]gital Consultant"  # the AI cut it
+    given["work_experiences"][0]["roles"][0]["bullets"][0] = "Ran Digital campaigns for Digi Example Berhad."
+    answer["work_experiences"][0]["roles"][0]["bullets"][0] = "Ran [Company]gital campaigns for [Company]."
+    cv = cvstudio.after_blind(answer, given)
+    role = cv["work_experiences"][0]["roles"][0]
+    assert role["title"] == "Digital Consultant"
+    assert role["bullets"][0] == "Ran Digital campaigns for [Company].", "the employer itself stays masked"
+
+
+def test_a_brand_named_product_stays_masked() -> None:
+    assert guard.unglued("Launched [Company]Food and [Company]2u", "Launched GrabFood and Maybank2u") == (
+        "Launched [Company]Food and [Company]2u"
+    )
+    assert guard.unglued("[Company]gital Consultant", "Digital Consultant") == "Digital Consultant"

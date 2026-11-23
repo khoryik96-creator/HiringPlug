@@ -358,15 +358,22 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
     after = section[i + 1 : min(end, i + 5)]
     # A labelled "Duration:" line (a table row) always has its role and
     # employer below it, whatever the rest of the CV does.
-    below_dates = dates_first or bool(_DURATION_LABEL.match(section[i].strip()))
+    # A table row (tables.py): "Duration:" with its Role or Organization right below.
+    table_row = bool(_DURATION_LABEL.match(section[i].strip())) and any(
+        _TITLE_LABEL.match(t) or _COMPANY_LABEL.match(t) for t in after[:2]
+    )
+    below_dates = dates_first or table_row
     near, far = (after, before) if below_dates else (before, after)
     lt, lc = _labelled([section[i], *near])
-    ft, fc = _labelled(far)
+    # A table row left a cell empty: the neighbouring row never fills it.
+    ft, fc = _labelled(far) if not table_row else (None, None)
     lt, lc = lt or ft, lc or fc
     title, company = title or lt, company or lc
     above = _joined(_headlines(section, range(i - 1, start - 1, -1))[::-1])[::-1]  # nearest first
     below = _joined(_headlines(section, range(i + 1, end)))
-    for text in [*below, *above] if dates_first else [*above, *below]:
+    # A table row ("Duration:" first) is its own lines below, never the row above.
+    candidates = below if table_row else ([*below, *above] if dates_first else [*above, *below])
+    for text in candidates:
         if title and company:
             break
         t, c, u = from_text(text)

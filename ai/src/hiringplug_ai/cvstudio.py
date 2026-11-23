@@ -147,11 +147,14 @@ def blind_refusal(exc: Exception) -> str | None:
 def after_blind(blinded: dict[str, Any], prepared: dict[str, Any]) -> dict[str, Any]:
     """CV Studio's five checks after the AI's anonymised answer, in its order,
     against the prepared CV it was given; around them HiringPlug's guardrails
-    (cvstudio_blind_guard): titles and dates as given, jobs kept apart. No
-    other wording is copied back from the reading the AI was given."""
-    return blind_guard.finish(
-        dict(pipeline.postprocess_blind(blind_guard.steady(blinded, prepared), prepared))
-    )
+    (cvstudio_blind_guard): titles and dates the AI kept word for word as
+    formatted, a word a mask cut in two given back ("Digital" never
+    "[Company]gital"), jobs kept apart. Nothing the AI masked is copied back."""
+    # Words a mask cut in two are given back before CV Studio's checks (so a
+    # title matches again and its sub-headings are restored) and after them.
+    answer = blind_guard.unglue(blind_guard.steady(blinded, prepared), prepared)
+    checked = dict(pipeline.postprocess_blind(answer, prepared))
+    return blind_guard.finish(blind_guard.unglue(checked, prepared))
 
 
 def _work_bullets(cv: dict[str, Any]) -> list[str]:

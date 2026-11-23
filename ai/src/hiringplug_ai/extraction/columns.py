@@ -144,30 +144,51 @@ def _respaced(text: str, rows: list[_Row]) -> str:
 def page_text(page: Any) -> str:
     """The page's text, column by column when it has two columns; a
     work-history table read row by row (tables.py), between the text above
-    and below it."""
+    and below it, with any text beside it (a sidebar) after it."""
     tables = work_tables(page)
     if not tables:
         return _region_text(page)
     x0, top, x1, bottom = (float(v) for v in page.bbox)
+
+    def in_table(w: dict[str, Any]) -> bool:
+        return any(
+            t.left - 1 <= w["x0"]
+            and w["x1"] <= t.right + 1
+            and t.top - 1 <= w["top"]
+            and w["bottom"] <= t.bottom + 1
+            for t in tables
+        )
+
+    # The columns are found on the whole page (without the tables): the strips
+    # between tables are often too short to tell on their own.
+    outside = [w for w in page.extract_words() if not in_table(w)]
+    gutter = find_gutter(outside, x1, _rows(outside))
     parts: list[str] = []
     for t in tables:
         if t.top - top > 1:
-            parts.append(_region_text(page.crop((x0, top, x1, min(t.top, bottom)))))
+            parts.append(_region_text(page.crop((x0, top, x1, min(t.top, bottom))), gutter))
         parts.append(t.text)
+        for side in ((x0, t.left), (t.right, x1)):  # beside the table
+            if side[1] - side[0] > 1 and t.bottom > t.top:
+                parts.append(
+                    _region_text(page.crop((side[0], max(t.top, top), side[1], min(t.bottom, bottom))))
+                )
         top = max(top, t.bottom)
     if bottom - top > 1:
-        parts.append(_region_text(page.crop((x0, top, x1, bottom))))
+        parts.append(_region_text(page.crop((x0, top, x1, bottom)), gutter))
     return "\n".join(p for p in parts if p.strip())
 
 
-def _region_text(page: Any) -> str:
+def _region_text(page: Any, gutter: float | None = None) -> str:
     words = page.extract_words()
     rows = _rows(words)
-    return _respaced(_page_text(page, words, rows), rows)
+    return _respaced(_page_text(page, words, rows, gutter), rows)
 
 
-def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row]) -> str:
-    gutter = find_gutter(words, float(page.bbox[2]), rows)
+def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row], gutter: float | None = None) -> str:
+    # A gutter found on the whole page holds for a strip of it that crosses it.
+    if gutter is None or not (float(page.bbox[0]) < gutter < float(page.bbox[2])) or not words:
+        gutter = find_gutter(words, float(page.bbox[2]), rows)
     if gutter is None:
         return str(page.extract_text() or "")
     parts: list[str] = []
