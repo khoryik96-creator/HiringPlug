@@ -56,7 +56,10 @@ web/src/                     the React app
 5. **Every table with tenant data has row-level security.**
    (`TestEveryTenantTableHasRowLevelSecurity`)
 6. **Migrations are append-only.** Never edit or delete a committed migration;
-   add a new one. (`task check:migrations`)
+   add a new one. (`task check:migrations`) Number it above the highest
+   migration on `main` when it merges, never in a block reserved earlier: a
+   server that already has a higher number refuses to apply a lower one and
+   does not start.
 7. **Use the service's transaction.** All database work goes through
    `database.InTx`, which scopes it to one tenant. Write an audit entry for
    every change. Never put salary values in audit entries, logs or AI prompts.

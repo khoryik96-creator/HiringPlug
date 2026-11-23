@@ -34,10 +34,10 @@ func migrateDB(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 	if err != nil {
 		return fmt.Errorf("migrate: reading migration status: %w", err)
 	}
-	if isApolloPreviewUpgrade(statuses) {
+	if lateButKnown(statuses) {
 		provider, err = goose.NewProvider(goose.DialectPostgres, db, migrations, goose.WithAllowOutofOrder(true))
 		if err != nil {
-			return fmt.Errorf("migrate: preparing Apollo preview upgrade: %w", err)
+			return fmt.Errorf("migrate: preparing a known late migration: %w", err)
 		}
 	}
 	if _, err := provider.Up(ctx); err != nil {
@@ -72,28 +72,36 @@ func PendingMigrations(ctx context.Context, url string, migrations fs.FS) (int, 
 	return pending, nil
 }
 
-// The Apollo preview shipped 157 while the earlier Leads schema was still in
-// a separate branch. Permit that one independent migration for preview users
-// while keeping the usual order check for all other missing migrations.
-func isApolloPreviewUpgrade(statuses []*goose.MigrationStatus) bool {
-	const leadsVersion, apolloVersion = 156, 157
+// knownLate are migrations that reached some databases after a higher one:
+// each is independent of every migration numbered after it, so applying it
+// late is safe. The Apollo preview shipped 157 while the earlier Leads schema
+// (156) was still in a separate branch; 171 (client links following deleted
+// records) was added after 180-190 had shipped in its own number range.
+var knownLate = map[int64]string{
+	156: "00156_leads_workspace.sql",
+	171: "00171_shortlist_cascades.sql",
+}
+
+// lateButKnown says whether every pending migration numbered below the
+// newest applied one is a known late one (and there is at least one), so
+// they may be applied out of order. Any other gap keeps the usual order
+// check: the update stops rather than apply it.
+func lateButKnown(statuses []*goose.MigrationStatus) bool {
 	var latest int64
-	var apolloApplied, leadsPending bool
 	for _, status := range statuses {
 		if status.State == goose.StateApplied {
 			latest = max(latest, status.Source.Version)
-			apolloApplied = apolloApplied || (status.Source.Version == apolloVersion && path.Base(status.Source.Path) == "00157_apollo_hr.sql")
-		} else if status.Source.Version == leadsVersion && path.Base(status.Source.Path) == "00156_leads_workspace.sql" {
-			leadsPending = true
 		}
 	}
-	if !apolloApplied || !leadsPending {
-		return false
-	}
+	late := 0
 	for _, status := range statuses {
-		if status.State == goose.StatePending && status.Source.Version < latest && status.Source.Version != leadsVersion {
+		if status.State != goose.StatePending || status.Source.Version >= latest {
+			continue
+		}
+		if knownLate[status.Source.Version] != path.Base(status.Source.Path) {
 			return false
 		}
+		late++
 	}
-	return true
+	return late > 0
 }
