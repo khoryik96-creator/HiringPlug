@@ -1,7 +1,7 @@
 package app
 
 // The notifications module reads its list from the modules that own the
-// records (jobs, pipeline, tasks, offers, interviews) and emails through
+// records (jobs, pipeline, tasks, offers, interviews, formatted CVs) and emails through
 // identity and emails: these adapters are where they meet.
 
 import (
@@ -52,6 +52,25 @@ func (a notificationSources) Interviews(ctx context.Context, tx pgx.Tx, userID s
 	out := make([]notifications.Interview, len(rows))
 	for i, r := range rows {
 		out[i] = notifications.Interview{ID: r.ID, ApplicationID: r.ApplicationID, Title: r.Title, StartsAt: r.StartsAt, CreatedAt: r.CreatedAt}
+	}
+	return out, err
+}
+
+func (a notificationSources) FormattedCVs(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]notifications.FormattedCV, error) {
+	runs, err := a.m.Cvformats.FinishedBy(ctx, tx, userID, since)
+	if err != nil || len(runs) == 0 {
+		return nil, err
+	}
+	ids := make([]string, len(runs))
+	for i, r := range runs {
+		ids[i] = r.CandidateID
+	}
+	names, err := a.m.Candidates.Briefs(ctx, tx, ids)
+	out := make([]notifications.FormattedCV, 0, len(runs))
+	for _, r := range runs {
+		if b, ok := names[r.CandidateID]; ok { // a candidate since deleted is left out
+			out = append(out, notifications.FormattedCV{ID: r.ID, CandidateID: r.CandidateID, CandidateName: b.Name, Blind: r.Blind, Failed: r.Failed, At: r.At})
+		}
 	}
 	return out, err
 }

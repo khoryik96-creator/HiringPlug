@@ -2,9 +2,11 @@
 // An outline shows how they are going (orange: importing, red: one failed,
 // green: imported), with the number imported and failed since last looked
 // at; the browser tab's title shows the same. Opening it lists them, with
-// the candidate each became.
+// the candidate each became; while open its icon is marked, and a click
+// elsewhere or 30 seconds closes it.
 import { useEffect, useRef } from "react";
 
+import { useTopbarPanel } from "../topbarPanel";
 import { CvImportOutcome } from "./ImportCvButton";
 import { markCvImportsSeen, stateOf, useCvImports } from "./outlookCvImports";
 
@@ -18,6 +20,7 @@ export function titleWithCounts(title: string, counts: { importing: number; done
 export function CvImportIndicator({ userId }: { userId: string }) {
   const views = useCvImports(userId);
   const menu = useRef<HTMLDetailsElement>(null);
+  const { open, track } = useTopbarPanel(menu);
   const importing = views.filter((v) => stateOf(v.status) === "importing").length;
   const done = views.filter((v) => !v.seen && stateOf(v.status) === "done").length;
   const failed = views.filter((v) => !v.seen && stateOf(v.status) === "failed").length;
@@ -30,9 +33,9 @@ export function CvImportIndicator({ userId }: { userId: string }) {
   const state = importing ? "importing" : failed ? "failed" : done ? "done" : "idle";
   const label = [importing && `${String(importing)} importing`, done && `${String(done)} imported`, failed && `${String(failed)} failed`].filter(Boolean).join(", ");
   return (
-    <details ref={menu} className="cv-indicator" onToggle={(e) => { if (!e.currentTarget.open) markCvImportsSeen(userId); }}>
+    <details ref={menu} className="cv-indicator" onToggle={(e) => { track(e); if (!e.currentTarget.open) markCvImportsSeen(userId); }}>
       <summary className={`settings-link topbar-shortcut cv-indicator-button ${state}`} aria-label={`CV imports from Outlook${label ? `: ${label}` : ""}`}
-        title={label ? `CV imports: ${label}` : "CV imports"}>
+        title={label ? `CV imports: ${label}` : "CV imports"} aria-expanded={open}>
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6" /><circle cx="12" cy="12.5" r="2" /><path d="M8.5 18a3.5 3.5 0 0 1 7 0" />
         </svg>

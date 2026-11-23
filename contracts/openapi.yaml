@@ -15979,9 +15979,9 @@ components:
           items: {$ref: '#/components/schemas/ActivityEntry'}
     NotificationKind:
       type: string
-      enum: [applicant, task, offer_approval, interview]
+      enum: [applicant, task, offer_approval, interview, cv_formatted]
       description: >
-        applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow.
+        applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow; cv_formatted: a CV you had formatted CV Studio's way is ready, or could not be made (last 2 days).
 
     Notification:
       type: object

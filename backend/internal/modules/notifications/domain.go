@@ -16,10 +16,11 @@ const (
 	KindTask          = "task"
 	KindOfferApproval = "offer_approval"
 	KindInterview     = "interview"
+	KindCVFormatted   = "cv_formatted"
 )
 
 // Kinds is every kind, in the order Settings lists them.
-var Kinds = []string{KindApplicant, KindTask, KindOfferApproval, KindInterview}
+var Kinds = []string{KindApplicant, KindTask, KindOfferApproval, KindInterview, KindCVFormatted}
 
 // NormalizeMuted checks the kinds a user turned off and puts them in order,
 // once each.
@@ -46,6 +47,9 @@ func NormalizeMutedSilently(kinds []string) []string {
 
 // ApplicantDays is how far back new applicants show in the bell.
 const ApplicantDays = 7
+
+// FormattedDays is how far back CVs formatted show in the bell.
+const FormattedDays = 2
 
 // MorningHour is when the morning email goes, in the agency's time.
 const MorningHour = 8
@@ -79,11 +83,19 @@ type Application struct {
 	JobTitle, CompanyName      string
 }
 
+// FormattedCV is a CV the user had formatted CV Studio's way: ready, or failed.
+type FormattedCV struct {
+	ID, CandidateID, CandidateName string
+	Blind, Failed                  bool
+	At                             time.Time // when it finished
+}
+
 // Inputs are the records a user's notifications are made from.
 type Inputs struct {
 	Applicants, Offers []Record
 	Tasks              []Task
 	Interviews         []Interview
+	FormattedCVs       []FormattedCV
 	Apps               map[string]Application
 }
 
@@ -96,11 +108,12 @@ type Item struct {
 
 // Window is what the notifications cover at a moment: tasks due up to
 // today, interviews from now to the end of tomorrow, applicants since a
-// week ago (all in the agency's time).
+// week ago, CVs formatted in the last two days (all in the agency's time).
 type Window struct {
 	Today           time.Time // midnight UTC of the agency's today (compared with due days)
 	From, To        time.Time // interviews starting in [From, To)
 	ApplicantsSince time.Time
+	FormattedSince  time.Time
 	zone            *time.Location
 }
 
@@ -113,6 +126,7 @@ func WindowAt(now time.Time, loc *time.Location) Window {
 		From:            now,
 		To:              time.Date(y, m, d+2, 0, 0, 0, 0, loc),
 		ApplicantsSince: now.AddDate(0, 0, -ApplicantDays),
+		FormattedSince:  now.AddDate(0, 0, -FormattedDays),
 		zone:            loc,
 	}
 }
@@ -169,6 +183,19 @@ func Build(in Inputs, seen *time.Time, w Window) []Item {
 		out = append(out, Item{ID: KindInterview + ":" + iv.ID, Kind: KindInterview, At: later(iv.CreatedAt, dayBefore),
 			Title:  "Interview " + dayWord(starts, w.Today) + ", " + starts.Format("3:04 PM") + ": " + a.CandidateName,
 			Detail: iv.Title + " · " + jobText(a), Href: "#/candidates/" + a.CandidateID})
+	}
+	for _, f := range in.FormattedCVs {
+		it := Item{ID: KindCVFormatted + ":" + f.ID, Kind: KindCVFormatted, At: f.At, Href: "#/candidates/" + f.CandidateID}
+		what := "CV"
+		if f.Blind {
+			what = "Blind CV"
+		}
+		if f.Failed {
+			it.Title, it.Detail = what+" could not be formatted: "+f.CandidateName, "Try again from their page"
+		} else {
+			it.Title, it.Detail = what+" formatted: "+f.CandidateName, "Ready under CVs on their page"
+		}
+		out = append(out, it)
 	}
 	slices.SortStableFunc(out, func(a, b Item) int { return cmp.Or(b.At.Compare(a.At), strings.Compare(a.ID, b.ID)) })
 	for i := range out {
@@ -243,6 +270,9 @@ func NextMorning(now time.Time, loc *time.Location) time.Time {
 func DigestFor(items []Item, since time.Time) []Item {
 	var out []Item
 	for _, it := range items {
+		if it.Kind == KindCVFormatted { // for the moment it is ready, in the bell; not the morning email
+			continue
+		}
 		if it.Kind == KindApplicant && it.At.Before(since) {
 			continue
 		}

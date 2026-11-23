@@ -67,3 +67,10 @@ SELECT * FROM formatted_cv WHERE document_id = @document_id;
 
 -- name: MoveFormattedCvs :exec
 UPDATE formatted_cv SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- The CV Studio runs a user started that finished since a moment, for their
+-- notifications (row-level security leaves out candidates they may not see).
+-- name: StudioCvsFinishedBy :many
+SELECT id, candidate_id, status, blind, finished_at FROM studio_cv
+WHERE created_by = @user_id AND status IN ('done', 'failed') AND finished_at >= @since
+ORDER BY finished_at DESC LIMIT 50;

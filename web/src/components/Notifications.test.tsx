@@ -39,6 +39,39 @@ describe("NotificationBell", () => {
     await screen.findByTitle("Notifications"); // the count is gone
   });
 
+  it("lights green the moment a CV is formatted, naming the candidate", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(list({ items: [
+      { id: "cv_formatted:scv_1", kind: "cv_formatted", title: "Blind CV formatted: Siti Aminah", detail: "Ready under CVs on their page", href: "#/candidates/cand_1", at: "2026-11-22T01:30:00Z", new: true },
+    ] })));
+    vi.spyOn(api, "POST").mockResolvedValue(noContent());
+    renderWithClient(<NotificationBell />);
+    const bell = await screen.findByLabelText("Notifications: 1 new, a CV is formatted");
+    expect(bell.className).toContain("cv-ready");
+    fireEvent.click(bell);
+    const menu = await screen.findByRole("dialog", { name: "Notifications" });
+    expect(within(menu).getByText("CV ready")).toBeTruthy();
+    expect(within(menu).getByText("Blind CV formatted: Siti Aminah").closest("a")?.getAttribute("href")).toBe("#/candidates/cand_1");
+  });
+
+  it("is marked while open, and closes by itself after 30 seconds", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(list({ unseen: 0, items: [] })));
+    renderWithClient(<NotificationBell />);
+    const bell = await screen.findByTitle("Notifications");
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(bell);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(bell.getAttribute("aria-expanded")).toBe("true");
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(bell.closest("details")?.open).toBe(true);
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(bell.closest("details")?.open).toBe(false);
+      expect(bell.getAttribute("aria-expanded")).toBe("false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not mark seen when nothing is new, and says when there is nothing", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(list({ unseen: 0, items: [] })));
     const post = vi.spyOn(api, "POST");

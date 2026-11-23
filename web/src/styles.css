@@ -1504,6 +1504,12 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .bell-item.kind-task a { border-left-color: #d97706; }
 .bell-item.kind-offer_approval a { border-left-color: #dc2626; }
 .bell-item.kind-interview a { border-left-color: #7c3aed; }
+.bell-item.kind-cv_formatted a { border-left-color: #16a34a; }
+/* A CV formatted since last looked: the bell lights green, its count too. */
+.bell-button.cv-ready { color: #15803d; background: #dcfce7; box-shadow: inset 0 0 0 1px #86efac; }
+.bell-button.cv-ready .bell-count { background: #16a34a; }
+/* The bell (and the CV inbox) open: marked as the one clicked. */
+.bell[open] > summary, .topbar-shortcut[aria-expanded="true"] { background: var(--accent-soft, #efe9fb); color: var(--accent, #6d4ae0); box-shadow: inset 0 0 0 2px var(--accent, #6d4ae0); }
 .bell-kind { grid-row: span 2; align-self: start; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #6b6680); padding-top: .1rem; min-width: 4.6rem; }
 .bell-title { overflow-wrap: anywhere; }
 .bell-detail { font-size: .8rem; overflow-wrap: anywhere; }
