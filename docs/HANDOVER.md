@@ -1,260 +1,150 @@
-# Handover (17 Nov 2026)
+# Handover (22 Nov 2026, version 1.37.0)
 
-For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
-first (the rules, enforced by `task verify`), then `docs/README.md`;
-`docs/features.md` says what every screen does.
+For the next developer or AI helper picking up HiringPlug, a recruitment
+agency system for recruiters in Malaysia. Read in this order:
 
-## Outlook calendar
+1. [AGENTS.md](../AGENTS.md): the rules (most enforced by `task verify`).
+2. [README.md](README.md): the docs' reading order (architecture first).
+3. [WORKING-ON.md](WORKING-ON.md): who is changing what right now.
+4. [features.md](features.md): what every screen does (long; search it).
+   The app's own **Help** (the ? in the top bar, `web/src/help/`) is the
+   short, plain-words version for users.
 
-- The calendar icon beside Settings opens a private calendar per user, using the existing Microsoft
-  app registration with separate delegated calendar consent. Read
-  [calendar.md](calendar.md) for the extra redirect URI, permissions and behavior.
-- Interviews/bookings queue private Outlook holds; scheduling reads only busy
-  intervals. Never add attendees to automatic holds or expose personal event
-  details through team scheduling. Live Entra/mailbox validation is still needed.
+## What is built
 
-## Candidate workspace
+A modular monolith: a Go API and Go worker (`backend/`), a Python AI worker
+(`ai/`), a React web app (`web/`), PostgreSQL for data, search and the job
+queue. Every module's API is a contract in `contracts/modules/*.yaml`.
 
-- The approved compact candidate design is implemented: Details first, followed
-  by CV & files, Jobs, Activity, Salary and Email. Visited tabs retain drafts.
-- Work-rights choices live in Details' existing Work authorization field. The
-  FIFA card retains its stripe, uses an availability dropdown and plain
-  expandable skills, and has a slim notice/salary ribbon with natural height.
-- CV library selection drives a single viewer and toolbar. Existing document,
-  stage-move, salary-note and privacy behavior is retained; see `docs/features.md`.
-- Each candidate can keep three formatted CVs and four other CVs. At the limit,
-  choose which files to move to the Bin when the new one saves. Admins can also
-  move a CV to the Bin from its file menu, then restore it within 30 days if
-  there is room in its category.
+- **Recruiting core**: candidates (CVs read with OCR and the AI, formatted
+  and blind CVs in CV Studio's way, compare, duplicates and merge), companies
+  and contacts (website auto-fill, email verifier, LinkedIn checks, Find HR),
+  jobs from the client's JD, the pipeline (Steps and Board), interviews,
+  booking links, offers with approval, placements with fees, retainers and
+  invoices emailed on the start date, careers page and job board links.
+- **Search**: quick search (Kano's /find rules), boolean and advanced search
+  over CVs and profiles, AI search against a JD, possible candidates per job.
+- **Communication**: email from a connected Microsoft, Google or SMTP mailbox,
+  templates with fields, one email to many, client emails about several
+  candidates, Outlook Mail and Calendar inside the app, WhatsApp links with
+  templates (1.30).
+- **Running an agency**: roles and access per company (enforced by the
+  database, salary its own permission), teams, two-step sign-in (1.29),
+  automations, expense claims with receipt OCR and cloud storage, leads from
+  job ads, reports, market map, interview insights, PDPA tools, Bin, backups.
+- **Recent versions**: phones (1.31), merging duplicate companies and
+  contacts (1.32), notifications: the bell and the morning email (1.33),
+  exports to Excel/CSV from every list and report and Excel import (1.34),
+  in-app help and a getting-started checklist on the dashboard (1.37).
+  1.35 (client shortlist link) and 1.36 (activity targets and revenue
+  forecast) were being built alongside 1.37; see WORKING-ON.md and the
+  roadmap for whether they are merged.
+- The JobAdder migration tool (`tools/jobadder-migrator`) is separate and
+  discovery-only so far: see [jobadder-migration.md](jobadder-migration.md).
+- Deeper notes per area: [calendar.md](calendar.md) (Outlook calendar,
+  private holds), [mailbox-connections.md](mailbox-connections.md) (Microsoft,
+  Google, SMTP), [industries.md](industries.md), [claims-storage.md](claims-storage.md),
+  [apollo-hr.md](apollo-hr.md), [access-control.md](access-control.md).
 
-## External JobAdder migration tool
+## How to run it
 
-- `tools/jobadder-migrator` is a separate Go executable with a local browser UI
-  and a Windows build. It needs neither Docker nor a HiringPlug database.
-- First release is read-only discovery: counts/access gaps, original response
-  evidence, encrypted credentials/responses, pause/resume and synthetic demo.
-  It does not yet export full records/CVs or write into HiringPlug.
-- Discovery preserves append-only observations across retries, recognises
-  JobAdder's definition envelopes, pages categories, defers the candidate-only
-  payroll endpoint, persists provider retry deadlines and surfaces workspace
-  errors. Archive preparation/downloads do not hold the application lock.
-- The owner requires JobAdder field values to remain unchanged. No normalization,
-  deduplication, salary rewriting or AI enrichment during migration. API access
-  is available; approximately 80,000 candidates and all obtainable related
-  records are in scope. See [jobadder-migration.md](jobadder-migration.md) for
-  the remaining extraction, projection, import and reconciliation architecture.
+- On your own machine: [run-locally.md](playbooks/run-locally.md); on a server:
+  [deploy-to-a-server.md](playbooks/deploy-to-a-server.md).
+- Developing: `task setup` once (only for missing dependencies), `task db:up`,
+  then `task dev` (or `go run ./cmd/api` in `backend/` plus `pnpm dev` in
+  `web/`). `hp migrate` then `hp dev-setup` (in `backend/`, `go run ./cmd/hp`)
+  prints demo users and tokens (owner, recruiter, sourcer, viewer; password
+  `demo-password-2026`). `hp tenant -name … -owner-email … -owner-name …`
+  makes a fresh, empty company (to see the getting-started checklist) and
+  `hp token -user usr_…` a sign-in token for it.
+- Several helpers on one machine: give each its own database
+  (`/hiringplug_<name>` in the three `HP_DATABASE*`/`HP_AI_DATABASE_URL`
+  settings of its own `.env`), its own API port (`HP_HTTP_ADDR`) and point
+  the web dev server at it with `HP_DEV_API=http://localhost:<port>`.
+- Screenshots (AGENTS rule 12): Playwright (pre-installed), set
+  `sessionStorage['hiringplug.token']` to a token and reload; check desktop
+  and 390px phone width.
+- Checks: targeted tests while working (`go test ./internal/app/ -run …`,
+  `npx vitest run <files>` in `web/`), then `task verify` (about 10 minutes;
+  run it in the background with the dev stack stopped). `task gen` after
+  editing `contracts/` or `backend/db/`.
 
-## Where things stand
+## Where things are
 
-- **main** has everything below, plus descriptive screening salaries and
-  configurable fixed monthly salary calculations (built in another session on
-  10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
-- Nothing uncommitted, nothing half-built. Start new work on a fresh branch
-  from main.
-- Latest migration: `00126_calendars.sql`. Migrations are append-only.
+| What | Where |
+|---|---|
+| A module's API, permissions, errors, jobs | `contracts/modules/<module>.yaml` |
+| Database changes (append-only) | `backend/db/migrations/`; numbers are taken in ranges when helpers work in parallel (00170–00199 were given out on 22 Nov) |
+| A module's SQL / Go | `backend/db/queries/<module>.sql`, `backend/internal/modules/<module>/` |
+| Wiring (the only place modules meet) | `backend/internal/app/` (integration tests live here too) |
+| AI worker | `ai/src/hiringplug_ai/` (CV Studio's engine vendored in `ai/cvstudio`) |
+| Web pages, routes, menus | `web/src/pages/`, `web/src/routes.tsx` (one table drives the router, top bar and Settings menu) |
+| In-app help topics, getting-started steps | `web/src/help/` (typed data; update a topic when its screen changes) |
+| Each person's settings | `GET/PUT /v1/me/preferences` (identity module) |
 
 ## How the owner works with us
 
-- Build on the branch, push it; **fast-forward main only when the owner says
-  "merge"**. No pull requests unless asked.
-- Before merging: `task verify`; the new-module check (in a throwaway
-  worktree: `task new:module -- name=ci_samples entity=ci_sample`,
-  `task gen:contract gen:go`, `go test ./internal/app/ ./internal/modules/... ./internal/devtools/...`,
-  `task lint:go`); the end-to-end run (API + both workers + `ai/tests/e2e`)
-  and the browser smoke tests (`web/e2e`). CI runs all of these too, so a
-  green CI run on the exact commit counts.
-- After merging, check GitHub CI on main a few minutes later. Re-run jobs
-  that infrastructure cancelled (an apt timeout happened once); reproduce and
-  fix real failures on the branch.
-- Every screen change: screenshot it in the real app (AGENTS rule 12) and
-  show it. Every bug fix: a test that fails without it (rule 11).
-- No model names in commits. Write to the owner in plain words; they are a
-  recruiter, not a developer.
-- The owner likes to **see options before a screen is redesigned**: a small
-  HTML mock-up with two or three choices, then they pick ("1.a and 2.C").
-- They name other tools to copy: **CV Studio** (their CV formatter; its
-  engine is vendored in `ai/cvstudio`) and **Kano** (their browser tool; only
-  its /find code was ever shared, as an upload, not in the repo). If asked to
-  copy something from them that you cannot see, say so and ask for it.
-- **Deleting an uploaded document is admin-only**, as a permission of its own
-  per kind of document (`companies.documents:delete`,
-  `jobs.documents:delete`): the button is always shown, disabled for others.
-  A new permission needs a migration adding it to admins who chose their own
-  permissions (see `00079_job_documents_delete.sql`).
+- The owner is a recruiter, not a developer: write to them in plain words.
+- Build on a branch and push it; **main moves only when the owner says
+  "merge"** (fast-forward, no pull requests unless asked). Raise `VERSION`
+  with every update (minor for features, patch for fixes).
+- Several helpers work at once and see each other only through GitHub: keep
+  your WORKING-ON.md entry current and push often.
+- Every screen change: a screenshot in the real app, shown when reporting.
+  Every bug fix: a test that fails without it.
+- They like to **see options before a screen is redesigned**: a small HTML
+  mock-up with two or three choices, then they pick.
+- They name tools to copy: **CV Studio** (their CV formatter, vendored) and
+  **Kano** (their browser tool; only its /find code was shared). If asked to
+  copy something you cannot see, say so and ask for it.
+- No model names in commits.
 
 ## Must never happen
 
-- **Real CVs are never committed.** The owner uploaded real people's CVs for
-  testing (in earlier sessions' uploads); use them only locally. Tests use
-  invented people and CV Studio's synthetic example (`ai/cvstudio/examples`).
-- **Salary** never goes into audit entries, logs or AI prompts. Salary in
-  client emails only per the rules in `docs/features.md` (only senders who may
-  see salary fill those fields; such emails hidden from roles without salary
-  access unless Settings says otherwise). CV Studio formatting removes lines
-  stating the candidate's own pay before the AI sees the CV.
+- **Real CVs are never committed.** Tests use invented people and CV
+  Studio's synthetic example (`ai/cvstudio/examples`).
+- **Salary** never goes into audit entries, logs, AI prompts or help text
+  examples; salary in emails only per the rules in features.md.
 - No secrets in code; settings are `HP_*` variables listed in `.env.example`.
 
-## Email connections
+## What is next (roadmap "Product pipeline")
 
-- Settings > Email connection supports Microsoft, Google and SMTP per user per agency, with encrypted credentials, PKCE and replay/cancellation protection. Queued messages bind their sender; refresh rotation survives retries. New test deliveries are labelled clearly.
-- Microsoft/Google need deployment app registrations and `HP_MAIL_*` secrets before live sign-in. System mail still uses server SMTP. See [mailbox-connections.md](mailbox-connections.md) for scopes, redirects, setup and validation limits.
+1. Client shortlist link (7) and activity targets and revenue forecast (8),
+   if not merged yet.
+2. Search by meaning (embeddings) for possible candidates (9).
+3. Housekeeping (10): help, checklist and this handover are done; **tidying
+   old branches (the Leads workspace merged or closed) is left to the owner**.
+4. Then: batch CV formatting, Find HR for unlinked leads, Gmail replies and
+   bounces, AI usage and cost per month, an audit-log page and "who viewed
+   salary", single sign-on, cloud readiness (files in object storage, sign-in
+   limits in PostgreSQL, key rotation, alerts). Waiting on the owner: Google
+   calendar sync and job board posting (partner accounts), live Microsoft
+   mailbox and calendar validation.
 
-## Candidate email packages and salary history
-
-- General Settings chooses monthly figures or cleaned salary breakdowns for emails only. Stored salary wording and screening inputs are unchanged. Unknown units require review. Applied/Screening have stage-specific bulk email selection; job details start collapsed. Invalid fields and missing candidate cells are outlined in red.
-- Candidate/contact composers and job-client submissions share multi-candidate
-  selection, per-candidate CV choice and optional profile/salary fields. An
-  explicit recipient is separate from the referenced candidates; inserted data
-  carries versions checked at send time. See `docs/features.md`.
-- Free salary notes are preserved independently of calculations. New screening
-  calls store immutable compensation-protected snapshots, exposed under Salary
-  history. Older overwritten figures cannot be recovered. Industries and
-  subindustries are also editable while screening.
-
-## Industry catalogue (11 Nov 2026)
-
-- The approved option B is the shared candidate/company hierarchy browser.
-  Settings > Industries supports add, rename, aliases, move, retirement and
-  replacement before deleting used categories. The seed has 10 parents and
-  81 children. See [industries.md](industries.md) for Go module boundaries,
-  recognition rules, compatibility, migration and safety checks.
-- Go owns employer selection and industry recognition; Python keeps extraction
-  and optional missing-detail reads. Unknown employers remain manually
-  selectable. No industry-only AI call is made.
-
-## What was built 7–10 Nov (newest first; details in `docs/features.md`)
-
-- **Screening salary**: descriptive current and expected pay, fixed monthly
-  totals, percentage expectations and configurable component/bonus rules in
-  Settings. Variable pay stays excluded by default. Ambiguous amounts require
-  review; only the fixed monthly figure appears on candidate cards.
-- **Email**: one email to many people, each their own copy (`POST
-  /v1/email-batches`, tick boxes on the candidate and contact lists and the
-  pipeline); one email to the client about several candidates, each with
-  their own details as a block or a table row and their own profile attached
-  (`candidates` on `/v1/emails`, table `email_candidate`); attachments up to
-  20 MB in all; contacts emailed from their page; templates with a formatting
-  toolbar and field picker (only admins change them; anyone saves a new one).
-- **AI assistant** can be docked to the right of the screen (remembered in
-  the browser, `web/src/components/useDock.ts`); answers are cards.
-- **Job page**: pipeline first with possible candidates folded under it,
-  notes next; uploaded JDs kept with the job (view, download, admin delete);
-  job ads as foldable cards.
-- **Candidates**: duplicate CV uploads caught (same file skipped, same name
-  asks); screening calls with who and when (salary follows the latest);
-  notes timeline with the latest call pinned, filters and search; list with
-  your own columns and work authorization as a coloured initials disc;
-  advanced search (dropdowns and a boolean on CVs) and AI search (CV Studio's
-  AI Crawler); home search by Kano's /find rules.
-- **Companies**: categories with colours (Settings) and a card; LinkedIn
-  page; benefits and pre-offer process; documents; terms of business as
-  rates by salary band.
-- **Placements**: invoicing (terms, recipient, due date, invoice emailed on
-  the start date), invoice preview in the app.
-- **CV Studio's way**: blind CVs, blind job ads rewritten by the AI,
-  formatted CVs (Word and PDF, "About him/her", agency file names, delete).
-
-## Open ends and ideas (none started)
-
-- The assistant's dock is a standard side panel: the owner compared it with
-  Kano's; if they share how Kano docks, match it.
-- In one-email-to-many, every copy's attachment row points at the **same
-  stored file** (`storage_key`). Anything that later deletes email files
-  must keep a file while another email still uses it.
-- **Selling it as a SaaS** (the owner's goal: ~1,000 agencies, 5,000–20,000
-  users online): what to change, the set-up and costs at each size, and why
-  Python stays, in [saas-plan-scaling-to-20k-users.md](saas-plan-scaling-to-20k-users.md).
-- **Review of the 10–12 Nov work (12 Nov).** Fixed: a salary breakdown
-  stayed on the record after the figure changed on the Salary form, so client
-  emails showed the old package beside the new number (the server now keeps a
-  breakdown only while its figure is unchanged; the Salary form no longer
-  sends it); "per month" was added to salary wording with no amount in it.
-  Then also fixed: the salary calculator reads the company's saved rules on
-  the server (the browser can no longer send its own; the unused
-  `/v1/salary-calculation-rules` route is gone); money is exact (`math/big`),
-  which corrected expected salaries that came out one unit low at exact
-  halves; the salary code moved into the candidates module
-  (`candidates/internal/salary`) and compiles its patterns once;
-  `ScreeningSalary.tsx`, `SalaryCalculationSettings.tsx` and `Shortlist.tsx`
-  are formatted for reading. Still open, none urgent: refreshing a
-  Microsoft/Google token opens a one-connection database pool each time (rare,
-  about hourly per user); the Microsoft connection asks for `Mail.ReadWrite`
-  because large attachments go through a draft; "Payment Getaway" in the
-  industry list is CV Studio's spelling, shared with its AI prompt, so change
-  both together or neither.
-- **Second, full review (12 Nov).** Fixed: every candidate and company save
-  (and loading suggestions) took the agency's industry lock exclusively, so
-  saves queued behind each other; saves now share it and only Settings edits
-  to the industry list take it alone. Renaming, moving or deleting an
-  industry rewrote records one by one (2.3 s for 5,000 candidates, all saves
-  waiting); it is now a few bulk statements (0.3 s). CV imports and the CV
-  review again fill the current title and company when jobs are undated
-  (the job marked current, else the first listed); industries still need a
-  clearly identified employer. Calls without salary no longer show the
-  candidate's salary as if recorded on them (snapshots stored 10–12 Nov for
-  such calls were left in place). Candidate details go below the paragraph
-  the cursor is in, not after the sign-off. The salary calculator's review
-  points are highlighted but no longer block "Use these figures". The
-  screening-call cards replace the "Latest call" box and the separate
-  salary history in Notes and activity. Logged calls read as a sentence in
-  the timeline. Owner's decision: an email to a candidate may describe other
-  candidates but never show their salary (the server refuses it; the
-  composer hides the salary options and says why); their own salary is fine.
-- Proposed before and still open: batch CV formatting; possible candidates
-  by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
-  PostgreSQL, key rotation, alerts). Waiting on the owner: Google calendar sync
-  (OAuth apps), posting ads to job boards (partner accounts),
-  a test of CV Studio formatting with their real AI key.
+Known open ends: the top bar still scrolls its page links at 1280px wide
+(it fits from 1366px); in one-email-to-many every copy's attachment points at
+the same stored file, so anything that deletes email files must keep a file
+another email still uses.
 
 ## Things that cost time before
 
-- Reuse the existing environment and run targeted checks during edits; finish
-  with `task verify` before pushing. See
-  [development-workflow.md](playbooks/development-workflow.md) for dependency
-  caching, bounded installation and the verification sequence.
-- Check database health if tests cannot connect; start the existing service
-  only if stopped (a retained cloud session may already have Docker PostgreSQL).
-- Stop the dev stack (api, workers, `pnpm dev`) before `task verify`: on a
-  busy machine the AI-queue tests time out and workers are killed for memory.
-  Run `task verify` in the background; it takes about 10 minutes.
-- `hp migrate` runs the migrations built into the binary: rebuild `hp`
-  after adding one.
-- `task gen` regenerates every module's `internal/store/models.go` when a
-  table is added: expected, commit them.
+- Stop the dev stack before `task verify`: on a busy machine the AI-queue
+  tests time out. `hp migrate` runs the migrations built into the binary, so
+  rebuild `hp` (or `go run`) after adding one.
+- `task gen` rewrites every module's `internal/store/models.go` when a table
+  or column changes: expected, commit them.
 - In contract YAML, a `description:` inside `{ ... }` with a comma or colon
-  must be quoted, or the contract stops being valid OpenAPI.
-- Two files whose names differ only in case (`shortlist.ts`,
-  `Shortlist.tsx`) are refused by a test.
-- The test server takes uploads of at most 256 KB (`testMaxUpload`): test
-  big-file limits as unit tests.
-- In the dev stack there is no mail server: sent emails show "failed: no
-  mail server is set up". That is expected; the integration tests have one.
-
-## Working in a cloud session
-
-- Inspect installed tools and database health first. If the local PostgreSQL
-  service is stopped, start it with `service postgresql start`. If Docker
-  already provides PostgreSQL, reuse it instead of starting another server.
-- Go, golangci-lint and the other tools are already on PATH (there is no
-  `/root/go/bin`); sqlc runs through `go tool`. Install ShellCheck if
-  `task lint:shell` cannot find it (`apt-get install -y shellcheck`). Keep
-  existing dependency caches.
-- Run `task setup` only for missing dependencies or changed lockfiles (Go,
-  Python with `uv`, web with `pnpm`, and `npm ci` for CV Studio's renderer).
-  Run targeted checks during edits, then `task verify` before pushing.
-- To run the real app: build `backend/cmd/{api,worker,hp}`, set the `HP_*`
-  variables from `.env.example` against a local database, `hp dev-setup`
-  prints demo users and tokens (owner, recruiter, sourcer, viewer; password
-  `demo-password-2026`), start `api`, `worker`, `uv run hiringplug-ai` (in
-  `ai/`) and `pnpm dev` (in `web/`, port 5173). For screenshots, Playwright:
-  set `sessionStorage['hiringplug.token']` and reload.
-- To see AI features without a real key: run a small local OpenAI-compatible
-  stand-in and set `HP_AI_PROVIDER=openai_compatible`,
-  `HP_AI_PROVIDER_URL=http://127.0.0.1:<port>/v1`, `HP_AI_MODEL=stand-in`,
-  then choose "Server default" in Settings > AI provider. Never present
-  stand-in output as real AI quality.
-- Headless Chromium does not draw PDFs inside an iframe: for screenshots of
-  CV previews, render the PDF page with `pdftoppm` and say so.
-- Docker builds cannot reach package registries from the sandbox's proxy;
-  test images' pieces directly (e.g. nginx with the config mounted), and rely
-  on CI's Docker job for full builds.
+  must be quoted.
+- Two files whose names differ only in case are refused by a test; files
+  stay under 500 lines.
+- A new permission needs a migration adding it to the roles of companies
+  that chose their own permissions (see `00079_job_documents_delete.sql`).
+- The test server takes uploads of at most 256 KB: test big-file limits as
+  unit tests. The dev stack has no mail server ("failed: no mail server is
+  set up" is expected).
+- AI features without a real key: a small local OpenAI-compatible stand-in,
+  `HP_AI_PROVIDER=openai_compatible`, `HP_AI_PROVIDER_URL=http://127.0.0.1:<port>/v1`;
+  never present its output as real AI quality.
+- Headless Chromium does not draw PDFs in an iframe: render the page with
+  `pdftoppm` for screenshots, and say so. Docker builds cannot reach package
+  registries from the sandbox; rely on CI's Docker job.

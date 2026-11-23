@@ -1,0 +1,52 @@
+/* The help page and the dashboard's getting-started checklist. */
+.help-page { max-width: 880px; }
+.help-search { position: relative; display: block; margin: 1rem 0 1.25rem; }
+.help-search svg { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.help-search input { width: 100%; padding-left: 2.5rem; min-height: 46px; font-size: 1rem; }
+
+.help-topics { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem; }
+.help-topics a { display: flex; flex-direction: column; gap: 0.25rem; height: 100%; box-sizing: border-box; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); color: var(--text); }
+.help-topics a:hover { border-color: var(--accent); text-decoration: none; }
+.help-topics strong { color: var(--ink); }
+.help-topics span { color: var(--muted); font-size: 0.9rem; font-weight: 400; line-height: 1.4; }
+
+.help-results { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; gap: 0.5rem; }
+.help-results li { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.help-results .muted { font-size: 0.9rem; line-height: 1.4; }
+
+.help-topic h2 { margin-bottom: 0.35rem; }
+.help-summary { color: var(--muted); margin-top: 0; }
+.help-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 0.5rem; }
+.help-links a.button { min-height: 34px; }
+.help-topic section { margin-top: 1.25rem; }
+.help-topic h3 { margin-bottom: 0.4rem; }
+.help-topic ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.35rem; }
+.help-guide-again { margin-top: 1.5rem; }
+
+.first-run { border-color: var(--line-strong); background: linear-gradient(180deg, var(--accent-soft), var(--surface) 5rem); }
+.first-run-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.first-run-head h3 { margin-bottom: 0.15rem; }
+.first-run-head p { margin: 0; }
+.first-run-head .link { white-space: nowrap; }
+.first-run-progress { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0.5rem; font-size: 0.88rem; color: var(--muted); }
+.first-run-progress progress { flex: 1; max-width: 16rem; height: 8px; appearance: none; border: 0; border-radius: 999px; background: var(--line); overflow: hidden; }
+.first-run-progress progress::-webkit-progress-bar { background: var(--line); border-radius: 999px; }
+.first-run-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
+.first-run-progress progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
+.first-run-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
+.first-run-steps li { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 0.35rem 0.75rem; padding: 0.6rem 0; border-top: 1px solid var(--line); }
+.first-run-steps li:first-child { border-top: 0; }
+.first-run-tick { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-strong); color: #fff; font-size: 0.8rem; font-weight: 700; }
+.first-run-steps li.done .first-run-tick { background: #16a34a; border-color: #16a34a; }
+.first-run-text { min-width: 0; display: flex; flex-direction: column; }
+.first-run-text .muted { font-size: 0.88rem; line-height: 1.4; }
+.first-run-steps li.done strong { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.first-run-steps a.button { min-height: 34px; justify-self: end; }
+.first-run-foot { margin: 0.75rem 0 0; }
+
+@media (max-width: 700px) {
+  .first-run-steps li { grid-template-columns: 24px 1fr; }
+  .first-run-steps a.button { grid-column: 2; justify-self: start; }
+  .first-run-head { flex-direction: column; gap: 0.25rem; }
+  .help-topics { grid-template-columns: 1fr; }
+}

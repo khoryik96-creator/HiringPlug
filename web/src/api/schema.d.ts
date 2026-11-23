@@ -3186,7 +3186,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your own settings, such as the columns of your candidate list and your dashboard's order */
+        /** Your own settings, such as the columns of your candidate list, your dashboard's order and its getting-started checklist */
         get: operations["getMyPreferences"];
         /** Change your own settings (no one else's) */
         put: operations["putMyPreferences"];
@@ -8813,6 +8813,8 @@ export interface components {
             /** @description The candidate list's columns, in order, after the name (null: the default ones). */
             candidateColumns?: components["schemas"]["CandidateColumn"][] | null;
             favourites?: components["schemas"]["Favourites"];
+            /** @description You hid the dashboard's getting-started checklist (false: it shows while a step you can do is left). */
+            guideDismissed?: boolean;
         };
         /** @description Your favourites in the dropdowns, shown first for you only. Saving sends the kinds it changes; a kind left out keeps its favourites. Nothing is removed from the lists themselves, and every item can still be chosen. */
         Favourites: {

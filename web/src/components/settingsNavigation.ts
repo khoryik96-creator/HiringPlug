@@ -59,6 +59,7 @@ const features = [
   { section: "outlook", label: "Outlook Mail", href: "#/outlook", words: "inbox messages drafts forwarding schedule mail reply" },
   { section: "calendar", label: "Calendar", href: "#/calendar", words: "day week month agenda events outlook calendar dock" },
   { section: "import", label: "Import profiles", href: "#/import", words: "upload CV CVs resume resumes bulk parse documents create candidates", permission: "intake:create" },
+  { section: "help", label: "Help", href: "#/help", words: "help guide how to question support getting started checklist" },
 ] satisfies { section: string; label: string; href: string; words: string; permission?: Permission }[];
 
 export function groupSettings(pages: Route[]) {
