@@ -16,8 +16,6 @@
 @keyframes meaning-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .meaning-banner .spinner { animation: none; } }
 
-.why-row td { padding-top: 0; }
-.why-row:has(+ .snippet-row) td { border-bottom: 0; } /* the CV's words, when shown, belong to the same candidate */
 .why-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; font-size: 0.85rem; color: var(--text); }
 .why-strength {
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
@@ -32,9 +30,16 @@
 .why-passage::after { content: "”"; }
 .why-words { white-space: nowrap; }
 
-/* Phones (lists as cards): why, and the CV's words, are part of the candidate's card. */
+/* In a list's Match column (searching by meaning): stacked, the CV's words cut to three lines. */
+.candidates-table .col-match { min-width: 16rem; max-width: 26rem; }
+.why-line.in-cell { flex-direction: column; align-items: flex-start; gap: 0.2rem; font-size: 0.82rem; }
+.why-line.in-cell .why-passage {
+  flex-basis: auto; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Phones (lists as cards): the CV's words are part of the candidate's card; Match takes a line of its own. */
 @media (max-width: 700px) {
   table.pick-table tr.has-snippet { border-bottom: 0; padding-bottom: 0.35rem; }
-  table.pick-table tr:is(.why-row, .snippet-row) { padding-top: 0; }
-  table.pick-table tr.why-row:has(+ .snippet-row) { border-bottom: 0; }
+  table.pick-table tr.snippet-row { padding-top: 0; }
+  table.pick-table td.col-match { flex-basis: 100%; max-width: none; }
 }

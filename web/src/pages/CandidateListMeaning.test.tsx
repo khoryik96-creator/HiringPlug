@@ -53,7 +53,12 @@ describe("searching candidates by meaning", () => {
 
     const line = await screen.findByText(/whatever their titles say/, {}, { timeout: 3000 }); // asked again a moment later
     expect(line.textContent).toBe("Searching for accounts executive (accounting), executive level first, whatever their titles say. Best matches first.");
-    expect(document.querySelector(".why-line")?.textContent).toBe("Strong matchas Account Executive (now) · accounting · level: executive");
+    // In a Match column beside the name, not a line across the other columns.
+    expect(screen.getByRole("columnheader", { name: "Match" })).toBeTruthy();
+    const cell = document.querySelector("td.col-match .why-line");
+    expect(cell?.textContent).toBe("Strong matchas Account Executive (now)accounting · level: executive"); // the field on a line of its own
+    expect(cell?.querySelector(".why-field")?.textContent).toBe("accounting · level: executive");
+    expect(document.querySelector("td[colspan]")).toBeNull();
     expect(screen.getByText(/1 candidate, best match first/)).toBeTruthy();
   });
 

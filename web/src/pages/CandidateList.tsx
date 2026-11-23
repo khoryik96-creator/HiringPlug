@@ -119,9 +119,11 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const industries = useIndustries();
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
   const filtersOn = chips.length + (mine ? 1 : 0); // on the Filters button
-  const width = cols.columns.length + (folders.hasFolders ? 2 : 1);
+  // Searching by meaning: why each candidate was found, in a column of its own beside the name.
+  const matchCol = meaningText !== "";
+  const width = cols.columns.length + (folders.hasFolders ? 2 : 1) + (matchCol ? 1 : 0);
   const tableRef = useRef<HTMLTableElement>(null);
-  const widths = useColumnWidths("candidates", ["name", ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
+  const widths = useColumnWidths("candidates", ["name", ...(matchCol ? ["match"] : []), ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
   // The columns after the name move by dragging their headings; the order is kept with the choice of columns.
   const moveColumn = useColumnMove(tableRef, cols.columns, (next) => { cols.save.mutate(next); });
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
@@ -132,7 +134,6 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     set: (ids, on) => { pick.pick(hits.filter((h) => ids.includes(h.candidate.id)).map((h) => personOf(h.candidate)), on); },
   });
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
-    snippet = snippet ?? hits.find((h) => h.candidate.id === c.id)?.why; // a why line is under the row too
     if (!canPick) return { className: snippet ? "has-snippet" : undefined };
     const row = picking.rowProps(c.id);
     return { ...row, className: `${row.className ?? ""}${snippet ? " has-snippet" : ""}` };
@@ -230,6 +231,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
           <thead>
             <tr>
               <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />
+              {matchCol && <th {...widths.head("match", "Match")}>Match{widths.handle("match", "Match")}</th>}
               {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} move={moveColumn} />)}
               {folders.hasFolders && <th {...widths.head("folders", "In folders")}>In folders{widths.handle("folders", "In folders")}</th>}
             </tr>
@@ -237,7 +239,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
           <tbody>
             {hits.map(({ candidate: c, matchedIn, cvSnippet, why }) => (
               <Fragment key={c.id}>
-                <tr {...rowProps(c, cvSnippet ?? why)}>
+                <tr {...rowProps(c, cvSnippet)}>
                   <td className="name-cell" {...folders.drag(c.id, pick.ids)}>
                     <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
                       {" "}
@@ -246,14 +248,10 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
                       {canPick && pick.ids.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
                     </WaName>
                   </td>
+                  {matchCol && <td className="col-match">{why && <WhyLine why={why} showLevel={Boolean(meaning?.understood?.levelName)} inCell />}</td>}
                   {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}
                   {folders.hasFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
                 </tr>
-                {why && (
-                  <tr className="snippet-row why-row">
-                    <td colSpan={width}><WhyLine why={why} showLevel={Boolean(meaning?.understood?.levelName)} /></td>
-                  </tr>
-                )}
                 {cvSnippet && (
                   <tr className="snippet-row">
                     <td colSpan={width}>

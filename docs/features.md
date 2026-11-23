@@ -208,10 +208,11 @@ in another field counts less, however close the words (a salesperson is at
 most a possible match for "accounts executive"); the fields a recruiter
 would also look at are not (an HR generalist for talent acquisition, a
 finance manager for accounts). A tool or code in the search (S/4HANA, ACCA)
-counts most where a CV names it. Each candidate shows why: **Strong**,
-**Good** or **Possible match**, the title of theirs that matched with its
-field (and level, when the search named one), and the part of their CV
-that matched (for those who may read CVs). The other filters and folders
+counts most where a CV names it. Each candidate shows why, in a **Match**
+column beside the name: **Strong**, **Good** or **Possible match**, the
+title of theirs that matched with its field (and level, when the search
+named one), and the part of their CV that matched (three lines, all of it
+on hover; for those who may read CVs). The other filters and folders
 still apply. A line above the list says how the search was read ("Searching
 for accounts executive (accounting), executive level first, whatever their
 titles say") and, while the company's CVs are still being read, how far it

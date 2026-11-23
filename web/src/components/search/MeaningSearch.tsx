@@ -100,21 +100,32 @@ export function MeaningBanner({ outcome, text, tooLong, onWords }: {
 
 const STRENGTH: Record<Schemas["MeaningWhy"]["strength"], string> = { strong: "Strong match", good: "Good match", possible: "Possible match" };
 
+/** The matched title's field, and its level when the search asked for one ("accounting · level: executive"). */
+function WhyField({ why, showLevel, lead }: { why: Schemas["MeaningWhy"]; showLevel: boolean; lead: string }) {
+  const parts = [why.family, showLevel && why.level ? `level: ${why.level.toLowerCase()}` : null].filter(Boolean);
+  if (parts.length === 0) return null;
+  return <span className="muted why-field">{lead}{parts.join(" · ")}</span>;
+}
+
 /** Why a candidate was found by meaning: the title of theirs that matched (its
  * field, and its level when the search asked for one), where their CV says it,
- * and the search's own words in it (unless shown otherwise). */
-export function WhyLine({ why, showLevel = false, showWords = true }: { why: Schemas["MeaningWhy"]; showLevel?: boolean; showWords?: boolean }) {
+ * and the search's own words in it (unless shown otherwise). inCell stacks it
+ * in a list's Match column, the CV's words cut to three lines (all of them on
+ * hover). */
+export function WhyLine({ why, showLevel = false, showWords = true, inCell = false }: {
+  why: Schemas["MeaningWhy"]; showLevel?: boolean; showWords?: boolean; inCell?: boolean;
+}) {
   return (
-    <span className="why-line">
+    <span className={`why-line${inCell ? " in-cell" : ""}`}>
       <span className={`why-strength ${why.strength}`}>{STRENGTH[why.strength]}</span>
       {why.title && (
         <span className="why-title">
           as <strong>{why.title}</strong> ({why.titleWhen === "now" || !why.titleWhen ? "now" : why.titleWhen})
-          {why.family && <span className="muted"> · {why.family}</span>}
-          {showLevel && why.level && <span className="muted"> · level: {why.level.toLowerCase()}</span>}
+          {!inCell && <WhyField why={why} showLevel={showLevel} lead=" · " />}
         </span>
       )}
-      {why.passage && <q className="why-passage">{why.passage}</q>}
+      {why.title && inCell && <WhyField why={why} showLevel={showLevel} lead="" />}
+      {why.passage && <q className="why-passage" title={inCell ? why.passage : undefined}>{why.passage}</q>}
       {showWords && why.words.length > 0 && <span className="muted small why-words">CV says: {why.words.join(", ")}</span>}
     </span>
   );
