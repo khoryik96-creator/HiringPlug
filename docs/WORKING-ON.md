@@ -20,10 +20,10 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Code review of 1.38.1; meeting editor toolbar
+### Search by meaning (roadmap item 9)
 - Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v
-- Touches: review only; then web/src/components/clientEmail/RichEditor.tsx and web/src/components/calendar/ComposeBody.tsx (the toolbar's buttons in the new-meeting window)
+- Touches: matching module (possible candidates, AI search ranking), candidates search, documents (CV passages), AI worker (a local meaning model), a new migration (pgvector), deploy (database image), web/src/pages/Candidates* and the job page's Possible candidates
 - Started: 23 Nov 2026    Last update: 23 Nov 2026
 - State: in progress
-- Next: report the review of bddbe0d..1.38.1; fix the toolbar's squashed labels in the meeting window; fix what the owner asks
+- Next: design and build; nothing pushed for it yet
