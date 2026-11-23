@@ -1,6 +1,6 @@
 # Apollo work email in Find HR
 
-Open **Companies → Find HR → Apollo**. Choose **Connect Apollo**, open the
+Open **Settings → Integrations → Apollo** (or **Companies → Find HR → Apollo**). Choose **Connect Apollo**, open the
 Apollo sign-in page, approve access with your own Apollo account, then return
 to HiringPlug and choose **Check connection**.
 
