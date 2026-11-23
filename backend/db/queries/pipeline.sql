@@ -204,3 +204,15 @@ SELECT id, created_at FROM application
 WHERE job_order_id = ANY(@job_ids::text[]) AND channel IS NOT NULL AND created_at > @since
 ORDER BY created_at DESC, id DESC
 LIMIT 50;
+
+-- Moves to a stage in a period by a person, with the candidate (reports:
+-- CVs sent are moves to submitted).
+-- name: MovesToStageBetween :many
+SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
+FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
+WHERE c.to_stage = @stage AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
+LIMIT 50000;
+
+-- Applications now at some stages (reports: the revenue forecast).
+-- name: ApplicationsAtStages :many
+SELECT * FROM application WHERE stage = ANY(@stages::text[]) ORDER BY id LIMIT 5000;

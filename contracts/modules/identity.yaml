@@ -832,7 +832,7 @@ components:
     DashboardBlock:
       type: string
       description: A block of the dashboard that can be moved.
-      enum: [numbers, needsYou, import, tasks, offersToApprove, interviews, openJobs]
+      enum: [numbers, needsYou, import, tasks, offersToApprove, interviews, activity, openJobs]
     CandidateColumn:
       type: string
       description: A column the candidate list can show.

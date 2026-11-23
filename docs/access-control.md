@@ -118,6 +118,9 @@ details get their own permissions.
 | `cvformats:create` (formatted CVs) | ✓ | ✓ | ✓ | ✓ | | |
 | `cvformats.templates:manage` (upload and remove CV templates) | ✓ | ✓ | ✓ | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
+| `reports.team:read` (everyone's activity against targets, not only your own) | ✓ | ✓ | | | | |
+| `reports.settings:manage` (activity targets and the forecast's stage weights) | ✓ | ✓ | | | | |
+| `reports.forecast:read` (the revenue forecast; also needs `placements.fees:read`) | ✓ | ✓ | | | | |
 | `intake:create` (import CVs and LinkedIn PDFs as candidates; follow your imports) | ✓ | ✓ | ✓ | ✓ | | |
 | `settings:read` (dropdown options and mandatory fields; every form needs it) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `settings:manage` (change them) | ✓ | ✓ | | | | |

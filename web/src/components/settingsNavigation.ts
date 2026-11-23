@@ -6,7 +6,7 @@ export const settingsGroups = [
   { label: "Recruiting setup", sections: ["settings-stages", "settings-lists", "industries", "settings-salary", "cv-templates"] },
   { label: "Email & scheduling", sections: ["email-connection", "email-templates", "whatsapp-templates", "booking-calendars", "automations"] },
   { label: "Team & agency", sections: ["settings", "team", "access", "privacy"] },
-  { label: "Finance", sections: ["invoicing", "settings-claims-storage"] },
+  { label: "Finance", sections: ["invoicing", "settings-targets", "settings-claims-storage"] },
   { label: "System & integrations", sections: ["integrations", "ai-provider", "companion", "system", "backups", "bin"] },
 ];
 
@@ -28,6 +28,7 @@ const aliases: Record<string, string> = {
   access: "permissions user access admin roles visibility",
   privacy: "privacy consent retention data deletion do not contact",
   invoicing: "invoice billing placement fees finance",
+  "settings-targets": "activity targets KPI goals calls CVs sent interviews placements recruiter revenue forecast pipeline weights",
   "settings-claims-storage": "receipt files scans expenses claim uploads OneDrive Google Drive Dropbox",
   integrations: "connections API service webhooks third party",
   "ai-provider": "AI assistant model API key OpenAI Claude DeepSeek",

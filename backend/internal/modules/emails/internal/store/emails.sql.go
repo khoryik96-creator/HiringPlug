@@ -55,6 +55,45 @@ func (q *Queries) BindEmailDelivery(ctx context.Context, arg BindEmailDeliveryPa
 	return err
 }
 
+const cVsEmailedBetween = `-- name: CVsEmailedBetween :many
+SELECT sent_by, created_at, cv_candidate_ids FROM email
+WHERE cardinality(cv_candidate_ids) > 0 AND status <> 'failed' AND created_at >= $1 AND created_at < $2
+LIMIT 20000
+`
+
+type CVsEmailedBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type CVsEmailedBetweenRow struct {
+	SentBy         string
+	CreatedAt      time.Time
+	CvCandidateIds []string
+}
+
+// CVs emailed in a period, by whom (reports: each user's activity); failed
+// emails are left out.
+func (q *Queries) CVsEmailedBetween(ctx context.Context, arg CVsEmailedBetweenParams) ([]CVsEmailedBetweenRow, error) {
+	rows, err := q.db.Query(ctx, cVsEmailedBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CVsEmailedBetweenRow
+	for rows.Next() {
+		var i CVsEmailedBetweenRow
+		if err := rows.Scan(&i.SentBy, &i.CreatedAt, &i.CvCandidateIds); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearMailboxStates = `-- name: ClearMailboxStates :exec
 DELETE FROM email_mailbox_state WHERE user_id=app_current_user()
 `
@@ -251,7 +290,7 @@ func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, 
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at, cv_candidate_ids FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -285,6 +324,7 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.BouncedTo,
 		&i.BouncedAt,
 		&i.DeliveryAttemptedAt,
+		&i.CvCandidateIds,
 	)
 	return i, err
 }
@@ -428,7 +468,7 @@ INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addre
 VALUES (app_current_tenant(), $1, $2, $3, $4::text[],
         $5::text[], $6::text[], $7, $8, $9, $10, $11,
         $12, coalesce($13::text, app_current_user()), $14, $15)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at, cv_candidate_ids
 `
 
 type InsertEmailParams struct {
@@ -496,6 +536,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.BouncedTo,
 		&i.BouncedAt,
 		&i.DeliveryAttemptedAt,
+		&i.CvCandidateIds,
 	)
 	return i, err
 }
@@ -620,7 +661,7 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id, e.mailbox_ref, e.delivery_mode, e.bounced_to, e.bounced_at, e.delivery_attempted_at FROM email e
+SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id, e.mailbox_ref, e.delivery_mode, e.bounced_to, e.bounced_at, e.delivery_attempted_at, e.cv_candidate_ids FROM email e
 WHERE e.candidate_id = $1
    OR e.id IN (SELECT ec.email_id FROM email_candidate ec WHERE ec.candidate_id = $1::text)
 ORDER BY e.id DESC LIMIT 200
@@ -664,6 +705,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.BouncedTo,
 			&i.BouncedAt,
 			&i.DeliveryAttemptedAt,
+			&i.CvCandidateIds,
 		); err != nil {
 			return nil, err
 		}
@@ -676,7 +718,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 }
 
 const listContactEmails = `-- name: ListContactEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at, delivery_attempted_at, cv_candidate_ids FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]Email, error) {
@@ -716,6 +758,7 @@ func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]E
 			&i.BouncedTo,
 			&i.BouncedAt,
 			&i.DeliveryAttemptedAt,
+			&i.CvCandidateIds,
 		); err != nil {
 			return nil, err
 		}
@@ -1202,6 +1245,21 @@ type SeedWhatsAppTemplateParams struct {
 // The starter WhatsApp templates, added the first time a company opens them.
 func (q *Queries) SeedWhatsAppTemplate(ctx context.Context, arg SeedWhatsAppTemplateParams) error {
 	_, err := q.db.Exec(ctx, seedWhatsAppTemplate, arg.Name, arg.Body)
+	return err
+}
+
+const setEmailCVCandidates = `-- name: SetEmailCVCandidates :exec
+UPDATE email SET cv_candidate_ids = $1::text[] WHERE id = $2
+`
+
+type SetEmailCVCandidatesParams struct {
+	CandidateIds []string
+	ID           string
+}
+
+// Whose CVs the email carries to someone other than that candidate.
+func (q *Queries) SetEmailCVCandidates(ctx context.Context, arg SetEmailCVCandidatesParams) error {
+	_, err := q.db.Exec(ctx, setEmailCVCandidates, arg.CandidateIds, arg.ID)
 	return err
 }
 

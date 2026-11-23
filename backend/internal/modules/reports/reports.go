@@ -1,18 +1,27 @@
 // Package reports works out how the business is doing over a period: how far
 // candidates get (pipeline conversion), which sources bring candidates who
 // get hired, placements and fees per recruiter, and how long jobs take to
-// fill.
+// fill; each user's activity (calls, CVs sent, interviews arranged,
+// placements) against the targets owners and admins set; and the revenue
+// forecast (fees expected from the pipeline, weighted by stage).
 //
-// It keeps no data of its own: it reads other modules' records through their
-// public functions, in one transaction, as the user (fees the user may not
-// see are left out by the database).
+// It reads other modules' records through their public functions, in one
+// transaction, as the user (fees and salary budgets the user may not see are
+// left out by the database). Its own tables are the targets and the
+// forecast's stage weights.
 //
 // Layout:
 //
-//	reports.go  the module's public API and what it needs from other modules
-//	domain.go   the calculations, as pure functions on plain values (unit tested)
-//	service.go  the report: one read-only transaction
-//	http.go     HTTP handler: contract types <-> service calls
+//	reports.go                     the module's public API and what it needs from other modules
+//	domain.go                      the period report's calculations (unit tested)
+//	activity_domain.go             weeks, months, counting activity, targets (unit tested)
+//	forecast_domain.go             expected fees, weighting, totals (unit tested)
+//	service.go                     the period report: one read-only transaction
+//	activity.go                    activity against targets; the targets and weights
+//	forecast.go                    the revenue forecast
+//	http.go, targets_http.go       HTTP handlers: contract types <-> service calls
+//	export.go, export_targets.go   the reports as Excel or CSV
+//	internal/store                 generated SQL (db/queries/reports.sql)
 package reports
 
 import (
@@ -61,6 +70,91 @@ type Deps struct {
 	Users interface {
 		UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 	}
+	// Activity reads what each user did (candidates, notes, pipeline,
+	// emails, interviews and placements modules).
+	Activity ActivitySources
+	// Forecast reads the open pipeline and what each placement would bring
+	// (pipeline, placements, jobs and companies modules).
+	Forecast ForecastSources
+}
+
+// ActivitySources read, in the caller's transaction, what users did in a
+// period: [from, to) as instants, or fromDay..toDay as days.
+type ActivitySources interface {
+	ScreeningCalls(ctx context.Context, tx pgx.Tx, fromDay, toDay time.Time) ([]ScreeningCall, error)
+	CallNotes(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CallNote, error)
+	// ScreeningCallNotes returns those of some notes written with a screening call.
+	ScreeningCallNotes(ctx context.Context, tx pgx.Tx, noteIDs []string) ([]string, error)
+	Submitted(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CVSent, error)
+	CVsEmailed(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CVSent, error)
+	Interviews(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Done, error)
+	Placements(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Done, error)
+	// Members are the company's active users.
+	Members(ctx context.Context, tx pgx.Tx) ([]Member, error)
+}
+
+// ForecastSources read, in the caller's transaction (as the user: fees and
+// salary budgets they may not see are left out by the database), what the
+// forecast needs.
+type ForecastSources interface {
+	AtStages(ctx context.Context, tx pgx.Tx, stages []string) ([]OpenApplication, error)
+	ToInvoice(ctx context.Context, tx pgx.Tx) ([]Uninvoiced, error)
+	// WithPlacement reports which of some applications have a placement.
+	WithPlacement(ctx context.Context, tx pgx.Tx, applicationIDs []string) (map[string]bool, error)
+	Jobs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]FeeJob, error)
+	Terms(ctx context.Context, tx pgx.Tx, companyID string) (Terms, error)
+}
+
+// ScreeningCall is a screening call made by a user on a day, with the note
+// written with it (nil when none).
+type ScreeningCall struct {
+	By     string
+	Day    time.Time
+	NoteID *string
+}
+
+// CallNote is a call logged as a note: kind screening, reference or call.
+type CallNote struct {
+	ID, Kind, By string
+	At           time.Time
+}
+
+// CVSent is a candidate's CV sent to a client by a user: an application
+// moved to submitted, or a CV attached to an email.
+type CVSent struct {
+	By, CandidateID string
+	At              time.Time
+}
+
+// Done is something a user did at a time (an interview arranged, a
+// placement recorded).
+type Done struct {
+	By string
+	At time.Time
+}
+
+// Member is an active user.
+type Member struct{ ID, Name string }
+
+// OpenApplication is an application at a forecast stage.
+type OpenApplication struct {
+	ID, Stage, JobID, JobTitle, CompanyName, CandidateName string
+}
+
+// Uninvoiced is a placement that stands and is not yet invoiced.
+type Uninvoiced struct {
+	ApplicationID          string
+	RecruiterID            *string
+	StartDate              time.Time
+	FeeAmount, FeeCurrency *string // nil when not recorded (or hidden)
+}
+
+// FeeJob is what the forecast needs of a job: its client, owner and salary
+// budget (nil when none, or hidden).
+type FeeJob struct {
+	CompanyID string
+	OwnerID   *string
+	Budget    *Budget
 }
 
 // Module is the reports module.

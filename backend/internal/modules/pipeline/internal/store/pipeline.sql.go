@@ -101,6 +101,47 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 	return items, nil
 }
 
+const applicationsAtStages = `-- name: ApplicationsAtStages :many
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE stage = ANY($1::text[]) ORDER BY id LIMIT 5000
+`
+
+// Applications now at some stages (reports: the revenue forecast).
+func (q *Queries) ApplicationsAtStages(ctx context.Context, stages []string) ([]Application, error) {
+	rows, err := q.db.Query(ctx, applicationsAtStages, stages)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.JobOrderID,
+			&i.CandidateID,
+			&i.Stage,
+			&i.Reason,
+			&i.ReasonNote,
+			&i.StageChangedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Channel,
+			&i.Binned,
+			&i.Step,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const applicationsOf = `-- name: ApplicationsOf :many
 SELECT id, candidate_id, job_order_id FROM application
 WHERE candidate_id = ANY($1::text[]) OR job_order_id = ANY($2::text[])
@@ -666,6 +707,47 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const movesToStageBetween = `-- name: MovesToStageBetween :many
+SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
+FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
+WHERE c.to_stage = $1 AND c.changed_at >= $2 AND c.changed_at < $3 AND c.changed_by IS NOT NULL
+LIMIT 50000
+`
+
+type MovesToStageBetweenParams struct {
+	Stage    string
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type MovesToStageBetweenRow struct {
+	ChangedBy   string
+	ChangedAt   time.Time
+	CandidateID string
+}
+
+// Moves to a stage in a period by a person, with the candidate (reports:
+// CVs sent are moves to submitted).
+func (q *Queries) MovesToStageBetween(ctx context.Context, arg MovesToStageBetweenParams) ([]MovesToStageBetweenRow, error) {
+	rows, err := q.db.Query(ctx, movesToStageBetween, arg.Stage, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MovesToStageBetweenRow
+	for rows.Next() {
+		var i MovesToStageBetweenRow
+		if err := rows.Scan(&i.ChangedBy, &i.ChangedAt, &i.CandidateID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const overlappingApplications = `-- name: OverlappingApplications :many

@@ -268,3 +268,9 @@ UPDATE job_order SET contact_id = @to_id WHERE contact_id = @from_id;
 -- The jobs a recruiter owns (notifications: new applicants on them).
 -- name: JobOrderIDsOwnedBy :many
 SELECT id FROM job_order WHERE owner_id = @owner_id ORDER BY id DESC LIMIT 1000;
+
+-- The salary budgets of some jobs (reports: the fee a placement would
+-- bring); none without jobs.salary:read (row-level security).
+-- name: JobSalaries :many
+SELECT job_order_id, min_amount, max_amount, currency, period FROM job_order_salary
+WHERE job_order_id = ANY(@ids::text[]);

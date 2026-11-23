@@ -503,3 +503,14 @@ SELECT btrim(first_name || ' ' || last_name)::text AS label FROM candidate WHERE
 -- A work authorization suggested from their CV, kept only while none is set.
 -- name: SetWorkAuthSuggestion :exec
 UPDATE candidate SET wa_suggestion = sqlc.narg(suggestion)::jsonb WHERE id = @id AND work_authorization IS NULL;
+
+-- Screening calls made between two days (reports: each user's activity).
+-- name: ScreeningCallsBetween :many
+SELECT called_by, called_on, note_id FROM screening_call
+WHERE called_on >= @from_day AND called_on <= @to_day
+LIMIT 50000;
+
+-- Which of some notes were written with a screening call (reports: such a
+-- note is the call, not another one).
+-- name: ScreeningCallNoteIDs :many
+SELECT note_id::text FROM screening_call WHERE note_id = ANY(@note_ids::text[]);
