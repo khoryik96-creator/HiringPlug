@@ -17,6 +17,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // MaxBatch is how many candidates one batch formats.
@@ -63,9 +64,21 @@ func (s *Service) StartStudioBatch(ctx context.Context, p authz.Principal, candi
 		return nil, err
 	}
 	o.Replace = nil
+	// No AI at all: say so before anything, whatever else each candidate lacks.
+	if err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		_, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID)
+		if err == nil && !on {
+			err = apperr.New(api.ErrorCodeSTUDIOCVOFF,
+				"CV Studio formatting needs the AI: set up an AI provider in Settings, or wait for next month's allowance.")
+		}
+		return err
+	}); err != nil {
+		return nil, err
+	}
 	types := slices.Sorted(maps.Keys(formattable))
 	out := make([]BatchItem, 0, len(ids))
-	for _, id := range ids {
+	started := 0
+	for n, id := range ids {
 		item := BatchItem{CandidateID: id}
 		var doc string
 		err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -89,10 +102,25 @@ func (s *Service) StartStudioBatch(ctx context.Context, p authz.Principal, candi
 		}
 		if err != nil {
 			reason, skip := BatchSkipReason(err)
-			if !skip {
-				return out, err
+			e, isApp := apperr.As(err)
+			switch {
+			case skip:
+				item.Reason = reason
+			case started == 0:
+				return nil, err // nothing started: the error as it is
+			case isApp && e.Code == api.ErrorCodeSTUDIOCVOFF:
+				// The month's AI allowance ran out part-way: those started go on.
+				for _, rest := range ids[n:] {
+					out = append(out, BatchItem{CandidateID: rest, Reason: "not started: the AI allowance for this month ran out"})
+				}
+				return out, nil
+			default:
+				logx.From(ctx).Error("batch cv formatting: a candidate could not be started", "candidate_id", id, "err", err)
+				item.Reason = "could not be started just now: try again from their page"
 			}
-			item.Reason = reason
+		}
+		if item.Run != nil {
+			started++
 		}
 		out = append(out, item)
 	}

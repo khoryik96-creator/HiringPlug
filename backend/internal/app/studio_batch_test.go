@@ -103,3 +103,70 @@ func TestSeveralCVsAreFormattedAtOnceWithTheSameOptions(t *testing.T) {
 	answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "studioCvId", limRun.Id), api.JobKindCvStudioFormatted,
 		studioResult(limRun.Id, simpleDocx(t, "Accountant"), ""))
 }
+
+// The month's AI allowance running out part-way: those already started go
+// on and are listed, the rest are told why; and with no AI at all the batch
+// says so, even for candidates who would be skipped anyway.
+func TestABatchThatRunsOutOfAIAllowanceListsWhatStarted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	// Room for two runs: each queued one counts as an estimate until done.
+	a := newTestApp(t, map[string]string{"HP_AI_PROVIDER": "openai_compatible", "HP_AI_MONTHLY_TOKENS": "1500"})
+	var ids []string
+	for _, name := range []string{"Siti", "Lim", "Nur"} {
+		c := a.createCandidate(token, map[string]any{"firstName": name})
+		require.Equal(t, http.StatusCreated, a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.docx", minimalDOCX(t)).Status)
+		ids = append(ids, c.Id)
+	}
+	res := a.request(http.MethodPost, "/v1/studio-cvs/batch", token, map[string]any{"candidateIds": ids})
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	var out api.StudioCvBatch
+	res.JSON(&out)
+	require.Len(t, out.Items, 3)
+	assert.True(t, out.Items[0].Started)
+	assert.True(t, out.Items[1].Started)
+	assert.False(t, out.Items[2].Started)
+	assert.Contains(t, *out.Items[2].Reason, "allowance for this month ran out")
+	for _, it := range out.Items[:2] {
+		answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "studioCvId", it.StudioCv.Id), api.JobKindCvStudioFormatted,
+			studioResult(it.StudioCv.Id, simpleDocx(t, "Accountant"), ""))
+	}
+
+	off := newTestApp(t)
+	noCV := off.createCandidate(token, map[string]any{"firstName": "Wei"})
+	res = off.request(http.MethodPost, "/v1/studio-cvs/batch", token, map[string]any{"candidateIds": []string{noCV.Id}})
+	assert.Equal(t, http.StatusConflict, res.Status, "no AI: said first, though Wei has no CV either")
+	assert.Equal(t, api.ErrorCodeSTUDIOCVOFF, res.Error().Error.Code)
+}
+
+// A candidate's LinkedIn CV is formatted before a later file of another kind.
+func TestABatchFormatsTheirCVBeforeOtherFiles(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	a := newTestApp(t, matchingOn)
+	c := a.createCandidate(token, map[string]any{"firstName": "Aina"})
+	res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "linkedin", "profile.docx", minimalDOCX(t))
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var linkedin api.Document
+	res.JSON(&linkedin)
+	require.Equal(t, http.StatusCreated, a.upload("/v1/candidates/"+c.Id+"/documents", token, "other", "certificate.docx", simpleDocx(t, "Certificate of completion")).Status)
+
+	res = a.request(http.MethodPost, "/v1/studio-cvs/batch", token, map[string]any{"candidateIds": []string{c.Id}})
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	var out api.StudioCvBatch
+	res.JSON(&out)
+	require.True(t, out.Items[0].Started)
+	assert.Equal(t, linkedin.Id, out.Items[0].StudioCv.SourceDocumentId, "the LinkedIn CV, not the later certificate")
+	answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "studioCvId", out.Items[0].StudioCv.Id), api.JobKindCvStudioFormatted,
+		studioResult(out.Items[0].StudioCv.Id, simpleDocx(t, "Accountant"), ""))
+}

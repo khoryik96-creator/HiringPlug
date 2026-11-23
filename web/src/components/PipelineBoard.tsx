@@ -198,13 +198,15 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
         <div className="pick-bar" role="status">
           <span>{picked.length} chosen</span>
           {canEmail && <>
-            <IconButton label={`Email client about ${String(picked.length)} candidate${picked.length === 1 ? "" : "s"}`} tip="Email the client about them"
+            <IconButton label={`Email client about ${String(picked.length)} candidate${picked.length === 1 ? "" : "s"}`} tip={picked.length > 10 ? "At most 10 candidates in one email to the client" : "Email the client about them"}
               icon={<MailIcon />} className="icon-outline" disabled={picked.length > 10} onClick={startShortlist} />
             <IconButton label="Email each candidate separately" tip="Email each candidate separately" icon={<MailManyIcon />} className="icon-outline"
               onClick={() => { setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName }))); }} />
           </>}
           {onClientLink && (
-            <IconButton label={`Client link for ${String(picked.length)}`} tip="Client link: the client approves or rejects them" icon={<LinkIcon />}
+            <IconButton label={`Client link for ${String(picked.length)}`} tip={picked.length > 20 ? "At most 20 candidates on one client link"
+              : chosenApps.some((a) => a.stage === "rejected" || a.stage === "withdrawn") ? "Leave out rejected or withdrawn candidates for a client link"
+                : "Client link: the client approves or rejects them"} icon={<LinkIcon />}
               className="icon-outline" disabled={chosenApps.some((a) => a.stage === "rejected" || a.stage === "withdrawn") || picked.length > 20}
               onClick={() => {
                 onClientLink(chosenApps.map((a) => ({ applicationId: a.id, candidateId: a.candidateId, name: a.candidateName, stage: a.stage })));
@@ -212,7 +214,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
               }} />
           )}
           {canFormat && (
-            <IconButton label={`Format CVs for ${String(picked.length)}`} tip="Format their CVs CV Studio's way" icon={<FileIcon />} className="icon-outline"
+            <IconButton label={`Format CVs for ${String(picked.length)}`} tip={picked.length > BATCH_MAX ? `At most ${String(BATCH_MAX)} CVs at a time` : "Format their CVs CV Studio's way"} icon={<FileIcon />} className="icon-outline"
               disabled={picked.length > BATCH_MAX}
               onClick={() => { setFormatting(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName }))); }} />
           )}
