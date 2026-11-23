@@ -4,7 +4,10 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { Schemas } from "../../api/client";
-import { LinkIcon, MoreIcon, StepsIcon } from "../ActionIcons";
+import {
+  AlignCenterIcon, AlignLeftIcon, AlignRightIcon, ClearFormatIcon, IndentIcon, LinkIcon, MoreIcon, NumberedListIcon, OutdentIcon, StepsIcon,
+  StrikeIcon,
+} from "../ActionIcons";
 import { exec, fillTypedFields, insertHtml, insertValue, plainToHtml, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
 
 const NONE: Record<string, string> = {};
@@ -167,20 +170,20 @@ export function RichEditor({ compact = false, iconTools = false, invalid = false
         {button("Bold", "bold", iconTools ? <b>B</b> : "B")}
         {button("Italic", "italic", iconTools ? <i>I</i> : "I")}
         {button("Underline", "underline", iconTools ? <u>U</u> : "U")}
-        <span className="extra-formatting" hidden={!extras}>{button("Strike", "strikeThrough", "Strike")}
+        <span className="extra-formatting" hidden={!extras}>{button("Strike", "strikeThrough", iconTools ? <StrikeIcon /> : "Strike")}
         </span>{button("Bullets", "insertUnorderedList", iconTools ? <StepsIcon /> : "Bullets")}
         <span className="extra-formatting" hidden={!extras}>
-        {button("Numbered list", "insertOrderedList")}
-        {button("Indent", "indent", "Indent →")}
-        {button("Outdent", "outdent", "← Outdent")}
-        {button("Left", "justifyLeft")}
-        {button("Center", "justifyCenter")}
-        {button("Right", "justifyRight")}
+        {button("Numbered list", "insertOrderedList", iconTools ? <NumberedListIcon /> : "Numbered list")}
+        {button("Indent", "indent", iconTools ? <IndentIcon /> : "Indent →")}
+        {button("Outdent", "outdent", iconTools ? <OutdentIcon /> : "← Outdent")}
+        {button("Left", "justifyLeft", iconTools ? <AlignLeftIcon /> : "Left")}
+        {button("Center", "justifyCenter", iconTools ? <AlignCenterIcon /> : "Center")}
+        {button("Right", "justifyRight", iconTools ? <AlignRightIcon /> : "Right")}
         </span><button type="button" className={toolClass} aria-label="Link" data-tip={iconTools ? "Link" : undefined} onMouseDown={keep} onClick={() => {
           const url = window.prompt("Link to (https://…)");
           if (url && /^(https?:\/\/|mailto:)/i.test(url)) run("createLink", url);
         }}>{iconTools ? <LinkIcon /> : "Link"}</button>
-        <span className="extra-formatting" hidden={!extras}>{button("Clear format", "removeFormat")}
+        <span className="extra-formatting" hidden={!extras}>{button("Clear format", "removeFormat", iconTools ? <ClearFormatIcon /> : "Clear format")}
         <select aria-label="Font" defaultValue="Calibri" onChange={(e) => { run("fontName", e.target.value); }}>
           {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>

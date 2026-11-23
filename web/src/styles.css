@@ -194,6 +194,8 @@ main.list-page { max-width: 1600px; padding: 0 1.5rem; }
 .rich { margin-top: 0.75rem; }
 .rich .toolbar { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
 .rich .tool { font-size: 0.8rem; padding: 0.25rem 0.55rem; border: 1px solid #d1d5db; border-radius: 999px; background: #fff; cursor: pointer; }
+/* An icon tool (meeting and Outlook windows): no text padding, so the icon sits in the middle of its circle. */
+.rich .tool.format-tool { padding: 0; }
 .rich .toolbar select, .rich .toolbar input[type="color"] { font-size: 0.8rem; width: auto; }
 .subject-fields select { font-size: 0.85rem; width: auto; }
 .rich .toolbar input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; }

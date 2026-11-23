@@ -21,6 +21,19 @@ describe("the message box", () => {
     expect(box.textContent).toBe("Edited draft");
   });
 
+  it("shows every tool as an icon with its name as a tip when asked for icons, as in the meeting window", () => {
+    render(<RichEditor compact iconTools html="<p>Draft</p>" resetKey={0} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", {name: "More formatting"}));
+    const tools = screen.getAllByRole("button");
+    expect(tools.map((b) => b.getAttribute("aria-label"))).toEqual(["Bold", "Italic", "Underline", "Strike", "Bullets", "Numbered list", "Indent",
+      "Outdent", "Left", "Center", "Right", "Link", "Clear format", "Less formatting"]);
+    for (const tool of tools) {
+      expect(tool.getAttribute("data-tip")).toBe(tool.getAttribute("aria-label"));
+      // An icon, or one letter (B, I, U): no word squeezed into a round button.
+      expect(tool.querySelector("svg") !== null || tool.textContent.length === 1).toBe(true);
+    }
+  });
+
   it("puts candidate details below the paragraph the cursor is in, not after the sign-off", () => {
     const props = { html: "<p>Hi Mei, please see the candidates:</p><p>Regards, Aisyah</p>", resetKey: 0, onChange: vi.fn(), fields, banners: [], bannerUrls: {} };
     const { rerender } = render(<RichEditor {...props} />);
