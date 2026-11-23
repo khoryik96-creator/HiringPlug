@@ -20,10 +20,4 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Review fixes for 1.37 (client links, blind CV indents, forecast)
-- Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v
-- Touches: shortlists module (migration 00171), pipeline merge wiring, cvstudio blind levels, reports forecast order
-- Started: 23 Nov 2026    Last update: 23 Nov 2026
-- State: in progress
-- Next: tests, verify, merge when the owner says
+(Nothing in progress.)
