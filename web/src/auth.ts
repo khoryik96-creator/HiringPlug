@@ -19,3 +19,35 @@ export function authLinkRoute(hash: string): { kind: "invite" | "reset"; token: 
   const [, kind, token] = m ?? [];
   return kind && token ? { kind: kind as "invite" | "reset", token } : null;
 }
+
+// A new browser tab of HiringPlug (a record's tab dragged out, a link opened
+// in a new tab) takes the sign-in of a tab already signed in, asked over this
+// website's own channel (no other website can hear it); with none open, it
+// asks to sign in as before. Closing every tab still signs out.
+const CHANNEL = "hiringplug.session";
+type Message = { kind: "ask" } | { kind: "token"; token: string };
+
+/** Answers other new tabs while this one is signed in; returns the stop. */
+export function shareSignIn(): () => void {
+  if (typeof BroadcastChannel !== "function") return () => {};
+  const channel = new BroadcastChannel(CHANNEL);
+  channel.onmessage = (e: MessageEvent<Message>) => {
+    const token = getToken();
+    if (e.data.kind === "ask" && token) channel.postMessage({ kind: "token", token } satisfies Message);
+  };
+  return () => { channel.close(); };
+}
+
+/** Asks the tabs already signed in for their sign-in; null when none answers in time. */
+export function askSignIn(waitMs = 500): Promise<string | null> {
+  if (typeof BroadcastChannel !== "function") return Promise.resolve(null);
+  return new Promise((done) => {
+    const channel = new BroadcastChannel(CHANNEL);
+    const finish = (token: string | null) => { window.clearTimeout(timer); channel.close(); done(token); };
+    const timer = window.setTimeout(() => { finish(null); }, waitMs);
+    channel.onmessage = (e: MessageEvent<Message>) => {
+      if (e.data.kind === "token" && typeof e.data.token === "string" && e.data.token) finish(e.data.token);
+    };
+    channel.postMessage({ kind: "ask" } satisfies Message);
+  });
+}

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 
 import { api, ApiError, unwrap } from "./api/client";
-import { authLinkRoute, clearToken, getToken } from "./auth";
+import { askSignIn, authLinkRoute, clearToken, getToken, setToken, shareSignIn } from "./auth";
 import { AiNotice } from "./components/AiNotice";
 import { CloseIcon, DockRightIcon, IconButton, OutlookIcon } from "./components/ActionIcons";
 import { ErrorMessage } from "./components/ErrorMessage";
@@ -190,6 +190,20 @@ function CalendarDock({ userId, modal, onClose }: { userId: string; modal: boole
 export function App() {
   useHash(); // re-render on navigation
   const [signedIn, setSignedIn] = useState(getToken() !== null);
+  // A new browser tab (a record dragged out): another signed-in tab's sign-in, if one is open.
+  const [asking, setAsking] = useState(!signedIn);
+  useEffect(() => {
+    if (!asking) return;
+    let live = true;
+    void askSignIn().then((token) => {
+      if (!live) return;
+      if (token) { setToken(token); setSignedIn(true); }
+      setAsking(false);
+    });
+    return () => { live = false; };
+  }, [asking]);
+  // Signed in: other new tabs may take this sign-in.
+  useEffect(() => (signedIn ? shareSignIn() : undefined), [signedIn]);
   const [queryClient, setQueryClient] = useState(newSessionQueries);
   // The public careers page: never behind sign-in. (hash re-renders on change.)
   const careers = careersRoute(window.location);
@@ -224,6 +238,8 @@ export function App() {
         <ChoosePassword key={link.token} token={link.token} onSignedIn={() => { changeSession(true); }} />
       ) : signedIn ? (
         <Shell onSignOut={signOut} />
+      ) : asking ? (
+        <p className="muted page-loading" role="status">Opening…</p>
       ) : (
         <SignIn onSignedIn={() => { changeSession(true); }} />
       )}

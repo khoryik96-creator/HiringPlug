@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api, type Schemas } from "../api/client";
+import { api, type Permission, type Schemas } from "../api/client";
 import { ok, renderWithClient, testMe } from "../test-utils";
 import { INLINE, inlineTabs, OpenTabs } from "./OpenTabs";
 import { forgetTabs, MAX_TABS, nameTab, openTab, recordOf, resetTabs, setTabsOwner } from "./openRecords";
@@ -9,10 +9,13 @@ import { forgetTabs, MAX_TABS, nameTab, openTab, recordOf, resetTabs, setTabsOwn
 beforeEach(() => { resetTabs(); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-function bell(items: Schemas["Notification"][] = [], permissions = ["notifications:read"]) {
+function bell(items: Schemas["Notification"][] = [], permissions: Permission[] = ["notifications:read"]) {
   return vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/me" ? ok(testMe(permissions))
     : ok({ unseen: items.length, morningEmail: false, mutedKinds: [], asOf: "2026-11-23T02:00:00Z", items }))) as never);
 }
+
+/** The paths a mocked GET was asked for. */
+const paths = (get: { mock: { calls: unknown[][] } }) => get.mock.calls.map((c) => c[0]);
 
 /** Opens these records one after another, naming each tab; ends on the last. */
 function openAll(records: [string, string][]) {
@@ -90,7 +93,7 @@ describe("open records", () => {
       { id: "cv_formatted:scv_1", kind: "cv_formatted", title: "CV formatted: Aina", detail: "", href: "#/candidates/cand_01a", at: "2026-11-23T01:00:00Z", new: true },
     ]);
     const view = renderWithClient(<OpenTabs hash="#/candidates/cand_01a" />); // the news comes while on Aina's page
-    await waitFor(() => { expect(vi.mocked(api.GET).mock.calls.some(([path]) => path === "/v1/notifications")).toBe(true); });
+    await waitFor(() => { expect(paths(vi.mocked(api.GET)).includes("/v1/notifications")).toBe(true); });
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     view.rerender(<OpenTabs hash="#/candidates/cand_01b" />); // Badrul's tab opened afterwards: you see it there
     act(() => { nameTab("#/candidates/cand_01b", "Badrul"); nameTab("#/candidates/cand_01a", "Aina"); });
@@ -154,9 +157,9 @@ describe("open records", () => {
   it("asks nobody for the bell's list without the permission", async () => {
     const get = bell([], []);
     renderWithClient(<OpenTabs hash="#/candidates/cand_01a" />);
-    await waitFor(() => { expect(get.mock.calls.some(([path]) => path === "/v1/me")).toBe(true); });
+    await waitFor(() => { expect(paths(get).includes("/v1/me")).toBe(true); });
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    expect(get.mock.calls.some(([path]) => path === "/v1/notifications")).toBe(false);
+    expect(paths(get).includes("/v1/notifications")).toBe(false);
   });
 
   it("keeps the newest few", () => {

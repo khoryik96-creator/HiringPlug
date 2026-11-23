@@ -1797,7 +1797,12 @@ finds any by typing a name (Enter opens it). Shift-click selects a run of
 tabs, Ctrl-click (Cmd on a Mac) picks several: **Close selected**, **Select
 all**, **Close all**; closing the one you are on opens the one beside it. A
 tab lights **green** when work on its record finishes while you are elsewhere
-(a CV formatted), until you open it.
+(a CV formatted), until you open it. Drag a tab to the browser's tab bar (or
+middle-click it) to open the record in a new browser tab: a new tab takes the
+sign-in of a HiringPlug tab already open (with none open, it asks to sign in;
+closing every tab still signs out). The tabs are the signed-in user's own,
+forgotten on signing out, and the same in every window; closing the page you
+typed into asks first.
 
 ## Main settings ✅
 
