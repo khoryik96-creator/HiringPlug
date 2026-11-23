@@ -26,6 +26,7 @@ type Suggestion struct {
 	CVHit
 	Name  string
 	Title *string
+	Why   *api.MeaningWhy // found by meaning: why
 }
 
 // WhenAdded scores a candidate just put on a job, in the caller's
@@ -117,13 +118,15 @@ func skipIfExpected(err error) error {
 	return err
 }
 
-// Suggest returns possible candidates for a job: those not on it whose CVs
-// share the most words with the job's text, best first, leaving out those
-// who withdrew consent and (by the database) those the user may not see.
-// needsText is true, with no suggestions, for a job with no text to search with yet.
-func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) (out []Suggestion, needsText bool, err error) {
+// Suggest returns possible candidates for a job: those not on it whose work
+// matches the job by meaning (its title and needs), then those whose CVs
+// share its distinctive words, best first, leaving out those who withdrew
+// consent and (by the database) those the user may not see. needsText is
+// true, with no suggestions, for a job with no text to search with yet.
+// meaning says how the job was read by meaning (nil: not asked).
+func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) (out []Suggestion, needsText bool, meaning *api.MeaningOutcome, err error) {
 	if !p.Can(api.PermissionCandidatesRead) || !p.Can(api.PermissionDocumentsRead) || !p.Can(api.PermissionPipelineRead) {
-		return nil, false, apperr.New(api.ErrorCodeFORBIDDEN, "Finding possible candidates reads CVs and the job's pipeline, which you may not see.")
+		return nil, false, nil, apperr.New(api.ErrorCodeFORBIDDEN, "Finding possible candidates reads CVs and the job's pipeline, which you may not see.")
 	}
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if !p.Can(api.PermissionJobsRead) {
@@ -145,29 +148,51 @@ func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) 
 		if err != nil {
 			return err
 		}
-		ids := make([]string, len(hits))
-		for i, h := range hits {
-			ids[i] = h.CandidateID
+		var matches []MeaningMatch
+		if s.deps.Meaning != nil {
+			outcome, found, err := s.deps.Meaning.ForJob(ctx, tx, p, j.Title, JobMeaningText(j), onJob, hits, 2*maxSuggestions)
+			if err != nil {
+				return err
+			}
+			meaning, matches = &outcome, found
 		}
+		ids := suggestionOrder(matches, hits)
 		briefs, err := s.deps.Candidates.Briefs(ctx, tx, ids)
 		if err != nil {
 			return err
 		}
+		byWords := map[string]CVHit{}
 		for _, h := range hits {
-			b, ok := briefs[h.CandidateID]
+			byWords[h.CandidateID] = h
+		}
+		why := map[string]MeaningMatch{}
+		for _, m := range matches {
+			why[m.CandidateID] = m
+		}
+		for _, id := range ids {
+			b, ok := briefs[id]
 			if !ok || len(out) == maxSuggestions {
 				continue
 			}
-			if no, err := s.consentWithdrawn(ctx, tx, h.CandidateID); err != nil {
+			if no, err := s.consentWithdrawn(ctx, tx, id); err != nil {
 				return err
 			} else if no {
 				continue
 			}
-			out = append(out, Suggestion{CVHit: h, Name: b.Name, Title: b.Title})
+			hit, found := byWords[id]
+			if !found {
+				hit = CVHit{CandidateID: id}
+			}
+			sug := Suggestion{CVHit: hit, Name: b.Name, Title: b.Title}
+			if m, ok := why[id]; ok {
+				w := m.Why
+				sug.Why, sug.Rank = &w, min(1, m.Score)
+			}
+			out = append(out, sug)
 		}
 		return nil
 	})
-	return out, needsText, err
+	return out, needsText, meaning, err
 }
 
 func (s *Service) consentWithdrawn(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error) {

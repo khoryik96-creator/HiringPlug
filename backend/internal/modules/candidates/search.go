@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -28,6 +29,7 @@ func (m *Module) SearchCVsWith(c CVs) { m.service.cvs = c }
 // SearchFilter is an advanced search: every part given must hold.
 type SearchFilter struct {
 	Query, Boolean                                  *string
+	Meaning                                         *string // search by meaning: the best matches, in that order
 	Availability, WorkKinds, Nationality, Residence []string
 	Sources, Industries, Skills, Tags               []string
 	Specializations, Certifications                 []string
@@ -45,7 +47,8 @@ type SearchFilter struct {
 type SearchHit struct {
 	Summary
 	InCV, InProfile bool
-	CVSnippet       *string // the words found between [[ and ]]
+	CVSnippet       *string         // the words found between [[ and ]]
+	Why             *api.MeaningWhy // found by meaning: why
 }
 
 // SearchPage is a page of hits, and the boolean's words to highlight.
@@ -54,6 +57,7 @@ type SearchPage struct {
 	NextCursor *string
 	NextOffset *int // with a sort other than newest
 	Terms      []string
+	Meaning    *api.MeaningOutcome // with a search by meaning: how it went
 }
 
 // Search runs an advanced search, newest first.
@@ -116,6 +120,16 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	}
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	sort, cur, offset := f.Order.paging(p, cursor)
+	var why map[string]api.MeaningWhy
+	var ranked []string
+	pageSize := limit
+	if f.Meaning != nil {
+		if ranked, why, err = s.byMeaning(ctx, tx, p, *f.Meaning, &page); err != nil || ranked == nil {
+			return page, err // still being read, or no model: nothing yet
+		}
+		inIDs = keepOrder(ranked, inIDs)
+		sort, cur, offset, limit = "newest", nil, 0, len(inIDs) // all of them, ordered by meaning below
+	}
 	in := store.SearchCandidatesParams{
 		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), BooleanPlan: plan, Prefilter: prefilter,
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
@@ -128,6 +142,10 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	rows, err := searchRows(ctx, store.New(tx), in, sort, offset)
 	if err != nil {
 		return page, err
+	}
+	if ranked != nil { // best by meaning first; one page, no more
+		rows = inOrder(rows, inIDs, func(r store.SearchCandidatesRow) string { return r.ID })
+		rows, limit = rows[:min(len(rows), pageSize)], pageSize
 	}
 	if len(rows) > limit {
 		rows = rows[:limit]
@@ -160,6 +178,9 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	page.Items = make([]SearchHit, len(rows))
 	for i, r := range rows {
 		page.Items[i] = SearchHit{Summary: summaries[i], InCV: r.CvHit, InProfile: r.ProfileHit}
+		if w, ok := why[r.ID]; ok {
+			page.Items[i].Why = &w
+		}
 		if sn, ok := snippets[r.ID]; ok && strings.TrimSpace(sn) != "" {
 			page.Items[i].CVSnippet = &sn
 		}

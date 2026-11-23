@@ -68,6 +68,11 @@ type Deps struct {
 	Jobs interface {
 		ForMatching(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Job, error)
 	}
+	// Meaning finds possible candidates for a job by meaning (search by
+	// meaning), the job's words found in CVs counted too. Nil: by words only.
+	Meaning interface {
+		ForJob(ctx context.Context, tx pgx.Tx, p authz.Principal, title, text string, exclude []string, words []CVHit, limit int) (api.MeaningOutcome, []MeaningMatch, error)
+	}
 	// AI is the AI provider the company uses (aiproviders).
 	AI interface {
 		Access(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)

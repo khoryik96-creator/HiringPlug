@@ -42,6 +42,12 @@ func (h *HTTP) SearchCandidates(ctx context.Context, req api.SearchCandidatesReq
 		if hit.CVSnippet != nil {
 			out.Items[i].CvSnippet = nullable.NewNullableWithValue(*hit.CVSnippet)
 		}
+		if hit.Why != nil {
+			out.Items[i].Why = nullable.NewNullableWithValue(*hit.Why)
+		}
+	}
+	if page.Meaning != nil {
+		out.Meaning = nullable.NewNullableWithValue(*page.Meaning)
 	}
 	return out, nil
 }
@@ -69,7 +75,7 @@ func strs[T ~string](in *[]T) []string {
 // FilterOf is an advanced search as the API takes it ("me" as owner is the user).
 func FilterOf(b api.CandidateSearch, p authz.Principal) SearchFilter {
 	f := SearchFilter{
-		Query: blankNil(b.Q), Boolean: blankNil(b.Boolean), Location: blankNil(b.Location),
+		Query: blankNil(b.Q), Boolean: blankNil(b.Boolean), Meaning: blankNil(b.Meaning), Location: blankNil(b.Location),
 		Availability: strs(b.Availability), WorkKinds: strs(b.WorkAuthorization), Nationality: strs(b.Nationality),
 		Residence: strs(b.Residence), Sources: strs(b.Source), Industries: strs(b.Industry), Skills: strs(b.Skills), Tags: strs(b.Tags),
 		Specializations: strs(b.Specialization), Certifications: strs(b.Certifications),

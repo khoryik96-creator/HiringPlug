@@ -184,9 +184,10 @@ func NewModules(d Deps) *Modules {
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	// Search by meaning: candidates read by the AI worker's meaning model, ranked here.
 	m.Meaning = meaning.New(d.Pool, meaning.Deps{Candidates: meaningCandidates{m.Candidates}, CVs: meaningCVs{m.Documents}})
+	m.Candidates.SearchByMeaningWith(candidatesMeaning{m.Meaning})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
-		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
+		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders, Meaning: matchingMeaning{m.Meaning},
 		OtherAIUse: aiUse{func() []tokensSince {
 			return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
 		}},

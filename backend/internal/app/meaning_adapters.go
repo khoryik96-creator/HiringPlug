@@ -5,12 +5,16 @@ package app
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/meaning"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
@@ -77,4 +81,37 @@ func (a meaningCVs) SearchCVs(ctx context.Context, tx pgx.Tx, terms []meaning.Te
 
 func (a meaningCVs) DocumentExists(ctx context.Context, tx pgx.Tx, documentID string) (bool, error) {
 	return a.documents.DocumentExists(ctx, tx, documentID)
+}
+
+// candidatesMeaning lets the advanced search rank by meaning.
+type candidatesMeaning struct{ meaning *meaning.Module }
+
+func (a candidatesMeaning) Search(ctx context.Context, tx pgx.Tx, p authz.Principal, text string, limit int) (api.MeaningOutcome, []candidates.MeaningHit, error) {
+	outcome, ranked, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Body: text, Limit: limit})
+	hits := make([]candidates.MeaningHit, len(ranked))
+	for i, r := range ranked {
+		hits[i] = candidates.MeaningHit{CandidateID: r.CandidateID, Why: r.Why}
+	}
+	return outcome, hits, err
+}
+
+// matchingMeaning finds a job's possible candidates by meaning.
+type matchingMeaning struct{ meaning *meaning.Module }
+
+func (a matchingMeaning) ForJob(ctx context.Context, tx pgx.Tx, p authz.Principal, title, text string, exclude []string,
+	words []matching.CVHit, limit int,
+) (api.MeaningOutcome, []matching.MeaningMatch, error) {
+	if strings.TrimSpace(title) == "" { // read as a job, never as a typed search
+		title, _, _ = strings.Cut(strings.TrimSpace(text), "\n")
+	}
+	hits := make([]meaning.CVHit, len(words))
+	for i, w := range words {
+		hits[i] = meaning.CVHit{CandidateID: w.CandidateID, Rank: w.Rank, Snippet: w.Snippet}
+	}
+	outcome, ranked, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Title: title, Body: text, Exclude: exclude, Words: hits, Limit: limit})
+	out := make([]matching.MeaningMatch, len(ranked))
+	for i, r := range ranked {
+		out[i] = matching.MeaningMatch{CandidateID: r.CandidateID, Score: r.Score, Why: r.Why}
+	}
+	return outcome, out, err
 }

@@ -37,6 +37,7 @@ type Service struct {
 	used        usedCache          // the suggestions of values already used
 	zone        *time.Location     // the agency's time zone: what day it is (UseTimeZone)
 	folderItems folderfilter.Items // a folder's candidates (UseFolders)
+	meaning     Meaning            // search by meaning (SearchByMeaningWith)
 }
 
 // Create adds a candidate.

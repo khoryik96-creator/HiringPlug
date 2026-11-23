@@ -49,7 +49,7 @@ func (h *HTTP) ScoreJobApplications(ctx context.Context, req api.ScoreJobApplica
 
 // SuggestCandidates handles GET /v1/matches/suggestions.
 func (h *HTTP) SuggestCandidates(ctx context.Context, req api.SuggestCandidatesRequestObject) (api.SuggestCandidatesResponseObject, error) {
-	found, needsText, err := h.svc.Suggest(ctx, authz.MustFromContext(ctx), req.Params.JobId)
+	found, needsText, meaning, err := h.svc.Suggest(ctx, authz.MustFromContext(ctx), req.Params.JobId)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,11 @@ func (h *HTTP) SuggestCandidates(ctx context.Context, req api.SuggestCandidatesR
 	for i, s := range found {
 		out.Items[i] = api.MatchSuggestion{
 			CandidateId: s.CandidateID, CandidateName: s.Name, CurrentTitle: apiconv.OrNull(s.Title), Rank: float32(s.Rank), Snippet: s.Snippet,
+			Why: apiconv.OrNull(s.Why),
 		}
+	}
+	if meaning != nil {
+		out.Meaning = apiconv.OrNull(meaning)
 	}
 	return out, nil
 }
