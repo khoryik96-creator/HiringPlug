@@ -185,22 +185,22 @@ def page_text(page: Any) -> str:
 def _columns_with_tables(page: Any, tables: list[Any], gutter: float, outside: list[dict[str, Any]]) -> str:
     """A two-column page whose work tables sit in one column: the lines across
     both columns above them (the name) first, then each column top to bottom,
-    a table's rows in its place in its column."""
+    a table's rows in its place in its column, then from the first line across
+    both columns below the tables (a heading, a footer) as the page reads."""
     x0, top, x1, bottom = (float(v) for v in page.bbox)
-    first = min(t.top for t in tables)
-    across = [
-        r.bottom
-        for r in _rows(outside)
-        if r.bottom <= first and any(w["x0"] < gutter < w["x1"] for w in r.words)
-    ]
-    head = max(across, default=top)
+    first, last = min(t.top for t in tables), max(t.bottom for t in tables)
+    across = [r for r in _rows(outside) if any(w["x0"] < gutter < w["x1"] for w in r.words)]
+    head = max((r.bottom for r in across if r.bottom <= first), default=top)
+    foot = min((r.top for r in across if r.top >= last), default=bottom)
     parts = [_region_text(_strip(page, (x0, top, x1, head)), gutter)] if head - top > 1 else []
     for a, b in ((x0, gutter), (gutter, x1)):
         y = head
         for t in [t for t in tables if a - 1 <= t.left and t.right <= b + 1]:
             parts += [_column_text(_strip(page, (a, y, b, t.top))), t.text]
             y = max(y, t.bottom)
-        parts.append(_column_text(_strip(page, (a, y, b, bottom))))
+        parts.append(_column_text(_strip(page, (a, y, b, foot))))
+    if bottom - foot > 1:
+        parts.append(_region_text(_strip(page, (x0, foot, x1, bottom)), gutter))
     return "\n".join(p for p in parts if p.strip())
 
 

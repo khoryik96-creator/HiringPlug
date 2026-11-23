@@ -354,10 +354,11 @@ def _table_row(section: list[str], i: int, start: int) -> bool:
     back to that row's "Duration:")."""
     if not _DURATION_LABEL.match(section[i].strip()):
         return False
-    after = [t.strip() for t in section[i + 1 : i + 3]]
-    if any(_TITLE_LABEL.match(t) or _COMPANY_LABEL.match(t) for t in after):
+    # tables.py writes a row's Role, else its Organization, right after its dates.
+    after = section[i + 1].strip() if i + 1 < len(section) else ""
+    if _owns_labels(after):
         return True
-    if not after or not _ANY_LABEL.match(after[0]):
+    if not _ANY_LABEL.match(after):
         return False
     first = max(0, start - 1)  # the row above's "Duration:" line is the job line before this one's context
     j = i - 1
@@ -365,7 +366,28 @@ def _table_row(section: list[str], i: int, start: int) -> bool:
         j > first and _ANY_LABEL.match(section[j].strip()) and not _DURATION_LABEL.match(section[j].strip())
     ):
         j -= 1
-    return j < i - 1 and bool(_DURATION_LABEL.match(section[j].strip()))
+    # The row above came from a table too: its "Duration:" line has its Role
+    # or Organization right below (a labelled CV's job has other lines there).
+    return (
+        j < i - 1 and bool(_DURATION_LABEL.match(section[j].strip())) and _owns_labels(section[j + 1].strip())
+    )
+
+
+def _owns_labels(text: str) -> bool:
+    return bool(_TITLE_LABEL.match(text) or _COMPANY_LABEL.match(text))
+
+
+def _labels_above(section: list[str], i: int, start: int) -> list[str]:
+    """The labelled lines right above line i, nearest first, back to the job
+    line before ("Position: ...", "Company: ..." above "Duration: ...")."""
+    out: list[str] = []
+    j = i - 1
+    while (
+        j >= start and _ANY_LABEL.match(section[j].strip()) and not _DURATION_LABEL.match(section[j].strip())
+    ):
+        out.append(section[j].strip())
+        j -= 1
+    return out
 
 
 def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool) -> Job | None:
@@ -384,11 +406,17 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
     # A table row (tables.py) has its role and employer below its "Duration:"
     # line, whatever the rest of the CV does.
     table_row = _table_row(section, i, start)
-    below_dates = dates_first or table_row
-    near, far = (after, before) if below_dates else (before, after)
+    # A labelled CV with the labels above the dates ("Position:", "Company:",
+    # then "Duration:" and "Responsibilities:"): those above are this job's,
+    # the ones below the next job's.
+    above_labels = [] if table_row else _labels_above(section, i, start)
+    own_above = any(_owns_labels(t) for t in above_labels) and not (after and _owns_labels(after[0].strip()))
+    below_dates = (dates_first or table_row) and not own_above
+    near, far = (after, before) if below_dates else (above_labels if own_above else before, after)
     lt, lc = _labelled([section[i], *near])
-    # A table row left a cell empty: the neighbouring row never fills it.
-    ft, fc = _labelled(far) if not table_row else (None, None)
+    # A table row left a cell empty: the neighbouring row never fills it;
+    # nor does the next job fill one a labelled job left out.
+    ft, fc = _labelled(far) if not (table_row or own_above) else (None, None)
     lt, lc = lt or ft, lc or fc
     title, company = title or lt, company or lc
     above = _joined(_headlines(section, range(i - 1, start - 1, -1))[::-1])[::-1]  # nearest first

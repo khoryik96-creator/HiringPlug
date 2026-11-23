@@ -71,4 +71,60 @@ func TestOneOutlookFolderFailingNeverBlocksTheInbox(t *testing.T) {
 	_, warned = mail.Error.Get()
 	assert.Error(t, warned, "still no warning")
 	assert.Equal(t, tries, broken, "the failing folder waits its turn")
+
+	// Its wait over, and the only folder due in that pass: still no warning.
+	_, err = testutil.Current.Admin.Exec(t.Context(), `UPDATE email_outlook_folder SET checked_at = CASE WHEN remote_id='conversation-history'
+		THEN now()-interval '20 minutes' ELSE now() END WHERE tenant_id=$1`, tenant.ID)
+	require.NoError(t, err)
+	runPostponedCalendarJobs(t, a, tenant.ID)
+	a.request("GET", root, token, nil).JSON(&mail)
+	_, warned = mail.Error.Get()
+	assert.Error(t, warned, "no warning when only that folder was due")
+	assert.Greater(t, broken, tries, "it was tried again")
+}
+
+// The Inbox itself failing is said, with Microsoft's reason; a link Outlook
+// rejects is dropped, so the folder starts afresh.
+func TestTheInboxFailingIsSaidWithMicrosoftsReason(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	f := &outlookMailFixture{folder: "inbox"}
+	failing := false
+	connectTestOutlook(t, a, token, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		fail := failing
+		f.mu.Unlock()
+		if fail && strings.Contains(r.URL.Path, "inbox") && strings.HasSuffix(r.URL.Path, "/messages/delta") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"code":"SyncStateInvalid","message":"The sync state is invalid."}}`))
+			return
+		}
+		f.serve(w, r)
+	}))
+	root := "/v1/outlook/mail"
+	require.Equal(t, 204, a.request("POST", root, token, nil).Status)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	runPostponedCalendarJobs(t, a, tenant.ID)
+	var cursor *string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT cursor_url FROM email_outlook_folder WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID).Scan(&cursor))
+	require.NotNil(t, cursor, "the Inbox synced and keeps its link")
+
+	f.mu.Lock()
+	failing = true
+	f.mu.Unlock()
+	_, err := testutil.Current.Admin.Exec(t.Context(), "UPDATE email_outlook_folder SET checked_at=now()-interval '5 minutes' WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID)
+	require.NoError(t, err)
+	runPostponedCalendarJobs(t, a, tenant.ID)
+	var mail api.OutlookMailPage
+	a.request("GET", root, token, nil).JSON(&mail)
+	message, err := mail.Error.Get()
+	require.NoError(t, err, "the Inbox failing is said")
+	assert.Contains(t, message, "Microsoft said SyncStateInvalid")
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT cursor_url FROM email_outlook_folder WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID).Scan(&cursor))
+	assert.Nil(t, cursor, "the rejected link is dropped: the Inbox starts afresh")
 }

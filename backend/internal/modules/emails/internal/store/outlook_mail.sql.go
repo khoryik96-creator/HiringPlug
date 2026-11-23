@@ -128,13 +128,21 @@ func (q *Queries) CreateOutlookScheduled(ctx context.Context, arg CreateOutlookS
 }
 
 const delayOutlookFolder = `-- name: DelayOutlookFolder :exec
-UPDATE email_outlook_folder SET complete=true, checked_at=now() + interval '10 minutes' WHERE id= $1
+UPDATE email_outlook_folder SET complete=true, checked_at=now() + interval '10 minutes',
+  cursor_url = CASE WHEN $1::boolean THEN NULL ELSE cursor_url END
+WHERE id= $2
 `
 
+type DelayOutlookFolderParams struct {
+	Restart bool
+	ID      string
+}
+
 // A folder Outlook would not hand over waits ten minutes, so the others are
-// synced meanwhile (it no longer counts as still syncing).
-func (q *Queries) DelayOutlookFolder(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, delayOutlookFolder, id)
+// synced meanwhile (it no longer counts as still syncing); with restart, its
+// saved link (what Outlook may have rejected) is dropped: it starts afresh.
+func (q *Queries) DelayOutlookFolder(ctx context.Context, arg DelayOutlookFolderParams) error {
+	_, err := q.db.Exec(ctx, delayOutlookFolder, arg.Restart, arg.ID)
 	return err
 }
 

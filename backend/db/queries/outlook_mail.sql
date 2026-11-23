@@ -47,9 +47,12 @@ UPDATE email_outlook_folder SET cursor_url=sqlc.narg(cursor_url),complete= @comp
 WHERE id= @id;
 
 -- A folder Outlook would not hand over waits ten minutes, so the others are
--- synced meanwhile (it no longer counts as still syncing).
+-- synced meanwhile (it no longer counts as still syncing); with restart, its
+-- saved link (what Outlook may have rejected) is dropped: it starts afresh.
 -- name: DelayOutlookFolder :exec
-UPDATE email_outlook_folder SET complete=true, checked_at=now() + interval '10 minutes' WHERE id= @id;
+UPDATE email_outlook_folder SET complete=true, checked_at=now() + interval '10 minutes',
+  cursor_url = CASE WHEN @restart::boolean THEN NULL ELSE cursor_url END
+WHERE id= @id;
 
 -- name: ClearOutlookFolder :exec
 DELETE FROM email_outlook_message WHERE folder_id= @folder_id;

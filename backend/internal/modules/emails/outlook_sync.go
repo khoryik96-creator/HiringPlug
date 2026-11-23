@@ -1,7 +1,6 @@
 package emails
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"net/http"
@@ -134,28 +133,31 @@ func (s *Service) pullOutlook(ctx context.Context, q *store.Queries, state store
 	// Collect pages before making changes so one provider failure cannot mark
 	// a partially handled page as seen. A folder Outlook will not hand over
 	// (a special or shared folder) waits, and the others go on: it never
-	// blocks the Inbox. The mailbox shows an error only when none could sync.
-	var failed error
-	synced := 0
+	// blocks the Inbox. The mailbox warns only when the Inbox itself fails.
+	var inboxFailed error
 	for _, folder := range due {
 		err := s.pullOutlookFolder(ctx, q, token, folder)
 		var graph *outlookGraphError
 		if errors.As(err, &graph) && outlookFolderOnly(graph) {
+			// What Outlook rejects as asked (not a passing fault on its side)
+			// may be the folder's saved link: it starts afresh next time.
+			restart := graph.status < 500 || graph.status == http.StatusBadGateway
 			logx.From(ctx).Warn("outlook mail: a folder could not sync; trying it again later",
-				"folder_id", folder.ID, "folder_kind", folder.Kind, "status", graph.status, "reason", outlookReason(graph))
-			if err := q.DelayOutlookFolder(ctx, folder.ID); err != nil {
+				"folder_id", folder.ID, "folder_kind", folder.Kind, "status", graph.status, "reason", outlookReason(graph), "restart", restart)
+			if err := q.DelayOutlookFolder(ctx, store.DelayOutlookFolderParams{ID: folder.ID, Restart: restart}); err != nil {
 				return false, err
 			}
-			failed = cmp.Or(failed, error(graph))
+			if folder.Kind == "inbox" {
+				inboxFailed = graph
+			}
 			continue
 		}
 		if err != nil {
 			return false, err
 		}
-		synced++
 	}
-	if synced == 0 && failed != nil {
-		return false, failed
+	if inboxFailed != nil {
+		return false, inboxFailed
 	}
 	return len(due) > 0, nil
 }

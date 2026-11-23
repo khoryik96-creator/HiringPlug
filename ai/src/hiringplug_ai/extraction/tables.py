@@ -78,10 +78,12 @@ def rows_as_lines(
     return "\n\n".join(out)
 
 
-# Headers of tables that are not work history: certificates, awards, courses.
+# Headers of tables that are not work history (certificates, awards,
+# courses): a whole header naming what was issued or by whom, only in a table
+# with no employer column.
 _NOT_WORK = re.compile(
-    r"\b(?:issu\w*|institut\w*|universit\w*|school|college|certifi\w*|award\w*|course|"
-    r"qualification|grade|cgpa|result|publisher|journal)\b",
+    r"^(?:issu(?:er|ed\s*by|ing\s*body)|institut(?:e|ion)|universit(?:y|ies)|school|college|"
+    r"certificat(?:e|es|ion|ions)|award(?:s|ed\s*by)?|course(?:s)?|qualifications?|grade|cgpa|result|publisher|journal)$",
     re.I,
 )
 
@@ -89,9 +91,9 @@ _NOT_WORK = re.compile(
 def _is_work_header(cells: list[str]) -> bool:
     """A role column with its dates or employer. A bare "Title" is a role only
     beside an employer column ("Title | Issuer | Date" lists certificates)."""
-    if any(_NOT_WORK.search(c) for c in cells):
-        return False
     org = any(_ORG.match(c) for c in cells)
+    if not org and any(_NOT_WORK.match(c) for c in cells):
+        return False
     role = any(_ROLE.match(c) and (org or c.strip().lower() != "title") for c in cells)
     return role and (org or any(_DATES.match(c) for c in cells))
 
