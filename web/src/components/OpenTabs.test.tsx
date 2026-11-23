@@ -2,15 +2,16 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
-import { ok, renderWithClient } from "../test-utils";
+import { ok, renderWithClient, testMe } from "../test-utils";
 import { INLINE, inlineTabs, OpenTabs } from "./OpenTabs";
-import { MAX_TABS, nameTab, recordOf, resetTabs } from "./openRecords";
+import { forgetTabs, MAX_TABS, nameTab, openTab, recordOf, resetTabs, setTabsOwner } from "./openRecords";
 
 beforeEach(() => { resetTabs(); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-function bell(items: Schemas["Notification"][] = []) {
-  vi.spyOn(api, "GET").mockResolvedValue(ok({ unseen: items.length, morningEmail: false, mutedKinds: [], asOf: "2026-11-23T02:00:00Z", items }));
+function bell(items: Schemas["Notification"][] = [], permissions = ["notifications:read"]) {
+  return vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/me" ? ok(testMe(permissions))
+    : ok({ unseen: items.length, morningEmail: false, mutedKinds: [], asOf: "2026-11-23T02:00:00Z", items }))) as never);
 }
 
 /** Opens these records one after another, naming each tab; ends on the last. */
@@ -89,8 +90,8 @@ describe("open records", () => {
       { id: "cv_formatted:scv_1", kind: "cv_formatted", title: "CV formatted: Aina", detail: "", href: "#/candidates/cand_01a", at: "2026-11-23T01:00:00Z", new: true },
     ]);
     const view = renderWithClient(<OpenTabs hash="#/candidates/cand_01a" />); // the news comes while on Aina's page
-    await waitFor(() => { expect(api.GET).toHaveBeenCalled(); });
-    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => { expect(vi.mocked(api.GET).mock.calls.some(([path]) => path === "/v1/notifications")).toBe(true); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     view.rerender(<OpenTabs hash="#/candidates/cand_01b" />); // Badrul's tab opened afterwards: you see it there
     act(() => { nameTab("#/candidates/cand_01b", "Badrul"); nameTab("#/candidates/cand_01a", "Aina"); });
     view.rerender(<OpenTabs hash="#/jobs/jo_01j" />);
@@ -115,6 +116,47 @@ describe("open records", () => {
     expect(within(found).getAllByRole("link").map((a) => a.textContent)).toEqual(["Nurul Huda"]);
     fireEvent.keyDown(screen.getByRole("searchbox", { name: "Find an open record" }), { key: "Enter" });
     expect(window.location.hash).toBe("#/candidates/cand_02");
+  });
+
+  it("are the signed-in user's own, forgotten on signing out", () => {
+    bell();
+    act(() => { openTab("#/candidates/cand_01a", "candidate"); nameTab("#/candidates/cand_01a", "Aina"); });
+    renderWithClient(<OpenTabs hash="#/dashboard" />);
+    expect(screen.getByRole("link", { name: /Aina/ })).toBeTruthy();
+    act(() => { forgetTabs(); setTabsOwner("tnt_test:usr_other"); }); // someone else signs in on this browser
+    expect(screen.queryByRole("navigation", { name: "Open records" })).toBeNull();
+    act(() => { forgetTabs(); setTabsOwner("tnt_test:usr_test"); }); // the first comes back: signing out forgot them
+    expect(screen.queryByRole("navigation", { name: "Open records" })).toBeNull();
+  });
+
+  it("follows another window of the browser", () => {
+    bell();
+    renderWithClient(<OpenTabs hash="#/candidates/cand_01a" />);
+    const theirs = [{ href: "#/candidates/cand_01a", kind: "candidate", label: "Aina" }, { href: "#/jobs/jo_01j", kind: "job", label: "Accountant" }];
+    act(() => {
+      localStorage.setItem("hp.openTabs:tnt_test:usr_test", JSON.stringify(theirs));
+      window.dispatchEvent(new StorageEvent("storage", { key: "hp.openTabs:tnt_test:usr_test" }));
+    });
+    expect(screen.getByRole("link", { name: /Accountant/ })).toBeTruthy();
+  });
+
+  it("asks before closing the page you typed into", () => {
+    bell();
+    const ask = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderWithClient(<><OpenTabs hash="#/candidates/cand_01a" /><form><input aria-label="Notes" /></form></>);
+    act(() => { nameTab("#/candidates/cand_01a", "Aina"); });
+    fireEvent.input(screen.getByRole("textbox", { name: "Notes" }), { target: { value: "Wants 15k" } });
+    fireEvent.click(screen.getByRole("button", { name: "Close Aina" }));
+    expect(ask).toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: /Aina/ })).toBeTruthy(); // kept: said no
+  });
+
+  it("asks nobody for the bell's list without the permission", async () => {
+    const get = bell([], []);
+    renderWithClient(<OpenTabs hash="#/candidates/cand_01a" />);
+    await waitFor(() => { expect(get.mock.calls.some(([path]) => path === "/v1/me")).toBe(true); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(get.mock.calls.some(([path]) => path === "/v1/notifications")).toBe(false);
   });
 
   it("keeps the newest few", () => {

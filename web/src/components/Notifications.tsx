@@ -28,9 +28,10 @@ export const KINDS: { kind: Kind; label: string; short: string; permission: Perm
 const SHORT = Object.fromEntries(KINDS.map((k) => [k.kind, k.short])) as Record<Kind, string>;
 
 /** The bell's list (shared: the open-record tabs read it too, with no request of their own). */
-export function useNotifications() {
+export function useNotifications(enabled = true) {
   return useQuery({
     queryKey: notificationsKey,
+    enabled,
     queryFn: async () => unwrap(await api.GET("/v1/notifications")),
     refetchInterval: 30_000, // a formatted CV is said soon after it is ready
     retry: false,

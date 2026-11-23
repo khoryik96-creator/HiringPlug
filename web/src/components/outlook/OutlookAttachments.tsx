@@ -56,7 +56,7 @@ export function OutlookAttachments({ messageId, canImportCv = false, userId, rem
             <IconButton label={`Download ${file.fileName}`} tip={download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
               icon={<DownloadIcon />} disabled={download.isPending} onClick={() => { download.mutate(file); }} />
             {canImportCv && userId && file.savable && isCvFileName(file.fileName) && <ImportCvButton userId={userId} messageId={messageId} file={file} />}
-            {canImportCv && canCreateJob && isJdFileName(file.fileName) && <CreateJobButton messageId={messageId} file={file} />}
+            {!remove && canCreateJob && isJdFileName(file.fileName) && <CreateJobButton messageId={messageId} file={file} />}
           </> : <small className="muted">Available in Outlook</small>}
           {remove && <IconButton label={`Remove ${file.fileName}`} tip="Remove attachment" icon={<TrashIcon />} danger
             disabled={remove.disabled} onClick={() => { remove.onPick(file); }} />}

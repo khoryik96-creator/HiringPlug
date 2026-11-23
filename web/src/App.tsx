@@ -11,6 +11,7 @@ import { NotificationBell } from "./components/Notifications";
 import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { OpenTabs } from "./components/OpenTabs";
+import { forgetTabs, setTabsOwner } from "./components/openRecords";
 import { SettingsLayout } from "./components/SettingsLayout";
 import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { ClientShortlistPage, shortlistRoute } from "./pages/ClientShortlistPage";
@@ -66,6 +67,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   // (and any form being filled in) for the last loaded profile.
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
+  // The open-record tabs are this user's own.
+  setTabsOwner(`${me.data.tenant.id}:${me.data.user.id}`);
   const permissions = me.data.permissions;
   const { route, id } = resolve(hash, permissions);
   const settingsPages = menu("settings", permissions);
@@ -204,6 +207,7 @@ export function App() {
     setSignedIn(signedIn);
   };
   const signOut = () => {
+    forgetTabs(); // the next person on this browser never sees them
     clearToken();
     changeSession(false);
   };

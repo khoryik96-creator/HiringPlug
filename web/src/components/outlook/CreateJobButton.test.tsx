@@ -38,3 +38,13 @@ it("opens Add job on Jobs with the job description handed over, reading it at on
   await waitFor(() => { expect(send).toHaveBeenCalledWith("/v1/jd-files", expect.objectContaining({ method: "POST" })); });
   expect(takeJd()).toBeNull(); // taken once
 });
+
+it("offers Create job to anyone who may add jobs, on a received message (not a draft)", async () => {
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/me" ? ok(testMe(["jobs:create"])) : ok({
+    items: [{ id: "jd", fileName: "Finance Manager JD.pdf", sizeBytes: 9000, downloadable: true, savable: true }], more: false,
+  }))) as never);
+  const view = renderWithClient(<OutlookAttachments messageId="omg_1" />); // no CV imports for them
+  expect(await screen.findByRole("button", { name: "Create a job from Finance Manager JD.pdf" })).toBeTruthy();
+  view.rerender(<OutlookAttachments messageId="omg_1" remove={{ disabled: false, onPick: vi.fn() }} />); // their own draft
+  await waitFor(() => { expect(screen.queryByRole("button", { name: "Create a job from Finance Manager JD.pdf" })).toBeNull(); });
+});

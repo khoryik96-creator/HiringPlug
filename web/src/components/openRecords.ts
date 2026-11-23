@@ -1,6 +1,8 @@
 // The records you have open (candidates, contacts, companies, jobs), kept
 // as tabs in this browser: each named after what it is (the candidate's or
 // contact's name, the company, the job title), so you can go back and forth.
+// They are the signed-in user's own (kept per user and company, forgotten on
+// signing out), and the same in every window of the browser.
 import { useEffect, useSyncExternalStore } from "react";
 
 export type TabKind = "candidate" | "contact" | "company" | "job";
@@ -9,7 +11,10 @@ export type OpenTab = { href: string; kind: TabKind; label: string; done?: boole
 
 /** At most this many tabs: opening another closes the one least recently opened. */
 export const MAX_TABS = 30;
-const KEY = "hp.openTabs";
+/** Whose tabs these are ("tenant:user"): none until someone is signed in. */
+let owner = "";
+const key = () => `hp.openTabs:${owner}`;
+const litKey = () => `hp.openTabsLit:${owner}`;
 const ROUTES: [RegExp, TabKind, string][] = [
   [/^#\/candidates\/(cand_[0-9a-z]+)(?:\/(?:screening|reference-check|compare))?(?:\?.*)?$/, "candidate", "#/candidates/"],
   [/^#\/contacts\/(cont_[0-9a-z]+)(?:\?.*)?$/, "contact", "#/contacts/"],
@@ -27,20 +32,49 @@ export function recordOf(hash: string): { href: string; kind: TabKind } | null {
 }
 
 function load(): OpenTab[] {
+  if (!owner) return [];
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? "[]") as unknown;
+    const saved = JSON.parse(localStorage.getItem(key()) ?? "[]") as unknown;
     if (!Array.isArray(saved)) return [];
     return saved.filter((t): t is OpenTab => typeof t === "object" && t !== null && typeof (t as OpenTab).href === "string"
       && recordOf((t as OpenTab).href)?.href === (t as OpenTab).href && typeof (t as OpenTab).label === "string").slice(-MAX_TABS);
   } catch { return []; }
 }
 
-let tabs: OpenTab[] = load();
+function loadLit(): string[] {
+  if (!owner) return [];
+  try { const v = JSON.parse(localStorage.getItem(litKey()) ?? "[]") as unknown; return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+}
+
+let tabs: OpenTab[] = [];
+// What has lit a tab already (a notification's id): never twice.
+let lit: string[] = [];
 const listeners = new Set<() => void>();
+const notify = () => { listeners.forEach((l) => { l(); }); };
 function set(next: OpenTab[]) {
+  if (!owner) return; // nobody signed in: nothing kept
   tabs = next;
-  try { localStorage.setItem(KEY, JSON.stringify(tabs)); } catch { /* private window: kept for this visit only */ }
-  listeners.forEach((l) => { l(); });
+  try { localStorage.setItem(key(), JSON.stringify(tabs)); } catch { /* private window: kept for this visit only */ }
+  notify();
+}
+
+/** The signed-in user's tabs: called as the app opens for them (no re-render needed: nothing is shown yet). */
+export function setTabsOwner(who: string) {
+  if (who === owner) return;
+  owner = who;
+  tabs = load();
+  lit = loadLit();
+}
+
+/** Signing out: this user's tabs are forgotten (another person may use the browser next). */
+export function forgetTabs() {
+  if (owner) {
+    try { localStorage.removeItem(key()); localStorage.removeItem(litKey()); } catch { /* private window */ }
+  }
+  owner = "";
+  tabs = [];
+  lit = [];
+  notify();
 }
 
 /** Opens a record's tab (at the end), or keeps it where it is if open already. */
@@ -62,15 +96,10 @@ export function closeTabs(hrefs: string[]) {
 
 export function closeTab(href: string) { closeTabs([href]); }
 
-// What has lit a tab already (a notification's id): never twice.
-const LIT_KEY = "hp.openTabsLit";
-let lit: string[] = (() => {
-  try { const v = JSON.parse(localStorage.getItem(LIT_KEY) ?? "[]") as unknown; return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
-})();
-
 function remember(event: string) {
+  if (!owner) return;
   lit = [...lit, event].slice(-200);
-  try { localStorage.setItem(LIT_KEY, JSON.stringify(lit)); } catch { /* private window */ }
+  try { localStorage.setItem(litKey(), JSON.stringify(lit)); } catch { /* private window */ }
 }
 
 /** Lights a record's tab green: something finished on it (once per event).
@@ -89,8 +118,23 @@ export function seenTab(href: string) {
   if (tabs.some((t) => t.href === href && t.done)) set(tabs.map((t) => (t.href === href ? { ...t, done: false } : t)));
 }
 
+// Another window opened or closed a tab: these follow.
+function fromOtherWindow(e: StorageEvent) {
+  if (!owner || (e.key !== key() && e.key !== litKey())) return;
+  tabs = load();
+  lit = loadLit();
+  notify();
+}
+
 export function useOpenTabs(): OpenTab[] {
-  return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs);
+  return useSyncExternalStore((l) => {
+    listeners.add(l);
+    if (listeners.size === 1) window.addEventListener("storage", fromOtherWindow);
+    return () => {
+      listeners.delete(l);
+      if (listeners.size === 0) window.removeEventListener("storage", fromOtherWindow);
+    };
+  }, () => tabs);
 }
 
 /** A record page names its tab: the candidate's name, the job title. */
@@ -98,5 +142,5 @@ export function useTabName(href: string, label: string | undefined) {
   useEffect(() => { if (label) nameTab(href, label); }, [href, label]);
 }
 
-/** For tests: start with no tabs. */
-export function resetTabs() { lit = []; set([]); }
+/** For tests: start with no tabs, as this user. */
+export function resetTabs(who = "tnt_test:usr_test") { forgetTabs(); setTabsOwner(who); }

@@ -5,10 +5,11 @@
 // kind shows its latest few and "+N" lists the rest, and "All open" finds
 // any by name. A tab lights green
 // when something finished on its record (a CV formatted), until you open it.
-import { type MouseEvent, useEffect, useState } from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 
 import { useNotifications } from "./Notifications";
 import { closeTabs, markTabDone, openTab, recordOf, seenTab, type TabKind, useOpenTabs } from "./openRecords";
+import { useCan } from "./useCan";
 
 const KIND: Record<TabKind, { word: string; plural: string; list: string }> = {
   candidate: { word: "Candidate", plural: "Candidates", list: "#/candidates" },
@@ -29,8 +30,19 @@ export function OpenTabs({ hash }: { hash: string }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [anchor, setAnchor] = useState<string | null>(null);
   const [find, setFind] = useState("");
-  const bell = useNotifications();
+  const bell = useNotifications(useCan("notifications:read"));
   useEffect(() => { if (here) { openTab(here.href, here.kind); seenTab(here.href); } }, [here?.href, here?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Typed into a form on this page (not a search box): closing its tab asks first.
+  const typed = useRef(false);
+  useEffect(() => {
+    typed.current = false;
+    const onInput = (e: Event) => {
+      const field = e.target as HTMLElement | null;
+      if (field?.closest("form") && !field.closest(".open-tabs") && (field as HTMLInputElement).type !== "search") typed.current = true;
+    };
+    document.addEventListener("input", onInput, true);
+    return () => { document.removeEventListener("input", onInput, true); };
+  }, [hash]);
   // Something finished on an open record you are not looking at: its tab lights green.
   useEffect(() => {
     for (const it of bell.data?.items ?? []) {
@@ -51,9 +63,11 @@ export function OpenTabs({ hash }: { hash: string }) {
   const picked = selected.filter((h) => tabs.some((t) => t.href === h));
 
   const close = (hrefs: string[]) => {
+    const leaving = !!here && hrefs.includes(here.href);
+    if (leaving && typed.current && !window.confirm("Close this page? What you typed on it is not saved.")) return;
     closeTabs(hrefs);
     setSelected((s) => s.filter((h) => !hrefs.includes(h)));
-    if (!here || !hrefs.includes(here.href)) return;
+    if (!here || !leaving) return;
     // The tab you are on: the one beside it opens, or its list.
     const at = shown.findIndex((t) => t.href === here.href);
     const rest = shown.filter((t) => !hrefs.includes(t.href));
