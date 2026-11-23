@@ -47,7 +47,7 @@ describe("activity against targets", () => {
     renderWithClient(<ActivityProgress onlyUser="usr_a" title="Your activity" />);
     const panel = await screen.findByRole("region", { name: "Your activity" });
     expect(within(panel).queryByText("Wei")).toBeNull();
-    expect(await within(panel).findByText("Target 20")).toBeTruthy();
+    expect(await within(panel).findByText("of 20")).toBeTruthy();
     expect(within(panel).getAllByText("No target set")).toHaveLength(1); // interviews
   });
 

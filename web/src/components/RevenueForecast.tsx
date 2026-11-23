@@ -69,12 +69,12 @@ export function RevenueForecast() {
                 <tbody>
                   {f.lines.map((l) => (
                     <tr key={l.applicationId}>
-                      <td>{l.candidateName}</td><td>{l.jobTitle}<span className="muted job-company">{l.companyName}</span></td><td>{STAGE[l.stage]}</td>
-                      <td>{l.recruiterName ?? "–"}</td><td>{monthName(l.month)}</td>
-                      <td title={l.feeFrom === "placement" ? "The fee recorded on the placement" : "The client's rate on the job's salary budget"}>
-                        {formatMoney(l.fee, l.currency)}{l.feeFrom === "placement" && <span className="muted"> (placement)</span>}
+                      <td>{l.candidateName}</td><td>{l.jobTitle}<br /><span className="muted small">{l.companyName}</span></td><td>{STAGE[l.stage]}</td>
+                      <td>{l.recruiterName ?? "–"}</td><td className="nowrap">{monthName(l.month)}</td>
+                      <td className="nowrap" title={l.feeFrom === "placement" ? "The fee recorded on the placement" : "The client's rate on the job's salary budget"}>
+                        {formatMoney(l.fee, l.currency)}{l.feeFrom === "placement" && <><br /><span className="muted small">recorded on the placement</span></>}
                       </td>
-                      <td>{l.percent}%</td><td>{formatMoney(l.expected, l.currency)}</td>
+                      <td>{l.percent}%</td><td className="nowrap"><strong>{formatMoney(l.expected, l.currency)}</strong></td>
                     </tr>
                   ))}
                 </tbody>

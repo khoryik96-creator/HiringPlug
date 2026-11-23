@@ -6295,7 +6295,10 @@ class ActivityReport(BaseModel):
     from_: Annotated[date, Field(alias="from")]
     to: Annotated[date, Field(description="The last day of the week or month.")]
     team: Annotated[
-        bool, Field(description="Every active user is listed (reports.team:read); else only you.")
+        bool,
+        Field(
+            description="Every active user who recruits (whose role may move candidates) is listed, and anyone else who did something (reports.team:read); else only you."
+        ),
     ]
     rows: Annotated[list[ActivityRow], Field(description="By name.")]
 

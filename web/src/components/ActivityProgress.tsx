@@ -26,11 +26,11 @@ export function progress(done: number, target: number | null | undefined): { tex
   return { text: `${String(done)} of ${String(target)}`, percent: Math.min(100, Math.round((done * 100) / target)) };
 }
 
-function Meter({ label, done, target }: { label: string; done: number; target: number | null | undefined }) {
+function Meter({ label, done, target, bare = false }: { label: string; done: number; target: number | null | undefined; bare?: boolean }) {
   const p = progress(done, target);
   return (
     <span className="meter-cell">
-      <span>{p.text}</span>
+      {!bare && <span>{p.text}</span>}
       {p.percent !== null && (
         <span className={p.percent >= 100 ? "meter met" : "meter"} role="meter" aria-label={label}
           aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.percent}>
@@ -76,8 +76,8 @@ export function ActivityProgress({ onlyUser, title = "Activity against targets" 
               <div className="activity-card" key={key}>
                 <span className="kpi-label">{label}</span>
                 <strong>{me.done[key]}</strong>
-                <Meter label={`${label}: progress`} done={me.done[key]} target={target} />
-                <small className="muted">{target === null || target === undefined ? "No target set" : `Target ${String(target)}`}</small>
+                <Meter label={`${label}: progress`} done={me.done[key]} target={target} bare />
+                <small className="muted">{target === null || target === undefined ? "No target set" : `of ${String(target)}`}</small>
               </div>
             );
           })}

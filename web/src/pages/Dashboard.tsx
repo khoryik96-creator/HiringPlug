@@ -44,6 +44,8 @@ export function Dashboard({ permissions, meId }: { permissions: Permission[]; me
         <div className="kpi"><span className="kpi-label">Placed in 30 days</span><strong>{s.placedLast30Days}</strong></div>
       </div>
         ) },
+        ...(permissions.includes("reports:read") && meId
+          ? [{ id: "activity" as const, label: "Your activity", node: <ActivityProgress onlyUser={meId} title="Your activity" /> }] : []),
         { id: "needsYou", label: "Needs you today", node: <NeedsYouToday permissions={permissions} jobs={s.jobs} progress={progress.data} /> },
         ...(permissions.includes("intake:create") ? [{ id: "import" as const, label: "Import profiles", node: <CvImports foldedHistory /> }] : []),
         ...(permissions.includes("automations.tasks:read")
@@ -52,8 +54,6 @@ export function Dashboard({ permissions, meId }: { permissions: Permission[]; me
           ? [{ id: "offersToApprove" as const, label: "Offers to approve", node: <OffersToApprove permissions={permissions} /> }] : []),
         ...(permissions.includes("interviews:read")
           ? [{ id: "interviews" as const, label: "My upcoming interviews", node: <MyInterviews permissions={permissions} /> }] : []),
-        ...(permissions.includes("reports:read") && meId
-          ? [{ id: "activity" as const, label: "Your activity", node: <ActivityProgress onlyUser={meId} title="Your activity" /> }] : []),
         { id: "openJobs", label: "Open jobs", node: (
       <section className="panel" aria-label="Open jobs">
         <h3>Open jobs</h3>

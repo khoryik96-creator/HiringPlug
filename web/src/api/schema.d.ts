@@ -11079,7 +11079,7 @@ export interface components {
              * @description The last day of the week or month.
              */
             to: string;
-            /** @description Every active user is listed (reports.team:read); else only you. */
+            /** @description Every active user who recruits (whose role may move candidates) is listed, and anyone else who did something (reports.team:read); else only you. */
             team: boolean;
             /** @description By name. */
             rows: components["schemas"]["ActivityRow"][];

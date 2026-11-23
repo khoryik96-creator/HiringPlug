@@ -6,10 +6,12 @@ package app
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
@@ -90,13 +92,28 @@ func (a reportActivity) Placements(ctx context.Context, tx pgx.Tx, from, to time
 	return out, err
 }
 
+// Members are the active users who recruit: those whose role may move
+// candidates through the pipeline (not hiring managers or viewers).
 func (a reportActivity) Members(ctx context.Context, tx pgx.Tx) ([]reports.Member, error) {
 	members, err := a.identity.ActiveMembers(ctx, tx)
-	out := make([]reports.Member, len(members))
-	for i, m := range members {
-		out[i] = reports.Member{ID: m.ID, Name: m.Name}
+	if err != nil {
+		return nil, err
 	}
-	return out, err
+	ids := make([]string, len(members))
+	for i, m := range members {
+		ids[i] = m.ID
+	}
+	perms, err := a.identity.ActiveUsers(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	var out []reports.Member
+	for _, m := range members {
+		if slices.Contains(perms[m.ID], api.PermissionPipelineUpdate) {
+			out = append(out, reports.Member{ID: m.ID, Name: m.Name})
+		}
+	}
+	return out, nil
 }
 
 type reportForecast struct {

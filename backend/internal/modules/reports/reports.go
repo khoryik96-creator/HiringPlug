@@ -1,18 +1,27 @@
 // Package reports works out how the business is doing over a period: how far
 // candidates get (pipeline conversion), which sources bring candidates who
 // get hired, placements and fees per recruiter, and how long jobs take to
-// fill.
+// fill; each user's activity (calls, CVs sent, interviews arranged,
+// placements) against the targets owners and admins set; and the revenue
+// forecast (fees expected from the pipeline, weighted by stage).
 //
-// It keeps no data of its own: it reads other modules' records through their
-// public functions, in one transaction, as the user (fees the user may not
-// see are left out by the database).
+// It reads other modules' records through their public functions, in one
+// transaction, as the user (fees and salary budgets the user may not see are
+// left out by the database). Its own tables are the targets and the
+// forecast's stage weights.
 //
 // Layout:
 //
-//	reports.go  the module's public API and what it needs from other modules
-//	domain.go   the calculations, as pure functions on plain values (unit tested)
-//	service.go  the report: one read-only transaction
-//	http.go     HTTP handler: contract types <-> service calls
+//	reports.go                     the module's public API and what it needs from other modules
+//	domain.go                      the period report's calculations (unit tested)
+//	activity_domain.go             weeks, months, counting activity, targets (unit tested)
+//	forecast_domain.go             expected fees, weighting, totals (unit tested)
+//	service.go                     the period report: one read-only transaction
+//	activity.go                    activity against targets; the targets and weights
+//	forecast.go                    the revenue forecast
+//	http.go, targets_http.go       HTTP handlers: contract types <-> service calls
+//	export.go, export_targets.go   the reports as Excel or CSV
+//	internal/store                 generated SQL (db/queries/reports.sql)
 package reports
 
 import (

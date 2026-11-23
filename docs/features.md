@@ -1542,6 +1542,40 @@ Every stage change is recorded (by the database, whatever made it), so these
 figures come from what happened, not from where applications are now; the
 history before this was rebuilt from the audit log.
 
+### Activity targets and revenue forecast ✅ (1.36.0)
+
+- **Activity against targets:** each recruiter's **calls** (screening calls,
+  reference checks and notes of a call; a screening call's own note is not a
+  second call), **CVs sent** to clients (candidates moved to Submitted, and CVs
+  attached to an email to anyone but that candidate; the same candidate on the
+  same day counts once), **interviews arranged** (scheduled by them) and
+  **placements** (recorded and credited to them; not cancelled or backed out),
+  **this week** (Monday to Sunday) or **this month**, in the company's time
+  zone. A recruiter sees their own, as cards with a bar towards each target,
+  on the dashboard (**Your activity**, a block that can be moved) and on the
+  Reports page; owners and admins (`reports.team:read`) see everyone who
+  recruits (roles that may move candidates) in a table. Emails sent before
+  1.36.0 did not record their CVs, so they count only from then on.
+- **Targets** are set in **Settings, Targets & forecast** by owners and admins
+  (`reports.settings:manage`): per week and per month, one row for everyone
+  and a row per person (a person's own target replaces everyone's); an empty
+  box means no target for that activity.
+- **Revenue forecast** (owners and admins: `reports.forecast:read` and
+  `placements.fees:read`): the fees expected from candidates now at
+  Submitted, Interview, Offer and Placed (a placement until it is invoiced),
+  each counted at its stage's weight (10%, 30%, 70% and 100% unless changed in
+  Settings, Targets & forecast) in a month: this month plus the stage's months
+  ahead (2, 1, 0 unless changed), a placement in the month it starts. The fee
+  is the one recorded on the placement, else the client's terms of business
+  applied to the job's salary budget (the middle of its range, a monthly
+  salary 12 times, the rate whose range holds it). Shown per month and per
+  recruiter (the placement's recruiter, else the job's owner), with each
+  candidate counted and those without a fee (no budget, no terms, no rate
+  that fits) listed apart. Fees are never written to the audit log or logs.
+- **Export:** the Reports export adds an **Activity** sheet (the report's
+  period, per person you may see) and, for those who may see the forecast,
+  **Forecast by month**, **Forecast by recruiter** and **Forecast detail**.
+
 ## Market map ✅
 
 On each job (owners, admins, recruiters and sourcers), from the company's own

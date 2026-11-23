@@ -39,7 +39,7 @@ func goal(calls, cvs, interviews, placements any) map[string]any {
 func TestActivityAgainstTargets(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter, api.RoleViewer)
 	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
 	token := recruiter.Token
 	client := "hr." + tenant.ID + "@client.test"
@@ -130,6 +130,9 @@ func TestActivityAgainstTargets(t *testing.T) {
 	assert.Equal(t, mine.Done, rowOf(t, team, recruiter.ID).Done)
 	assert.Equal(t, api.ActivityCounts{}, rowOf(t, team, owner.ID).Done, "everyone is listed, with nothing done too")
 	assert.True(t, rowOf(t, team, owner.ID).Target.IsSpecified())
+	for _, row := range team.Rows {
+		assert.NotEqual(t, tenant.Users[api.RoleViewer].ID, row.UserId, "a viewer does not recruit: no row, no target")
+	}
 
 	lastYear := a.activity(token, "?day=2020-03-04")
 	assert.Equal(t, api.ActivityCounts{}, lastYear.Rows[0].Done, "another week")
