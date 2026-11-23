@@ -42,13 +42,13 @@ const (
 
 // Shortlist is a link as the recruiter sees it.
 type Shortlist struct {
-	ID, JobID, Status       string
-	Message, EmailedTo      *string
-	CreatedByName           *string
-	ExpiresAt, CreatedAt    time.Time
-	RevokedAt, OpenedAt     *time.Time
-	LastOpenedAt            *time.Time
-	Candidates              []Candidate
+	ID, JobID, Status    string
+	Message, EmailedTo   *string
+	CreatedByName        *string
+	ExpiresAt, CreatedAt time.Time
+	RevokedAt, OpenedAt  *time.Time
+	LastOpenedAt         *time.Time
+	Candidates           []Candidate
 }
 
 // Candidate is one candidate on a link, with the client's answer.
