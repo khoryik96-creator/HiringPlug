@@ -85,6 +85,8 @@ type Deps struct {
 		ForClient(ctx context.Context, tx pgx.Tx, p authz.Principal, candidateID, documentID string) (ClientCV, string, error)
 		// File is the CV's PDF when it has one, else its file.
 		File(ctx context.Context, tx pgx.Tx, documentID string) (CVFile, error)
+		// FileName is the name File would give, without reading the file.
+		FileName(ctx context.Context, tx pgx.Tx, documentID string) (string, error)
 	}
 	// Consent says whether a candidate withdrew consent (privacy module).
 	Consent interface {
@@ -107,11 +109,26 @@ type Module struct {
 }
 
 // New wires the module. publicURL is where people reach the web app (the
-// links' address).
-func New(pool *pgxpool.Pool, deps Deps, publicURL string) *Module {
-	svc := &Service{pool: pool, deps: deps, publicURL: publicURL, now: time.Now,
+// links' address); timeZone is the agency's (the dates in emails).
+func New(pool *pgxpool.Pool, deps Deps, publicURL string, timeZone *time.Location) *Module {
+	if timeZone == nil {
+		timeZone = time.UTC
+	}
+	svc := &Service{pool: pool, deps: deps, publicURL: publicURL, now: time.Now, loc: timeZone,
 		limiter: ratelimit.New(time.Now, ratelimit.Limit{Window: time.Hour, Max: 120})}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// OnApplications says which of some applications are on a client link, in
+// the caller's transaction: merging candidates keeps those, so the client's
+// answer still moves the candidate.
+func (m *Module) OnApplications(ctx context.Context, tx pgx.Tx, applicationIDs []string) (map[string]bool, error) {
+	ids, err := store.New(tx).ApplicationsOnLinks(ctx, applicationIDs)
+	out := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, err
 }
 
 // MoveCandidate moves a merged duplicate's places on links to the candidate

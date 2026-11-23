@@ -77,3 +77,19 @@ func TestForecastTotals(t *testing.T) {
 	assert.Equal(t, "Wei", lines[0].CandidateName)
 	assert.Equal(t, "Ali", lines[3].CandidateName)
 }
+
+// Recruiters are ranked by what they expect in the main currency, never by
+// comparing amounts in different currencies.
+func TestRecruitersRankedInOneCurrency(t *testing.T) {
+	r := func(v string) *big.Rat { x, _ := new(big.Rat).SetString(v); return x }
+	a, b, c := "usr_a", "usr_b", "usr_c"
+	lines := []Line{
+		{RecruiterID: &a, Currency: "USD", Fee: r("90000"), Expected: r("90000")}, // a big number, in another currency
+		{RecruiterID: &a, Currency: "MYR", Fee: r("1000"), Expected: r("1000")},
+		{RecruiterID: &b, Currency: "MYR", Fee: r("30000"), Expected: r("30000")},
+		{RecruiterID: &c, Currency: "SGD", Fee: r("50000"), Expected: r("50000")},
+	}
+	got := ByRecruiter(lines)
+	assert.Equal(t, []string{"usr_b", "usr_a", "usr_c"}, []string{got[0].Key, got[1].Key, got[2].Key},
+		"MYR is the main currency: b expects more of it than a; c has none")
+}

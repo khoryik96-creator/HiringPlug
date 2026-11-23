@@ -43,6 +43,31 @@ func (q *Queries) AnswerShortlistCandidate(ctx context.Context, arg AnswerShortl
 	return i, err
 }
 
+const applicationsOnLinks = `-- name: ApplicationsOnLinks :many
+SELECT DISTINCT application_id::text FROM client_shortlist_candidate WHERE application_id = ANY($1::text[])
+`
+
+// Which of some applications are on a client link (merging candidates keeps them).
+func (q *Queries) ApplicationsOnLinks(ctx context.Context, applicationIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, applicationsOnLinks, applicationIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var application_id string
+		if err := rows.Scan(&application_id); err != nil {
+			return nil, err
+		}
+		items = append(items, application_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getShortlist = `-- name: GetShortlist :one
 SELECT id, tenant_id, token_hash, job_id, message, expires_at, revoked_at, revoked_by, opened_at, last_opened_at, emailed_to, created_by, created_at FROM client_shortlist WHERE id = $1
 `

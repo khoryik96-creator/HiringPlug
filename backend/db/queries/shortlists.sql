@@ -51,6 +51,10 @@ RETURNING *;
 -- name: ShortlistTenant :one
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_client_shortlist_tenant(@token_hash::text);
 
+-- Which of some applications are on a client link (merging candidates keeps them).
+-- name: ApplicationsOnLinks :many
+SELECT DISTINCT application_id::text FROM client_shortlist_candidate WHERE application_id = ANY(@application_ids::text[]);
+
 -- Merging candidates: the duplicate's places on links follow it.
 -- name: MoveShortlistCandidates :exec
 UPDATE client_shortlist_candidate SET candidate_id = @to_id WHERE candidate_id = @from_id;

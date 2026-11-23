@@ -163,7 +163,10 @@ func ByMonth(lines []Line) []Group {
 	return groups
 }
 
-// ByRecruiter adds the lines up per recruiter, most expected first.
+// ByRecruiter adds the lines up per recruiter, most expected first. Amounts
+// in different currencies are not compared: recruiters are ranked by what
+// they expect in the forecast's main currency (the one most lines are in),
+// those with none in it after, by name key.
 func ByRecruiter(lines []Line) []Group {
 	groups := groupBy(lines, func(l Line) string {
 		if l.RecruiterID == nil {
@@ -171,14 +174,43 @@ func ByRecruiter(lines []Line) []Group {
 		}
 		return *l.RecruiterID
 	})
+	main := mainCurrency(lines)
+	in := func(g Group) *big.Rat {
+		for _, t := range g.Totals {
+			if t.Currency == main {
+				return t.Expected
+			}
+		}
+		return nil
+	}
 	sort.SliceStable(groups, func(i, j int) bool {
-		a, b := groups[i].Totals[0].Expected, groups[j].Totals[0].Expected
-		if c := a.Cmp(b); c != 0 {
-			return c > 0
+		a, b := in(groups[i]), in(groups[j])
+		switch {
+		case a != nil && b == nil:
+			return true
+		case a == nil && b != nil:
+			return false
+		case a != nil:
+			if c := a.Cmp(b); c != 0 {
+				return c > 0
+			}
 		}
 		return groups[i].Key < groups[j].Key
 	})
 	return groups
+}
+
+// mainCurrency is the currency most lines are in (the first such, by name).
+func mainCurrency(lines []Line) string {
+	count := map[string]int{}
+	main := ""
+	for _, l := range lines {
+		count[l.Currency]++
+		if n := count[l.Currency]; n > count[main] || (n == count[main] && l.Currency < main) {
+			main = l.Currency
+		}
+	}
+	return main
 }
 
 func groupBy(lines []Line, key func(Line) string) []Group {

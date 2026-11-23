@@ -254,7 +254,7 @@ func NewModules(d Deps) *Modules {
 	// a merged contact's emails, jobs, invoices and notes follow them.
 	m.Companies.MoveRecordsWith(m.Contacts, m.Jobs, m.Notes, m.Folders, m.Leads, m.Automations, m.Industries)
 	m.Contacts.MoveRecordsWith(m.Jobs, m.Notes, m.Folders, m.Emails, m.Placements)
-	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications)
+	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications, m.Shortlists.OnApplications)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	// CVs read, blind ad rewrites and a new company's industry: one monthly allowance.

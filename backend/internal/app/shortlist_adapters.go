@@ -5,6 +5,8 @@ package app
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -88,6 +90,18 @@ func (a shortlistCVs) File(ctx context.Context, tx pgx.Tx, documentID string) (s
 	return shortlists.CVFile{FileName: d.FileName, Data: data}, err
 }
 
+// FileName is the name File would give: the PDF's when it is made.
+func (a shortlistCVs) FileName(ctx context.Context, tx pgx.Tx, documentID string) (string, error) {
+	d, _, err := a.documents.SourceCV(ctx, tx, documentID)
+	if err != nil {
+		return "", err
+	}
+	if d.PdfStatus != nil && *d.PdfStatus == "ready" {
+		return strings.TrimSuffix(d.FileName, filepath.Ext(d.FileName)) + ".pdf", nil
+	}
+	return d.FileName, nil
+}
+
 // shortlistMailer queues the email with the link to the hiring contact.
 type shortlistMailer struct{ emails *emails.Module }
 
@@ -101,5 +115,5 @@ func newShortlists(d Deps, m *Modules) *shortlists.Module {
 	return shortlists.New(d.Pool, shortlists.Deps{
 		Jobs: shortlistJobs{m.Jobs, m.Contacts}, Applications: shortlistApplications{m.Pipeline}, Candidates: privacyCandidates{m.Candidates},
 		CVs: shortlistCVs{m.Cvformats, m.Documents}, Consent: m.Privacy, Users: m.Identity, Mailer: shortlistMailer{m.Emails},
-	}, d.Config.PublicURL)
+	}, d.Config.PublicURL, d.Config.TimeZone)
 }
