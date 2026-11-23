@@ -136,9 +136,9 @@ function Candidate({ c, n, token, busy, who, onAnswer }: {
           )}
         </span>
       </div>
-      {copy && <iframe className="shortlist-frame" title={`CV of ${c.label}`} src={`${copy.url}#navpanes=0&view=FitH`} />}
       {c.note && <p className="shortlist-note"><span className="muted small">{who}: </span>{c.note}</p>}
       <ErrorMessage error={cv.error} />
+      {copy && <iframe className="shortlist-frame" title={`CV of ${c.label}`} src={`${copy.url}#navpanes=0&view=FitH`} />}
       {c.decision ? (
         <p className={`shortlist-answer ${c.decision}`} role="status">
           <strong>{c.decision === "approved" ? "✓ Approved" : "✕ Rejected"}</strong>
@@ -147,7 +147,7 @@ function Candidate({ c, n, token, busy, who, onAnswer }: {
         </p>
       ) : (
         <div className="shortlist-decide">
-          <label className="field">Comment <span className="muted small">(optional)</span>
+          <label className="field">Comment (optional)
             <textarea rows={2} maxLength={2000} value={comment} placeholder="e.g. Strong on reporting; can they start in March?"
               onChange={(e) => { setComment(e.target.value); }} />
           </label>

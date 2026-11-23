@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { api, type Document, type Schemas, unwrap } from "../../api/client";
 import { STAGE } from "../../labels";
-import { CopyButton } from "../CopyButton";
+import { copyText } from "../CopyButton";
 import { ErrorMessage } from "../ErrorMessage";
 import { clientShortlistsKey } from "../../api/keys";
 
@@ -32,6 +32,7 @@ export function ClientLinkForm({ jobId, people: chosen, contactName, canEmail, o
   const [message, setMessage] = useState("");
   const [days, setDays] = useState(14);
   const [email, setEmail] = useState(false);
+  const [copied, setCopied] = useState(false);
   const docs = useQueries({
     queries: people.map((p) => ({
       queryKey: ["documents", p.candidateId],
@@ -62,7 +63,7 @@ export function ClientLinkForm({ jobId, people: chosen, contactName, canEmail, o
         <p>Copy it now and send it to the client: for safety it is shown only this once.</p>
         <div className="client-link-url">
           <input readOnly value={made.url} aria-label="Client link" onFocus={(e) => { e.target.select(); }} />
-          <CopyButton text={made.url} what="client link" />
+          <button type="button" className="primary" onClick={() => { void copyText(made.url).then(setCopied); }}>{copied ? "Copied ✓" : "Copy link"}</button>
         </div>
         {made.shortlist.emailedTo && <p className="muted small">Also emailed to {made.shortlist.emailedTo}.</p>}
         <p className="muted small">It works until {new Date(made.shortlist.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}. The client&apos;s answers appear under Client links, and move each candidate on the pipeline.</p>

@@ -1198,6 +1198,44 @@ lead's company (with the built-in email check).
 - **Later**: connecting Google or Microsoft accounts directly (OAuth), to
   write the event straight into the calendar and read busy times live.
 
+## Client shortlist links ✅ (1.35.0)
+
+Client feedback used to come back by email and be typed in. Now the client
+answers on a page of their own (module `shortlists`, permission
+`shortlists:share`: owners, admins and recruiters).
+
+- **Making a link** (a job's page): tick cards on the pipeline and press
+  **Client link for N**, or **New link for those at Submitted** under
+  **Client links**. For each candidate choose one of their formatted CVs
+  (blind ones first) and, if you like, a note for the client; add a message
+  for the top of the page, and how long the link works (7 to 90 days, 14
+  unless chosen). The link is shown once, to copy (only a hash of its secret
+  is kept). With `emails:send`, **Also email it to <hiring contact>** sends it
+  from your connected mailbox (else the server's) through the emails module.
+- **Only what you chose reaches the client**: the label (a blind CV shows
+  "Candidate C-4F2K9Q", a formatted one the name), your note and the CV, as a
+  PDF when it has one (named after the label, never the stored file name).
+  Never salary, email or phone: a CV made with salary, or one whose text still
+  shows the candidate's email or phone, is refused, saying which and why
+  (cvformats keeps how each formatted CV was made in `formatted_cv`; CVs made
+  before are filled in from the audit log). Uploaded CVs cannot be shared.
+- **Consent**: a candidate who withdrew consent (Data protection) cannot be put
+  on a link, and one who withdraws later drops off every link at once.
+- **The client's page** (`/shortlist/<link>`, no sign-in, fits a phone): the
+  CV opens on the page (or downloads), then **Approve for interview** or
+  **Reject**, with an optional comment, once per candidate. Approving moves the
+  application to Interview (the job's first interview stage with custom
+  stages; one that is already further along stays); rejecting closes it as
+  Rejected, reason *Client said no*, the comment as the note (a placed or
+  closed one stays). Answers and CV downloads are limited per address (120 an
+  hour).
+- **What the recruiter sees** (Client links on the job): each link's status
+  (open, expired, revoked), whether and when the client opened it, and each
+  candidate's answer and comment. **Revoke** stops a link at once.
+- **Activity**: making a link (job, and each candidate), the client's first
+  visit, every answer (job and candidate, "The client approved …") and
+  revoking are in the audit log and on the timelines; salary never is.
+
 ## Offers ✅
 
 On a candidate's job (from submitted on), **Make offer** drafts an offer:

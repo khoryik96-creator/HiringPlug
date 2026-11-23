@@ -18,7 +18,7 @@
 .shortlist-frame { display: block; width: 100%; height: 70vh; min-height: 420px; margin-top: 0.75rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .shortlist-decide { margin-top: 0.6rem; }
 .shortlist-decide textarea { width: 100%; box-sizing: border-box; }
-.shortlist-decide .row { gap: 0.5rem; }
+.shortlist-decide .row { gap: 0.5rem; margin-top: 0.5rem; align-items: stretch; }
 .shortlist-decide button.approve { background: #15803d; border-color: #15803d; color: #fff; }
 .shortlist-decide button.reject { color: #b91c1c; }
 .shortlist-answer { margin: 0.6rem 0 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; align-items: baseline; }
