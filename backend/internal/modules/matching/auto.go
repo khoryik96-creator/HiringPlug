@@ -148,15 +148,14 @@ func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) 
 		if err != nil {
 			return err
 		}
-		var matches []MeaningMatch
+		var found MeaningFound
 		if s.deps.Meaning != nil {
-			outcome, found, err := s.deps.Meaning.ForJob(ctx, tx, p, j.Title, JobMeaningText(j), onJob, hits, 2*maxSuggestions)
-			if err != nil {
+			if found, err = s.deps.Meaning.ForJob(ctx, tx, p, j.Title, JobMeaningText(j), onJob, hits, 2*maxSuggestions); err != nil {
 				return err
 			}
-			meaning, matches = &outcome, found
+			meaning = &found.Outcome
 		}
-		ids := suggestionOrder(matches, hits)
+		ids := suggestionOrder(found, hits)
 		briefs, err := s.deps.Candidates.Briefs(ctx, tx, ids)
 		if err != nil {
 			return err
@@ -166,7 +165,7 @@ func (s *Service) Suggest(ctx context.Context, p authz.Principal, jobID string) 
 			byWords[h.CandidateID] = h
 		}
 		why := map[string]MeaningMatch{}
-		for _, m := range matches {
+		for _, m := range found.Matches {
 			why[m.CandidateID] = m
 		}
 		for _, id := range ids {

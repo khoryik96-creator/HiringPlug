@@ -14,6 +14,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/meaning/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
@@ -60,7 +61,7 @@ func (s *Service) candidatesRead(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 		until := s.now().Add(unavailable)
 		return q.SetUnavailable(ctx, &until)
 	}
-	if err := q.SetSweepModel(ctx, &payload.Model); err != nil {
+	if err := s.modelRead(ctx, tx, job.TenantID, payload.Model); err != nil {
 		return err
 	}
 	ids := make([]string, len(payload.Candidates))
@@ -192,5 +193,29 @@ func (s *Service) queryRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 			return err
 		}
 	}
-	return q.SetSweepModel(ctx, &payload.Model)
+	return s.modelRead(ctx, tx, job.TenantID, payload.Model)
+}
+
+// modelRead notes the model (and reading rules) that read the latest; a new
+// one starts the company's read-through again at once, so everyone is read
+// with it (vectors of different models are not compared).
+func (s *Service) modelRead(ctx context.Context, tx pgx.Tx, tenantID, model string) error {
+	q := store.New(tx)
+	changed, err := q.SetSweepModel(ctx, &model)
+	if database.IsNoRows(err) || (err == nil && !changed) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := s.ensureRunning(ctx, tx, tenantID); err != nil {
+		return err
+	}
+	chain, err := q.RestartSweep(ctx)
+	if err != nil {
+		return err
+	}
+	logx.From(ctx).Info("search by meaning: a new model reads everyone again", "model", model)
+	_, err = jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindMeaningSweep, api.MeaningSweepJob{Chain: int(chain)})
+	return err
 }

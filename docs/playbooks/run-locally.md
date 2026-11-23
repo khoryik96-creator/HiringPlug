@@ -165,3 +165,10 @@ start if the database is behind.
 
 See the quick start in the [README](../../README.md): `task db:up`,
 `task db:setup`, `task dev`.
+
+Search by meaning needs two things the compose file and `task setup` give:
+PostgreSQL with the pgvector extension (the `pgvector/pgvector:pg16` image; on
+a PostgreSQL installed by hand, `apt-get install postgresql-16-pgvector`), and
+the meaning model in the AI worker (`task setup` downloads it to
+`ai/.models/`; `HP_AI_MEANING_MODEL_DIR` points elsewhere). Without the model
+the app works and says that search by meaning is not set up.

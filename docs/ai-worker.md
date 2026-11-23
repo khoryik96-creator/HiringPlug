@@ -392,6 +392,44 @@ requests are sent again only on 429/529; provider error texts (which can echo
 part of a key) are replaced by fixed messages. See
 [features.md](features.md#35-ai-assistant-sidebar--off-until-an-ai-provider-is-set-up).
 
+## Search by meaning (built: `meaning.read_candidates`, `meaning.read_query`)
+
+A small sentence model (all-MiniLM-L6-v2, ONNX, 384 numbers per text, pinned
+by revision and checked by SHA-256; `python -m hiringplug_ai.meaning.fetch`
+downloads it, `task setup` and the AI image do so) runs in the worker: no AI
+provider, nothing sent away. It has its own slot (`job_claim_kinds`), so
+searches are read in a moment even while CVs are being read; searches first.
+
+Before the model reads anything, `meaning/recruiter.py` reads it as a
+recruiter would (rules tested in `tests/test_meaning_recruiter.py`):
+abbreviations spelt out; tools and qualifications placed (`SKILLS`);
+misleading titles explained (`MEANS`); a title's level (0 intern to 7
+director); its job family (`meaning/families.py`: the head noun of the title
+decides, "IT Project Manager" is project management; a broad family narrowed
+in brackets, "HR Executive (Recruitment)"; a title that cannot say placed by
+the work under it, `WORK_SIGNS`). A search is split into the role and the
+rest ("headhunter | for finance roles"); work described ("someone who hired
+engineers") is read by its family; a level counts only when the search names
+one; a tool or code (S/4HANA) marks it exact. `families.NEAR` lists the
+families a recruiter also looks at for each (sent with the search's reading):
+the Go meaning module counts a candidate whose best title is in any other
+family three quarters. CV passages (`meaning/passages.py`) leave out contact
+lines, headings and the opening name lines.
+
+A candidate is read as: each title's field (its family's work plus its own
+words), each title with its work, the newest CV's passages, and the whole
+profile. Go (`backend/internal/modules/meaning`) keeps the vectors in
+PostgreSQL (pgvector, HNSW), gathers the nearest by each, compares them
+exactly and ranks (`domain.go`; the same weights as
+`tests/test_meaning_bench.py`, change both together). The model's name
+carries the rules' version (`model.READING`): raising it makes every company
+read everyone again, and searches are read again (cached by model).
+
+Measured by three recruiter benches (`tests/meaning_bench_*.py`, made up):
+NDCG@10 0.97 / 0.95 / 0.96 against 0.62 / 0.66 / 0.61 for keywords; bench C
+was written after the rules were tuned and measured once. Set
+`HP_SKIP_MEANING_TESTS=1` to skip the bench on a machine without the model.
+
 ## Shared AI allowance
 
 Admissions count a provisional 1,000-token hold for each queued or running

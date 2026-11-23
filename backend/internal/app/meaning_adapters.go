@@ -87,12 +87,12 @@ func (a meaningCVs) DocumentExists(ctx context.Context, tx pgx.Tx, documentID st
 type candidatesMeaning struct{ meaning *meaning.Module }
 
 func (a candidatesMeaning) Search(ctx context.Context, tx pgx.Tx, p authz.Principal, text string, limit int) (api.MeaningOutcome, []candidates.MeaningHit, error) {
-	outcome, ranked, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Body: text, Limit: limit})
-	hits := make([]candidates.MeaningHit, len(ranked))
-	for i, r := range ranked {
+	res, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Body: text, Limit: limit})
+	hits := make([]candidates.MeaningHit, len(res.Found))
+	for i, r := range res.Found {
 		hits[i] = candidates.MeaningHit{CandidateID: r.CandidateID, Why: r.Why}
 	}
-	return outcome, hits, err
+	return res.Outcome, hits, err
 }
 
 // matchingMeaning finds a job's possible candidates by meaning.
@@ -100,7 +100,7 @@ type matchingMeaning struct{ meaning *meaning.Module }
 
 func (a matchingMeaning) ForJob(ctx context.Context, tx pgx.Tx, p authz.Principal, title, text string, exclude []string,
 	words []matching.CVHit, limit int,
-) (api.MeaningOutcome, []matching.MeaningMatch, error) {
+) (matching.MeaningFound, error) {
 	if strings.TrimSpace(title) == "" { // read as a job, never as a typed search
 		title, _, _ = strings.Cut(strings.TrimSpace(text), "\n")
 	}
@@ -108,10 +108,13 @@ func (a matchingMeaning) ForJob(ctx context.Context, tx pgx.Tx, p authz.Principa
 	for i, w := range words {
 		hits[i] = meaning.CVHit{CandidateID: w.CandidateID, Rank: w.Rank, Snippet: w.Snippet}
 	}
-	outcome, ranked, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Title: title, Body: text, Exclude: exclude, Words: hits, Limit: limit})
-	out := make([]matching.MeaningMatch, len(ranked))
-	for i, r := range ranked {
-		out[i] = matching.MeaningMatch{CandidateID: r.CandidateID, Score: r.Score, Why: r.Why}
+	res, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Title: title, Body: text, Exclude: exclude, Words: hits, Limit: limit})
+	found := matching.MeaningFound{Outcome: res.Outcome, Matches: make([]matching.MeaningMatch, len(res.Found)), NotMatched: map[string]bool{}}
+	for i, r := range res.Found {
+		found.Matches[i] = matching.MeaningMatch{CandidateID: r.CandidateID, Score: r.Score, Why: r.Why}
 	}
-	return outcome, out, err
+	for _, id := range res.NotMatched {
+		found.NotMatched[id] = true
+	}
+	return found, err
 }

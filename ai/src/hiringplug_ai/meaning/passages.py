@@ -16,6 +16,15 @@ MAX_NEEDS = 12
 _BULLET = re.compile(r"^\s*(?:[-*•▪●◦‣►▶✓✔·o]|\d{1,2}[.)])\s+")
 _CONTACT = re.compile(r"@|https?://|www\.|linkedin\.com/|(?:\+?\d[\d\s().-]{7,}\d)")
 _SENTENCE = re.compile(r"(?<=[.;!?])\s+")
+# A CV's section headings ("WORK EXPERIENCE", "Education:") say nothing of their own.
+_HEADING = re.compile(
+    r"^((professional|career|work|employment|personal|key|technical|core|relevant) )?"
+    r"(summary|profile|objective|experience|history|employment|education|qualifications?|skills|"
+    r"competenc(y|ies)|certifications?|languages?|references?|achievements?|projects?|interests|"
+    r"details|particulars|information|background)( (history|summary|details|and \w+))?\s*:?$",
+    re.IGNORECASE,
+)
+TOP_LINES, TOP_WORDS = 4, 5  # a CV's opening short lines: its owner's name, where they live
 
 
 def _lines(text: str) -> list[str]:
@@ -24,6 +33,22 @@ def _lines(text: str) -> list[str]:
         line = re.sub(r"\s+", " ", _BULLET.sub("", raw)).strip()
         if line and _CONTACT.search(line) and len(line.split()) < 12:
             continue  # an email, a phone number or a link: no meaning
+        out.append(line)
+    return out
+
+
+def _work_lines(text: str) -> list[str]:
+    """A CV's lines without its headings, nor the short lines it opens with
+    (the person's name, where they live), which say nothing of their work."""
+    out: list[str] = []
+    top = 0
+    for line in _lines(text):
+        if line and _HEADING.match(line):
+            continue
+        if line and top < TOP_LINES and not any(out):  # still at the top: nothing kept yet
+            top += 1
+            if len(line.split()) <= TOP_WORDS and not re.search(r"[\d|]", line):
+                continue
         out.append(line)
     return out
 
@@ -44,7 +69,7 @@ def passages(text: str, limit: int = MAX_PASSAGES) -> list[str]:
         if len(joined.split()) >= MIN_WORDS:
             out.append(joined[:MAX_CHARS])
 
-    for line in _lines(text):
+    for line in _work_lines(text):
         if not line:  # a blank line closes a passage that has enough
             if sum(len(x.split()) for x in current) >= PASSAGE_WORDS // 3:
                 close()

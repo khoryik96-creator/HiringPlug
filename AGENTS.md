@@ -19,7 +19,7 @@ checked in review.
   [the efficient development workflow](docs/playbooks/development-workflow.md).
 - `task gen` after editing anything in `contracts/` or `backend/db/`.
 - `task new:module -- name=<plural> entity=<singular>` to start a module.
-- `task test` needs PostgreSQL (`task db:up`) and its client tools of the same version (pg_dump, for backups), rclone (off-site backups), Tesseract, antiword, LibreOffice (old .doc files) and Node (CV Studio's renderer; `task setup` installs its package).
+- `task test` needs PostgreSQL with pgvector (`task db:up`) and its client tools of the same version (pg_dump, for backups), rclone (off-site backups), Tesseract, antiword, LibreOffice (old .doc files), Node (CV Studio's renderer; `task setup` installs its package) and the meaning model (`task setup` downloads it).
   Tests never skip silently.
 
 ## Where things go

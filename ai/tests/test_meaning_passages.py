@@ -39,6 +39,17 @@ def test_a_cv_is_cut_into_passages_in_its_order_without_contact_details() -> Non
     assert not any(p.startswith(("•", "-")) for p in got), "bullets are taken off"
 
 
+def test_a_cvs_name_where_they_live_and_its_headings_are_left_out() -> None:
+    joined = " ".join(passages(CV))
+    for left_out in ("Aina Binti Rahman", "SUMMARY", "EXPERIENCE", "EDUCATION"):
+        assert left_out not in joined  # what a passage shows starts at the work
+    cv = "NURUL AINA\n\nKuala Lumpur, Malaysia\n\nWORK EXPERIENCE\n"
+    cv += "Talent Acquisition Partner | Contoh | 2021 - Present\nHired 120 engineers and designers a year.\n"
+    assert passages(cv)[0].startswith("Talent Acquisition Partner | Contoh")
+    skills = "SKILLS\nSAP FICO, ACCA, MFRS reporting and consolidation for group companies"
+    assert passages(skills) == ["SAP FICO, ACCA, MFRS reporting and consolidation for group companies"]
+
+
 def test_a_long_cv_keeps_its_first_passages_and_long_lines_are_cut() -> None:
     long_line = " ".join(f"word{i}" for i in range(400))
     got = passages(long_line + "\n\n" + CV * 10, limit=5)

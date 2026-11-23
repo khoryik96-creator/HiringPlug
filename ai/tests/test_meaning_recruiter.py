@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from hiringplug_ai.meaning.families import FAMILY_WORDS, NEAR
 from hiringplug_ai.meaning.recruiter import (
     expand,
     family,
@@ -13,7 +14,10 @@ from hiringplug_ai.meaning.recruiter import (
     level,
     read_search,
     reading,
+    reading_in_work,
     reading_with_work,
+    said_level,
+    search_reading,
     work_family,
 )
 
@@ -84,6 +88,19 @@ def test_the_level_of_a_title(title: str, want: int | None) -> None:
         ("Business Development Manager", "sales"),
         ("Relationship Manager", "banking"),
         ("Staff Nurse", "healthcare"),
+        ("HR Executive (Recruitment)", "recruitment"),  # a broad family narrowed in brackets
+        ("HR Executive (Payroll)", "payroll"),
+        ("Admin Executive (Purchasing)", "procurement"),
+        ("HR Executive", "hr"),
+        ("Project Manager (IT)", "project management"),  # brackets that only say where
+        ("SAP FICO Consultant", "erp finance"),
+        ("ERP Finance Consultant", "erp finance"),  # an ERP consultant, not an accountant
+        ("SAP MM Consultant", "erp"),
+        # Tools and qualifications, placed as a recruiter places them.
+        ("S/4HANA", "erp"),
+        ("HACCP", "manufacturing quality"),  # food quality, not workplace safety
+        ("GMP", "manufacturing quality"),
+        ("Selenium", "software testing"),
     ],
 )
 def test_a_title_is_placed_in_its_job_family(title: str, want: str) -> None:
@@ -128,6 +145,13 @@ def test_a_title_that_cannot_say_is_placed_by_the_work(title: str, work: str, wa
     assert reading_with_work(title, work).startswith(found[1])
 
 
+def test_a_title_placed_by_its_work_is_not_explained_the_other_way() -> None:
+    books = reading_in_work("Account Executive", "Full set of accounts and month-end closing.")
+    assert books.startswith("accounting:")
+    assert "sales" not in books  # keeping the books, not selling
+    assert reading_in_work("Account Executive", "") == "account sales"  # what most mean by it
+
+
 def test_work_that_points_two_ways_equally_says_nothing() -> None:
     assert family_of_work("Sold software; prepared invoices.") is None
     assert family_of_work("Answered the phone.") is None
@@ -148,9 +172,16 @@ def test_a_title_is_read_as_its_familys_work_then_its_own_words() -> None:
 @pytest.mark.parametrize(
     ("text", "want"),
     [
-        ("headhunter for finance roles", ("headhunter", "finance roles", False, "recruitment", 2)),
-        ("account executive selling software", ("account executive", "selling software", False, None, 2)),
+        ("headhunter for finance roles", ("headhunter", "finance roles", False, "recruitment", None)),
+        # A role that cannot say, placed by the rest of the search.
+        ("account executive selling software", ("account executive", "selling software", False, "sales", 2)),
+        (
+            "quality assurance in a food factory",
+            ("quality assurance", "a food factory", False, "manufacturing quality", None),
+        ),
         ("Finance Manager", ("Finance Manager", "", False, "finance management", 5)),
+        ("software tester", ("software tester", "", False, "software testing", None)),  # any level
+        ("senior recruiter", ("senior recruiter", "", False, "recruitment", 3)),
         ("someone who hired software engineers for a tech company", ("", "", True, "recruitment", None)),
         (
             "prepared monthly management accounts and liaised with auditors",
@@ -166,3 +197,40 @@ def test_a_search_is_read_as_the_role_and_the_rest(
     assert (s.role, s.describes, s.level) == (role, describes, lvl)
     assert s.context == (text if describes else context)
     assert (s.family[0] if s.family else None) == fam
+
+
+@pytest.mark.parametrize(
+    ("title", "want"),
+    [
+        ("Headhunter", None),  # the job, not a level: any level will do
+        ("Software Engineer", None),
+        ("Senior Recruiter", 3),
+        ("Accounts Executive", 2),
+        ("Finance Manager", 5),
+        ("Head of Talent Acquisition", 5),
+        ("Sr. Accountant", 3),
+    ],
+)
+def test_a_search_asks_for_a_level_only_when_it_names_one(title: str, want: int | None) -> None:
+    assert said_level(title) == want
+
+
+def test_the_role_asked_for_is_read_with_the_family_the_rest_of_the_search_gives() -> None:
+    assert search_reading(read_search("account executive selling software")).startswith("sales:")
+    food = search_reading(read_search("quality assurance in a food factory"))
+    assert food.startswith("quality assurance in factories")
+    assert search_reading(read_search("accounts executive")) == reading("accounts executive")
+
+
+def test_neighbouring_families_are_real_and_go_both_ways() -> None:
+    for name, near in NEAR.items():
+        assert name in FAMILY_WORDS
+        assert name not in near
+        for other in near:
+            assert other in FAMILY_WORDS
+            assert name in NEAR[other]
+    assert "hr" in NEAR["recruitment"]  # an HR generalist hires too
+    assert "finance management" in NEAR["accounting"]
+    assert "sales" not in NEAR["accounting"]  # Account Executive (sales) is not Accounts Executive
+    assert "sales" not in NEAR["erp"]  # an ERP sales director is not an SAP consultant
+    assert "executive assistant" not in NEAR["corporate secretarial"]

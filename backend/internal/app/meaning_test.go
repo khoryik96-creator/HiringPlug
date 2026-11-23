@@ -186,8 +186,12 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 	withCV(t, a, aiConn, token, ben.Id, "Bookkeeping, ledger reconciliations and audit support.")
 	cara := a.createCandidate(token, map[string]any{"firstName": "Cara", "currentTitle": "Headhunter"})
 	a.addToJob(token, job.Id, cara.Id)
+	dina := a.createCandidate(token, map[string]any{"firstName": "Dina", "currentTitle": "Procurement Manager"})
+	withCV(t, a, aiConn, token, dina.Id, "Interviews and offers with suppliers; tenders and contracts.") // the job's words, not its work
 	a.request(http.MethodGet, "/v1/meaning/status", token, nil)
 	readByMeaning(t, a, aiConn, tenant.ID)
+	eve := a.createCandidate(token, map[string]any{"firstName": "Eve"})
+	withCV(t, a, aiConn, token, eve.Id, "Interviews and offers for engineering teams.") // not read by meaning yet
 
 	suggest := func() api.MatchSuggestionList {
 		res := a.request(http.MethodGet, "/v1/matches/suggestions?jobId="+job.Id, token, nil)
@@ -196,11 +200,18 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 		res.JSON(&list)
 		return list
 	}
+	ids := func(list api.MatchSuggestionList) []string {
+		out := []string{}
+		for _, s := range list.Items {
+			out = append(out, s.CandidateId)
+		}
+		return out
+	}
 	list := suggest()
 	outcome, err := list.Meaning.Get()
 	require.NoError(t, err)
 	assert.Equal(t, api.MeaningOutcomeStatusReading, outcome.Status, "the job is read first; meanwhile by its words")
-	assert.Empty(t, list.Items, "no CV shares the job's words")
+	assert.ElementsMatch(t, []string{dina.Id, eve.Id}, ids(list), "those whose CVs share the job's words")
 	asked, ok := readSearch(t, a, aiConn, tenant.ID, api.MeaningUnderstood{Role: str("talent acquisition lead"), Family: str("recruitment")})
 	require.True(t, ok)
 	require.NotNil(t, asked.Title)
@@ -209,10 +220,105 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 	assert.NotContains(t, asked.Body, "Maju", "never its employer")
 
 	list = suggest()
-	require.Len(t, list.Items, 1, "not the accountant, nor Cara who is on the job")
-	assert.Equal(t, aina.Id, list.Items[0].CandidateId)
+	require.Equal(t, []string{aina.Id, eve.Id}, ids(list),
+		"by meaning first; then by the job's words Eve, not yet read, but not Dina, whom meaning read and turned down; "+
+			"never the accountant, nor Cara who is on the job")
+	assert.False(t, list.Items[1].Why.IsSpecified() && !list.Items[1].Why.IsNull(), "Eve: by the job's words only")
 	why, err := list.Items[0].Why.Get()
 	require.NoError(t, err)
 	assert.Equal(t, "Senior Recruiter", *why.Title)
 	assert.Empty(t, list.Items[0].Snippet, "found by meaning, not by the job's words")
+}
+
+// A new meaning model (or new reading rules, which the worker names as a new
+// model) has everyone read again at once: vectors of different models are
+// never compared.
+func TestANewMeaningModelReadsEveryoneAgain(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	c := a.createCandidate(token, map[string]any{"firstName": "Aina", "currentTitle": "Recruiter"})
+	a.request(http.MethodGet, "/v1/meaning/status", token, nil)
+	require.Equal(t, 1, readByMeaning(t, a, aiConn, tenant.ID))
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	_, again := claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadCandidates)
+	require.False(t, again, "read once")
+
+	a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"meaning": "recruiter"})
+	job, ok := claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadQuery)
+	require.True(t, ok)
+	var asked api.MeaningReadQueryJob
+	require.NoError(t, json.Unmarshal(job.Payload, &asked))
+	v := fakeMeaning("recruiter")
+	answerAIJob(t, a, aiConn, job, api.JobKindMeaningQueryRead, api.MeaningQueryReadJob{
+		QueryId: asked.QueryId, Model: "stand-in, rules 2", Role: &v, Whole: &v, Needs: []api.MeaningNeedRead{},
+	})
+	runCoreJobsUntilIdle(t, a, tenant.ID) // the read-through starts again at once
+	job, ok = claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadCandidates)
+	require.True(t, ok, "everyone is read again with the new model")
+	assert.Contains(t, string(job.Payload), c.Id)
+
+	var page api.CandidateSearchPage
+	a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"meaning": "recruiter"}).JSON(&page)
+	outcome, err := page.Meaning.Get()
+	require.NoError(t, err)
+	assert.Equal(t, api.MeaningOutcomeStatusReading, outcome.Status, "and the search: its words are read again by the new rules")
+	_, ok = claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadQuery)
+	assert.True(t, ok)
+}
+
+// A recruiter does not take another field for the one asked for, however
+// close the words: of three Executives, the one keeping the books comes
+// first for an accounts search, the one doing budgets (a neighbouring
+// field) close behind, and the one selling counts for less.
+func TestAnotherFieldCountsForLessInASearchByMeaning(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	for name, cv := range map[string]string{
+		"Mei":   "Executive. Accounts, ledger and bookkeeping.",
+		"Siti":  "Executive. Budgets, forecasts and forecasting.",
+		"Kumar": "Executive. Sales: selling software, new business and quota.",
+	} {
+		c := a.createCandidate(token, map[string]any{"firstName": name, "currentTitle": "Executive"})
+		withCV(t, a, aiConn, token, c.Id, cv)
+	}
+	a.request(http.MethodGet, "/v1/meaning/status", token, nil)
+	require.Equal(t, 3, readByMeaning(t, a, aiConn, tenant.ID))
+
+	search := func() api.CandidateSearchPage {
+		var page api.CandidateSearchPage
+		res := a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"meaning": "executive"})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&page)
+		return page
+	}
+	search()
+	_, ok := readSearch(t, a, aiConn, tenant.ID, api.MeaningUnderstood{
+		Role: str("executive"), Family: str("accounting"), Near: &[]string{"audit", "finance management"},
+	})
+	require.True(t, ok)
+	page := search()
+	require.Equal(t, []string{"Mei", "Siti", "Kumar"}, names(page))
+	whys := map[string]api.MeaningWhy{}
+	for _, hit := range page.Items {
+		w, err := hit.Why.Get()
+		require.NoError(t, err)
+		whys[strings.Fields(hit.Candidate.FullName)[0]] = w
+	}
+	assert.Equal(t, "sales", *whys["Kumar"].Family, "why: their title's field")
+	assert.Equal(t, api.MeaningWhyStrengthStrong, whys["Mei"].Strength)
+	assert.Equal(t, api.MeaningWhyStrengthStrong, whys["Siti"].Strength, "a neighbouring field counts in full")
+	assert.NotEqual(t, api.MeaningWhyStrengthStrong, whys["Kumar"].Strength, "the same title in another field")
+	assert.Less(t, whys["Kumar"].Score, float32(0.8)*whys["Siti"].Score)
 }

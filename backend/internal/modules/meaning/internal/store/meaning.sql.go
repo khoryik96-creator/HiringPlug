@@ -804,13 +804,19 @@ func (q *Queries) SearchWidely(ctx context.Context, ef string) error {
 	return err
 }
 
-const setSweepModel = `-- name: SetSweepModel :exec
-UPDATE meaning_sweep SET model = $1, unavailable_until = NULL WHERE model IS DISTINCT FROM $1 OR unavailable_until IS NOT NULL
+const setSweepModel = `-- name: SetSweepModel :one
+WITH before AS (SELECT model FROM meaning_sweep)
+UPDATE meaning_sweep SET model = $1, unavailable_until = NULL
+WHERE meaning_sweep.model IS DISTINCT FROM $1 OR unavailable_until IS NOT NULL
+RETURNING ((SELECT before.model FROM before) IS DISTINCT FROM $1)::boolean AS changed
 `
 
-func (q *Queries) SetSweepModel(ctx context.Context, model *string) error {
-	_, err := q.db.Exec(ctx, setSweepModel, model)
-	return err
+// The model (and reading rules) that read the latest; changed: everyone is read again.
+func (q *Queries) SetSweepModel(ctx context.Context, model *string) (bool, error) {
+	row := q.db.QueryRow(ctx, setSweepModel, model)
+	var changed bool
+	err := row.Scan(&changed)
+	return changed, err
 }
 
 const setUnavailable = `-- name: SetUnavailable :exec

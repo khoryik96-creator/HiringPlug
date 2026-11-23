@@ -5325,7 +5325,16 @@ class MeaningUnderstood(BaseModel):
         str | None, Field(description='The role asked for, abbreviations spelt out ("talent acquisition").')
     ] = None
     family: Annotated[str | None, Field(description='Its job family ("recruitment").')] = None
-    level: Annotated[int | None, Field(ge=0, le=7)] = None
+    near: Annotated[
+        list[str] | None,
+        Field(
+            description='The families a recruiter also looks at for it ("hr" for recruitment). A candidate whose best-matching title is in any other family counts for less.'
+        ),
+    ] = None
+    level: Annotated[
+        int | None,
+        Field(description="The level the search names (none when it names only the job).", ge=0, le=7),
+    ] = None
     levelName: Annotated[str | None, Field(description='"Manager", "Senior", ...')] = None
     context: Annotated[str | None, Field(description='What else the search says ("finance roles").')] = None
     describes: Annotated[bool, Field(description="The search describes work rather than naming a title.")]

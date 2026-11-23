@@ -56,6 +56,46 @@ func TestTheNewestTitleAtTheLevelAskedForCountsMost(t *testing.T) {
 	assert.Less(t, was.Score, now.Score)
 }
 
+// An Account Executive who sells is not an Accounts Executive, however close
+// the words: a best title in another field (neither the one asked for nor a
+// neighbour of it) counts for less; a neighbour or an unknown field does not.
+func TestABestTitleInAnotherFieldCountsForLess(t *testing.T) {
+	t.Parallel()
+	q := meaning.Query{HasRole: true, Family: "accounting", Near: []string{"finance management", "audit"}}
+	in := func(family *string) meaning.Evidence {
+		return meaning.Evidence{Roles: []meaning.RoleSim{{Title: "Account Executive", Family: family, Field: 0.7, Work: 0.5}}, Profile: 0.5}
+	}
+	same := meaning.Score(q, in(ptr("accounting")), 2026)
+	assert.InDelta(t, 0.7*0.7+0.3*0.5, same.Score, 1e-9)
+	assert.Equal(t, "good", meaning.Strength(same.Score))
+	assert.False(t, same.AnotherField)
+	other := meaning.Score(q, in(ptr("sales")), 2026)
+	assert.InDelta(t, 0.75*same.Score, other.Score, 1e-9)
+	assert.True(t, other.AnotherField)
+	assert.Equal(t, "possible", meaning.Strength(other.Score), "a good match by its words, possible in another field")
+	for _, kept := range []*string{ptr("finance management"), ptr(""), nil} {
+		assert.InDelta(t, same.Score, meaning.Score(q, in(kept), 2026).Score, 1e-9, "a neighbour, or a field not known")
+	}
+	assert.InDelta(t, same.Score, meaning.Score(meaning.Query{HasRole: true}, in(ptr("sales")), 2026).Score, 1e-9,
+		"a search with no field asks for none")
+
+	// Their CV naming a tool asked for still counts in full.
+	exact := q
+	exact.Exact = true
+	withWords := in(ptr("sales"))
+	withWords.Words = 1
+	assert.InDelta(t, other.Score+0.25, meaning.Score(exact, withWords, 2026).Score, 1e-9)
+
+	// Their own title in the field asked for wins over a newer one outside it.
+	moved := meaning.Evidence{Roles: []meaning.RoleSim{
+		{Title: "Sales Director", Family: ptr("sales"), Field: 0.45, Work: 0.45},
+		{Title: "Accountant", Family: ptr("accounting"), Field: 0.9, Work: 0.9, EndYear: ptr(2022)},
+	}}
+	got := meaning.Score(q, moved, 2026)
+	assert.Equal(t, "Accountant", got.Role.Title)
+	assert.False(t, got.AnotherField)
+}
+
 func TestWhyAndStrengthAreSaidInWords(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "strong", meaning.Strength(0.7))
@@ -75,8 +115,11 @@ func TestASearchesOwnWordsLeaveOutWhatEverySearchSays(t *testing.T) {
 
 func TestTheSameWordsAreReadOnceAndAChangedCandidateAgain(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, meaning.QueryHash("", "Talent  Acquisition "), meaning.QueryHash("", "talent acquisition"))
-	assert.NotEqual(t, meaning.QueryHash("", "recruiter"), meaning.QueryHash("Recruiter", ""), "a job is not a search")
+	const model = "all-MiniLM-L6-v2@1110a243/r3"
+	assert.Equal(t, meaning.QueryHash(model, "", "Talent  Acquisition "), meaning.QueryHash(model, "", "talent acquisition"))
+	assert.NotEqual(t, meaning.QueryHash(model, "", "recruiter"), meaning.QueryHash(model, "Recruiter", ""), "a job is not a search")
+	assert.NotEqual(t, meaning.QueryHash(model, "", "recruiter"), meaning.QueryHash("all-MiniLM-L6-v2@1110a243/r4", "", "recruiter"),
+		"new reading rules read the words again")
 
 	src := meaning.Source{CandidateID: "cand_1", CurrentTitle: "Accountant", CV: &meaning.CV{DocumentID: "doc_1", Text: "Full set of accounts"}}
 	same := src

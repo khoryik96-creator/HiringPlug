@@ -189,6 +189,45 @@ and Next (or the ← → keys), Open profile, + Add to job (open jobs) and
 Choose to email. On a phone the list and the resume take turns ("Back to
 results").
 
+**Search by meaning** ✅ (1.40.0; the **≈ Meaning** switch in the search box,
+kept on that computer): type who you need in your own words, a role
+("talent acquisition", "accounts executive") or the work ("someone who hired
+engineers"), and candidates are found by what they do, whatever their
+titles say and whether or not their CVs use your words. A recruiter's
+reading comes first: abbreviations spelt out (TA, AR/AP, HRBP), tools and
+qualifications placed (S/4HANA is SAP, ACCA is accounting, HACCP is food
+quality, Android is mobile), every title put in its job family (about 55:
+recruitment, accounting, software testing, factory quality...), and titles
+that mislead read by the work under them: an Account Executive who keeps
+the books is accounting, one who sells is sales; a "Principal Consultant"
+placing accountants is a recruiter. The newest title counts most, an old one
+less each year (a recruiter until 2013 is still found, lower); a level is
+put first only when the search names one ("senior", "manager", "executive"),
+so "headhunter" finds headhunters at any level. Someone whose best title is
+in another field counts less, however close the words (a salesperson is at
+most a possible match for "accounts executive"); the fields a recruiter
+would also look at are not (an HR generalist for talent acquisition, a
+finance manager for accounts). A tool or code in the search (S/4HANA, ACCA)
+counts most where a CV names it. Each candidate shows why: **Strong**,
+**Good** or **Possible match**, the title of theirs that matched with its
+field (and level, when the search named one), and the part of their CV
+that matched (for those who may read CVs). The other filters and folders
+still apply. A line above the list says how the search was read ("Searching
+for accounts executive (accounting), executive level first, whatever their
+titles say") and, while the company's CVs are still being read, how far it
+has got. When a word search finds few, it offers to search the same words
+by meaning.
+
+How: a small meaning model runs in the AI worker on this server (nothing is
+sent anywhere, no AI provider or allowance needed). Every candidate is read
+in the background once (titles, work and newest CV), then again when those
+change; a search's words are read in a moment (the page waits, then ranks).
+Measured on three recruiter benches of made-up candidates and the searches a
+recruiter types (the third written after the rules were tuned, measured
+once): right people first 0.97, 0.95 and 0.96 (NDCG@10) against 0.62, 0.66
+and 0.61 for a keyword search. Without the model installed, the page says
+so and offers the word search.
+
 **AI candidate search** (Candidates, "AI search"; CV Studio's AI Crawler, on
 the company's own candidates): drop the client's JD (PDF, Word or text; it is
 read as for a new job) or paste it, and/or write a boolean; the same filters
@@ -538,9 +577,14 @@ for each of their jobs, with **Score fit** / **Score again**.
   them, their name included (a double-click, Enter or Ctrl/Cmd-click opens
   their profile); a board column's count chooses its stage, and in Steps
   "Choose all N" chooses those shown.
-- **Possible candidates** on each job's page (folded under the pipeline): people not on the job whose CVs
+- **Possible candidates** on each job's page (folded under the pipeline): first
+  those whose work matches the job **by meaning** (its title and the needs its
+  description lists, read as in Search by meaning; each with why, the job's
+  words in their CV counted too), then people whose CVs
   best match the job's distinctive terms (a keyword search of CVs, not the
-  AI, so it works without one): the words every job description uses
+  AI, so it works without one), except those the meaning search read and
+  turned down (a procurement "Strategic Sourcing Manager" shares words with a
+  talent sourcing job, not its work): the words every job description uses
   (experience, proven, within, advanced, skills, strong, team...), headings
   and place names are left out; the title, acronyms (ACCA, SAP) and the
   description's two-word terms count most, and each term counts less the more
@@ -550,8 +594,6 @@ for each of their jobs, with **Score fit** / **Score again**.
   those words. Those who withdrew consent, and those the user may not see, are
   left out. **Add to job** puts them on it (and scores them). A job with no
   description or ad yet asks for one instead.
-- **Later:** finding possible candidates by meaning rather than words
-  (embeddings).
 
 ## 1, 2. Companies and contacts
 

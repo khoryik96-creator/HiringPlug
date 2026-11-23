@@ -146,6 +146,7 @@ def test_a_search_is_read_as_its_role_and_the_rest() -> None:
         "finance roles",
     )
     assert texts[0].startswith("recruitment: finding")  # the role, read as its family's work
+    assert got.understood.near == ["hr", "hr business partner"]  # also looked at; any other field counts less
     assert not got.exact
 
 
@@ -178,8 +179,18 @@ def test_a_job_is_read_as_its_title_and_the_needs_it_lists() -> None:
     assert not got.describes
     assert got.understood is not None
     assert got.understood.family == "accounting"
+    assert got.understood.near is not None
+    assert "finance management" in got.understood.near
     assert "insurance" not in " ".join(texts)
     assert "fintech" not in " ".join(texts)
+
+
+def test_a_job_title_naming_only_the_job_asks_for_no_level() -> None:
+    job = MeaningReadQueryJob(queryId="mnq_5", title="Software Engineer (Backend)", body="- Go and SQL")
+    got, _ = read_query(job)
+    assert got.level is None
+    assert got.understood is not None
+    assert got.understood.levelName is None
 
 
 def test_the_meaning_slot_takes_searches_first() -> None:

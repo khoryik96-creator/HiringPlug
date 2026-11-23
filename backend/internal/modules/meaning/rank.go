@@ -42,6 +42,15 @@ type Ranked struct {
 	Why         api.MeaningWhy
 }
 
+// Result is a ranking: how the words were read, the candidates found (best
+// first), and those whose reading it compared and judged not to match, the
+// words they share counted (a job's keyword matches it turned down).
+type Result struct {
+	Outcome    api.MeaningOutcome
+	Found      []Ranked
+	NotMatched []string
+}
+
 // Ask is a search or a job to rank candidates for.
 type Ask struct {
 	Title, Body string   // a job: its title and description; a search: its words (Body)
@@ -53,34 +62,38 @@ type Ask struct {
 // Rank finds the candidates for a search or a job, best first, in the
 // caller's transaction. While the words are being read the outcome says
 // reading and nothing is ranked: ask again in a moment.
-func (m *Module) Rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask Ask) (api.MeaningOutcome, []Ranked, error) {
+func (m *Module) Rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask Ask) (Result, error) {
 	return m.service.rank(ctx, tx, p, ask)
 }
 
-func (s *Service) rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask Ask) (api.MeaningOutcome, []Ranked, error) {
-	out := api.MeaningOutcome{Status: api.MeaningOutcomeStatusReading, Understood: nullable.NewNullNullable[api.MeaningUnderstood]()}
+func (s *Service) rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask Ask) (Result, error) {
+	res := Result{Outcome: api.MeaningOutcome{Status: api.MeaningOutcomeStatusReading, Understood: nullable.NewNullNullable[api.MeaningUnderstood]()}}
 	sweep, err := s.ensureRunning(ctx, tx, p.TenantID)
 	if err != nil {
-		return out, nil, err
+		return res, err
 	}
-	if err := s.progress(ctx, tx, &out, sweep.Model); err != nil {
-		return out, nil, err
+	if err := s.progress(ctx, tx, &res.Outcome, sweep.Model); err != nil {
+		return res, err
 	}
 	if sweep.UnavailableUntil != nil && sweep.UnavailableUntil.After(s.now()) {
-		out.Status = api.MeaningOutcomeStatusUnavailable
-		return out, nil, nil
+		res.Outcome.Status = api.MeaningOutcomeStatusUnavailable
+		return res, nil
 	}
-	query, ready, err := s.readQuery(ctx, tx, p.TenantID, ask)
+	model := ""
+	if sweep.Model != nil {
+		model = *sweep.Model
+	}
+	query, ready, err := s.readQuery(ctx, tx, p.TenantID, model, ask)
 	if err != nil || !ready {
-		return out, nil, err
+		return res, err
 	}
-	out.Status = api.MeaningOutcomeStatusReady
+	res.Outcome.Status = api.MeaningOutcomeStatusReady
 	var understood api.MeaningUnderstood
 	if len(query.Understood) > 0 && json.Unmarshal(query.Understood, &understood) == nil && string(query.Understood) != "null" {
-		out.Understood = nullable.NewNullableWithValue(understood)
+		res.Outcome.Understood = nullable.NewNullableWithValue(understood)
 	}
-	ranked, err := s.rankFor(ctx, tx, p, query, ask)
-	return out, ranked, err
+	res.Found, res.NotMatched, err = s.rankFor(ctx, tx, p, query, understood, ask)
+	return res, err
 }
 
 // progress says how many candidates are read, of how many.
@@ -100,10 +113,11 @@ func (s *Service) progress(ctx context.Context, tx pgx.Tx, out *api.MeaningOutco
 	return nil
 }
 
-// readQuery returns the search as read, or queues it to be read (ready false).
-func (s *Service) readQuery(ctx context.Context, tx pgx.Tx, tenantID string, ask Ask) (store.QueryByHashRow, bool, error) {
+// readQuery returns the search as read by the model that reads the
+// company's candidates, or queues it to be read (ready false).
+func (s *Service) readQuery(ctx context.Context, tx pgx.Tx, tenantID, model string, ask Ask) (store.QueryByHashRow, bool, error) {
 	q := store.New(tx)
-	hash := QueryHash(ask.Title, ask.Body)
+	hash := QueryHash(model, ask.Title, ask.Body)
 	row, err := q.QueryByHash(ctx, hash)
 	if database.IsNoRows(err) {
 		var title *string
@@ -146,11 +160,12 @@ func (s *Service) queueQuery(ctx context.Context, tx pgx.Tx, tenantID, id string
 	return err
 }
 
-// rankFor gathers who to look at, compares each exactly and ranks them.
-func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, query store.QueryByHashRow, ask Ask) ([]Ranked, error) {
+// rankFor gathers who to look at, compares each exactly and ranks them; it
+// also says who it read and judged not to match.
+func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, query store.QueryByHashRow, understood api.MeaningUnderstood, ask Ask) ([]Ranked, []string, error) {
 	q := store.New(tx)
 	if err := q.SearchWidely(ctx, searchWidth); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	words := ask.Words
 	if ask.Title == "" { // a typed search: its own words in CVs
@@ -161,29 +176,39 @@ func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, que
 		if len(terms) > 0 {
 			var err error
 			if words, err = s.deps.CVs.SearchCVs(ctx, tx, terms, ask.Exclude, byWords); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
 	ids, err := s.gather(ctx, q, query, words, ask.Exclude)
 	if err != nil || len(ids) == 0 {
-		return nil, err
+		return nil, nil, err
 	}
 	evidence, err := s.compare(ctx, q, query, ids, words)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	meta := Query{HasRole: query.HasRole, HasContext: query.HasContext, Describes: query.Describes, Exact: query.Exact, Needs: int(query.Needs)}
+	if understood.Family != nil {
+		meta.Family = *understood.Family
+	}
+	if understood.Near != nil {
+		meta.Near = *understood.Near
+	}
 	if query.Level != nil {
 		l := int(*query.Level)
 		meta.Level = &l
 	}
 	year := s.now().Year()
 	var out []Ranked
+	var notMatched []string
 	for _, id := range ids {
 		e := evidence[id]
 		scored := Score(meta, e, year)
 		if scored.Score < Shown {
+			if e.Read { // not someone it has yet to read
+				notMatched = append(notMatched, id)
+			}
 			continue
 		}
 		out = append(out, Ranked{CandidateID: id, Score: scored.Score, Why: why(scored, e, p.Can(api.PermissionDocumentsRead))})
@@ -192,7 +217,7 @@ func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, que
 	if ask.Limit > 0 && len(out) > ask.Limit {
 		out = out[:ask.Limit]
 	}
-	return out, nil
+	return out, notMatched, nil
 }
 
 // gather returns who to look at: the nearest by each index, and those whose CVs have the words.
@@ -263,7 +288,7 @@ func (s *Service) compare(ctx context.Context, q *store.Queries, query store.Que
 	}
 	for _, p := range profiles {
 		e := out[p.MCandidateID]
-		e.Profile = float64(p.Sim)
+		e.Profile, e.Read = float64(p.Sim), true
 		out[p.MCandidateID] = e
 	}
 	if query.Needs > 0 {

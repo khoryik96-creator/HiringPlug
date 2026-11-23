@@ -31,6 +31,7 @@ from ..contracts import (
     MeaningUnderstood,
     MeaningVector,
 )
+from ..meaning.families import NEAR
 from ..meaning.model import NAME, as_list
 from ..meaning.passages import needs, passages
 from ..meaning.recruiter import (
@@ -42,6 +43,8 @@ from ..meaning.recruiter import (
     reading,
     reading_in_work,
     reading_with_work,
+    said_level,
+    search_reading,
     work_family,
 )
 from ..queue import FollowUp
@@ -179,7 +182,7 @@ def run_query(payload: MeaningReadQueryJob, deps: Deps) -> list[FollowUp]:
     if search.describes:
         role = texts.add(search.family[1]) if search.family else None
     elif search.role:
-        role = texts.add(reading(search.role))
+        role = texts.add(search_reading(search))
     whole = texts.add(expand(payload.body)[:WHOLE_CHARS])
     # What else the search says ("for finance roles"); a search that describes work is all context.
     context = texts.add(expand(search.context)) if search.context and not search.describes else None
@@ -188,6 +191,7 @@ def run_query(payload: MeaningReadQueryJob, deps: Deps) -> list[FollowUp]:
     understood = MeaningUnderstood(
         role=expand(search.role).lower() or None,
         family=search.family[0] if search.family else None,
+        near=_near(search.family),
         level=lvl,
         levelName=LEVEL_NAMES.get(lvl) if lvl is not None else None,
         context=(search.context or None) if not search.describes else None,
@@ -220,7 +224,7 @@ def _read_job(
     listed = needs(payload.body)
     whole = (expand(title) + ". " + (" ".join(listed) or payload.body))[:WHOLE_CHARS]
     vectors = embed([reading(title), whole, *listed])
-    lvl = level(title)
+    lvl = said_level(title)
     found = family(title)
     return MeaningQueryReadJob(
         queryId=payload.queryId,
@@ -233,12 +237,19 @@ def _read_job(
         understood=MeaningUnderstood(
             role=expand(title).lower(),
             family=found[0] if found else None,
+            near=_near(found),
             level=lvl,
             levelName=LEVEL_NAMES.get(lvl) if lvl is not None else None,
             describes=False,
         ),
         needs=[MeaningNeedRead(need=n, vec=_vector(vectors[2 + i])) for i, n in enumerate(listed)],
     )
+
+
+def _near(found: tuple[str, str] | None) -> list[str] | None:
+    """The families a recruiter also looks at for this one (a candidate in
+    any other counts for less: the Go meaning module)."""
+    return sorted(NEAR.get(found[0], ())) if found else None
 
 
 def _answer(kind: JobKind, payload: MeaningCandidatesReadJob | MeaningQueryReadJob) -> FollowUp:

@@ -51,9 +51,9 @@ FAMILIES: list[tuple[str, str, str]] = [
     ),
     # Money
     (
-        "sap finance",
-        r"\bsap\b.*\b(fi|co|fico|finance)\b|\bfi co\b",
-        "SAP finance and controlling systems consulting",
+        "erp finance",
+        r"\b(sap|erp|oracle)\b.*\b(fi|co|fico|finance|financials)\b|\bfi co\b",
+        "ERP finance systems consulting: SAP FI/CO, Oracle Financials",
     ),
     ("erp", r"\bsap\b|\berp\b|oracle (financials|ebs)|dynamics|s/4 ?hana", "ERP business systems consulting"),
     (
@@ -316,10 +316,65 @@ WORK_SIGNS = {
     "accounting": r"full set of accounts|bank reconciliation|month-end|ledger|accruals|management accounts|"
     r"three-way match|invoices|debt collection|credit control|statutory audit",
     "software testing": r"selenium|cypress|test cases|regression testing|test plans?|automated tests|defect",
-    "manufacturing quality": r"haccp|\bgmp\b|iso 9001|\bcapa\b|incoming inspection|halal audit",
+    "manufacturing quality": r"haccp|\bgmp\b|iso 9001|\bcapa\b|incoming inspection|halal audit|"
+    r"food (factory|factories|manufacturing|processing|production)",
     "software": r"\bjava\b|python|golang|\bgo\b and|react|node\.?js|microservices|kubernetes|\bapis?\b",
     "civil engineering": r"construction|contractors|earthworks|drainage|site supervision|mixed development",
     "procurement": r"purchase orders?|vendor quotations|suppliers? (evaluation|tenders)|price negotiation",
     "hr": r"employee relations|onboarding|hr policies|performance management|org design",
 }
 WORK_RES = {name: re.compile(rx, re.IGNORECASE) for name, rx in WORK_SIGNS.items()}
+
+# Families a recruiter also looks at for each other (both ways): a payroll
+# executive for an accounts role, an HR generalist for talent acquisition.
+# A candidate whose best-matching title is in another family, not one of
+# these, counts for less (the Go meaning module): an Account Executive who
+# sells is not an Accounts Executive, an ERP sales director not an SAP
+# consultant, however close their words.
+_NEAR = {
+    "recruitment": "hr, hr business partner",
+    "hr": "hr business partner, payroll, reward, learning, administration",
+    "hr business partner": "reward, learning",
+    "payroll": "reward, accounting",
+    "accounting": "administration",  # "Finance & Admin Executive" keeps the books
+    "learning": "education",
+    "erp finance": "erp",
+    "erp": "business analysis, software",
+    "finance management": "accounting, audit, treasury, tax, investment, risk",
+    "audit": "accounting, tax, risk, compliance",
+    "tax": "accounting",
+    "treasury": "accounting, banking",
+    "investment": "banking",
+    "banking credit": "banking, risk",
+    "banking": "sales",
+    "risk": "compliance, insurance",
+    "compliance": "legal, corporate secretarial",
+    "customer success": "sales, customer service",
+    "sales": "marketing, retail",
+    "customer service": "retail, hospitality",
+    "retail": "hospitality",
+    "software testing": "software",
+    "data": "software, business analysis, cloud and devops",
+    "cloud and devops": "software, it infrastructure",
+    "it infrastructure": "it support",
+    "product management": "business analysis, project management, design",
+    "business analysis": "project management",
+    "design": "marketing, digital marketing",
+    "quantity surveying": "civil engineering, building services",
+    "building services": "civil engineering, mechanical engineering, electrical engineering",
+    "oil and gas": "mechanical engineering, health and safety",
+    "health and safety": "civil engineering, manufacturing engineering",
+    "mechanical engineering": "manufacturing engineering, electrical engineering",
+    "electrical engineering": "manufacturing engineering",
+    "manufacturing engineering": "manufacturing quality",
+    "procurement": "supply chain planning, logistics",
+    "supply chain planning": "logistics",
+    "digital marketing": "marketing",
+    "corporate secretarial": "legal",
+    "executive assistant": "administration",
+}
+NEAR: dict[str, frozenset[str]] = {}
+for _a, _bs in _NEAR.items():
+    for _b in (x.strip() for x in _bs.split(",")):
+        NEAR[_a] = NEAR.get(_a, frozenset()) | {_b}
+        NEAR[_b] = NEAR.get(_b, frozenset()) | {_a}

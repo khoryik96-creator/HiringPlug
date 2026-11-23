@@ -23,6 +23,7 @@ from .dates import DateRange, find_range
 from .layout import BULLET, Line, is_bullet
 from .vocab import (
     COMPANY_RE,
+    FIRM_NAME_RE,
     INSTITUTION_RE,
     LEGAL_SUFFIX_RE,
     QUALIFICATION_RE,
@@ -129,7 +130,9 @@ def kind(piece: str) -> str:
         return "skip"
     if LEGAL_SUFFIX_RE.search(piece):
         return "company"
-    company, role = bool(COMPANY_RE.search(piece)), bool(ROLE_RE.search(piece))
+    firm = bool(FIRM_NAME_RE.search(piece))
+    company = firm or bool(COMPANY_RE.search(piece))
+    role = bool(ROLE_RE.search(FIRM_NAME_RE.sub(" ", piece)))
     if not (company or role) and (INSTITUTION_RE.search(piece) or QUALIFICATION_RE.search(piece)):
         return "skip"
     if company and not role:

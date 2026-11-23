@@ -19,8 +19,12 @@ UPDATE meaning_sweep SET chain = chain + 1, due_at = now() RETURNING chain;
 UPDATE meaning_sweep SET cursor_id = @cursor_id, passes = passes + @finished::int, due_at = @due_at, ran_at = now()
 WHERE chain = @chain;
 
--- name: SetSweepModel :exec
-UPDATE meaning_sweep SET model = @model, unavailable_until = NULL WHERE model IS DISTINCT FROM @model OR unavailable_until IS NOT NULL;
+-- The model (and reading rules) that read the latest; changed: everyone is read again.
+-- name: SetSweepModel :one
+WITH before AS (SELECT model FROM meaning_sweep)
+UPDATE meaning_sweep SET model = @model, unavailable_until = NULL
+WHERE meaning_sweep.model IS DISTINCT FROM @model OR unavailable_until IS NOT NULL
+RETURNING ((SELECT before.model FROM before) IS DISTINCT FROM @model)::boolean AS changed;
 
 -- name: SetUnavailable :exec
 UPDATE meaning_sweep SET unavailable_until = @until;

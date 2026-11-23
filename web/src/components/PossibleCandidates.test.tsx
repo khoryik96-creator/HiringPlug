@@ -37,11 +37,50 @@ describe("possible candidates", () => {
     expect(sentBody(post)).toEqual({ candidateId: "cand_1" });
   });
 
+  it("say why someone found by meaning matches, though their CV shares none of the job's words", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({
+      items: [{ candidateId: "cand_2", candidateName: "Nurul", currentTitle: "Talent Acquisition Partner", rank: 0.9, snippet: "",
+        why: { score: 0.91, strength: "strong", title: "Talent Acquisition Partner", titleWhen: "now", family: "recruitment", level: "Executive",
+          passage: "Hired 120 engineers a year", words: [] } }],
+      meaning: { status: "ready", understood: { role: "recruiter", family: "recruitment", describes: false } }, needsText: false,
+    }));
+    renderWithClient(<PossibleCandidates jobId="jo_1" permissions={SEE} />);
+    expect(await screen.findByText("Nurul")).toBeTruthy();
+    expect(document.querySelector(".why-line")?.textContent)
+      .toBe("Strong matchas Talent Acquisition Partner (now) · recruitmentHired 120 engineers a year"); // no level: the job names none
+    expect(document.querySelector(".suggestion-snippet")).toBeNull();
+    expect(screen.queryByLabelText("Matched words")).toBeNull();
+  });
+
+  it("quote a CV once: where it matches by meaning, with the job's words it has as chips", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({
+      items: [{ candidateId: "cand_3", candidateName: "Priya", currentTitle: "HR Executive (Recruitment)", rank: 0.8,
+        snippet: "HR Executive ([[Recruitment]]) … walk-in [[interviews]]",
+        why: { score: 0.6, strength: "good", title: "HR Executive (Recruitment)", titleWhen: "now", family: "recruitment", level: "Executive",
+          passage: "Recruitment of operators and engineers: walk-in interviews", words: ["Recruitment", "interviews"] } }],
+      meaning: { status: "ready", understood: { role: "talent acquisition manager", family: "recruitment", level: 5, levelName: "Manager", describes: false } },
+      needsText: false,
+    }));
+    renderWithClient(<PossibleCandidates jobId="jo_1" permissions={SEE} />);
+    expect(await screen.findByText("Priya")).toBeTruthy();
+    expect(document.querySelector(".why-line")?.textContent) // the job names a level: theirs is shown
+      .toBe("Good matchas HR Executive (Recruitment) (now) · recruitment · level: executiveRecruitment of operators and engineers: walk-in interviews");
+    expect(screen.getByLabelText("Matched words").textContent).toBe("2 matched:Recruitmentinterviews");
+    expect(document.querySelector(".suggestion-snippet")).toBeNull();
+  });
+
+  it("say the job is being read by meaning, and not that no one matches meanwhile", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], meaning: { status: "reading" }, needsText: false }));
+    renderWithClient(<PossibleCandidates jobId="jo_1" permissions={SEE} />);
+    expect((await screen.findByRole("status")).textContent).toContain("Reading the job the way a recruiter would");
+    expect(screen.queryByText("No one matches yet.")).toBeNull();
+  });
+
   it("ask for the job's text when there is none", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], needsText: true })); // an answer, not an error the browser logs
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={SEE} />);
     expect(await screen.findByText(/Add a description or an ad/)).toBeTruthy();
-    expect(screen.queryByText("No CV matches.")).toBeNull();
+    expect(screen.queryByText("No one matches yet.")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(document.querySelector(".count-chip")).toBeNull();
   });

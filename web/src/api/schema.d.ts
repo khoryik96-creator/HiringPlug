@@ -10325,6 +10325,9 @@ export interface components {
             role?: string;
             /** @description Its job family ("recruitment"). */
             family?: string;
+            /** @description The families a recruiter also looks at for it ("hr" for recruitment). A candidate whose best-matching title is in any other family counts for less. */
+            near?: string[];
+            /** @description The level the search names (none when it names only the job). */
             level?: number;
             /** @description "Manager", "Senior", ... */
             levelName?: string;

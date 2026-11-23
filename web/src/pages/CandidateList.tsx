@@ -15,6 +15,7 @@ import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
 import { ResumeReader } from "../components/search/ResumeReader";
+import { looksLikeWork, MeaningBanner, MeaningSwitch, readingInterval, useMeaningMode, useReadingTooLong, WhyLine } from "../components/search/MeaningSearch";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
 import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
 import { useRowPicking } from "../components/useRowPicking";
@@ -63,10 +64,13 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   // Boolean rules typed in the search box (AND, OR, NOT, "…", word*) run the boolean search of CVs and profiles.
   // One search once typing pauses (not one per key, nor errors for a half-typed boolean).
   const typed = useDebounced(q, 350);
-  const boolQ = looksBoolean(typed);
+  // Search by meaning: the typed words are a role or the work, ranked by meaning (with the filters).
+  const [byMeaning, setByMeaning] = useMeaningMode();
+  const meaningText = byMeaning ? typed.trim() : "";
+  const boolQ = !byMeaning && looksBoolean(typed);
   const effective: SearchState = boolQ ? { ...adv, boolean: adv.boolean.trim() ? `(${adv.boolean.trim()}) AND (${typed.trim()})` : typed.trim() } : adv;
-  const plainQ = boolQ ? "" : typed;
-  const advanced = !isEmpty(effective);
+  const plainQ = boolQ || byMeaning ? "" : typed;
+  const advanced = meaningText !== "" || !isEmpty(effective);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
   const [sortBy, setSortBy] = useState<CandidateSort>(() => {
     const kept = readSort();
@@ -89,13 +93,20 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     },
     getNextPageParam: nextPage,
   });
+  const searchBody = (page?: PageAt) => (meaningText
+    ? { ...toBody(effective, "", mine, undefined, "newest", folder), meaning: meaningText, limit: 100 }
+    : toBody(effective, plainQ, mine, page, sortBy, folder));
   const found = useInfiniteQuery({
-    queryKey: [...candidatesKey, "search", plainQ, mine, effective, sortBy, folder],
+    queryKey: [...candidatesKey, "search", plainQ, mine, effective, sortBy, folder, meaningText],
     enabled: advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
-    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(effective, plainQ, mine, pageParam, sortBy, folder) })),
+    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: searchBody(pageParam) })),
     getNextPageParam: nextPage,
+    // While the meaning words are being read (a moment), ask again.
+    refetchInterval: (query) => readingInterval(query.state.data?.pages[0]?.meaning?.status === "reading", query.state.dataUpdateCount),
   });
+  const meaning = meaningText ? found.data?.pages[0]?.meaning : undefined;
+  const tooLong = useReadingTooLong(meaning?.status === "reading", meaningText);
   const shownList = advanced ? found : list;
   const allHits: Hit[] = advanced
     ? (found.data?.pages.flatMap((pg) => pg.items) ?? [])
@@ -121,6 +132,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     set: (ids, on) => { pick.pick(hits.filter((h) => ids.includes(h.candidate.id)).map((h) => personOf(h.candidate)), on); },
   });
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
+    snippet = snippet ?? hits.find((h) => h.candidate.id === c.id)?.why; // a why line is under the row too
     if (!canPick) return { className: snippet ? "has-snippet" : undefined };
     const row = picking.rowProps(c.id);
     return { ...row, className: `${row.className ?? ""}${snippet ? " has-snippet" : ""}` };
@@ -142,7 +154,9 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         </div>
       )}
       <div className="list-top">
-        <BooleanSearchBox value={q} onChange={setQ} label="Search candidates" placeholder="Search by name, email, phone, title or company, or AND, OR, NOT…">
+        <BooleanSearchBox value={q} onChange={setQ} label={byMeaning ? "Search candidates by meaning" : "Search candidates"}
+          placeholder={byMeaning ? "Who do you need? A role or the work, in your words: talent acquisition, someone who hired engineers…" : "Search by name, email, phone, title or company, or AND, OR, NOT…"}>
+          <MeaningSwitch on={byMeaning} onChange={setByMeaning} />
           <button type="button" className={`search-pill${filtersOn > 0 ? " on" : ""}`} aria-expanded={panel} title="Filters (and Mine only)"
             aria-label={`Filters${filtersOn > 0 ? `, ${String(filtersOn)} on` : ""}`} onClick={() => { setPanel(!panel); }}>
             <FunnelIcon />{filtersOn > 0 && <span className="badge">{filtersOn}</span>}
@@ -151,6 +165,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         </BooleanSearchBox>
         {canImport && !dropped && <DropHint accept={CV_TYPES} label="Drop CVs anywhere to upload" onPick={drop.take} skipped={drop.skipped} />}
       </div>
+      {meaningText && <MeaningBanner outcome={meaning} text={meaningText} tooLong={tooLong} onWords={() => { setByMeaning(false); }} />}
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} mine={{ on: mine, set: setMine }} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && filtersOn > 0 && (
         <div className="active-filters" aria-label="Search filters">
@@ -177,8 +192,11 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
       </>}>
       <div className="list-meta">
         <span role="status">
-          {shownList.data && (hits.length === 0 ? (folder && !q.trim() && !advanced && !mine ? "Nothing in this folder yet: choose candidates under All candidates, then Add to folder (or drag them onto it)." : "No candidates match.")
-            : `${String(hits.length)}${shownList.hasNextPage ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}`)}
+          {shownList.data && meaning?.status !== "reading" && (hits.length === 0 ? (folder && !q.trim() && !advanced && !mine ? "Nothing in this folder yet: choose candidates under All candidates, then Add to folder (or drag them onto it)." : meaningText ? "No one matches by meaning." : "No candidates match.")
+            : `${String(hits.length)}${shownList.hasNextPage ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}${meaningText ? ", best match first" : ""}`)}
+          {!byMeaning && shownList.data && hits.length < 3 && looksLikeWork(plainQ) && (
+            <> · <button type="button" className="link small" onClick={() => { setByMeaning(true); }}>Search “{plainQ.trim()}” by meaning</button>: titles that differ, CVs without the words</>
+          )}
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
           {sortBy !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
         </span>
@@ -217,9 +235,9 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
             </tr>
           </thead>
           <tbody>
-            {hits.map(({ candidate: c, matchedIn, cvSnippet }) => (
+            {hits.map(({ candidate: c, matchedIn, cvSnippet, why }) => (
               <Fragment key={c.id}>
-                <tr {...rowProps(c, cvSnippet)}>
+                <tr {...rowProps(c, cvSnippet ?? why)}>
                   <td className="name-cell" {...folders.drag(c.id, pick.ids)}>
                     <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
                       {" "}
@@ -231,6 +249,11 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
                   {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}
                   {folders.hasFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
                 </tr>
+                {why && (
+                  <tr className="snippet-row why-row">
+                    <td colSpan={width}><WhyLine why={why} showLevel={Boolean(meaning?.understood?.levelName)} /></td>
+                  </tr>
+                )}
                 {cvSnippet && (
                   <tr className="snippet-row">
                     <td colSpan={width}>

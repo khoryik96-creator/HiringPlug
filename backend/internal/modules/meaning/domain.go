@@ -30,6 +30,7 @@ const (
 
 	levelStep, levelMaxSteps = 0.03, 3    // a level away from the one asked for
 	oldRoleStep, oldRoleLow  = 0.05, 0.55 // a year since a title ended, and the least it keeps
+	otherField               = 0.75       // their best title in another field: what the rest counts for
 
 	// What a score says (measured on the benches: right answers mostly
 	// above Strong, wrong ones almost all below Shown).
@@ -38,12 +39,30 @@ const (
 
 // Query is how a search or a job was read.
 type Query struct {
-	HasRole    bool // the role asked for was read (a family, for a search describing work)
-	HasContext bool // the search says more than the role ("for finance roles")
-	Describes  bool // it describes work rather than naming a title
-	Exact      bool // it names a tool, qualification or code (S/4HANA, ACCA)
-	Level      *int // the level asked for
-	Needs      int  // a job's needs (its description's lines), each compared with CVs
+	HasRole    bool     // the role asked for was read (a family, for a search describing work)
+	HasContext bool     // the search says more than the role ("for finance roles")
+	Describes  bool     // it describes work rather than naming a title
+	Exact      bool     // it names a tool, qualification or code (S/4HANA, ACCA)
+	Level      *int     // the level asked for (none when the search names only the job)
+	Needs      int      // a job's needs (its description's lines), each compared with CVs
+	Family     string   // the role's job family ("" unknown)
+	Near       []string // the families a recruiter also looks at for it
+}
+
+// InAnotherField says whether a title's family is neither the one asked for
+// nor a neighbour of it: an Account Executive who sells, for an Accounts
+// Executive; an ERP sales director, for an SAP consultant. Unknown families
+// never are.
+func (q Query) InAnotherField(family *string) bool {
+	if q.Family == "" || family == nil || *family == "" || *family == q.Family {
+		return false
+	}
+	for _, near := range q.Near {
+		if near == *family {
+			return false
+		}
+	}
+	return true
 }
 
 // RoleSim is one title a candidate held, compared with the role asked for.
@@ -67,14 +86,16 @@ type Evidence struct {
 	Needs          []float64 // for a job: each need, against their CV's nearest passage
 	Words          float64   // the search's own words in their CV, 0 to 1
 	WordsFound     []string
+	Read           bool // they have been read by meaning (else only their words were compared)
 }
 
 // Scored is a candidate's score and what made it.
 type Scored struct {
-	Score       float64
-	Role        *RoleSim // their title that matched best (nil: none)
-	RoleScore   float64
-	ShowPassage bool // their CV mattered: show the passage
+	Score        float64
+	Role         *RoleSim // their title that matched best (nil: none)
+	RoleScore    float64
+	ShowPassage  bool // their CV mattered: show the passage
+	AnotherField bool // their best title is in another field: it counted for less
 }
 
 // Recency is what a title counts for: 1 for their job now, less each year
@@ -130,6 +151,12 @@ func Score(q Query, e Evidence, thisYear int) Scored {
 	default:
 		out.Score = titleOnlyRole*role + titleOnlyProfile*e.Profile
 	}
+	// However close the words, a recruiter does not take another field for
+	// this one; their CV naming the search's own words (below) still counts.
+	if q.HasRole && out.Role != nil && q.InAnotherField(out.Role.Family) {
+		out.Score *= otherField
+		out.AnotherField = true
+	}
 	if q.Exact {
 		out.Score += exactWordsWeight * e.Words
 	} else {
@@ -170,10 +197,11 @@ var LevelNames = map[int]string{
 var spaces = regexp.MustCompile(`\s+`)
 
 // QueryHash identifies a search's words (or a job's title and text), the
-// same however they are spaced or capitalised, so they are read once.
-func QueryHash(title, body string) string {
+// same however they are spaced or capitalised, so they are read once by
+// each model (and its reading rules: a new one reads them again).
+func QueryHash(model, title, body string) string {
 	norm := func(s string) string { return strings.ToLower(strings.TrimSpace(spaces.ReplaceAllString(s, " "))) }
-	sum := sha256.Sum256([]byte(norm(title) + "\n" + norm(body)))
+	sum := sha256.Sum256([]byte(model + "\n" + norm(title) + "\n" + norm(body)))
 	return hex.EncodeToString(sum[:])
 }
 

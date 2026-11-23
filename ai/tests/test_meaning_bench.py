@@ -1,5 +1,6 @@
 """Search by meaning, measured the way a recruiter would judge it: made-up
-candidates and searches (meaning_bench_a.py, meaning_bench_b.py), read with
+candidates and searches (meaning_bench_a.py, meaning_bench_b.py, and
+meaning_bench_c.py, written after the others were tuned), read with
 the real meaning model and this worker's reading rules, ranked with the same
 weights as the Go meaning module (backend/internal/modules/meaning/domain.go:
 change both together). Each bench must rank right people first (NDCG@10),
@@ -21,6 +22,7 @@ import numpy as np
 import pytest
 
 from hiringplug_ai.meaning import model as meaning_model
+from hiringplug_ai.meaning.families import NEAR
 from hiringplug_ai.meaning.recruiter import (
     expand,
     family,
@@ -29,9 +31,12 @@ from hiringplug_ai.meaning.recruiter import (
     reading,
     reading_in_work,
     reading_with_work,
+    said_level,
+    search_reading,
+    work_family,
 )
 
-from . import meaning_bench_a, meaning_bench_b
+from . import meaning_bench_a, meaning_bench_b, meaning_bench_c
 
 THIS_YEAR = 2026  # the benches' "now"
 
@@ -45,6 +50,8 @@ WORDS = 0.06  # the search's own words in the CV
 WORDS_EXACT = 0.25  # ... when it names a tool, qualification or code (S/4HANA, ACCA)
 LEVEL_STEP, LEVEL_MAX_STEPS = 0.03, 3
 OLD_ROLE_STEP, OLD_ROLE_FLOOR = 0.05, 0.55
+OTHER_FIELD = 0.75  # their best title in another field, not a neighbour (families.NEAR)
+GOOD = 0.5  # what a score must reach to be called a good match
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +79,8 @@ class Read:
     """The bench's candidates as the worker reads them (one passage each: what they did)."""
 
     ids: list[str]
-    roles: list[list[tuple[np.ndarray, np.ndarray, int | None, int | None]]]  # field, work, level, end
+    # Each title: field, work, level, end, family.
+    roles: list[list[tuple[np.ndarray, np.ndarray, int | None, int | None, str | None]]]
     passages: np.ndarray
     profiles: np.ndarray
     texts: list[str]  # for the keyword search
@@ -83,16 +91,34 @@ def read_bench(bench: ModuleType, m: meaning_model.MeaningModel) -> Read:
     for _, titles, did, _ in bench.C:
         field_v = m.embed([reading_in_work(t, did if k == 0 else "") for k, (t, _, _) in enumerate(titles)])
         work_v = m.embed([reading_with_work(t, did if k == 0 else "") for k, (t, _, _) in enumerate(titles)])
-        roles.append([(field_v[k], work_v[k], level(t), end) for k, (t, _, end) in enumerate(titles)])
+        placed = [work_family(t, did if k == 0 else "") for k, (t, _, _) in enumerate(titles)]
+        fams = [found[0] if found else None for found in placed]
+        roles.append([(field_v[k], work_v[k], level(t), e, fams[k]) for k, (t, _, e) in enumerate(titles)])
     profiles = m.embed([". ".join(t for t, _, _ in titles) + ". " + did for _, titles, did, _ in bench.C])
     texts = [" ".join(t for t, _, _ in titles) + ". " + did for _, titles, did, _ in bench.C]
     return Read([c[0] for c in bench.C], roles, m.embed([c[2] for c in bench.C]), profiles, texts)
 
 
-def role_score(r: Read, i: int, role: np.ndarray, want: int | None) -> float:
+def role_score(r: Read, i: int, role: np.ndarray, want: int | None) -> tuple[float, str | None]:
+    """Their best title's score for the role asked for, and its family."""
     return max(
-        max(float(f @ role), float(w @ role)) * recency(end) * level_fit(want, lvl)
-        for f, w, lvl, end in r.roles[i]
+        (max(float(f @ role), float(w @ role)) * recency(end) * level_fit(want, lvl), fam)
+        for f, w, lvl, end, fam in r.roles[i]
+    )
+
+
+def other_field(asked: str | None, theirs: str | None) -> bool:
+    return asked is not None and theirs is not None and theirs != asked and theirs not in NEAR.get(asked, ())
+
+
+def best_roles(
+    r: Read, role: np.ndarray, want: int | None, asked: str | None
+) -> tuple[np.ndarray, np.ndarray]:
+    """Each candidate's best title score, and what their meaning counts for (less in another field)."""
+    best = [role_score(r, i, role, want) for i in range(len(r.ids))]
+    return (
+        np.array([b[0] for b in best]),
+        np.array([OTHER_FIELD if other_field(asked, b[1]) else 1.0 for b in best]),
     )
 
 
@@ -163,25 +189,24 @@ def search(r: Read, m: meaning_model.MeaningModel, query: str) -> np.ndarray:
     whole = m.embed([expand(query)])[0]
     profile = r.profiles @ whole
     words = (WORDS_EXACT if s.exact else WORDS) * keywords(r.texts, query)
+    asked = s.family[0] if s.family else None
     scores: np.ndarray
     if s.describes and s.family is None:
         a, b = DESCRIBES_NO_FAMILY
         scores = a * (r.passages @ whole) + b * profile
     elif s.describes and s.family is not None:
-        role = m.embed([s.family[1]])[0]
-        roles = np.array([role_score(r, i, role, None) for i in range(len(r.ids))])
+        roles, counts = best_roles(r, m.embed([s.family[1]])[0], None, asked)
         a, b = DESCRIBES
-        scores = a * (r.passages @ whole) + b * roles
+        scores = (a * (r.passages @ whole) + b * roles) * counts
     else:
-        role = m.embed([reading(s.role)])[0]
-        roles = np.array([role_score(r, i, role, s.level) for i in range(len(r.ids))])
+        roles, counts = best_roles(r, m.embed([search_reading(s)])[0], s.level, asked)
         if s.context:
             context = m.embed([expand(s.context)])[0]
             a, b, c = WITH_CONTEXT
-            scores = a * roles + b * (r.passages @ context) + c * profile
+            scores = (a * roles + b * (r.passages @ context) + c * profile) * counts
         else:
             a, b = TITLE_ONLY
-            scores = a * roles + b * profile
+            scores = (a * roles + b * profile) * counts
     return scores + words
 
 
@@ -206,7 +231,9 @@ def top(r: Read, scores: np.ndarray, n: int) -> list[str]:
     return [r.ids[i] for i in np.argsort(-scores, kind="stable")[:n]]
 
 
-@pytest.mark.parametrize(("bench", "at_least"), [(meaning_bench_a, 0.92), (meaning_bench_b, 0.89)])
+@pytest.mark.parametrize(
+    ("bench", "at_least"), [(meaning_bench_a, 0.95), (meaning_bench_b, 0.93), (meaning_bench_c, 0.93)]
+)
 def test_right_people_come_first_far_above_a_keyword_search(
     model: meaning_model.MeaningModel, bench: ModuleType, at_least: float
 ) -> None:
@@ -224,9 +251,9 @@ def test_right_people_come_first_far_above_a_keyword_search(
 def test_the_traps_a_recruiter_would_notice(model: meaning_model.MeaningModel) -> None:
     a = read_bench(meaning_bench_a, model)
     sales = {"s1", "s2", "s3", "s4", "s5", "s6", "s7"}
-    assert not sales & set(top(a, search(a, model, "accounts executive"), 3)), (
-        "Account (sales) is not Accounts"
-    )
+    accounts = search(a, model, "accounts executive")
+    assert not sales & set(top(a, accounts, 3)), "Account (sales) is not Accounts"
+    assert max(accounts[a.ids.index(s)] for s in sales) < GOOD, "a salesperson is at most a possible match"
     procurement = {"q1", "q2", "q3", "q4", "q5", "q6"}
     assert not procurement & set(top(a, search(a, model, "talent acquisition"), 5)), "talent, not suppliers"
     recruiters = {"r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9"}
@@ -296,13 +323,14 @@ def test_possible_candidates_for_a_job_are_found_by_its_title_and_needs(
         role = model.embed([reading(title)])[0]
         whole = model.embed([(expand(title) + ". " + " ".join(needs))])[0]
         need_v = model.embed(needs)
-        roles = np.array([role_score(r, i, role, level(title)) for i in range(len(r.ids))])
+        asked = family(title)
+        roles, counts = best_roles(r, role, said_level(title), asked[0] if asked else None)
         met = (r.passages @ need_v.T).mean(axis=1)  # each need against their CV
         a, b, c = JOB
-        scores = a * roles + b * met + c * (r.profiles @ whole)
+        scores = (a * roles + b * met + c * (r.profiles @ whole)) * counts
         grades = [grade(cand[3], cand[0], wanted) for cand in meaning_bench_a.C]
         results.append(ndcg(scores, grades))
         assert family(title) is not None
-    assert float(np.mean(results)) >= 0.85, (
+    assert float(np.mean(results)) >= 0.93, (
         f"jobs NDCG@10 {np.mean(results):.3f}: {[round(x, 2) for x in results]}"
     )

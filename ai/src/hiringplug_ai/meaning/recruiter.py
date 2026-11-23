@@ -112,12 +112,15 @@ SKILLS = {
     "figma": "Figma design",
     "selenium": "Selenium software test automation",
     "cypress": "Cypress software test automation",
-    "haccp": "HACCP food safety quality",
-    "gmp": "GMP manufacturing quality",
+    "haccp": "HACCP food safety and quality control",
+    "gmp": "GMP good manufacturing practice quality control",
     "pmp": "PMP project management",
     "cipd": "CIPD human resources",
     "shrm": "SHRM human resources",
     "flutter": "Flutter mobile app developer",
+    "android": "Android mobile app developer",
+    "ios": "iOS mobile app developer",
+    "kotlin": "Kotlin Android mobile app developer",
     "react": "React frontend developer",
     "linkedin recruiter": "LinkedIn Recruiter recruitment sourcing",
 }
@@ -223,15 +226,35 @@ def level(title: str) -> int | None:
     return best
 
 
-def field(title: str) -> str:
-    """What the person does, in words: rank words left out, misleading titles explained."""
+# Words that say how senior: a search for a "headhunter" or a "software
+# engineer" names the job, not a level, and any level will do.
+_SAID = re.compile(
+    r"\b(intern|internship|trainee|apprentice|graduate|junior|assistant|executive|officer|associate|senior|lead|"
+    r"principal|supervisor|manager|head|director|vice president|chief|president|controller|clerk)\b"
+)
+
+
+def said_level(title: str) -> int | None:
+    """The level a title names with a rank word ("senior", "manager"), or None
+    when it names only the job ("headhunter": any level will do)."""
+    return level(title) if _SAID.search(expand(title).lower()) else None
+
+
+def field(title: str, explain: bool = True) -> str:
+    """What the person does, in words: rank words left out, misleading titles
+    explained (not when the work under the title has placed it: an Account
+    Executive keeping the books is not explained as sales)."""
     t = re.sub(r"[(),:;|]", " ", expand(title).lower())
-    for rx, means in _MEANS_RES:
+    for rx, means in _MEANS_RES if explain else ():
         if rx.search(t):
             t = rx.sub(means, t)
             break
     stripped = re.sub(r"\s+", " ", _RANK.sub(" ", t)).strip(" -&/,")
     return stripped if len(stripped) >= 2 else t.strip()
+
+
+# Families that say little on their own: what a title adds in brackets says more.
+_BROAD = {"hr", "administration"}
 
 
 def _family_in(t: str) -> tuple[str, str] | None:
@@ -259,6 +282,9 @@ def family(title: str, role_only: bool = False) -> tuple[str, str] | None:
     extra = parts[1].strip(" )") if len(parts) > 1 else ""
     if not AMBIGUOUS.match(main):
         found = _family_in(main)
+        # A broad family narrowed in brackets: "HR Executive (Recruitment)" recruits.
+        if found and found[0] in _BROAD and "(" in t:
+            return _family_in(extra) or found
         if found:
             return found
     return _family_in(extra) if extra and not role_only else None
@@ -284,17 +310,28 @@ def reading(title: str) -> str:
     return f"{found[1]}; {words}" if found else words
 
 
+def _placed(title: str, work: str) -> tuple[tuple[str, str] | None, bool]:
+    """A title's family, and whether the title placed it (not the work under it)."""
+    own = family(title, role_only=True)
+    if own:
+        return own, True
+    by_work = family_of_work(work)
+    if by_work:
+        return by_work, False
+    return family(title), True
+
+
 def work_family(title: str, work: str) -> tuple[str, str] | None:
     """A title's family, from the title, else from the work under it."""
-    return family(title, role_only=True) or family_of_work(work) or family(title)
+    return _placed(title, work)[0]
 
 
 def reading_in_work(title: str, work: str) -> str:
     """A title as the meaning model reads it, placed by the work under it
     when the title alone cannot say ("Principal Consultant" placing
     accountants reads as recruitment)."""
-    found = work_family(title, work)
-    words = field(title)
+    found, by_title = _placed(title, work)
+    words = field(title, explain=by_title)
     return f"{found[1]}; {words}" if found else words
 
 
@@ -333,6 +370,13 @@ class Search:
 _CODE = re.compile(r"(?<!\w)(\.?[A-Za-z]+[/+#.][\w+#.]*|\w*\d\w*|[A-Z]{2,})(?!\w)")
 
 
+def search_reading(s: Search) -> str:
+    """The role a search asks for, as the meaning model reads it: placed by
+    the rest of the search when the role alone cannot say."""
+    words = field(s.role, explain=s.family is None or family(s.role) is not None)
+    return f"{s.family[1]}; {words}" if s.family else words
+
+
 def names_a_skill(text: str) -> bool:
     """Whether a search names a tool, qualification or code."""
     if _SKILLS_RE.search(text):
@@ -355,4 +399,6 @@ def read_search(text: str) -> Search:
     parts = _SPLIT.split(text, maxsplit=1)
     role = parts[0].strip()
     context = parts[1].strip() if len(parts) > 1 else ""
-    return Search(role, context, False, family(role), level(role), exact)
+    # A role that cannot say is placed by the rest ("account executive selling software" sells).
+    found = family(role) or (family_of_work(context) if context else None)
+    return Search(role, context, False, found, said_level(role), exact)

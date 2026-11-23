@@ -15983,7 +15983,12 @@ components:
       properties:
         role: {type: string, description: 'The role asked for, abbreviations spelt out ("talent acquisition").'}
         family: {type: string, description: 'Its job family ("recruitment").'}
-        level: {type: integer, minimum: 0, maximum: 7}
+        near:
+          type: array
+          description: >-
+            The families a recruiter also looks at for it ("hr" for recruitment). A candidate whose best-matching title is in any other family counts for less.
+          items: {type: string}
+        level: {type: integer, minimum: 0, maximum: 7, description: The level the search names (none when it names only the job).}
         levelName: {type: string, description: '"Manager", "Senior", ...'}
         context: {type: string, description: 'What else the search says ("finance roles").'}
         describes: {type: boolean, description: The search describes work rather than naming a title.}
