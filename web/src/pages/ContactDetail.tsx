@@ -16,6 +16,7 @@ import { JobsNeedingContact } from "../components/FollowLeaver";
 import { LinkedinCheckResult, LinkedinChecks } from "../components/LinkedinChecks";
 import { MailboxBadge } from "../components/MailboxBadge";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { useTabName } from "../components/openTabs";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { roleLabel } from "../components/contactRole";
 import { Timeline } from "../components/Timeline";
@@ -51,6 +52,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
       await queryClient.invalidateQueries({ queryKey: contactsKey });
     },
   });
+  useTabName(`#/contacts/${id}`, contact.data?.fullName); // its tab, by the contact's name
   const c = contact.data;
   if (!c) return contact.error ? <ErrorMessage error={contact.error} /> : <p className="muted">Loading…</p>;
   const canEdit = permissions.includes("contacts:update");

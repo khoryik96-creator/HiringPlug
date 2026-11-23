@@ -1535,3 +1535,43 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .target-input { width: 5.5rem; }
 .targets-table td { vertical-align: middle; }
 .report-period { margin-top: 1rem; }
+
+/* The strip of open records above the page (components/OpenTabs.tsx). */
+/* A band under the top bar, across the screen, as a browser's row of tabs. */
+.open-tabs { --kind: var(--accent, #6d4ae0); display: flex; gap: .35rem; align-items: flex-end; overflow-x: auto; scrollbar-width: thin;
+  margin: 0 0 1rem; padding: .5rem 1.5rem 0; background: var(--surface, #fff); border-bottom: 1px solid var(--line, #ded8eb); }
+.open-tab.kind-candidate, .open-tab-group.kind-candidate { --kind: #6d4ae0; }
+.open-tab.kind-contact, .open-tab-group.kind-contact { --kind: #0f766e; }
+.open-tab.kind-company, .open-tab-group.kind-company { --kind: #b45309; }
+.open-tab.kind-job, .open-tab-group.kind-job { --kind: #1d4ed8; }
+.open-tab { display: inline-flex; align-items: center; flex: 0 0 auto; max-width: 15rem; }
+.open-tab a { display: inline-flex; align-items: center; gap: .4rem; min-width: 0; color: inherit; text-decoration: none; font-size: .84rem; }
+.open-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.open-tab-kind { flex: 0 0 auto; display: inline-grid; place-items: center; font-size: .66rem; font-weight: 700; color: #fff; background: var(--kind); }
+.open-tab-close { flex: 0 0 auto; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; box-shadow: none;
+  color: var(--muted, #6b6680); font-size: 1rem; line-height: 1; cursor: pointer; }
+.open-tab-close:hover, .open-tab-close:focus-visible { background: #fee2e2; color: #b91c1c; }
+
+/* A: browser tabs sitting on the page. */
+.open-tabs.look-tabs { background: var(--soft, #f4f1fa); }
+.look-tabs .open-tab { gap: .15rem; padding: .4rem .3rem .4rem .7rem; border: 1px solid transparent; border-bottom: 0;
+  border-radius: 10px 10px 0 0; margin-bottom: -1px; color: var(--muted, #5b5670); }
+.look-tabs .open-tab:hover { background: color-mix(in srgb, var(--kind) 7%, transparent); }
+.look-tabs .open-tab.current { background: var(--bg, #fbfaff); border-color: var(--line, #ded8eb); color: var(--text, #1d1a2e); font-weight: 600;
+  box-shadow: inset 0 3px 0 var(--kind); }
+.look-tabs .open-tab-kind { width: 17px; height: 17px; border-radius: 5px; }
+
+/* B: pills with the person's initials. */
+.open-tabs.look-pills { align-items: center; padding: .45rem 1.5rem; }
+.look-pills .open-tab { gap: .1rem; padding: .2rem .2rem .2rem .25rem; border: 1px solid var(--line, #ded8eb); border-radius: 999px; background: var(--surface, #fff); }
+.look-pills .open-tab.current { border-color: var(--kind); background: color-mix(in srgb, var(--kind) 10%, #fff); box-shadow: 0 0 0 1px var(--kind); font-weight: 600; }
+.look-pills .open-tab-kind { width: 24px; height: 24px; border-radius: 50%; font-size: .64rem; }
+.look-pills .open-tab-close { border-radius: 50%; }
+
+/* C: grouped by kind, each group under its name. */
+.open-tabs.look-grouped { gap: 1.1rem; align-items: center; padding: .4rem 1.5rem; }
+.look-grouped .open-tab-group { display: inline-flex; align-items: center; gap: .25rem; flex: 0 0 auto; padding-left: .6rem; border-left: 3px solid var(--kind); }
+.look-grouped .open-tab-group-name { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--kind); margin-right: .2rem; }
+.look-grouped .open-tab { padding: .15rem .15rem .15rem .5rem; border-radius: 7px; }
+.look-grouped .open-tab.current { background: var(--surface, #fff); box-shadow: 0 0 0 1px var(--kind); font-weight: 600; }
+.look-grouped .open-tab-kind { display: none; }

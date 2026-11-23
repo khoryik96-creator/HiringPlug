@@ -17,6 +17,7 @@ import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { useTabName } from "../components/openTabs";
 import { QuickIndustries, QuickSpecialization, QuickWords } from "../components/ProfileQuickEdit";
 import { History } from "../components/History";
 import { Owner } from "../components/Owner";
@@ -44,6 +45,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
     queryKey: candidateKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}", { params: { path: { candidateId: id } } })),
   });
+  // Its tab in the strip of open records, by the candidate's name.
+  useTabName(`#/candidates/${id}`, candidate.data && [candidate.data.firstName, candidate.data.lastName].filter(Boolean).join(" "));
   const c = candidate.data;
   if (!c) {
     if (!candidate.error) return <p className="muted">Loading…</p>;

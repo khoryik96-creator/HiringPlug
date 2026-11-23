@@ -6,6 +6,7 @@ import { applicationsKey, jobKey } from "../api/keys";
 import { BuildingIcon, EditIcon, IconActions, IconButton, PersonIcon } from "../components/ActionIcons";
 import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { useTabName } from "../components/openTabs";
 import { Timeline } from "../components/Timeline";
 import { InterviewPrepPanel } from "../components/interviewprep/InterviewPrepPanel";
 import { InterviewQuestions } from "../components/interviewprep/InterviewQuestions";
@@ -40,6 +41,8 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
     queryKey: jobKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}", { params: { path: { jobId: id } } })),
   });
+  // Its tab, by the job title (and the client).
+  useTabName(`#/jobs/${id}`, job.data && [job.data.title, job.data.companyName].filter(Boolean).join(" · "));
   const j = job.data;
   if (!j) return job.error ? <ErrorMessage error={job.error} /> : <p className="muted">Loading…</p>;
 

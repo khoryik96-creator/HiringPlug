@@ -16,6 +16,7 @@ import { CompanyContacts } from "../components/CompanyContacts";
 import { CompanyForm } from "../components/CompanyForm";
 import { CompanyJobs } from "../components/CompanyJobs";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { useTabName } from "../components/openTabs";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { Timeline } from "../components/Timeline";
 
@@ -36,6 +37,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
     // industry shows, and an edit starts from the version with it.
     refetchInterval: (q) => (q.state.data?.industryPending ? 3000 : false),
   });
+  useTabName(`#/companies/${id}`, company.data?.name); // its tab, by the company's name
   const c = company.data;
   if (!c) return company.error ? <ErrorMessage error={company.error} /> : <p className="muted">Loading…</p>;
   const canEdit = permissions.includes("companies:update");
