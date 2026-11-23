@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { WhatsAppTemplates } from "../pages/WhatsAppTemplates";
 import { ok, renderWithClient, sentBody } from "../test-utils";
-import { chatLink, WhatsAppDialog } from "./WhatsApp";
+import { chatLink, WhatsAppButton, WhatsAppDialog } from "./WhatsApp";
 
 beforeAll(() => {
   if (typeof HTMLDialogElement.prototype.showModal !== "function") {
@@ -60,6 +60,14 @@ describe("WhatsApp", () => {
     expect(opened).toHaveBeenCalledWith("https://wa.me/60123456789?text=Hi%20Siti%2C%20call%20at%203%3F", "_blank", "noopener,noreferrer");
     await waitFor(() => { expect(onClose).toHaveBeenCalled(); });
     expect(sentBody(post, post.mock.calls.length - 1)).toEqual({ subjectType: "candidate", subjectId: "cand_1", kind: "whatsapp", body: "WhatsApp to +60123456789:\nHi Siti, call at 3?" });
+  });
+
+  it("is on every candidate's page: with no number saved it says what it needs", async () => {
+    mockGets();
+    renderWithClient(<WhatsAppButton subject={{ kind: "candidate", id: "cand_1", name: "Siti Aisyah" }} hasNumber={false} />);
+    const button = await screen.findByRole<HTMLButtonElement>("button", { name: "WhatsApp" });
+    expect(button.disabled).toBe(true);
+    expect(button.title).toContain("Add their phone number");
   });
 
   it("cannot send without a valid number", async () => {

@@ -33,10 +33,12 @@ export function WhatsAppButton({ subject, hasNumber }: { subject: Subject; hasNu
   const canSend = useCan("emails:send");
   const canNote = useCan("notes:create");
   const [open, setOpen] = useState(false);
-  if (!canSend || !canNote || !hasNumber) return null;
+  if (!canSend || !canNote) return null;
+  // Always there, so it can be found: with no number it says what it needs.
   return (
     <>
-      <IconButton label="WhatsApp" tip={`WhatsApp ${subject.name}`} icon={<WhatsAppIcon />} className="whatsapp-button" onClick={() => { setOpen(true); }} />
+      <IconButton label="WhatsApp" tip={hasNumber ? `WhatsApp ${subject.name}` : "Add their phone number, with the country code (+60...), to WhatsApp them"}
+        icon={<WhatsAppIcon />} className="whatsapp-button" disabled={!hasNumber} onClick={() => { setOpen(true); }} />
       {open && <WhatsAppDialog subject={subject} onClose={() => { setOpen(false); }} />}
     </>
   );
