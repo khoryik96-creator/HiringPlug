@@ -58,9 +58,9 @@ type LogFilter struct {
 }
 
 func (s *Service) auditFilter(f LogFilter) audit.Filter {
-	action, kind := SplitAction(f.Action)
+	actions, kinds := SplitActions(f.Action)
 	from, to := DayRange(f.From, f.To, s.loc)
-	return audit.Filter{Actor: f.Actor, Action: action, ActionKind: kind, EntityType: f.EntityType, EntityID: f.EntityID, From: from, To: to}
+	return audit.Filter{Actor: f.Actor, Actions: actions, ActionKinds: kinds, EntityType: f.EntityType, EntityID: f.EntityID, From: from, To: to}
 }
 
 // Entry is an audit log entry with who did it and what it is about, named.

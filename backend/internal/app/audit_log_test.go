@@ -126,6 +126,31 @@ func TestTheAuditLogNamesWhoDidWhatToWhich(t *testing.T) {
 	assert.Len(t, seen, len(page.Items))
 }
 
+// "What" can name several actions or kinds at once: a kind of change is
+// written under more than one ("Settings": each settings page's own;
+// "Documents and CVs": formatted CVs too).
+func TestTheAuditLogFindsSeveralActionsAtOnce(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner]
+	at := time.Now().Add(-time.Hour)
+	for _, action := range []string{"settings.policies_changed", "invoice_settings.saved", "tenant.renamed", "tenant.created", "cv.formatted", "document.uploaded", "candidate.created"} {
+		auditLogged(t, tenant.ID, owner.ID, action, "tenant", tenant.ID, at)
+	}
+	settings := auditActions(a.auditLog(owner.Token, "?action=settings,invoice_settings,tenant.renamed"))
+	assert.ElementsMatch(t, []string{"settings.policies_changed", "invoice_settings.saved", "tenant.renamed"}, settings)
+	docs := auditActions(a.auditLog(owner.Token, "?action=document,cv"))
+	assert.ElementsMatch(t, []string{"cv.formatted", "document.uploaded"}, docs)
+	res := a.request(http.MethodPost, "/v1/audit-log/export", owner.Token, map[string]any{"format": "csv", "action": "document,cv"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Contains(t, string(res.Body), "cv.formatted")
+	assert.NotContains(t, string(res.Body), "tenant.renamed")
+	for _, bad := range []string{"?action=settings,", "?action=,cv", "?action=cv,,document"} {
+		assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/audit-log"+bad, owner.Token, nil).Status, bad)
+	}
+}
+
 // A candidate on a job (an application) is named "Candidate · Job" and
 // opens the candidate; a job lead is named by its title and company.
 func TestTheAuditLogNamesCandidatesOnJobsAndJobLeads(t *testing.T) {

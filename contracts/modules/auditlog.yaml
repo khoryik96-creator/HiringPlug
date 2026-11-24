@@ -173,7 +173,9 @@ components:
       description: >
         Only this action ("candidate.updated"), or with no dot every action
         of that kind ("candidate" finds candidate.created, candidate.updated...).
-      schema: { type: string, pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$', maxLength: 80 }
+        Several, separated by commas, find any of them
+        ("settings,invoice_settings,tenant.renamed").
+      schema: { $ref: '#/components/schemas/AuditActionFilter' }
     AuditEntityType:
       name: entityType
       in: query
@@ -195,6 +197,11 @@ components:
       description: Up to and including this day (in the agency's time zone).
       schema: { type: string, format: date }
   schemas:
+    AuditActionFilter:
+      type: string
+      description: One action or kind of action, or several separated by commas (at most 20).
+      pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?(,[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?){0,19}$'
+      maxLength: 400
     AuditCursor:
       type: string
       description: Where a page ended (read it as an opaque value).
@@ -257,7 +264,7 @@ components:
       properties:
         format: { $ref: '#/components/schemas/ExportFormat' }
         actor: { type: string, minLength: 1, maxLength: 40 }
-        action: { type: string, pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$', maxLength: 80 }
+        action: { $ref: '#/components/schemas/AuditActionFilter' }
         entityType: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40 }
         entityId: { type: string, minLength: 1, maxLength: 60 }
         from: { type: string, format: date }

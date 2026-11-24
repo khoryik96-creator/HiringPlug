@@ -77,6 +77,10 @@ describe("audit log filters", () => {
     const f = { who: "system", what: "sign-ins", from: "2026-11-01", to: "2026-11-24" };
     expect(changesQuery(f, later)).toEqual({ actor: "system", action: "user.signed_in", from: "2026-11-01", to: "2026-11-24" });
     expect(changesQuery({ ...f, who: "", what: "pipeline", from: "" }, later)).toEqual({ action: "application", to: "2026-11-24" });
+    // Some kinds are written under several actions: formatted CVs, and each settings page's own.
+    expect(changesQuery({ ...f, who: "", what: "documents" }, later).action?.split(",")).toEqual(expect.arrayContaining(["document", "cv"]));
+    expect(changesQuery({ ...f, who: "", what: "settings" }, later).action?.split(",")).toEqual(
+      expect.arrayContaining(["settings", "invoice_settings", "tenant.renamed"]));
     expect(salaryQuery({ ...f, who: "usr_1", what: "candidate_list" }, later)).toEqual({ user: "usr_1", kind: "candidate_list", from: "2026-11-01", to: "2026-11-24" });
   });
 

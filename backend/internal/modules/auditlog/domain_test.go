@@ -27,16 +27,19 @@ func TestActorsAreNamedByKind(t *testing.T) {
 	assert.Equal(t, "API key", ActorName("akey_gone", users, keys))
 }
 
-func TestTheActionFilterIsOneActionOrAKind(t *testing.T) {
-	one, kind := SplitAction(new("candidate.updated"))
-	assert.Equal(t, "candidate.updated", *one)
-	assert.Nil(t, kind)
-	one, kind = SplitAction(new("candidate"))
-	assert.Nil(t, one)
-	assert.Equal(t, "candidate", *kind)
-	one, kind = SplitAction(nil)
-	assert.Nil(t, one)
-	assert.Nil(t, kind)
+func TestTheActionFilterIsActionsOrKinds(t *testing.T) {
+	actions, kinds := SplitActions(new("candidate.updated"))
+	assert.Equal(t, []string{"candidate.updated"}, actions)
+	assert.Empty(t, kinds)
+	actions, kinds = SplitActions(new("candidate"))
+	assert.Empty(t, actions)
+	assert.Equal(t, []string{"candidate"}, kinds)
+	actions, kinds = SplitActions(new("settings,invoice_settings,tenant.renamed,settings"))
+	assert.Equal(t, []string{"tenant.renamed"}, actions)
+	assert.Equal(t, []string{"settings", "invoice_settings"}, kinds)
+	actions, kinds = SplitActions(nil)
+	assert.Empty(t, actions)
+	assert.Empty(t, kinds)
 }
 
 func TestDaysAreTheAgencys(t *testing.T) {

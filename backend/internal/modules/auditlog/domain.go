@@ -58,16 +58,24 @@ func ActorName(id string, users, keys map[string]string) string {
 	}
 }
 
-// SplitAction reads the action filter: with a dot it is one action
-// ("candidate.updated"); without, every action of that kind ("candidate").
-func SplitAction(filter *string) (action, kind *string) {
-	if filter == nil || *filter == "" {
+// SplitActions reads the action filter: comma-separated, each with a dot
+// one action ("candidate.updated"), without every action of that kind
+// ("candidate"). Blanks and repeats are left out.
+func SplitActions(filter *string) (actions, kinds []string) {
+	if filter == nil {
 		return nil, nil
 	}
-	if strings.Contains(*filter, ".") {
-		return filter, nil
+	for _, a := range Distinct(strings.Split(*filter, ",")) {
+		if a = strings.TrimSpace(a); a == "" {
+			continue
+		}
+		if strings.Contains(a, ".") {
+			actions = append(actions, a)
+		} else {
+			kinds = append(kinds, a)
+		}
 	}
-	return nil, filter
+	return actions, kinds
 }
 
 // Day is the day a moment falls on in loc, as midnight UTC of that date

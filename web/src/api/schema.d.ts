@@ -6304,6 +6304,8 @@ export interface components {
             inputTokens: number;
             outputTokens: number;
         };
+        /** @description One action or kind of action, or several separated by commas (at most 20). */
+        AuditActionFilter: string;
         /** @description Where a page ended (read it as an opaque value). */
         AuditCursor: string;
         /** @example aud_01jbz6w0m0k8q9x2r3s4t5v6w7 */
@@ -6345,7 +6347,7 @@ export interface components {
         AuditLogExport: {
             format: components["schemas"]["ExportFormat"];
             actor?: string;
-            action?: string;
+            action?: components["schemas"]["AuditActionFilter"];
             entityType?: string;
             entityId?: string;
             /** Format: date */
@@ -12698,8 +12700,8 @@ export interface components {
         AuditCursor: components["schemas"]["AuditCursor"];
         /** @description Only what this actor did - a user id, an API key id, or "system" (what happened automatically). */
         AuditActor: string;
-        /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). */
-        AuditAction: string;
+        /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). Several, separated by commas, find any of them ("settings,invoice_settings,tenant.renamed"). */
+        AuditAction: components["schemas"]["AuditActionFilter"];
         /** @description Only entries about this kind of record (candidate, job, company, contact, email...). */
         AuditEntityType: string;
         /** @description Only entries about this record. */
@@ -13136,7 +13138,7 @@ export interface operations {
             query?: {
                 /** @description Only what this actor did - a user id, an API key id, or "system" (what happened automatically). */
                 actor?: components["parameters"]["AuditActor"];
-                /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). */
+                /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). Several, separated by commas, find any of them ("settings,invoice_settings,tenant.renamed"). */
                 action?: components["parameters"]["AuditAction"];
                 /** @description Only entries about this kind of record (candidate, job, company, contact, email...). */
                 entityType?: components["parameters"]["AuditEntityType"];

@@ -14,7 +14,10 @@ export const PAGE_SIZE = 50;
 export const auditLogKey = ["audit-log"] as const;
 export const salaryViewsKey = ["salary-views"] as const;
 
-/** The kinds of change in "What", each the action (or kind of action) the API finds. */
+/**
+ * The kinds of change in "What", each the actions (or kinds of action) the API finds: one, or several
+ * separated by commas.
+ */
 export const CHANGE_KINDS: { key: string; label: string; action: string }[] = [
   { key: "candidates", label: "Candidates", action: "candidate" },
   { key: "jobs", label: "Jobs", action: "job" },
@@ -25,10 +28,10 @@ export const CHANGE_KINDS: { key: string; label: string; action: string }[] = [
   { key: "offers", label: "Offers", action: "offer" },
   { key: "placements", label: "Placements", action: "placement" },
   { key: "emails", label: "Emails", action: "email" },
-  { key: "documents", label: "Documents and CVs", action: "document" },
+  { key: "documents", label: "Documents and CVs", action: "document,cv,cv_template,cv_import" },
   { key: "notes", label: "Notes", action: "note" },
   { key: "sign-ins", label: "Sign-ins", action: "user.signed_in" },
-  { key: "settings", label: "Settings", action: "settings" },
+  { key: "settings", label: "Settings", action: "settings,invoice_settings,tenant.renamed,ai_usage.settings_saved,aiprovider" },
   { key: "roles", label: "Roles and access", action: "role" },
 ];
 

@@ -854,6 +854,17 @@ class AssistantAnsweredJob(BaseModel):
     outputTokens: Annotated[int, Field(ge=0)]
 
 
+class AuditActionFilter(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="One action or kind of action, or several separated by commas (at most 20).",
+            max_length=400,
+            pattern="^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?(,[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?){0,19}$",
+        ),
+    ]
+
+
 class AuditCursor(RootModel[str]):
     root: Annotated[
         str,
@@ -885,9 +896,7 @@ class AuditLogExport(BaseModel):
     )
     format: ExportFormat
     actor: Annotated[str | None, Field(max_length=40, min_length=1)] = None
-    action: Annotated[str | None, Field(max_length=80, pattern="^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$")] = (
-        None
-    )
+    action: AuditActionFilter | None = None
     entityType: Annotated[str | None, Field(max_length=40, pattern="^[a-z][a-z0-9_]*$")] = None
     entityId: Annotated[str | None, Field(max_length=60, min_length=1)] = None
     from_: Annotated[date | None, Field(alias="from")] = None
