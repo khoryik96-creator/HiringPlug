@@ -37,9 +37,10 @@ const exportPage = 1000
 // Export returns everyone the search finds as a file.
 func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter, format string) (sheet.File, error) {
 	f.NoSnippets, f.IncludeSalary = true, true
-	var found []Summary
-	var labels map[string]map[string]string
+	var file sheet.File
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var found []Summary
+		var labels map[string]map[string]string
 		var err error
 		if s.labels != nil {
 			if labels, err = s.labels.Labels(ctx, tx); err != nil {
@@ -73,6 +74,10 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter,
 				f.Order.Offset = *page.NextOffset
 			}
 		}
+		// The file first: the salaries are counted as shown only once it is made.
+		if file, err = sheet.Write(format, sheet.Dated("Candidates", time.Now(), s.zone), CandidateTable(found, canSeeSalary(p), labels["candidate_source"], s.zone)); err != nil {
+			return err
+		}
 		if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.Export, salariesShown(found)...); err != nil {
 			return err
 		}
@@ -84,7 +89,7 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter,
 	if err != nil {
 		return sheet.File{}, err
 	}
-	return sheet.Write(format, sheet.Dated("Candidates", time.Now(), s.zone), CandidateTable(found, canSeeSalary(p), labels["candidate_source"], s.zone))
+	return file, nil
 }
 
 // CandidateTable is the export's sheet: the salary columns only when shown,

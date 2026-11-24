@@ -314,3 +314,25 @@ func TestAMergeMovesWhoWasShownTheDuplicatesSalary(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []api.SalaryViewKind{api.SalaryViewKindCandidate, api.SalaryViewKindCandidateList}, kinds, "the search that showed the duplicate")
 }
+
+// A formatted CV with the salary whose file (or PDF) cannot be opened shows
+// nothing, so it is not counted.
+func TestASalaryCVThatCannotBeOpenedIsNotCounted(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti"})
+	var cv api.FormattedCv
+	res := a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/formatted-cvs", recruiter.Token, map[string]any{"includeSalary": true})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	res.JSON(&cv)
+	require.Equal(t, 1, a.seen(owner, recruiter.ID)["cv:"+c.Id].Count, "made")
+	_, err := testutil.Current.Admin.Exec(t.Context(),
+		`UPDATE document SET storage_key = left(storage_key, -4) || '0000', pdf_key = left(storage_key, -4) || '0001', pdf_status = 'ready' WHERE id = $1`, cv.DocumentId)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+cv.DocumentId+"/file", recruiter.Token, nil).Status)
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+cv.DocumentId+"/pdf", recruiter.Token, nil).Status)
+	assert.Equal(t, 1, a.seen(owner, recruiter.ID)["cv:"+c.Id].Count, "nothing was shown")
+}
