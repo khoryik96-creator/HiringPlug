@@ -143,7 +143,9 @@ func (s *Service) written(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if err := job.Decode(&in); err != nil {
 		return err
 	}
-	params := store.FinishInterviewPrepParams{ID: in.PrepId, Status: "failed", Tokens: int32(in.InputTokens + in.OutputTokens)} //nolint:gosec // token counts are small
+	// Each count kept within 0..1<<30: a bad result can never lower the month's use.
+	input, output := min(max(in.InputTokens, 0), 1<<30), min(max(in.OutputTokens, 0), 1<<30)
+	params := store.FinishInterviewPrepParams{ID: in.PrepId, Status: "failed", Tokens: int32(min(input+output, 1<<30))} //nolint:gosec // within 0..1<<30
 	if m, err := in.Model.Get(); err == nil {
 		params.Model = &m
 	}
@@ -163,15 +165,19 @@ func (s *Service) written(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		}
 		params.Error = &reason
 	}
-	n, err := store.New(tx).FinishInterviewPrep(ctx, params)
-	if err == nil && n == 0 {
+	asker, err := store.New(tx).FinishInterviewPrep(ctx, params)
+	var who *string
+	switch {
+	case database.IsNoRows(err):
+		// Already finished (counted then: this adds nothing) or gone (still counted).
 		logx.From(ctx).Info("interview prep already finished or gone", "prep_id", in.PrepId)
+	case err != nil:
+		return err
+	default:
+		who = &asker
 	}
-	return err
-}
-
-func (s *Service) tokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).InterviewPrepTokensSince(ctx, since)
+	// Each prep is one AI run: counted once, and kept when the job is deleted.
+	return s.deps.AI.RecordAI(ctx, tx, job.TenantID, "interview_prep", in.PrepId, "", who, int64(input), int64(output))
 }
 
 func prepFrom(r store.InterviewPrep) Prep {

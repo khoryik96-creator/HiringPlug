@@ -55,7 +55,7 @@ export function Assistant({ subjectType, subjectId, permissions }: { subjectType
           )}
           <Conversation key={subject.id} subject={subject} />
           <p className="muted small assistant-usage">
-            {s.usedTokens.toLocaleString("en")} of {s.monthlyTokens.toLocaleString("en")} tokens this month
+            {s.usedPercent.toLocaleString("en")}% of this month's AI allowance used
           </p>
         </>
       )}

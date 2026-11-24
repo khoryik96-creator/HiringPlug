@@ -19,6 +19,8 @@ class Role(StrEnum):
 
 class Permission(StrEnum):
     aiproviders_manage = "aiproviders:manage"
+    aiusage_manage = "aiusage:manage"
+    aiusage_read = "aiusage:read"
     assistant_use = "assistant:use"
     automations_tasks_read = "automations.tasks:read"
     automations_tasks_update = "automations.tasks:update"
@@ -406,6 +408,17 @@ class AiProviderCheckJob(BaseModel):
     )
     provider: AiProviderName
     access: AiAccess
+    checkId: Annotated[
+        str | None,
+        Field(
+            description="Which check this is, sent back unchanged: its AI use is counted once.",
+            max_length=200,
+        ),
+    ] = None
+    askedBy: Annotated[
+        str | None,
+        Field(description="Who asked for the check (a user ID), sent back unchanged.", max_length=200),
+    ] = None
 
 
 class AiStatus(BaseModel):
@@ -448,6 +461,174 @@ class AiProviderCheckedJob(BaseModel):
     ]
     ok: bool
     message: Annotated[str | None, Field(...)]
+    checkId: Annotated[
+        str | None, Field(description="The check job's checkId, unchanged.", max_length=200)
+    ] = None
+    askedBy: Annotated[
+        str | None, Field(description="The check job's askedBy, unchanged.", max_length=200)
+    ] = None
+    inputTokens: Annotated[
+        int | None,
+        Field(description="Tokens the check's request took (counted in the monthly AI use).", ge=0),
+    ] = None
+    outputTokens: Annotated[int | None, Field(description="Tokens of the provider's answer.", ge=0)] = None
+
+
+class AiFeature(StrEnum):
+    assistant = "assistant"
+    assistant_email = "assistant_email"
+    fit_score = "fit_score"
+    talent_search = "talent_search"
+    cv_reading = "cv_reading"
+    cv_studio = "cv_studio"
+    jd_blind = "jd_blind"
+    jd_reading = "jd_reading"
+    industry_pick = "industry_pick"
+    interview_prep = "interview_prep"
+    provider_check = "provider_check"
+
+
+class AiUsageLimitKind(StrEnum):
+    tokens = "tokens"
+    money = "money"
+
+
+class AiPrice(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A price per million tokens, with up to 4 decimal places, as a string so no precision is lost.",
+            examples=["0.2700"],
+            pattern="^(0|[1-9][0-9]{0,9})(\\.[0-9]{1,4})?$",
+        ),
+    ]
+
+
+class AiCost(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="An estimated cost at the company's current prices, with 4 decimal places (rounded half up), as a string so no precision is lost.\n",
+            examples=["1.2345"],
+            pattern="^(0|[1-9][0-9]*)\\.[0-9]{4}$",
+        ),
+    ]
+
+
+class AiUsageSettings(BaseModel):
+    limitKind: AiUsageLimitKind
+    limitTokens: Annotated[
+        int | None, Field(description="Tokens a month (null: the server's default, serverDefaultTokens).")
+    ]
+    serverDefaultTokens: Annotated[
+        int, Field(description="The server's default monthly limit (HP_AI_MONTHLY_TOKENS).")
+    ]
+    limitMoney: Annotated[
+        DecimalAmount | None, Field(description="The most to spend a month, in currency (money limit).")
+    ]
+    currency: CurrencyCode
+    priceInputPerMillion: Annotated[
+        AiPrice | None,
+        Field(
+            description="What a million input tokens (what is sent to the AI) cost, in currency; null when not set."
+        ),
+    ]
+    priceOutputPerMillion: Annotated[
+        AiPrice | None,
+        Field(
+            description="What a million output tokens (what the AI writes) cost, in currency; null when not set."
+        ),
+    ]
+    warnPercent: Annotated[
+        int, Field(description="Warn when this share of the month's limit is used.", ge=1, le=99)
+    ]
+    version: Annotated[int, Field(description="0 until first saved.")]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class AiUsageSettingsUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    limitKind: AiUsageLimitKind
+    limitTokens: Annotated[
+        int | None, Field(description="null: the server's default.", ge=0, le=1000000000000)
+    ]
+    limitMoney: Annotated[DecimalAmount | None, Field(description="Needed for a money limit.")]
+    currency: CurrencyCode
+    priceInputPerMillion: Annotated[
+        AiPrice | None, Field(description="Both prices are needed for a money limit.")
+    ]
+    priceOutputPerMillion: Annotated[AiPrice | None, Field(...)]
+    warnPercent: Annotated[int, Field(ge=1, le=99)]
+    version: Annotated[
+        int, Field(description="The version you loaded (0 before the settings were first saved).", ge=0)
+    ]
+
+
+class AiUsageFeature(BaseModel):
+    feature: AiFeature
+    uses: int
+    inputTokens: int
+    outputTokens: int
+    cost: Annotated[AiCost | None, Field(description="null when the prices are not set.")]
+
+
+class AiUsagePerson(BaseModel):
+    userId: Annotated[
+        UserId | None, Field(description="null for what the system did on its own (named Automatic).")
+    ]
+    name: str
+    uses: int
+    tokens: Annotated[int, Field(description="Input and output together.")]
+    cost: Annotated[AiCost | None, Field(...)]
+
+
+class AiUsageMonth(BaseModel):
+    month: Annotated[str, Field(examples=["2026-11"], pattern="^[0-9]{4}-[0-9]{2}$")]
+    uses: int
+    inputTokens: int
+    outputTokens: int
+    cost: Annotated[AiCost | None, Field(...)]
+    byFeature: Annotated[
+        list[AiUsageFeature], Field(description="Features used in the month, most tokens first.")
+    ]
+
+
+class AiUsageLimit(BaseModel):
+    kind: AiUsageLimitKind
+    tokens: Annotated[int | None, Field(description="The month's limit in tokens (null for a money limit).")]
+    money: Annotated[
+        DecimalAmount | None, Field(description="The month's limit in money (null for a token limit).")
+    ]
+    currency: CurrencyCode
+    warnPercent: int
+    usedPercent: Annotated[int, Field(description="The share of the limit used this month (can pass 100).")]
+    reached: Annotated[bool, Field(description="The whole limit is used: AI features wait for next month.")]
+    resetsAt: Annotated[AwareDatetime, Field(description="The start of next month.")]
+
+
+class AiUsage(BaseModel):
+    month: Annotated[str, Field(description="This month.", pattern="^[0-9]{4}-[0-9]{2}$")]
+    uses: int
+    inputTokens: int
+    outputTokens: int
+    cost: Annotated[AiCost | None, Field(...)]
+    byFeature: Annotated[list[AiUsageFeature], Field(description="This month, most tokens first.")]
+    byPerson: Annotated[list[AiUsagePerson], Field(description="This month, most tokens first.")]
+    months: Annotated[
+        list[AiUsageMonth],
+        Field(description="This month and those before it, newest first, months without use included."),
+    ]
+    limit: AiUsageLimit
+    pricesSet: Annotated[bool, Field(description="Both prices are set (costs are null otherwise).")]
+
+
+class AiUsageStatus(BaseModel):
+    usedPercent: Annotated[int, Field(description="The share of this month's AI limit used (can pass 100).")]
+    warn: Annotated[bool, Field(description="The warning level is reached, but not the whole limit.")]
+    reached: Annotated[bool, Field(description="The whole limit is used: AI features wait until resetsAt.")]
+    resetsAt: Annotated[AwareDatetime, Field(description="The start of next month.")]
 
 
 class AssistantAnswerId(RootModel[str]):
@@ -478,8 +659,21 @@ class AssistantAnswerStatus(StrEnum):
 
 class AssistantStatus(BaseModel):
     enabled: Annotated[bool, Field(description="Whether an AI provider is set up.")]
-    usedTokens: Annotated[int, Field(description="Tokens the company used this calendar month.")]
-    monthlyTokens: Annotated[int, Field(description="The company's monthly allowance.")]
+    usedTokens: Annotated[
+        int,
+        Field(
+            description="Tokens the company used this calendar month, by every AI feature (the AI use ledger)."
+        ),
+    ]
+    monthlyTokens: Annotated[
+        int,
+        Field(
+            description="The company's monthly limit in tokens (its own, or the server's default); 0 when its limit is an amount of money."
+        ),
+    ]
+    usedPercent: Annotated[
+        int, Field(description="How much of this month's AI limit is used, in percent (can pass 100).", ge=0)
+    ]
 
 
 class AssistantQuestion(BaseModel):
@@ -2859,6 +3053,13 @@ class DocumentParseCvJob(BaseModel):
         AiAccess | None,
         Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
     ] = None
+    runKey: Annotated[
+        str | None,
+        Field(
+            description="Which reading of the document this is, sent back unchanged in the result: the AI use it took is counted once per reading, however often the result is delivered.\n",
+            max_length=200,
+        ),
+    ] = None
 
 
 class DocumentCvParsedJob(BaseModel):
@@ -2871,6 +3072,9 @@ class DocumentCvParsedJob(BaseModel):
     aiTokens: Annotated[
         int | None, Field(description="Tokens the AI used (counted in the monthly allowance).", ge=0)
     ] = None
+    runKey: Annotated[str | None, Field(description="The parse job's runKey, unchanged.", max_length=200)] = (
+        None
+    )
 
 
 class ToItem(RootModel[EmailStr]):
@@ -5641,6 +5845,7 @@ class NotificationKind(StrEnum):
     offer_approval = "offer_approval"
     interview = "interview"
     cv_formatted = "cv_formatted"
+    ai_limit = "ai_limit"
 
 
 class Notification(BaseModel):
@@ -5689,7 +5894,7 @@ class NotificationSettings(BaseModel):
         list[NotificationKind],
         Field(
             description="The kinds you turned off. They show neither in the bell nor in the morning email.",
-            max_length=4,
+            max_length=6,
         ),
     ]
 

@@ -10,7 +10,6 @@ import (
 	"encoding/base64"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/oapi-codegen/nullable"
@@ -178,17 +177,28 @@ func (s *Service) saveStudio(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		return err
 	}
 	q := store.New(tx)
-	if tokens := r.InputTokens + r.OutputTokens; tokens > 0 { // counted even when it failed
+	run, err := q.GetStudioCv(ctx, r.StudioCvId)
+	gone := database.IsNoRows(err)
+	if err != nil && !gone {
+		return err
+	}
+	// Counted even when it failed or the run is gone; once per run (a studio
+	// CV is one run of the AI), so a repeated result adds nothing.
+	var asker *string
+	if !gone {
+		asker = &run.CreatedBy
+	}
+	if err := s.deps.AI.RecordAI(ctx, tx, job.TenantID, "cv_studio", r.StudioCvId, "", asker,
+		int64(r.InputTokens), int64(r.OutputTokens)); err != nil {
+		return err
+	}
+	if gone || run.Status != "queued" {
+		return nil // a repeated result
+	}
+	if tokens := max(r.InputTokens, 0) + max(r.OutputTokens, 0); tokens > 0 {
 		if err := q.RecordStudioCvAIUse(ctx, store.RecordStudioCvAIUseParams{StudioCvID: r.StudioCvId, Tokens: int32(min(tokens, 1<<30))}); err != nil { //nolint:gosec // bounded above
 			return err
 		}
-	}
-	run, err := q.GetStudioCv(ctx, r.StudioCvId)
-	if database.IsNoRows(err) || (err == nil && run.Status != "queued") {
-		return nil // a repeated result
-	}
-	if err != nil {
-		return err
 	}
 	fail := func(msg string) error {
 		_, err := q.FinishStudioCv(ctx, store.FinishStudioCvParams{ID: run.ID, Status: "failed", Error: &msg, PayRemoved: int32(r.PayStatementsRemoved)}) //nolint:gosec // a small count
@@ -256,12 +266,6 @@ func (s *Service) saveStudio(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	return audit.Record(ctx, tx, audit.Entry{Action: "cv.formatted", EntityType: "candidate", EntityID: run.CandidateID, Changes: map[string]any{
 		"documentId": docID, "studioCvId": run.ID, "blind": run.Blind,
 	}})
-}
-
-// TokensSince is the AI tokens studio CVs used since a time (the company's
-// monthly allowance), in the caller's transaction.
-func (s *Service) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).StudioCvTokensSince(ctx, since)
 }
 
 func clip(s string, n int) string {

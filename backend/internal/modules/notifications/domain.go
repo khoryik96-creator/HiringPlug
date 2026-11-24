@@ -17,10 +17,11 @@ const (
 	KindOfferApproval = "offer_approval"
 	KindInterview     = "interview"
 	KindCVFormatted   = "cv_formatted"
+	KindAILimit       = "ai_limit"
 )
 
 // Kinds is every kind, in the order Settings lists them.
-var Kinds = []string{KindApplicant, KindTask, KindOfferApproval, KindInterview, KindCVFormatted}
+var Kinds = []string{KindApplicant, KindTask, KindOfferApproval, KindInterview, KindCVFormatted, KindAILimit}
 
 // NormalizeMuted checks the kinds a user turned off and puts them in order,
 // once each.
@@ -90,12 +91,25 @@ type FormattedCV struct {
 	At                             time.Time // when it finished
 }
 
+// AILimitLevel is the level of the whole AI limit (an AILimit's Level
+// otherwise is the company's warning percent).
+const AILimitLevel = 100
+
+// AILimit is a level the company's AI use reached in a month.
+type AILimit struct {
+	Level int       // the warning percent, or AILimitLevel
+	At    time.Time // when the use reached it
+	Month time.Time // when the month began
+	Until time.Time // when the next month begins (the limit starts again)
+}
+
 // Inputs are the records a user's notifications are made from.
 type Inputs struct {
 	Applicants, Offers []Record
 	Tasks              []Task
 	Interviews         []Interview
 	FormattedCVs       []FormattedCV
+	AILimits           []AILimit
 	Apps               map[string]Application
 }
 
@@ -197,6 +211,7 @@ func Build(in Inputs, seen *time.Time, w Window) []Item {
 		}
 		out = append(out, it)
 	}
+	out = append(out, aiLimitItems(in.AILimits, loc)...)
 	slices.SortStableFunc(out, func(a, b Item) int { return cmp.Or(b.At.Compare(a.At), strings.Compare(a.ID, b.ID)) })
 	for i := range out {
 		out[i].New = seen == nil || out[i].At.After(*seen)
@@ -217,6 +232,38 @@ func Shown(items []Item) ([]Item, int) {
 		}
 	}
 	return items, unseen
+}
+
+// aiLimitItems is one item per month: the whole limit once it is reached,
+// the warning before that.
+func aiLimitItems(levels []AILimit, loc *time.Location) []Item {
+	top := map[string]AILimit{}
+	var months []string
+	for _, l := range levels {
+		month := l.Month.In(loc).Format("2006-01")
+		have, ok := top[month]
+		if !ok {
+			months = append(months, month)
+		}
+		if !ok || l.Level > have.Level {
+			top[month] = l
+		}
+	}
+	out := make([]Item, 0, len(months))
+	for _, month := range months {
+		l := top[month]
+		until := l.Until.In(loc).Format("2 Jan")
+		it := Item{ID: fmt.Sprintf("%s:%s:%d", KindAILimit, month, l.Level), Kind: KindAILimit, At: l.At, Href: "#/settings/ai-usage"}
+		if l.Level >= AILimitLevel {
+			it.Title = "AI limit reached: AI features are paused until " + until
+			it.Detail = "See what used it in Settings › AI usage"
+		} else {
+			it.Title = fmt.Sprintf("AI use reached %d%% of this month's limit", l.Level)
+			it.Detail = "AI features pause at 100%, until " + until
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 func jobText(a Application) string {
@@ -265,15 +312,15 @@ func NextMorning(now time.Time, loc *time.Location) time.Time {
 }
 
 // DigestFor picks what the morning email lists: everything, except
-// applicants from before since (the last email's morning: that email had
-// them).
+// applicants and AI limit notices from before since (the last email's
+// morning: that email had them).
 func DigestFor(items []Item, since time.Time) []Item {
 	var out []Item
 	for _, it := range items {
 		if it.Kind == KindCVFormatted { // for the moment it is ready, in the bell; not the morning email
 			continue
 		}
-		if it.Kind == KindApplicant && it.At.Before(since) {
+		if (it.Kind == KindApplicant || it.Kind == KindAILimit) && it.At.Before(since) {
 			continue
 		}
 		out = append(out, it)
@@ -305,6 +352,7 @@ var digestSections = []struct{ kind, heading string }{
 	{KindTask, "Tasks due"},
 	{KindOfferApproval, "Offers waiting for your approval"},
 	{KindApplicant, "New applicants on your jobs"},
+	{KindAILimit, "The company's AI use this month"},
 }
 
 // DigestText writes the morning email; false when there is nothing to say.
@@ -342,6 +390,7 @@ func countText(kind string, n int) string {
 		KindTask:          {"task due", "tasks due"},
 		KindOfferApproval: {"offer to approve", "offers to approve"},
 		KindApplicant:     {"new applicant", "new applicants"},
+		KindAILimit:       {"AI limit notice", "AI limit notices"},
 	}[kind]
 	if n == 1 {
 		return "1 " + unit[0]

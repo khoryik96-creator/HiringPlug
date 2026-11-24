@@ -25,7 +25,7 @@ const map = (over: Partial<Schemas["MarketPool"]> = {}, insights: Schemas["Marke
 
 function reads(m: Schemas["MarketMap"], aiOn = true) {
   return vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
-    path === "/v1/assistant" ? ok({ enabled: aiOn, usedTokens: 0, monthlyTokens: 1000 }) : ok(m),
+    path === "/v1/assistant" ? ok({ enabled: aiOn, usedTokens: 0, monthlyTokens: 1000, usedPercent: 0 }) : ok(m),
   )) as never);
 }
 

@@ -79,6 +79,10 @@ def _result(
         queue=RESULT_QUEUE,
         kind=JobKind.document_cv_parsed,
         payload=DocumentCvParsedJob(
-            documentId=payload.documentId, profile=profile, errorMessage=error, aiTokens=tokens
+            documentId=payload.documentId,
+            profile=profile,
+            errorMessage=error,
+            aiTokens=tokens,
+            runKey=payload.runKey,  # unchanged: the reading's AI use counts once
         ),
     )

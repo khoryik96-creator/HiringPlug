@@ -1,6 +1,8 @@
 // Package notifications is the bell in the top bar and the morning email:
 // new applicants on your jobs, your tasks due, offers waiting for your
-// approval, and your interviews today and tomorrow. Nothing is copied: the
+// approval, your interviews today and tomorrow, the CVs you had formatted,
+// and (for who may see the company's AI use) this month's AI use reaching
+// the warning level or the limit. Nothing is copied: the
 // list is worked out from the other modules' records when asked, as the
 // user (so they see only what they may see). This module keeps only, per
 // user, when they last looked and whether they want the morning email.
@@ -44,6 +46,9 @@ type Sources interface {
 	// FormattedCVs is the CVs the user had formatted CV Studio's way that
 	// finished since then, with the candidate's name.
 	FormattedCVs(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]FormattedCV, error)
+	// AILimits is the levels the company's AI use reached in now's month
+	// (its warning percent, AILimitLevel).
+	AILimits(ctx context.Context, tx pgx.Tx, now time.Time) ([]AILimit, error)
 	// Applications names the candidate and job of applications (missing ones are left out).
 	Applications(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
 }

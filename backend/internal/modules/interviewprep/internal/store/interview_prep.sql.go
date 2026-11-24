@@ -55,11 +55,12 @@ func (q *Queries) DeleteInterviewQuestion(ctx context.Context, id string) (int64
 	return result.RowsAffected(), nil
 }
 
-const finishInterviewPrep = `-- name: FinishInterviewPrep :execrows
+const finishInterviewPrep = `-- name: FinishInterviewPrep :one
 UPDATE interview_prep SET
   status = $1, content = $2, error = $3, model = $4,
   tokens = $5, finished_at = now()
 WHERE id = $6 AND status = 'queued'
+RETURNING created_by
 `
 
 type FinishInterviewPrepParams struct {
@@ -73,8 +74,8 @@ type FinishInterviewPrepParams struct {
 
 // The AI's material (or why there is none), once; a late answer to a run
 // already shown as failed still fills it.
-func (q *Queries) FinishInterviewPrep(ctx context.Context, arg FinishInterviewPrepParams) (int64, error) {
-	result, err := q.db.Exec(ctx, finishInterviewPrep,
+func (q *Queries) FinishInterviewPrep(ctx context.Context, arg FinishInterviewPrepParams) (string, error) {
+	row := q.db.QueryRow(ctx, finishInterviewPrep,
 		arg.Status,
 		arg.Content,
 		arg.Error,
@@ -82,10 +83,9 @@ func (q *Queries) FinishInterviewPrep(ctx context.Context, arg FinishInterviewPr
 		arg.Tokens,
 		arg.ID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var created_by string
+	err := row.Scan(&created_by)
+	return created_by, err
 }
 
 const getInterviewPrep = `-- name: GetInterviewPrep :one
@@ -220,17 +220,6 @@ func (q *Queries) InsertInterviewQuestion(ctx context.Context, arg InsertIntervi
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const interviewPrepTokensSince = `-- name: InterviewPrepTokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM interview_prep WHERE created_at >= $1
-`
-
-func (q *Queries) InterviewPrepTokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, interviewPrepTokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
 }
 
 const listInterviewPreps = `-- name: ListInterviewPreps :many

@@ -152,6 +152,15 @@ def test_parse_cv_sends_the_profile_back_to_the_go_worker() -> None:
     DocumentCvParsedJob.model_validate(result.model_dump(mode="json"))
 
 
+def test_parse_cv_sends_its_run_key_back_unchanged() -> None:
+    queue = FakeQueue()
+    payload = {"documentId": DOC_ID, "text": "Nur Aisyah\n", "runKey": "RUN-7"}
+    process(queue, job("document.parse_cv", payload), deps())  # type: ignore[arg-type]
+    [[follow_up]] = queue.completed
+    assert isinstance(follow_up.payload, DocumentCvParsedJob)
+    assert follow_up.payload.runKey == "RUN-7", "Go counts a reading's AI use once by it"
+
+
 @pytest.mark.parametrize(
     ("the_job", "the_deps", "message"),
     [

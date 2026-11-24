@@ -202,9 +202,6 @@ SET status = @status, choice_id = sqlc.narg(choice_id), error = sqlc.narg(error)
 WHERE id = @id AND status = 'queued'
 RETURNING company_id;
 
--- name: IndustryPickTokensSince :one
-SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM company_industry_pick WHERE created_at >= @since::timestamptz;
-
 -- name: SetIndustryPickSince :exec
 UPDATE company SET industry_pick_since = sqlc.narg(since) WHERE id = @id;
 

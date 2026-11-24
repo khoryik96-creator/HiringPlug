@@ -11,12 +11,12 @@ package app
 import (
 	"fmt"
 	"maps"
-	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiusage"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/automations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/bin"
@@ -82,6 +82,7 @@ type Modules struct {
 	Intake        *intake.Module
 	Market        *market.Module
 	AIProviders   *aiproviders.Module
+	AIUsage       *aiusage.Module
 	Scheduling    *scheduling.Module
 	Industries    *industries.Module
 	Automations   *automations.Module
@@ -106,6 +107,10 @@ func NewModules(d Deps) *Modules {
 	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant})
 	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
+	// The AI use ledger and each company's monthly AI limit (the server's as default).
+	m.AIUsage = aiusage.New(d.Pool, aiusage.Deps{Users: m.Identity},
+		aiusage.Config{DefaultTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	m.AIProviders.RecordUseWith(aiLedger{m.AIUsage}) // a key check uses the AI too
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
@@ -162,12 +167,7 @@ func NewModules(d Deps) *Modules {
 	m.Cvformats = cvformats.New(d.Pool, cvformats.Deps{
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
 		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents}, Files: cvFiles{m.Documents},
-		AI: cvReadingAI{
-			all: aiUse{func() []tokensSince {
-				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-			}},
-			ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
-		},
+		AI: cvReadingAI{aiLedger{m.AIUsage}, m.AIProviders},
 	}, d.Files, d.Config.MaxUploadBytes)
 	m.Assistant = assistant.New(d.Pool, assistant.Deps{
 		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
@@ -175,20 +175,16 @@ func NewModules(d Deps) *Modules {
 		Market:       assistantMarket{m},
 		AI:           m.AIProviders,
 		Agency:       m.Identity,
-		OtherAIUse: aiUse{func() []tokensSince {
-			return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-		}},
-	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+		Usage:        assistantUsage{aiLedger{m.AIUsage}},
+	})
 	// Search by meaning: candidates read by the AI worker's meaning model, ranked here.
 	m.Meaning = meaning.New(d.Pool, meaning.Deps{Candidates: meaningCandidates{m.Candidates}, CVs: meaningCVs{m.Documents}})
 	m.Candidates.SearchByMeaningWith(candidatesMeaning{m.Meaning})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders, Meaning: matchingMeaning{m.Meaning},
-		OtherAIUse: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-		}},
-	}, matching.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+		Usage: aiLedger{m.AIUsage},
+	})
 	m.Intake = intake.New(d.Pool, intake.Deps{
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
 	}, d.Config.MaxUploadBytes)
@@ -243,12 +239,7 @@ func NewModules(d Deps) *Modules {
 	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies, m.Claims}) // records holding an option keep it
 	m.InterviewPrep = interviewprep.New(d.Pool, interviewprep.Deps{
 		Jobs: interviewPrepJobs{m.Jobs}, Companies: interviewPrepCompanies{m.Companies},
-		AI: cvReadingAI{ // prep material, in the same monthly allowance
-			all: aiUse{func() []tokensSince {
-				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-			}},
-			ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
-		},
+		AI: cvReadingAI{aiLedger{m.AIUsage}, m.AIProviders}, // prep material, in the same monthly allowance
 	}, d.Config.TimeZone)
 	m.Notifications = notifications.New(d.Pool, notificationSources{m}, m.Identity, notificationMailer{m}, notifications.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	m.Shortlists = newShortlists(d, m)
@@ -263,12 +254,7 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	// CVs read, blind ad rewrites and a new company's industry: one monthly allowance.
-	reading := cvReadingAI{
-		all: aiUse{func() []tokensSince {
-			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies, m.InterviewPrep}
-		}},
-		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
-	}
+	reading := cvReadingAI{aiLedger{m.AIUsage}, m.AIProviders}
 	m.Documents.UseAI(reading)
 	m.Jobs.UseAI(reading)
 	m.Companies.UseAI(reading)
@@ -303,6 +289,7 @@ type (
 	intakeHTTP        = intake.HTTP
 	marketHTTP        = market.HTTP
 	aiprovidersHTTP   = aiproviders.HTTP
+	aiusageHTTP       = aiusage.HTTP
 	schedulingHTTP    = scheduling.HTTP
 	industriesHTTP    = industries.HTTP
 	automationsHTTP   = automations.HTTP
@@ -345,6 +332,7 @@ type Server struct {
 	*intakeHTTP
 	*marketHTTP
 	*aiprovidersHTTP
+	*aiusageHTTP
 	*schedulingHTTP
 	*industriesHTTP
 	*automationsHTTP
@@ -388,6 +376,7 @@ func (m *Modules) Server() *Server {
 		intakeHTTP:        m.Intake.HTTP,
 		marketHTTP:        m.Market.HTTP,
 		aiprovidersHTTP:   m.AIProviders.HTTP,
+		aiusageHTTP:       m.AIUsage.HTTP,
 		schedulingHTTP:    m.Scheduling.HTTP,
 		industriesHTTP:    m.Industries.HTTP,
 		automationsHTTP:   m.Automations.HTTP,

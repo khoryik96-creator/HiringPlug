@@ -27,7 +27,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
@@ -77,17 +76,17 @@ type Deps struct {
 	AI interface {
 		Access(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
 	}
-	// OtherAIUse is the company's other use of the AI (the assistant): one
-	// monthly allowance covers both. Nil: none.
-	OtherAIUse interface {
-		TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error)
+	// Usage is the company's one monthly AI limit, shared by every AI
+	// feature, and the ledger each AI run is recorded in (aiusage), in the
+	// caller's transaction.
+	Usage interface {
+		// Remaining is this month's allowance left in tokens, work in
+		// progress held (0 or less: used up).
+		Remaining(ctx context.Context, tx pgx.Tx, tenantID string) (int64, error)
+		// RecordAI records one AI run's tokens (feature, the record it was
+		// for, which run of it, who asked).
+		RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 	}
-}
-
-// Settings is how matching may be used.
-type Settings struct {
-	MonthlyTokens int64
-	TimeZone      *time.Location // months start on the 1st here
 }
 
 // Module is the matching module.
@@ -97,22 +96,12 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, deps Deps, settings Settings) *Module {
-	if settings.TimeZone == nil {
-		settings.TimeZone = time.UTC
-	}
-	svc := &Service{pool: pool, deps: deps, settings: settings, now: time.Now}
+func New(pool *pgxpool.Pool, deps Deps) *Module {
+	svc := &Service{pool: pool, deps: deps, now: time.Now}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindMatchScored: m.service.scored, api.JobKindTalentRanked: m.service.talentRanked}
-}
-
-// TokensSince returns the AI tokens the company used for matching since the
-// given time, in the caller's transaction (the assistant counts them in the
-// shared allowance).
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).TokensSince(ctx, since)
 }

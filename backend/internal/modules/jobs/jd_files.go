@@ -169,7 +169,9 @@ func (s *Service) saveJDRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		return err
 	}
 	params := store.SaveJdReadParams{ID: result.JdFileId, Status: string(api.JdFileStatusFailed)}
+	var aiTokens int64
 	if result.AiTokens != nil && *result.AiTokens > 0 {
+		aiTokens = int64(*result.AiTokens)
 		params.AiTokens = int32(min(*result.AiTokens, 1_000_000)) //nolint:gosec // capped
 	}
 	text, _ := result.Text.Get()
@@ -195,11 +197,26 @@ func (s *Service) saveJDRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		}
 		params.Error = &msg
 	}
-	n, err := store.New(tx).SaveJdRead(ctx, params)
-	if err == nil && n == 0 {
+	uploader, err := store.New(tx).SaveJdRead(ctx, params)
+	if database.IsNoRows(err) {
+		// Deleted meanwhile: what the AI read is still counted.
 		logx.From(ctx).Info("job description no longer exists; dropping its text", "jd_file_id", result.JdFileId)
+		return s.recordJDRead(ctx, tx, job.TenantID, result.JdFileId, nil, aiTokens)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return s.recordJDRead(ctx, tx, job.TenantID, result.JdFileId, &uploader, aiTokens)
+}
+
+// recordJDRead counts the AI's reading of a JD file, when it took tokens: a
+// file is read once, so a repeated result counts once. It counts when the AI
+// read it, and stays counted when the file is deleted.
+func (s *Service) recordJDRead(ctx context.Context, tx pgx.Tx, tenantID, fileID string, uploader *string, tokens int64) error {
+	if s.ai == nil || tokens <= 0 {
+		return nil
+	}
+	return s.ai.RecordAI(ctx, tx, tenantID, "jd_reading", fileID, "", uploader, tokens, 0)
 }
 
 func jdFrom(r store.GetJdFileRow) (JDFile, error) {

@@ -64,8 +64,8 @@ five are being built now; the rest are queued in this order.
 | ✅ 1.38.0 | Batch CV formatting | One CV at a time today |
 | ✅ 1.39.0 | **Open records** as named tabs (select, close, find); a CV formatted said at once (green bell and tab); **Create job** from an email's JD; Apollo in Settings › Integrations | Records were reopened from the lists; a finished CV had to be checked for |
 | ✅ 1.41.0 | **Find HR for a lead** not yet linked to a company: a side panel on Leads picks or adds the company (its LinkedIn page found by the companion), then runs Find HR | A lead had to be linked first |
-| ⬜ | Gmail replies and bounces read back (needs Google's restricted scope) | Gmail can only send |
-| ⬜ | AI usage and cost per month, with a limit | Tokens are counted, not shown |
+| ✖ dropped | Gmail replies and bounces read back (needs Google's restricted scope) | Not needed: the agency uses Microsoft mailboxes, which already read replies and bounces; Gmail stays send-only |
+| ✅ 1.44.0 | **AI usage and cost per month, with a limit**: one ledger of every AI use, each company's own monthly limit (tokens or money) and prices, warnings at the warning level and the limit, and Settings › AI usage (this month, by feature and by person, 12 months) | Tokens were counted per feature and lost with their records; one server-wide limit; nothing shown |
 | ⬜ | An audit-log page for admins and a "who viewed salary" log | The audit trail has no screen |
 | ⬜ | Single sign-on (Microsoft, Google) | After two-step sign-in |
 | ⬜ | Cloud readiness: files in object storage, sign-in limits in PostgreSQL, key rotation, metrics and alerts (Phase 7) | Needed to host many agencies |

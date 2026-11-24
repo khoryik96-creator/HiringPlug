@@ -304,13 +304,15 @@ func TestAnotherFieldCountsForLessInASearchByMeaning(t *testing.T) {
 	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
 	require.NoError(t, err)
 	defer func() { _ = aiConn.Close(ctx) }()
-	for name, cv := range map[string]string{
-		"Mei":   "Executive. Accounts, ledger and bookkeeping.",
-		"Siti":  "Executive. Budgets, forecasts and forecasting.",
-		"Kumar": "Executive. Sales: selling software, new business and quota.",
+	// Added in a fixed order, not a map's random one: Mei and Siti score the same, so the search's
+	// order between them must not depend on chance.
+	for _, c := range []struct{ name, cv string }{
+		{"Mei", "Executive. Accounts, ledger and bookkeeping."},
+		{"Siti", "Executive. Budgets, forecasts and forecasting."},
+		{"Kumar", "Executive. Sales: selling software, new business and quota."},
 	} {
-		c := a.createCandidate(token, map[string]any{"firstName": name, "currentTitle": "Executive"})
-		withCV(t, a, aiConn, token, c.Id, cv)
+		made := a.createCandidate(token, map[string]any{"firstName": c.name, "currentTitle": "Executive"})
+		withCV(t, a, aiConn, token, made.Id, c.cv)
 	}
 	a.request(http.MethodGet, "/v1/meaning/status", token, nil)
 	require.Equal(t, 3, readByMeaning(t, a, aiConn, tenant.ID))

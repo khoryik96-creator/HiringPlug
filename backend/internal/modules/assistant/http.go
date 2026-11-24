@@ -18,7 +18,7 @@ func (h *HTTP) GetAssistant(ctx context.Context, _ api.GetAssistantRequestObject
 	if err != nil {
 		return nil, err
 	}
-	return api.GetAssistant200JSONResponse{Enabled: st.Enabled, UsedTokens: st.UsedTokens, MonthlyTokens: st.MonthlyTokens}, nil
+	return api.GetAssistant200JSONResponse{Enabled: st.Enabled, UsedTokens: st.UsedTokens, MonthlyTokens: st.LimitTokens, UsedPercent: st.UsedPercent}, nil
 }
 
 // ListAssistantAnswers handles GET /v1/assistant/answers.

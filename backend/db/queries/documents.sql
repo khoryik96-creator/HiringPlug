@@ -33,6 +33,9 @@ RETURNING *;
 -- name: QueueParse :one
 UPDATE document SET parse_status = 'queued', parse_error = NULL, updated_at = now() WHERE id = @id RETURNING *;
 
+-- The parser's result. The last result to land is kept (as before the AI
+-- use ledger): a reading asked for again while one ran replaces it. A repeated
+-- result is counted once in the ledger by its reading's own key.
 -- name: SaveParse :one
 UPDATE document SET
   parse_status = @parse_status,
@@ -129,10 +132,6 @@ LIMIT @row_limit;
 
 -- name: RecordAIUse :exec
 INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current_tenant(), @document_id, @tokens);
-
--- Tokens the AI used reading the company's CVs since a time.
--- name: AITokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= @since;
 
 -- Advanced search: the candidates with a CV (read, not formatted) matching
 -- a boolean search (as a text search query), up to a limit of CVs. A

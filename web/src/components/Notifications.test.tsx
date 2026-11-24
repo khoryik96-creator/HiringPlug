@@ -53,6 +53,20 @@ describe("NotificationBell", () => {
     expect(within(menu).getByText("Blind CV formatted: Siti Aminah").closest("a")?.getAttribute("href")).toBe("#/candidates/cand_1");
   });
 
+  it("lists the company's AI limit, linking to its AI use", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(list({ items: [
+      { id: "ai_limit:2026-11:100", kind: "ai_limit", title: "AI limit reached: AI features are paused until 1 Dec", detail: "See what used it in Settings › AI usage", href: "#/settings/ai-usage", at: "2026-11-22T01:30:00Z", new: true },
+    ] })));
+    vi.spyOn(api, "POST").mockResolvedValue(noContent());
+    renderWithClient(<NotificationBell />);
+    fireEvent.click(await screen.findByLabelText("Notifications: 1 new"));
+    const menu = await screen.findByRole("dialog", { name: "Notifications" });
+    expect(within(menu).getByText("AI limit")).toBeTruthy();
+    const item = within(menu).getByText("AI limit reached: AI features are paused until 1 Dec").closest("li");
+    expect(item?.className).toContain("kind-ai_limit");
+    expect(item?.querySelector("a")?.getAttribute("href")).toBe("#/settings/ai-usage");
+  });
+
   it("is marked while open, and closes by itself after 30 seconds", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(list({ unseen: 0, items: [] })));
     renderWithClient(<NotificationBell />);
@@ -102,6 +116,21 @@ describe("NotificationSettings", () => {
     expect(put.mock.calls[0]?.[0]).toBe("/v1/notifications/settings");
     expect(sentBody(put)).toEqual({ morningEmail: false, mutedKinds: ["task"] });
     expect(await screen.findByText("Saved.")).toBeTruthy();
+  });
+
+  it("offers the AI limit only to those who may see the company's AI use", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(list()));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ morningEmail: false, mutedKinds: ["ai_limit"] }));
+    renderWithClient(<NotificationSettings permissions={["pipeline:read", "aiusage:read"]} />);
+    const limit = await screen.findByRole("switch", { name: "The company's AI use near or at this month's limit" });
+    fireEvent.click(limit);
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({ morningEmail: false, mutedKinds: ["ai_limit"] });
+    cleanup();
+
+    renderWithClient(<NotificationSettings permissions={["pipeline:read"]} />);
+    await screen.findByRole("switch", { name: "New applicants on jobs you own" });
+    expect(screen.queryByRole("switch", { name: "The company's AI use near or at this month's limit" })).toBeNull();
   });
 
   it("turns the morning email on, keeping the kinds turned off", async () => {

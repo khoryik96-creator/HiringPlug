@@ -76,12 +76,6 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindJobJdRead: m.service.saveJDRead, api.JobKindJdBlinded: m.service.saveBlindRewrite, api.JobKindJdPdfRendered: m.service.saveJDPdf}
 }
 
-// TokensSince is the AI tokens blind ad rewrites used since a time (the
-// company's monthly allowance), in the caller's transaction.
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return m.service.TokensSince(ctx, tx, since)
-}
-
 // Exists reports whether a job exists in tx's tenant.
 func (m *Module) Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error) {
 	return m.service.Exists(ctx, tx, jobID)

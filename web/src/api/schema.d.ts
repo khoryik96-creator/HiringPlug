@@ -81,6 +81,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ai-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This month's AI use and cost (by feature and by person), the months before it, and the limit */
+        get: operations["getAiUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai-usage/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's monthly AI limit and AI prices */
+        get: operations["getAiUsageSettings"];
+        /** Set the monthly AI limit and the AI prices */
+        put: operations["putAiUsageSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai-usage/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How much of this month's AI limit is used, for the notice shown to everyone
+         * @description No token counts or money, only the share of the limit used.
+         */
+        get: operations["getAiUsageStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/assistant": {
         parameters: {
             query?: never;
@@ -5710,7 +5765,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
+        Permission: "aiproviders:manage" | "aiusage:manage" | "aiusage:read" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -5811,6 +5866,10 @@ export interface components {
         AiProviderCheckJob: {
             provider: components["schemas"]["AiProviderName"];
             access: components["schemas"]["AiAccess"];
+            /** @description Which check this is, sent back unchanged: its AI use is counted once. */
+            checkId?: string;
+            /** @description Who asked for the check (a user ID), sent back unchanged. */
+            askedBy?: string;
         };
         AiStatus: {
             /** @description The latest call to the provider failed, within the last hour. */
@@ -5845,6 +5904,175 @@ export interface components {
             sealedKey: string;
             ok: boolean;
             message: string | null;
+            /** @description The check job's checkId, unchanged. */
+            checkId?: string;
+            /** @description The check job's askedBy, unchanged. */
+            askedBy?: string;
+            /**
+             * Format: int64
+             * @description Tokens the check's request took (counted in the monthly AI use).
+             */
+            inputTokens?: number;
+            /**
+             * Format: int64
+             * @description Tokens of the provider's answer.
+             */
+            outputTokens?: number;
+        };
+        /**
+         * @description What the AI was used for: assistant (AI assistant answers), assistant_email (AI email writing), fit_score (CV vs job fit scores), talent_search (AI candidate search), cv_reading (reading CVs with the AI), cv_studio (formatted CVs), jd_blind (blind job ads), jd_reading (reading job descriptions with the AI), industry_pick (company industry picks), interview_prep (interview prep material), provider_check (AI provider checks in Settings).
+         * @enum {string}
+         */
+        AiFeature: "assistant" | "assistant_email" | "fit_score" | "talent_search" | "cv_reading" | "cv_studio" | "jd_blind" | "jd_reading" | "industry_pick" | "interview_prep" | "provider_check";
+        /**
+         * @description tokens = a number of tokens a month; money = an amount a month, at the company's prices.
+         * @enum {string}
+         */
+        AiUsageLimitKind: "tokens" | "money";
+        /**
+         * @description A price per million tokens, with up to 4 decimal places, as a string so no precision is lost.
+         * @example 0.2700
+         */
+        AiPrice: string;
+        /**
+         * @description An estimated cost at the company's current prices, with 4 decimal places (rounded half up), as a string so no precision is lost.
+         * @example 1.2345
+         */
+        AiCost: string;
+        AiUsageSettings: {
+            limitKind: components["schemas"]["AiUsageLimitKind"];
+            /**
+             * Format: int64
+             * @description Tokens a month (null: the server's default, serverDefaultTokens).
+             */
+            limitTokens: number | null;
+            /**
+             * Format: int64
+             * @description The server's default monthly limit (HP_AI_MONTHLY_TOKENS).
+             */
+            serverDefaultTokens: number;
+            /** @description The most to spend a month, in currency (money limit). */
+            limitMoney: components["schemas"]["DecimalAmount"] | null;
+            currency: components["schemas"]["CurrencyCode"];
+            /** @description What a million input tokens (what is sent to the AI) cost, in currency; null when not set. */
+            priceInputPerMillion: components["schemas"]["AiPrice"] | null;
+            /** @description What a million output tokens (what the AI writes) cost, in currency; null when not set. */
+            priceOutputPerMillion: components["schemas"]["AiPrice"] | null;
+            /** @description Warn when this share of the month's limit is used. */
+            warnPercent: number;
+            /** @description 0 until first saved. */
+            version: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        AiUsageSettingsUpdate: {
+            limitKind: components["schemas"]["AiUsageLimitKind"];
+            /**
+             * Format: int64
+             * @description null: the server's default.
+             */
+            limitTokens: number | null;
+            /** @description Needed for a money limit. */
+            limitMoney: components["schemas"]["DecimalAmount"] | null;
+            currency: components["schemas"]["CurrencyCode"];
+            /** @description Both prices are needed for a money limit. */
+            priceInputPerMillion: components["schemas"]["AiPrice"] | null;
+            priceOutputPerMillion: components["schemas"]["AiPrice"] | null;
+            warnPercent: number;
+            /** @description The version you loaded (0 before the settings were first saved). */
+            version: number;
+        };
+        AiUsageFeature: {
+            feature: components["schemas"]["AiFeature"];
+            /** Format: int64 */
+            uses: number;
+            /** Format: int64 */
+            inputTokens: number;
+            /** Format: int64 */
+            outputTokens: number;
+            /** @description null when the prices are not set. */
+            cost: components["schemas"]["AiCost"] | null;
+        };
+        AiUsagePerson: {
+            /** @description null for what the system did on its own (named Automatic). */
+            userId: components["schemas"]["UserId"] | null;
+            name: string;
+            /** Format: int64 */
+            uses: number;
+            /**
+             * Format: int64
+             * @description Input and output together.
+             */
+            tokens: number;
+            cost: components["schemas"]["AiCost"] | null;
+        };
+        AiUsageMonth: {
+            /** @example 2026-11 */
+            month: string;
+            /** Format: int64 */
+            uses: number;
+            /** Format: int64 */
+            inputTokens: number;
+            /** Format: int64 */
+            outputTokens: number;
+            cost: components["schemas"]["AiCost"] | null;
+            /** @description Features used in the month, most tokens first. */
+            byFeature: components["schemas"]["AiUsageFeature"][];
+        };
+        AiUsageLimit: {
+            kind: components["schemas"]["AiUsageLimitKind"];
+            /**
+             * Format: int64
+             * @description The month's limit in tokens (null for a money limit).
+             */
+            tokens: number | null;
+            /** @description The month's limit in money (null for a token limit). */
+            money: components["schemas"]["DecimalAmount"] | null;
+            currency: components["schemas"]["CurrencyCode"];
+            warnPercent: number;
+            /** @description The share of the limit used this month (can pass 100). */
+            usedPercent: number;
+            /** @description The whole limit is used: AI features wait for next month. */
+            reached: boolean;
+            /**
+             * Format: date-time
+             * @description The start of next month.
+             */
+            resetsAt: string;
+        };
+        /** @description Costs are estimates from each row's input and output tokens at the company's current prices; the AI provider's bill is final. */
+        AiUsage: {
+            /** @description This month. */
+            month: string;
+            /** Format: int64 */
+            uses: number;
+            /** Format: int64 */
+            inputTokens: number;
+            /** Format: int64 */
+            outputTokens: number;
+            cost: components["schemas"]["AiCost"] | null;
+            /** @description This month, most tokens first. */
+            byFeature: components["schemas"]["AiUsageFeature"][];
+            /** @description This month, most tokens first. */
+            byPerson: components["schemas"]["AiUsagePerson"][];
+            /** @description This month and those before it, newest first, months without use included. */
+            months: components["schemas"]["AiUsageMonth"][];
+            limit: components["schemas"]["AiUsageLimit"];
+            /** @description Both prices are set (costs are null otherwise). */
+            pricesSet: boolean;
+        };
+        AiUsageStatus: {
+            /** @description The share of this month's AI limit used (can pass 100). */
+            usedPercent: number;
+            /** @description The warning level is reached, but not the whole limit. */
+            warn: boolean;
+            /** @description The whole limit is used: AI features wait until resetsAt. */
+            reached: boolean;
+            /**
+             * Format: date-time
+             * @description The start of next month.
+             */
+            resetsAt: string;
         };
         /** @example ask_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         AssistantAnswerId: string;
@@ -5868,14 +6096,19 @@ export interface components {
             enabled: boolean;
             /**
              * Format: int64
-             * @description Tokens the company used this calendar month.
+             * @description Tokens the company used this calendar month, by every AI feature (the AI use ledger).
              */
             usedTokens: number;
             /**
              * Format: int64
-             * @description The company's monthly allowance.
+             * @description The company's monthly limit in tokens (its own, or the server's default); 0 when its limit is an amount of money.
              */
             monthlyTokens: number;
+            /**
+             * Format: int64
+             * @description How much of this month's AI limit is used, in percent (can pass 100).
+             */
+            usedPercent: number;
         };
         AssistantQuestion: {
             subjectType: components["schemas"]["AssistantSubjectType"];
@@ -8223,6 +8456,8 @@ export interface components {
             aiText?: string;
             /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
             ai?: components["schemas"]["AiAccess"];
+            /** @description Which reading of the document this is, sent back unchanged in the result: the AI use it took is counted once per reading, however often the result is delivered. */
+            runKey?: string;
         };
         DocumentCvParsedJob: {
             documentId: components["schemas"]["DocumentId"];
@@ -8230,6 +8465,8 @@ export interface components {
             errorMessage: string | null;
             /** @description Tokens the AI used (counted in the monthly allowance). */
             aiTokens?: number;
+            /** @description The parse job's runKey, unchanged. */
+            runKey?: string;
         };
         OutlookDraftInput: {
             subject?: string;
@@ -10558,10 +10795,10 @@ export interface components {
             items: components["schemas"]["ActivityEntry"][];
         };
         /**
-         * @description applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow; cv_formatted: a CV you had formatted CV Studio's way is ready, or could not be made (last 2 days).
+         * @description applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow; cv_formatted: a CV you had formatted CV Studio's way is ready, or could not be made (last 2 days); ai_limit: this month's AI use reached the company's warning level or its whole limit (with aiusage:read).
          * @enum {string}
          */
-        NotificationKind: "applicant" | "task" | "offer_approval" | "interview" | "cv_formatted";
+        NotificationKind: "applicant" | "task" | "offer_approval" | "interview" | "cv_formatted" | "ai_limit";
         Notification: {
             /** @description The kind and record it is about, e.g. task:tsk_..., stable while it shows. */
             id: string;
@@ -12477,6 +12714,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    getAiUsage: {
+        parameters: {
+            query?: {
+                /** @description How many months to list, this one included (12 unless given). */
+                months?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getAiUsageSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsageSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putAiUsageSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiUsageSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsageSettings"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getAiUsageStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsageStatus"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

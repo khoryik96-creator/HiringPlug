@@ -1,9 +1,11 @@
 // The bell in the top bar: new applicants on your jobs, your tasks due,
-// offers waiting for your approval, your interviews today and tomorrow and
-// the CVs you had formatted (green the moment one is ready), with how many
-// are new since you last opened it. Open, it is marked as the one clicked,
-// and it closes by itself after 30 seconds. And their settings in
-// Settings › Your account: which kinds you get, and the morning email.
+// offers waiting for your approval, your interviews today and tomorrow, the
+// CVs you had formatted (green the moment one is ready) and, for those who
+// may see the company's AI use, this month's use reaching its warning level
+// or its limit, with how many are new since you last opened it. Open, it is
+// marked as the one clicked, and it closes by itself after 30 seconds. And
+// their settings in Settings › Your account: which kinds you get, and the
+// morning email.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
@@ -24,6 +26,7 @@ export const KINDS: { kind: Kind; label: string; short: string; permission: Perm
   { kind: "offer_approval", label: "Offers waiting for your approval", short: "Offer", permission: "offers:approve" },
   { kind: "interview", label: "Your interviews today and tomorrow", short: "Interview", permission: "interviews:read" },
   { kind: "cv_formatted", label: "CVs you had formatted, ready or failed", short: "CV ready", permission: "cvformats:create" },
+  { kind: "ai_limit", label: "The company's AI use near or at this month's limit", short: "AI limit", permission: "aiusage:read" },
 ];
 const SHORT = Object.fromEntries(KINDS.map((k) => [k.kind, k.short])) as Record<Kind, string>;
 

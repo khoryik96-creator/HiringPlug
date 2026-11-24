@@ -70,9 +70,12 @@ type Deps struct {
 	Files interface {
 		FormattedFile(ctx context.Context, tx pgx.Tx, documentID string) (FormattedFile, error)
 	}
-	// AI is the company's AI provider, if it has one and allowance left this month.
+	// AI is the company's AI provider, if it has one and allowance left this
+	// month, and the company's AI use, where each run's tokens are recorded
+	// (aiusage).
 	AI interface {
 		Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+		RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 	}
 }
 
@@ -107,12 +110,6 @@ func (m *Module) FinishedBy(ctx context.Context, tx pgx.Tx, userID string, since
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindCvStudioFormatted: m.svc.saveStudio}
-}
-
-// TokensSince is the AI tokens studio CVs used since a time (the company's
-// monthly allowance), in the caller's transaction.
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return m.svc.TokensSince(ctx, tx, since)
 }
 
 // New wires the module. Templates are kept in files, up to maxUploadBytes.

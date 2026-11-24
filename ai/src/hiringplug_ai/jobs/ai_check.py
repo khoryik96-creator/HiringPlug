@@ -24,6 +24,7 @@ MAX_TOKENS = 16
 
 def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
     message: str | None = None
+    input_tokens = output_tokens = 0
     # Checking a key (often of a provider the company does not use yet) says
     # nothing about the AI in use: it is not reported as an outage.
     deps = dataclasses.replace(deps, log=None)
@@ -32,7 +33,9 @@ def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
         if ai is None:  # cannot happen: a check always carries the access
             message = "the AI worker has no provider to check"
         else:
-            ai.complete(SYSTEM, "Reply with OK.", max_tokens=MAX_TOKENS)
+            done = ai.complete(SYSTEM, "Reply with OK.", max_tokens=MAX_TOKENS)
+            # A check uses the provider too: counted in the company's AI use.
+            input_tokens, output_tokens = max(done.input_tokens, 0), max(done.output_tokens, 0)
     except ProviderError as exc:
         message = str(exc)
     log.info("ai provider checked", extra={"provider": payload.provider.value, "ok": message is None})
@@ -45,6 +48,10 @@ def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
                 sealedKey=payload.access.sealedKey,
                 ok=message is None,
                 message=message,
+                checkId=payload.checkId,
+                askedBy=payload.askedBy,
+                inputTokens=input_tokens,
+                outputTokens=output_tokens,
             ),
         )
     ]

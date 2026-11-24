@@ -10,18 +10,6 @@ import (
 	"time"
 )
 
-const aITokensSince = `-- name: AITokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= $1
-`
-
-// Tokens the AI used reading the company's CVs since a time.
-func (q *Queries) AITokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, aITokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const binDocument = `-- name: BinDocument :execrows
 UPDATE document SET binned_at = now(), updated_at = now() WHERE id = $1 AND binned_at IS NULL
 `
@@ -965,6 +953,9 @@ type SaveParseParams struct {
 	ID            string
 }
 
+// The parser's result. The last result to land is kept (as before the AI
+// use ledger): a reading asked for again while one ran replaces it. A repeated
+// result is counted once in the ledger by its reading's own key.
 func (q *Queries) SaveParse(ctx context.Context, arg SaveParseParams) (Document, error) {
 	row := q.db.QueryRow(ctx, saveParse,
 		arg.ParseStatus,

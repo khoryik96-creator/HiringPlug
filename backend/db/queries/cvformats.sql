@@ -49,8 +49,6 @@ RETURNING *;
 -- name: RecordStudioCvAIUse :exec
 INSERT INTO studio_cv_ai_use (tenant_id, studio_cv_id, tokens) VALUES (app_current_tenant(), @studio_cv_id, @tokens);
 
--- name: StudioCvTokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM studio_cv_ai_use WHERE created_at >= @since;
 
 -- Merging candidates: the duplicate's formatting runs follow it.
 -- name: MoveStudioCvs :exec

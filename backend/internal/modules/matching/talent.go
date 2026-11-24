@@ -232,12 +232,17 @@ func (s *Service) talentRanked(ctx context.Context, tx pgx.Tx, job jobqueue.Job)
 	summary, _ := r.Summary.Get()
 	suggested, _ := r.SuggestedBoolean.Get()
 	model, _ := r.Model.Get()
-	if _, err := q.FinishTalentSearch(ctx, store.FinishTalentSearchParams{
+	n, err := q.FinishTalentSearch(ctx, store.FinishTalentSearchParams{
 		ID: row.ID, Status: status, Results: body, Summary: nonBlank(clip(summary, 3000)),
 		MustHaves: cleanList(r.MustHaves), NiceToHaves: cleanList(r.NiceToHaves), SuggestedBoolean: nonBlank(clip(suggested, 1000)),
 		Error: failure, Model: nonBlank(clip(model, 200)),
 		Tokens: int32(min(max(r.InputTokens, 0)+max(r.OutputTokens, 0), 1<<30)), //nolint:gosec // capped
-	}); err != nil {
+	})
+	if err != nil || n == 0 {
+		return err // n == 0: answered meanwhile (a repeated result)
+	}
+	if err := s.deps.Usage.RecordAI(ctx, tx, job.TenantID, "talent_search", row.ID, "", &row.CreatedBy,
+		int64(r.InputTokens), int64(r.OutputTokens)); err != nil {
 		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: "talent_search.ranked", EntityType: "talent_search", EntityID: row.ID,

@@ -7,7 +7,7 @@ export const settingsGroups = [
   { label: "Email & scheduling", sections: ["email-connection", "email-templates", "whatsapp-templates", "booking-calendars", "automations"] },
   { label: "Team & agency", sections: ["settings", "team", "access", "privacy"] },
   { label: "Finance", sections: ["invoicing", "settings-targets", "settings-claims-storage"] },
-  { label: "System & integrations", sections: ["integrations", "ai-provider", "companion", "system", "backups", "bin"] },
+  { label: "System & integrations", sections: ["integrations", "ai-provider", "ai-usage", "companion", "system", "backups", "bin"] },
 ];
 
 const aliases: Record<string, string> = {
@@ -32,6 +32,7 @@ const aliases: Record<string, string> = {
   "settings-claims-storage": "receipt files scans expenses claim uploads OneDrive Google Drive Dropbox",
   integrations: "connections API service webhooks third party",
   "ai-provider": "AI assistant model API key OpenAI Claude DeepSeek",
+  "ai-usage": "AI cost costs tokens limit monthly usage spend budget prices billing allowance",
   companion: "browser extension LinkedIn CV profile import",
   system: "configuration uptime application status background jobs retries",
   backups: "database restore export data backup recovery",

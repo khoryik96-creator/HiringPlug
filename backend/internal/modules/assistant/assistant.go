@@ -4,8 +4,8 @@
 //
 // What the AI sees is gathered here from what the asking user may see, with
 // contact details and names taken out, and never salary. Answers are shown
-// only to the person who asked. Each company has a monthly token allowance,
-// shared with CV vs job matching.
+// only to the person who asked. Each company has one monthly AI limit,
+// shared by every AI feature (aiusage), where each answer's tokens are recorded.
 //
 // Layout (the same in every module):
 //
@@ -61,17 +61,25 @@ type Deps struct {
 	Agency interface {
 		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)
 	}
-	// OtherAIUse is the company's other use of the AI (CV vs job matching):
-	// one monthly allowance covers both. Nil: none.
-	OtherAIUse interface {
-		TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error)
+	// Usage is the company's AI use and its one monthly limit, shared by
+	// every AI feature (aiusage), in the caller's transaction.
+	Usage interface {
+		// Remaining is this month's allowance left in tokens, work in
+		// progress held (0 or less: used up).
+		Remaining(ctx context.Context, tx pgx.Tx, tenantID string) (int64, error)
+		// ThisMonth is what the company used of this month's limit.
+		ThisMonth(ctx context.Context, tx pgx.Tx, tenantID string) (MonthUse, error)
+		// RecordAI records one AI run's tokens (feature, the record it was
+		// for, which run of it, who asked).
+		RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 	}
 }
 
-// Settings is how the assistant may be used.
-type Settings struct {
-	MonthlyTokens int64
-	TimeZone      *time.Location // months start on the 1st here
+// MonthUse is what a company used of this month's AI limit.
+type MonthUse struct {
+	UsedTokens  int64
+	LimitTokens int64 // 0 when the limit is an amount of money
+	UsedPercent int64
 }
 
 // Module is the assistant module.
@@ -81,24 +89,14 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, deps Deps, settings Settings) *Module {
-	if settings.TimeZone == nil {
-		settings.TimeZone = time.UTC
-	}
-	svc := &Service{pool: pool, deps: deps, settings: settings, now: time.Now}
+func New(pool *pgxpool.Pool, deps Deps) *Module {
+	svc := &Service{pool: pool, deps: deps}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 
-// TokensSince returns the AI tokens the company used for the assistant since
-// the given time, in the caller's transaction (matching counts them in the
-// shared allowance).
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).TokensSince(ctx, since)
-}
-
-// JobHandlers returns the handlers for this module's jobs on the core queue.
 // Forget deletes what the AI said about records deleted for good (subjectType
-// candidate, application or job), in the caller's transaction.
+// candidate, application or job), in the caller's transaction. The tokens
+// they took stay counted (aiusage's ledger).
 func (m *Module) Forget(ctx context.Context, tx pgx.Tx, subjectType string, ids []string) error {
 	if len(ids) == 0 {
 		return nil

@@ -21,6 +21,7 @@ import (
 type Service struct {
 	pool     *pgxpool.Pool
 	settings Settings
+	ledger   Ledger // nil: checks are not counted
 }
 
 // Saved is a provider's settings as shown (never the key).
@@ -143,7 +144,7 @@ func (s *Service) Save(ctx context.Context, p authz.Principal, provider, model s
 		if err := q.SaveProvider(ctx, store.SaveProviderParams{Provider: provider, Model: model, SealedKey: sealed, KeyHint: hint}); err != nil {
 			return err
 		}
-		if err := queueCheck(ctx, tx, p.TenantID, provider, model, sealed); err != nil {
+		if err := queueCheck(ctx, tx, p, provider, model, sealed); err != nil {
 			return err
 		}
 		if choice, err := choiceIn(ctx, q); err != nil {
@@ -166,10 +167,13 @@ func (s *Service) Save(ctx context.Context, p authz.Principal, provider, model s
 	return out, err
 }
 
-func queueCheck(ctx context.Context, tx pgx.Tx, tenantID, provider, model, sealed string) error {
+// queueCheck queues a check of a key, with its own ID and who asked, sent
+// back with the result so its AI use is counted once, for them.
+func queueCheck(ctx context.Context, tx pgx.Tx, p authz.Principal, provider, model, sealed string) error {
 	name := api.AiProviderName(provider)
-	_, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindAiproviderCheck, api.AiProviderCheckJob{
-		Provider: name, Access: api.AiAccess{Provider: name, Model: model, SealedKey: sealed},
+	checkID, askedBy := "chk_"+rand.Text(), p.UserID
+	_, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindAiproviderCheck, api.AiProviderCheckJob{
+		Provider: name, Access: api.AiAccess{Provider: name, Model: model, SealedKey: sealed}, CheckId: &checkID, AskedBy: &askedBy,
 	})
 	return err
 }
@@ -215,7 +219,7 @@ func (s *Service) Check(ctx context.Context, p authz.Principal, provider string)
 		if err := q.MarkChecking(ctx, provider); err != nil {
 			return err
 		}
-		if err := queueCheck(ctx, tx, p.TenantID, provider, row.Model, row.SealedKey); err != nil {
+		if err := queueCheck(ctx, tx, p, provider, row.Model, row.SealedKey); err != nil {
 			return err
 		}
 		out, err = s.state(ctx, q)
@@ -243,11 +247,34 @@ func (s *Service) checked(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		}
 		message = &m
 	}
-	// A check of a key replaced since changes nothing.
-	_, err := store.New(tx).SaveCheck(ctx, store.SaveCheckParams{
+	// A check of a key replaced since changes nothing (but its use counts).
+	if _, err := store.New(tx).SaveCheck(ctx, store.SaveCheckParams{
 		Provider: string(r.Provider), SealedKey: r.SealedKey, CheckStatus: &status, CheckMessage: message,
-	})
-	return err
+	}); err != nil {
+		return err
+	}
+	return s.recordCheck(ctx, tx, job, r)
+}
+
+// recordCheck counts what a check used, once per check (a check queued
+// before checks had IDs counts by its result job's ID).
+func (s *Service) recordCheck(ctx context.Context, tx pgx.Tx, job jobqueue.Job, r api.AiProviderCheckedJob) error {
+	in, out := deref(r.InputTokens), deref(r.OutputTokens)
+	if s.ledger == nil || in+out <= 0 {
+		return nil
+	}
+	source := job.ID
+	if r.CheckId != nil && *r.CheckId != "" {
+		source = *r.CheckId
+	}
+	return s.ledger.RecordAI(ctx, tx, job.TenantID, "provider_check", source, "", r.AskedBy, in, out)
+}
+
+func deref(n *int64) int64 {
+	if n == nil {
+		return 0
+	}
+	return *n
 }
 
 // access is the AI the company uses, for the modules that queue AI work.

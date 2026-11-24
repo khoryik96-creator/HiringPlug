@@ -287,6 +287,12 @@ sql:
         <<: *go
         out: internal/modules/shortlists/internal/store
   - <<: *module
+    queries: db/queries/aiusage.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/aiusage/internal/store
+  - <<: *module
     queries: db/queries/reports.sql
     gen:
       go:

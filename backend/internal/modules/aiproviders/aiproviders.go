@@ -38,6 +38,15 @@ func New(pool *pgxpool.Pool, settings Settings) *Module {
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 
+// Ledger records an AI run's tokens in the company's AI use (aiusage), in
+// the caller's transaction: a key check asks the provider too.
+type Ledger interface {
+	RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
+}
+
+// RecordUseWith records what each key check used. Not set: not recorded.
+func (m *Module) RecordUseWith(l Ledger) { m.service.ledger = l }
+
 // Access returns the AI the company uses, in the caller's transaction: on
 // is false when it has none; access is nil when it uses the server's own
 // provider. Modules put access on the AI jobs they queue.

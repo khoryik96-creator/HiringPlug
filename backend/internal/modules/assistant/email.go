@@ -126,15 +126,11 @@ func (s *Service) ready(ctx context.Context, tx pgx.Tx, tenant string) (*api.AiA
 	if !on {
 		return nil, apperr.New(api.ErrorCodeASSISTANTOFF, "The AI assistant is switched off: no AI provider is set up yet.")
 	}
-	pending, err := jobqueue.PendingAI(ctx, tx, tenant)
+	left, err := s.deps.Usage.Remaining(ctx, tx, tenant) // work in progress held
 	if err != nil {
 		return nil, err
 	}
-	used, err := s.used(ctx, tx, tenant)
-	if err != nil {
-		return nil, err
-	}
-	if used+pending >= s.settings.MonthlyTokens {
+	if left <= 0 {
 		return nil, apperr.New(api.ErrorCodeASSISTANTLIMITREACHED, "This month's AI allowance is used or reserved by work in progress. Try again after it completes or next month.")
 	}
 	return ai, nil
@@ -176,7 +172,7 @@ func (s *Service) emailed(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		return err
 	}
 	params := store.SaveEmailParams{
-		ID: r.DraftId, Status: "done", InputTokens: int32(min(r.InputTokens, 1<<30)), OutputTokens: int32(min(r.OutputTokens, 1<<30)), //nolint:gosec // capped
+		ID: r.DraftId, Status: "done", InputTokens: tokens(r.InputTokens), OutputTokens: tokens(r.OutputTokens),
 	}
 	if v, err := r.Subject.Get(); err == nil && v != "" {
 		params.Subject = clipPtr(v, 1000)
@@ -192,9 +188,16 @@ func (s *Service) emailed(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	} else if params.Body == nil {
 		params.Status, params.Error = "failed", clipPtr("The AI wrote nothing.", 1000)
 	}
-	n, err := store.New(tx).SaveEmail(ctx, params)
-	if err != nil || n == 0 {
-		return err // already saved (a repeated result)
+	asker, err := store.New(tx).SaveEmail(ctx, params)
+	if database.IsNoRows(err) {
+		return nil // already saved (a repeated result)
+	}
+	if err != nil {
+		return err
+	}
+	if err := s.deps.Usage.RecordAI(ctx, tx, job.TenantID, "assistant_email", r.DraftId, "", &asker,
+		int64(params.InputTokens), int64(params.OutputTokens)); err != nil {
+		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: "assistant.emailed", EntityType: "assistant_email", EntityID: r.DraftId,
 		Changes: map[string]any{"status": params.Status, "tokens": params.InputTokens + params.OutputTokens}})

@@ -237,6 +237,8 @@ components:
       properties:
         provider: { $ref: '#/components/schemas/AiProviderName' }
         access: { $ref: '#/components/schemas/AiAccess' }
+        checkId: { type: string, maxLength: 200, description: "Which check this is, sent back unchanged: its AI use is counted once." }
+        askedBy: { type: string, maxLength: 200, description: "Who asked for the check (a user ID), sent back unchanged." }
     AiStatus:
       type: object
       required: [down, provider, message, since, failedAt]
@@ -264,3 +266,7 @@ components:
         sealedKey: { type: string, description: The key checked (a check of a key since replaced is dropped). }
         ok: { type: boolean }
         message: { type: string, nullable: true }
+        checkId: { type: string, maxLength: 200, description: "The check job's checkId, unchanged." }
+        askedBy: { type: string, maxLength: 200, description: "The check job's askedBy, unchanged." }
+        inputTokens: { type: integer, format: int64, minimum: 0, description: "Tokens the check's request took (counted in the monthly AI use)." }
+        outputTokens: { type: integer, format: int64, minimum: 0, description: "Tokens of the provider's answer." }

@@ -140,3 +140,45 @@ func TestAFormattedCVIsForTheBellNotTheMorningEmail(t *testing.T) {
 	assert.Equal(t, "CV could not be formatted: Lim Wei", items[1].Title)
 	assert.Empty(t, DigestFor(items, now.Add(-24*time.Hour)))
 }
+
+func TestAILimitShowsOneItemPerMonthTheLimitOverTheWarning(t *testing.T) {
+	loc := kl(t)
+	now := time.Date(2026, 11, 20, 10, 0, 0, 0, loc)
+	nov, dec := time.Date(2026, 11, 1, 0, 0, 0, 0, loc), time.Date(2026, 12, 1, 0, 0, 0, 0, loc)
+	warned, reached := now.Add(-3*time.Hour), now.Add(-time.Hour)
+	w := WindowAt(now, loc)
+
+	items := Build(Inputs{AILimits: []AILimit{{Level: 80, At: warned, Month: nov, Until: dec}}}, nil, w)
+	require.Len(t, items, 1)
+	assert.Equal(t, Item{ID: "ai_limit:2026-11:80", Kind: KindAILimit, Title: "AI use reached 80% of this month's limit",
+		Detail: "AI features pause at 100%, until 1 Dec", Href: "#/settings/ai-usage", At: warned, New: true}, items[0])
+
+	seen := now.Add(-2 * time.Hour)
+	items = Build(Inputs{AILimits: []AILimit{
+		{Level: 80, At: warned, Month: nov, Until: dec}, {Level: AILimitLevel, At: reached, Month: nov, Until: dec},
+	}}, &seen, w)
+	require.Len(t, items, 1, "once the limit is reached, only that shows")
+	assert.Equal(t, "ai_limit:2026-11:100", items[0].ID)
+	assert.Equal(t, "AI limit reached: AI features are paused until 1 Dec", items[0].Title)
+	assert.True(t, items[0].New, "reached after the user last looked")
+
+	picked := DigestFor(items, now.Add(-24*time.Hour))
+	subject, body, ok := DigestText(picked, "https://hp.example")
+	require.True(t, ok)
+	assert.Equal(t, "Today: 1 AI limit notice", subject)
+	assert.Contains(t, body, "The company's AI use this month\n- AI limit reached: AI features are paused until 1 Dec")
+	assert.Contains(t, body, "https://hp.example/#/settings/ai-usage")
+	assert.Empty(t, DigestFor(items, now), "a notice already in an earlier email is not sent again")
+}
+
+func TestEveryKindHasAMorningEmailSectionOrIsLeftOut(t *testing.T) {
+	now := time.Date(2026, 11, 22, 8, 0, 0, 0, time.UTC)
+	for _, kind := range Kinds {
+		picked := DigestFor([]Item{{Kind: kind, Title: "x", At: now}}, now.Add(-time.Hour))
+		subject, _, ok := DigestText(picked, "https://hp.example")
+		if len(picked) > 0 {
+			assert.True(t, ok, kind)
+			assert.NotEqual(t, "Today: ", subject, "%s needs a section and a count", kind)
+		}
+	}
+}

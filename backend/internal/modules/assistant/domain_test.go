@@ -3,7 +3,6 @@ package assistant
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,12 +79,4 @@ func TestQuestionRules(t *testing.T) {
 		_, err := CheckQuestion(q)
 		assert.Error(t, err, name)
 	}
-}
-
-func TestMonthStart(t *testing.T) {
-	kl, err := time.LoadLocation("Asia/Kuala_Lumpur")
-	require.NoError(t, err)
-	// 31 Oct 2026, 17:00 UTC is already 1 Nov in Kuala Lumpur.
-	got := MonthStart(time.Date(2026, 10, 31, 17, 0, 0, 0, time.UTC), kl)
-	assert.Equal(t, time.Date(2026, 11, 1, 0, 0, 0, 0, kl), got)
 }
