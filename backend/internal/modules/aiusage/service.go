@@ -231,9 +231,17 @@ func (s *Service) SaveSettings(ctx context.Context, p authz.Principal, in Settin
 		if err != nil {
 			return err
 		}
-		return audit.Record(ctx, tx, audit.Entry{
+		if err := audit.Record(ctx, tx, audit.Entry{
 			Action: "ai_usage.settings_saved", EntityType: "tenant", EntityID: p.TenantID,
 			Changes: audit.Diff(auditFields(before), auditFields(next)),
+		}); err != nil {
+			return err
+		}
+		// A new limit can put this month's use past a level (announced now:
+		// no AI work may start to announce it later) or below one (the
+		// notice goes; reaching the new limit is announced again).
+		return database.AsSystem(ctx, tx, p.TenantID, func() error {
+			return s.noteLevels(ctx, tx, store.New(tx), p.TenantID)
 		})
 	})
 	if err != nil {

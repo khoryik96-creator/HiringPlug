@@ -186,7 +186,13 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 		}
 	}
 	if _, err := q.SaveParse(ctx, params); database.IsNoRows(err) {
-		return nil // not waiting for a reading: a repeated result
+		// Not waiting for a reading: a repeated result, or a reading asked for
+		// again while this one ran (the first result to land is kept). The AI
+		// was used all the same: counted once, by the reading's own key.
+		if result.AiTokens == nil || result.RunKey == nil || *result.RunKey == "" {
+			return nil
+		}
+		return s.recordAI(ctx, tx, job, row, result.RunKey, int64(min(*result.AiTokens, 1<<30)))
 	} else if err != nil {
 		return err
 	}

@@ -386,7 +386,9 @@ servers): `HP_AI_PROVIDER` (off / openai_compatible), `HP_AI_PROVIDER_URL`,
 `HP_AI_PROVIDER_KEY` (never logged or printed), `HP_AI_MODEL`,
 `HP_AI_TIMEOUT_SECONDS` (`HP_AI_LONG_TIMEOUT_SECONDS` for CV Studio's whole-CV
 answers). `aiprovider.check` sends a provider a tiny request
-when a company saves a key and reports back as `aiprovider.checked`. Paid
+when a company saves a key and reports back as `aiprovider.checked`, with the
+check's own `checkId`, who asked (`askedBy`) and the tokens it used: Go counts
+them in the company's AI use (`provider_check`), once per check. Paid
 requests are sent again only on 429/529; provider error texts (which can echo
 part of a key) are replaced by fixed messages. See
 [features.md](features.md#35-ai-assistant-sidebar--off-until-an-ai-provider-is-set-up).
@@ -444,6 +446,12 @@ was written after the rules were tuned and measured once. Set
 
 ## Shared AI allowance
 
+Every result that used the AI is recorded once in the AI use ledger
+(`aiusage.Record`, by the record it was for and a run key fixed when the run
+was queued and sent back with the result: `runKey` on `document.parse_cv`,
+`checkId` on `aiprovider.check`). Every AI feature asks `aiusage.Remaining`
+before it queues work: the company's monthly limit (tokens, or money at its
+prices) less this month's ledger and the work still on its way.
 Admissions count a provisional 1,000-token hold for each queued or running
 AI operation. The hold covers the Python request and its Go result until actual
 usage replaces it. One final request can use a balance under 1,000 tokens.

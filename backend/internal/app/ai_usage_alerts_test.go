@@ -10,6 +10,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/oapi-codegen/nullable"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +20,8 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiusage"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -135,4 +140,87 @@ func TestTheAILimitWarnsWhoMaySeeTheCompanysAIUse(t *testing.T) {
 		other := testutil.Current.NewTenant(t, api.RoleOwner)
 		assert.Empty(t, a.aiLimitItems(other.Users[api.RoleOwner].Token))
 	})
+}
+
+// Two results landing together that cross the limit together: the second
+// to finish sees the first's use, so the limit is noted.
+func TestTwoAIResultsCrossingTheLimitTogetherAreNoted(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, bigAllowance) // 1,000,000 tokens a month
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	a.recordAIUse(tenant.ID, aiusage.Use{Feature: aiusage.FeatureCVStudio, SourceID: "scv_a", Input: 960_000})
+
+	record := func(source string) error {
+		return database.InTx(context.Background(), a.deps.Pool, authz.TenantOnly(tenant.ID), func(tx pgx.Tx) error {
+			return a.modules.AIUsage.Record(context.Background(), tx, tenant.ID, aiusage.Use{Feature: aiusage.FeatureCVStudio, SourceID: source, Input: 30_000})
+		})
+	}
+	// The first result is recorded but not yet committed when the second lands.
+	recorded, release, firstDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		firstDone <- database.InTx(context.Background(), a.deps.Pool, authz.TenantOnly(tenant.ID), func(tx pgx.Tx) error {
+			err := a.modules.AIUsage.Record(context.Background(), tx, tenant.ID, aiusage.Use{Feature: aiusage.FeatureCVStudio, SourceID: "scv_b", Input: 30_000})
+			close(recorded)
+			<-release
+			return err
+		})
+	}()
+	<-recorded
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- record("scv_c") }()
+	select {
+	case err := <-secondDone: // it did not wait for the first
+		close(release)
+		require.NoError(t, err)
+		require.NoError(t, <-firstDone)
+	case <-time.After(300 * time.Millisecond): // it waits for the first to end
+		close(release)
+		require.NoError(t, <-firstDone)
+		require.NoError(t, <-secondDone)
+	}
+
+	assert.Equal(t, 1, countRows(t, `SELECT count(*) FROM ai_usage_alert WHERE tenant_id = $1 AND level = 100`, tenant.ID),
+		"1,020,000 of 1,000,000 used: the limit is reached")
+	assert.Len(t, limitAudits(t, tenant.ID)["ai_usage.limit_reached"], 1)
+}
+
+// The notices follow the limit: raised past this month's use, the "limit
+// reached" notice goes, and reaching the new limit is announced again;
+// lowered below it, the limit is announced at once (no AI work can start
+// to announce it later).
+func TestTheAILimitNoticesFollowTheCompanysLimit(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, bigAllowance)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	monthKey := agencyMonth(t).Format("2006-01")
+	save := func(tokens int64) {
+		t.Helper()
+		version := a.aiUsageSettings(owner).Version
+		res := a.request(http.MethodPut, "/v1/ai-usage/settings", owner, tokenLimit(tokens, version))
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+
+	// Lowered below this month's use: announced when saved.
+	a.recordAIUse(tenant.ID, aiusage.Use{Feature: aiusage.FeatureAssistant, SourceID: "ask_a", Input: 6000})
+	assert.Empty(t, a.aiLimitItems(owner), "6,000 of 1,000,000")
+	save(5000)
+	items := a.aiLimitItems(owner)
+	require.Len(t, items, 1)
+	assert.Equal(t, "ai_limit:"+monthKey+":100", items[0].Id)
+	assert.Len(t, limitAudits(t, tenant.ID)["ai_usage.limit_reached"], 1)
+
+	// Raised: AI works again, and the notice goes.
+	save(50_000)
+	assert.Empty(t, a.aiLimitItems(owner), "6,000 of 50,000: neither the limit nor the warning")
+	seen := a.notifications(owner)
+	require.Equal(t, http.StatusNoContent, a.request(http.MethodPost, "/v1/notifications/seen", owner, map[string]any{"upTo": seen.AsOf}).Status)
+
+	// The new limit reached: announced again, as new.
+	a.recordAIUse(tenant.ID, aiusage.Use{Feature: aiusage.FeatureAssistant, SourceID: "ask_b", Input: 44_000})
+	items = a.aiLimitItems(owner)
+	require.Len(t, items, 1)
+	assert.Equal(t, "ai_limit:"+monthKey+":100", items[0].Id)
+	assert.True(t, items[0].New, "reached after the owner looked")
+	assert.Len(t, limitAudits(t, tenant.ID)["ai_usage.limit_reached"], 2, "each time the limit is reached")
 }

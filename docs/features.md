@@ -491,15 +491,48 @@ the panel takes the whole width).
   OpenAI-compatible chat API, e.g. a host running DeepSeek's open model in a
   region you choose) serves companies that chose none. Data location matters
   under Malaysia's PDPA: DeepSeek's own API stores data in China.
-- **Costs.** Tokens are recorded per answer; each company has a monthly
-  allowance (`HP_AI_MONTHLY_TOKENS`, default 2,000,000) for the assistant and
-  CV vs job matching together, shown in the panel. Once used, asking is
-  refused (`ASSISTANT_LIMIT_REACHED`) until the 1st.
+- **Costs.** Tokens are recorded per answer in the AI use ledger (see
+  [AI usage and its limit](#ai-usage-and-its-limit)); every AI feature counts
+  against one monthly limit per company, shown in the panel as a percentage.
+  Once used, asking is refused (`ASSISTANT_LIMIT_REACHED`) until the 1st.
 - **Flow.** Browser → Go API (permission check, context, allowance) → job
   queue → Python AI worker → provider → result job → Go saves it; the page
   polls while an answer is on its way. Questions and answers are never logged.
 - **Later:** streaming answers, notes in the context (with the sensitive-notes
   permission).
+
+### AI usage and its limit
+
+Built in 1.44.0 (the usage page in Settings comes next).
+
+- **One ledger.** Every AI run (assistant answers and emails, fit scores, AI
+  candidate searches, CV readings, formatted CVs, blind ads, JD readings,
+  industry picks, interview prep, provider key checks) adds a row to `ai_use`:
+  the feature, who asked (none for automatic work), the record it was for, and
+  its input and output tokens. The ledger is append-only: deleting the record
+  (Bin purge, a JD file deleted, answers forgotten) leaves the use counted. A
+  result delivered twice counts once (each run has its own key); a new run of
+  the same record (a CV read again, a fit score refreshed) counts again. A use
+  counts in the month the AI did the work (agency time, `HP_TIME_ZONE`).
+- **The limit.** Each company has one monthly limit for every AI feature
+  together: in tokens (`HP_AI_MONTHLY_TOKENS` is the default for a company that
+  set none) or in money at its own prices per million input and output tokens.
+  Owners and admins (`aiusage:manage`) set it with `PUT /v1/ai-usage/settings`.
+  Once it is reached, AI work is refused until the 1st (the assistant and fit
+  scores answer `*_LIMIT_REACHED`, CVs are read by the rules alone); AI work
+  already on its way finishes.
+- **Warnings.** When the month's use reaches the company's warning percent
+  (80% by default) and again at 100%, those who may see the company's AI use
+  (`aiusage:read`) get a bell item (`ai_limit`, can be turned off) and a line in
+  the morning email; each is audited once (`ai_usage.warning_reached`,
+  `ai_usage.limit_reached`: the percent and month only). Changing the limit
+  checks again: a limit set below this month's use is announced at once, and a
+  raised one takes the notice away (reaching the new limit is announced again).
+  Everyone sees a banner while the limit is reached (`GET /v1/ai-usage/status`).
+- **Costs.** `GET /v1/ai-usage` gives the month by feature and by person and
+  the last months. Costs are estimates from the company's current prices; the
+  provider's bill is final. History before 1.44.0 was copied into the ledger
+  from each feature's own records.
 
 ### AI help in the email windows ✅
 

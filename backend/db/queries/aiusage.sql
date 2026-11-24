@@ -72,3 +72,16 @@ ON CONFLICT (tenant_id, month, level) DO NOTHING;
 -- The levels a month's use reached, and when.
 -- name: LevelsReached :many
 SELECT level, reached_at FROM ai_usage_alert WHERE month = @month::date ORDER BY level;
+
+-- Serialises the alert check of the company's recordings and settings
+-- changes until the transaction ends, so two results landing together see
+-- each other's use and a level crossed by both together is noted. Its own
+-- lock, not the allowance's: admissions take that one before row locks.
+-- name: LockAlerts :exec
+SELECT pg_advisory_xact_lock(hashtextextended('ai-usage-alerts:' || app_current_tenant(), 0));
+
+-- Forgets a month's levels the use no longer reaches (the limit was raised,
+-- or the warning percent changed), so reaching them again is announced again.
+-- name: ForgetLevels :exec
+DELETE FROM ai_usage_alert WHERE month = @month::date
+  AND ((level = 100 AND NOT @reached::boolean) OR (level < 100 AND NOT @warned::boolean));

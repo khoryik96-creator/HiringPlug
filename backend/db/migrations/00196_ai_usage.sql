@@ -98,8 +98,8 @@ INSERT INTO ai_use (tenant_id, feature, user_id, source_id, input_tokens, output
 SELECT tenant_id, 'talent_search', nullif(created_by, 'system'), id, tokens, 0, created_at
 FROM talent_search WHERE tokens > 0;
 
--- document_ai_use and studio_cv_ai_use have no id: a row per reading of the
--- document (or run of the formatted CV), numbered to keep each one.
+-- document_ai_use has no id: a row per reading of the document, numbered to
+-- keep each one.
 INSERT INTO ai_use (tenant_id, feature, user_id, source_id, run_key, input_tokens, output_tokens, used_at)
 SELECT u.tenant_id, 'cv_reading', nullif(d.created_by, 'system'), u.document_id,
        'before-1.44:' || row_number() OVER (PARTITION BY u.tenant_id, u.document_id ORDER BY u.created_at),
@@ -108,13 +108,17 @@ FROM document_ai_use u
 LEFT JOIN document d ON d.tenant_id = u.tenant_id AND d.id = u.document_id
 WHERE u.tokens > 0;
 
+-- A formatted CV is one AI run: a second studio_cv_ai_use row for it was the
+-- same result delivered again, so only the first counts. Its run key is the
+-- one used from now on (''), so a result delivered again after the update
+-- is not counted twice either.
 INSERT INTO ai_use (tenant_id, feature, user_id, source_id, run_key, input_tokens, output_tokens, used_at)
-SELECT u.tenant_id, 'cv_studio', nullif(s.created_by, 'system'), u.studio_cv_id,
-       'before-1.44:' || row_number() OVER (PARTITION BY u.tenant_id, u.studio_cv_id ORDER BY u.created_at),
-       u.tokens, 0, u.created_at
+SELECT DISTINCT ON (u.tenant_id, u.studio_cv_id)
+       u.tenant_id, 'cv_studio', nullif(s.created_by, 'system'), u.studio_cv_id, '', u.tokens, 0, u.created_at
 FROM studio_cv_ai_use u
 LEFT JOIN studio_cv s ON s.tenant_id = u.tenant_id AND s.id = u.studio_cv_id
-WHERE u.tokens > 0;
+WHERE u.tokens > 0
+ORDER BY u.tenant_id, u.studio_cv_id, u.created_at;
 
 INSERT INTO ai_use (tenant_id, feature, user_id, source_id, input_tokens, output_tokens, used_at)
 SELECT tenant_id, 'jd_blind', nullif(created_by, 'system'), id, tokens, 0, created_at

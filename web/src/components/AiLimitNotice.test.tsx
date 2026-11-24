@@ -1,13 +1,28 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { useQuery } from "@tanstack/react-query";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient } from "../test-utils";
-import { AiLimitNotice, resetDay } from "./AiLimitNotice";
+import { AiLimitNotice, aiUsageStatusKey, resetDay } from "./AiLimitNotice";
 
 // The agency's 1 Dec (Kuala Lumpur, 8 hours ahead of UTC).
 const reached: Schemas["AiUsageStatus"] = { usedPercent: 103, warn: false, reached: true, resetsAt: "2026-11-30T16:00:00Z" };
 const warned: Schemas["AiUsageStatus"] = { usedPercent: 85, warn: true, reached: false, resetsAt: "2026-11-30T16:00:00Z" };
+
+/**
+ * Shows once the status has loaded (it renders with the notice), so a test
+ * can tell "the notice shows nothing" from "the status has not come yet".
+ */
+function Loaded() {
+  const status = useQuery<Schemas["AiUsageStatus"]>({ queryKey: aiUsageStatusKey, queryFn: () => new Promise(() => undefined), enabled: false });
+  return status.data ? <span>status loaded</span> : null;
+}
+
+function renderNotice() {
+  renderWithClient(<><AiLimitNotice permissions={["aiusage:read"]} /><Loaded /></>);
+  return screen.findByText("status loaded");
+}
 
 beforeEach(() => { sessionStorage.clear(); });
 afterEach(() => {
@@ -23,6 +38,7 @@ describe("the notice when the company's AI limit is reached", () => {
     expect(get.mock.calls[0]?.[0]).toBe("/v1/ai-usage/status");
     expect(notice.textContent).toContain("This month's AI limit is reached: AI features are paused until 1 Dec.");
     expect(notice.textContent).toContain("fit scores");
+    expect(notice.textContent, "they refuse until then: nothing waits").toContain("try them again from 1 Dec.");
     expect(screen.queryByRole("link", { name: "See the company's AI use" }), "only for those who may see it").toBeNull();
   });
 
@@ -33,9 +49,8 @@ describe("the notice when the company's AI limit is reached", () => {
   });
 
   it("shows nothing before the limit, the warning level included", async () => {
-    const get = vi.spyOn(api, "GET").mockResolvedValue(ok(warned));
-    renderWithClient(<AiLimitNotice permissions={["aiusage:read"]} />);
-    await waitFor(() => { expect(get).toHaveBeenCalled(); });
+    vi.spyOn(api, "GET").mockResolvedValue(ok(warned));
+    await renderNotice();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -46,8 +61,8 @@ describe("the notice when the company's AI limit is reached", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     cleanup();
 
-    renderWithClient(<AiLimitNotice permissions={[]} />);
-    await waitFor(() => { expect(get).toHaveBeenCalledTimes(2); });
+    await renderNotice();
+    expect(get).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert"), "the same month").toBeNull();
     cleanup();
 

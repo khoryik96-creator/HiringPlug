@@ -27,9 +27,17 @@ func monthDate(start time.Time) pgtype.Date {
 }
 
 // noteLevels stores the levels this month's use reached for the first time
-// and audits each once (the percent and month only). It runs in tx as the
-// system for the company, right after a use was recorded.
+// and audits each once (the percent and month only); levels it no longer
+// reaches (the limit was raised) are forgotten, so reaching them again is
+// announced again. It runs in tx as the system for the company, right after
+// a use was recorded or the settings were saved.
 func (s *Service) noteLevels(ctx context.Context, tx pgx.Tx, q *store.Queries, tenantID string) error {
+	// One check at a time per company: without it, two results landing
+	// together each see only their own use and neither notes the level
+	// they crossed together.
+	if err := q.LockAlerts(ctx); err != nil {
+		return err
+	}
 	set, err := readSettings(ctx, q)
 	if err != nil {
 		return err
@@ -40,7 +48,13 @@ func (s *Service) noteLevels(ctx context.Context, tx pgx.Tx, q *store.Queries, t
 	if err != nil {
 		return err
 	}
-	levels := LevelsReached(set.Limit(s.config.DefaultTokens), Spent{Input: use.InputTokens, Output: use.OutputTokens})
+	limit, spent := set.Limit(s.config.DefaultTokens), Spent{Input: use.InputTokens, Output: use.OutputTokens}
+	levels := LevelsReached(limit, spent)
+	if err := q.ForgetLevels(ctx, store.ForgetLevelsParams{
+		Month: monthDate(start), Reached: Reached(limit, spent), Warned: len(levels) > 0,
+	}); err != nil {
+		return err
+	}
 	for _, level := range levels {
 		n, err := q.ReachLevel(ctx, store.ReachLevelParams{Month: monthDate(start), Level: int16(level)}) //nolint:gosec // 1..100
 		if err != nil {

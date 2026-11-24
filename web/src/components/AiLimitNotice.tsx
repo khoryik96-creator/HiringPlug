@@ -1,6 +1,7 @@
 // A notice across the app once the company has used this month's whole AI
-// limit: everyone knows why CV reading, fit scores, formatting and the
-// assistant stopped, and until when. Those who may see the company's AI use
+// limit: everyone knows why CV reading, fit scores, formatting, the
+// assistant and the other AI features stopped (they refuse, nothing waits),
+// and until when. Those who may see the company's AI use
 // get a link to it. Closing it hides it for this month, in this session.
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -44,7 +45,8 @@ export function AiLimitNotice({ permissions }: { permissions: Permission[] }) {
     <div className="ai-notice ai-limit-notice" role="alert">
       <div>
         <strong>This month&apos;s AI limit is reached: AI features are paused until {resetDay(s.resetsAt)}.</strong>{" "}
-        Until then, CVs are read without the AI, and fit scores, CV formatting and the assistant wait; nothing is lost.
+        Until then, CVs are read without the AI, and fit scores, CV formatting, the assistant and the other AI features are
+        off: try them again from {resetDay(s.resetsAt)}.
         {permissions.includes("aiusage:read") && <> <a href="#/settings/ai-usage">See the company&apos;s AI use</a></>}
       </div>
       <button type="button" className="link" onClick={close} aria-label="Close the AI limit notice">Close</button>

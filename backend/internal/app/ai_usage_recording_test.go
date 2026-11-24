@@ -219,3 +219,65 @@ func TestAKeyCheckCountsInTheCompanysAIUse(t *testing.T) {
 		`SELECT user_id FROM ai_use WHERE tenant_id = $1 AND source_id = $2`, tenant.ID, *check.CheckId).Scan(&who))
 	assert.Equal(t, owner.ID, who, "who asked for the check")
 }
+
+// A CV read again while its first reading is still with the AI is two AI
+// runs: both count, though only the first result to land is kept.
+func TestACVReadAgainWhileBeingReadCountsBothReadings(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, bigAllowance)
+	aiConn := aiConnFor(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	doc, first, firstPayload := readCV(t, a, aiConn, token, "SITI AISYAH works at Contoh Sdn Bhd")
+
+	// Read again before the first reading's result lands.
+	res := a.request(http.MethodPost, "/v1/documents/"+doc.Id+"/parse", token, nil)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, "SITI AISYAH works at Contoh Sdn Bhd"))
+	second := claimAIJobFor(t, aiConn, doc.Id)
+	require.Equal(t, "document.parse_cv", second.Kind)
+	var secondPayload api.DocumentParseCvJob
+	require.NoError(t, json.Unmarshal(second.Payload, &secondPayload))
+	require.NotEqual(t, *firstPayload.RunKey, *secondPayload.RunKey, "each reading has its own key")
+
+	reading := func(runKey *string, tokens int) api.DocumentCvParsedJob {
+		return api.DocumentCvParsedJob{
+			DocumentId: doc.Id, ErrorMessage: nullable.NewNullNullable[string](), AiTokens: &tokens, RunKey: runKey,
+			Profile: nullable.NewNullableWithValue(api.ParsedProfile{
+				Parser: "rules@1+ai", FullName: sourced("Siti Aisyah", "SITI AISYAH"),
+				Skills: []api.SourcedText{}, Experience: []api.ParsedJob{}, Education: []api.ParsedEducation{},
+			}),
+		}
+	}
+	answerAIJob(t, a, aiConn, first, api.JobKindDocumentCvParsed, reading(firstPayload.RunKey, 1700))
+	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300))
+	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300)) // delivered again
+	assert.EqualValues(t, 1700+1300, a.usedThisMonth(token), "both readings used the AI")
+	assert.Equal(t, 2, countRows(t, `SELECT count(*) FROM ai_use WHERE tenant_id = $1 AND feature = 'cv_reading'`, tenant.ID))
+}
+
+// A job description uploaded last month and read by the AI this month
+// counts in this month's use: when the AI read it, not when it came.
+func TestAJobDescriptionReadCountsWhenTheAIReadIt(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, bigAllowance)
+	aiConn := aiConnFor(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	token := tenant.Users[api.RoleOwner].Token
+	res := a.upload("/v1/jd-files", token, "", "JD.pdf", minimalPDF)
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var jd api.JdFile
+	res.JSON(&jd)
+	lastMonth := agencyMonth(t).AddDate(0, 0, -3)
+	_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE job_description_file SET created_at = $1 WHERE id = $2`, lastMonth, jd.Id)
+	require.NoError(t, err)
+
+	tokens := 900
+	answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "jdFileId", jd.Id), api.JobKindJobJdRead, api.JobJdReadJob{
+		JdFileId: jd.Id, Status: api.ExtractionStatusExtracted, Text: nullable.NewNullableWithValue("Hub Manager\nRun the hub."),
+		ErrorMessage: nullable.NewNullNullable[string](), AiTokens: &tokens, AiDetails: nullable.NewNullNullable[api.JdAiDetails](),
+	})
+	assert.EqualValues(t, 900, a.usedThisMonth(token), "read this month")
+	assert.Equal(t, 1, countRows(t, `SELECT count(*) FROM ai_use WHERE tenant_id = $1 AND feature = 'jd_reading' AND used_at >= $2`,
+		tenant.ID, agencyMonth(t)))
+}

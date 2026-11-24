@@ -12,6 +12,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const forgetLevels = `-- name: ForgetLevels :exec
+DELETE FROM ai_usage_alert WHERE month = $1::date
+  AND ((level = 100 AND NOT $2::boolean) OR (level < 100 AND NOT $3::boolean))
+`
+
+type ForgetLevelsParams struct {
+	Month   pgtype.Date
+	Reached bool
+	Warned  bool
+}
+
+// Forgets a month's levels the use no longer reaches (the limit was raised,
+// or the warning percent changed), so reaching them again is announced again.
+func (q *Queries) ForgetLevels(ctx context.Context, arg ForgetLevelsParams) error {
+	_, err := q.db.Exec(ctx, forgetLevels, arg.Month, arg.Reached, arg.Warned)
+	return err
+}
+
 const getSetting = `-- name: GetSetting :one
 SELECT limit_kind, limit_tokens, limit_money, currency, price_input_per_million, price_output_per_million,
        warn_percent, version, updated_at
@@ -112,6 +130,19 @@ func (q *Queries) LevelsReached(ctx context.Context, month pgtype.Date) ([]Level
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockAlerts = `-- name: LockAlerts :exec
+SELECT pg_advisory_xact_lock(hashtextextended('ai-usage-alerts:' || app_current_tenant(), 0))
+`
+
+// Serialises the alert check of the company's recordings and settings
+// changes until the transaction ends, so two results landing together see
+// each other's use and a level crossed by both together is noted. Its own
+// lock, not the allowance's: admissions take that one before row locks.
+func (q *Queries) LockAlerts(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockAlerts)
+	return err
 }
 
 const reachLevel = `-- name: ReachLevel :execrows
