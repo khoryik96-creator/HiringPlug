@@ -21,31 +21,63 @@ type candidateFollowUp struct {
 	userID, organizer              string // the organizer's id and name
 	iv                             api.Interview
 	path                           string
+	managerID                      string // the hiring manager on the panel, when asked for
+}
+
+// outlookInvite is how a test's interview invitation is sent.
+type outlookInvite struct {
+	teams    bool
+	bodyHTML string // a formatted message
+	panel    bool   // a hiring manager interviews too
+	// lateTeams asks for Teams, but Outlook answers the create before it has
+	// the meeting (its join details arrive later).
+	lateTeams bool
 }
 
 func startCandidateFollowUp(t *testing.T) candidateFollowUp {
 	t.Helper()
+	return startOutlookInvitation(t, outlookInvite{teams: true})
+}
+
+// startOutlookInvitation sends an interview invitation (with the candidate's
+// email reminder on) from a recruiter's connected Outlook.
+func startOutlookInvitation(t *testing.T, o outlookInvite) candidateFollowUp {
+	t.Helper()
 	a := newTestApp(t)
-	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	roles := []api.Role{api.RoleRecruiter}
+	if o.panel {
+		roles = append(roles, api.RoleHiringManager)
+	}
+	tenant := testutil.Current.NewTenant(t, roles...)
 	user := tenant.Users[api.RoleRecruiter]
 	f := setupOutlook(t, a)
-	f.mu.Lock()
-	f.trialJoinURL = trialJoin
-	f.mu.Unlock()
+	if o.teams {
+		f.mu.Lock()
+		f.trialJoinURL = trialJoin
+		f.mu.Unlock()
+	}
 	connectOutlook(t, a, user.Token)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 
 	email := "nadia." + tenant.ID + "@example.test"
-	iv, candidate := scheduleOutlookTestInterview(t, a, user.Token, email, []string{user.ID})
+	panel, manager := []string{user.ID}, ""
+	if o.panel {
+		manager = tenant.Users[api.RoleHiringManager].ID
+		panel = append(panel, manager)
+	}
+	iv, candidate := scheduleOutlookTestInterview(t, a, user.Token, email, panel)
 	path := "/v1/interviews/" + iv.Id
-	in := inviteInput(iv, true)
+	in := inviteInput(iv, o.teams || o.lateTeams)
 	in["candidateReminder"] = true
+	if o.bodyHTML != "" {
+		in["bodyHtml"] = o.bodyHTML
+	}
 	res := a.request(http.MethodPost, path+"/outlook-invitation", user.Token, in)
 	require.Equal(t, 202, res.Status, "%s", res.Body)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	var name string
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), "SELECT name FROM app_user WHERE id=$1", user.ID).Scan(&name))
-	return candidateFollowUp{a, t, f, tenant.ID, user.Token, email, candidate, user.ID, name, iv, path}
+	return candidateFollowUp{a, t, f, tenant.ID, user.Token, email, candidate, user.ID, name, iv, path, manager}
 }
 
 func (c candidateFollowUp) reply(status string) api.InterviewInvitation {

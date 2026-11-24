@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const at = (h: number, m = 0) => new Date(2026, 10, 18, h, m);
 const event = (id: string, title: string, from: Date, to: Date) => ({
   id, version: 1, title, startsAt: from.toISOString(), endsAt: to.toISOString(), notes: "", location: "", timeZone: "UTC", allDay: false,
-  teams: false, attendees: [], source: "outlook", sourceId: null, status: "active", syncStatus: "synced", syncError: null, webUrl: null, joinUrl: null, editable: false,
+  teams: false, attendees: [], source: "outlook", sourceId: null, status: "active", syncStatus: "synced", syncError: null, webUrl: null, joinUrl: null, editable: false, outlookChangedAt: null,
 });
 
 it("shows the day with the new meeting on it, and says when it overlaps", async () => {

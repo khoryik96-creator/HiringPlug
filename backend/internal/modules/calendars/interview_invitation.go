@@ -163,6 +163,7 @@ func (m *Module) SendInterviewInvitation(ctx context.Context, tx pgx.Tx, p authz
 			InterviewID: ptr(id), SourceVersion: int32(in.Version), Title: meeting.Title, Notes: meeting.Instructions, NotesHtml: bodyHTML, Location: bounded(meeting.Location, 500), //nolint:gosec // checked against the database version
 			StartsAt: meeting.Start, EndsAt: meeting.End, Teams: in.Teams, Attendees: attendees, ReminderMinutes: int32(in.ReminderMinutes), //nolint:gosec // reminder range is bounded by the contract
 			InvitationSubject: ptr(conn.SubjectID), InvitationCalendar: ptr(conn.CalendarID), CandidateReminder: reminder,
+			CandidateEmail: ptr(email),
 		})
 	} else {
 		row, err = s.syncInvitationProjection(ctx, tx, row, meeting)
@@ -244,12 +245,12 @@ func (s *Service) invitationRecipient(ctx context.Context, tx pgx.Tx, meeting Me
 		return "", "Add a valid email address to the candidate profile before sending.", nil //nolint:nilerr // Invalid candidate email is a user-facing availability reason.
 	}
 	if row.ID != "" {
-		var people []api.CalendarAttendee
-		if err := json.Unmarshal(row.Attendees, &people); err != nil {
+		// The invitation's candidate (people added in Outlook are not).
+		pinned, err := candidateAttendee(row)
+		if err != nil {
 			return "", "", err
 		}
-		required := requiredAttendees(people)
-		if len(required) != 1 || !strings.EqualFold(string(required[0].Email), address) {
+		if !strings.EqualFold(pinned, address) {
 			return "", "The candidate email changed. Review the original invitation in Outlook.", nil
 		}
 	}

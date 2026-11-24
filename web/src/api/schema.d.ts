@@ -6263,6 +6263,11 @@ export interface components {
             webUrl: string | null;
             joinUrl: string | null;
             editable: boolean;
+            /**
+             * Format: date-time
+             * @description When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting.
+             */
+            outlookChangedAt: string | null;
         };
         CalendarEventList: {
             items: components["schemas"]["CalendarEvent"][];
@@ -9520,6 +9525,11 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: date-time
+             * @description When HiringPlug last took a change its organizer made in Outlook to this interview.
+             */
+            outlookChangedAt: string | null;
         };
         InterviewList: {
             items: components["schemas"]["Interview"][];

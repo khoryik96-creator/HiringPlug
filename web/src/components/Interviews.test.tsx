@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { failure, ok, RECRUITER, renderWithClient, sentBody, testMe } from "../test-utils";
+import { formatWhen } from "../labels";
 import { ApplicationInterviews, InterviewItem } from "./Interviews";
 
 afterEach(() => {
@@ -17,7 +18,7 @@ const interview = (over: Partial<Schemas["Interview"]> = {}): Schemas["Interview
   mode: "video", location: "https://meet.example/abc", instructions: null, status: "scheduled",
   interviewers: [{ userId: me.user.id, name: "Demo" }, { userId: "usr_2", name: "Aina" }],
   feedback: [], feedbackHidden: 0, myFeedbackDue: false, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
-  ...over,
+  outlookChangedAt: null, ...over,
 });
 const reads = (items: Schemas["Interview"][]) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) => {
@@ -260,6 +261,15 @@ describe("interviews", () => {
     reads([]);
     renderWithClient(<InterviewItem interview={interview({ location: "https://meet.google.com/abc-defg-hij" })} permissions={["interviews:read"]} />);
     expect((await screen.findByRole("link", { name: "Join Google Meet" })).getAttribute("href")).toBe("https://meet.google.com/abc-defg-hij");
+  });
+
+  it("says when the interview was last changed in Outlook", async () => {
+    reads([]);
+    renderWithClient(<InterviewItem interview={interview({ outlookChangedAt: "2026-11-24T06:30:00Z" })} permissions={["interviews:read"]} />);
+    expect(await screen.findByText(`Changed in Outlook ${formatWhen("2026-11-24T06:30:00Z")}`)).toBeTruthy();
+    cleanup();
+    renderWithClient(<InterviewItem interview={interview()} permissions={["interviews:read"]} />);
+    expect(screen.queryByText(/Changed in Outlook/)).toBeNull();
   });
 
   it("asks interviewers for feedback once the interview has taken place", async () => {

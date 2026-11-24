@@ -114,7 +114,7 @@ func eventAPI(row store.CalendarEvent) (api.CalendarEvent, error) {
 	if err := json.Unmarshal(row.Attendees, &people); err != nil {
 		return api.CalendarEvent{}, err
 	}
-	return api.CalendarEvent{Id: row.ID, Version: int(row.Version), Title: row.Title, Notes: row.Notes, NotesHtml: c.OrNull(row.NotesHtml), Location: row.Location, StartsAt: row.StartsAt, EndsAt: row.EndsAt, TimeZone: row.TimeZone, AllDay: row.AllDay, Teams: row.Teams, Attendees: people, Source: api.CalendarEventSource(row.Source), SourceId: c.OrNull(row.SourceID), Status: api.CalendarEventStatus(row.Status), SyncStatus: api.CalendarEventSyncStatus(row.SyncStatus), SyncError: c.OrNull(row.SyncError), WebUrl: c.OrNull(row.WebUrl), JoinUrl: c.OrNull(row.JoinUrl), Editable: row.Source == "local" && row.Status == "active"}, nil
+	return api.CalendarEvent{Id: row.ID, Version: int(row.Version), Title: row.Title, Notes: row.Notes, NotesHtml: c.OrNull(row.NotesHtml), Location: row.Location, StartsAt: row.StartsAt, EndsAt: row.EndsAt, TimeZone: row.TimeZone, AllDay: row.AllDay, Teams: row.Teams, Attendees: people, Source: api.CalendarEventSource(row.Source), SourceId: c.OrNull(row.SourceID), Status: api.CalendarEventStatus(row.Status), SyncStatus: api.CalendarEventSyncStatus(row.SyncStatus), SyncError: c.OrNull(row.SyncError), WebUrl: c.OrNull(row.WebUrl), JoinUrl: c.OrNull(row.JoinUrl), Editable: row.Source == "local" && row.Status == "active", OutlookChangedAt: c.OrNull(row.OutlookChangedAt)}, nil
 }
 func (s *Service) save(ctx context.Context, p authz.Principal, id string, version int, in Input) (api.CalendarEvent, error) {
 	var out api.CalendarEvent

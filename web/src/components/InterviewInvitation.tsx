@@ -9,7 +9,7 @@ type Interview = Schemas["Interview"];
 type Invitation = Schemas["InterviewInvitation"];
 const labels: Record<Invitation["status"], string> = {
   none: "", pending: "Waiting for Outlook", sent: "Sent in Outlook",
-  failed: "Needs attention", conflict: "Changed in Outlook", cancelled: "Cancellation synced",
+  failed: "Needs attention", conflict: "Needs review in Outlook", cancelled: "Cancellation synced",
 };
 const responses: Record<NonNullable<Invitation["candidateResponse"]>, string> = {
   not_responded: "Awaiting response", accepted: "Accepted", tentative: "Tentative", declined: "Declined",

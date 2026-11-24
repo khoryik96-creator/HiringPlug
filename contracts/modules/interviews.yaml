@@ -334,7 +334,7 @@ components:
         submittedAt: { type: string, format: date-time }
     Interview:
       type: object
-      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, title, startsAt, durationMinutes, mode, location, instructions, status, interviewers, feedback, feedbackHidden, myFeedbackDue, createdAt, updatedAt]
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, title, startsAt, durationMinutes, mode, location, instructions, status, interviewers, feedback, feedbackHidden, myFeedbackDue, createdAt, updatedAt, outlookChangedAt]
       properties:
         id: { $ref: '#/components/schemas/InterviewId' }
         version: { type: integer }
@@ -363,6 +363,7 @@ components:
         myFeedbackDue: { type: boolean, description: 'You interview on it, it has taken place, and you have not given feedback.' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        outlookChangedAt: { type: string, format: date-time, nullable: true, description: 'When HiringPlug last took a change its organizer made in Outlook to this interview.' }
     InterviewList:
       type: object
       required: [items]

@@ -27,6 +27,13 @@ type Meeting struct {
 	Start, End                        time.Time
 	Cancelled, Scheduled              bool
 }
+
+// MeetingChange is what an interview's organizer changed in Outlook to its
+// invitation (nil: unchanged).
+type MeetingChange struct {
+	Title, Location, Instructions *string
+	Start, End                    *time.Time
+}
 type Deps struct {
 	Apps interface {
 		MicrosoftApp(context.Context, pgx.Tx, string) (Application, error)
@@ -49,6 +56,13 @@ type Deps struct {
 	ReminderMail interface {
 		// QueueInterviewReminder(tenant, application, organizer, email, at, reminder): sent as the organizer.
 		QueueInterviewReminder(context.Context, pgx.Tx, string, string, string, string, time.Time, api.InterviewReminderDelivery) error
+	}
+	// Interviews takes into an interview what its organizer changed in Outlook
+	// (title, place, instructions, time), in the caller's transaction, and
+	// answers with the interview as it is now. Without it, an interview
+	// changed in Outlook is flagged for review.
+	Interviews interface {
+		ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id string, version int, c MeetingChange) (Meeting, error)
 	}
 }
 type Provider struct{ AuthorizeURL, TokenURL, GraphURL string }
@@ -92,6 +106,9 @@ func (m *Module) ConnectOutlookWith(deps Deps, c Config) {
 	}
 	if deps.ReminderMail != nil {
 		m.service.deps.ReminderMail = deps.ReminderMail
+	}
+	if deps.Interviews != nil {
+		m.service.deps.Interviews = deps.Interviews
 	}
 	if c.TimeZone == nil {
 		c.TimeZone = m.service.config.TimeZone

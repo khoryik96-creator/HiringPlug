@@ -50,6 +50,15 @@ UPDATE interview SET
 WHERE id = @id AND version = @expected_version
 RETURNING *;
 
+-- What the organizer changed in Outlook to the interview's invitation.
+-- name: UpdateInterviewFromOutlook :one
+UPDATE interview SET
+  title = @title, starts_at = @starts_at, duration_minutes = @duration_minutes, ends_at = @ends_at,
+  location = sqlc.narg(location), instructions = sqlc.narg(instructions),
+  outlook_changed_at = now(), version = version + 1, updated_at = now()
+WHERE id = @id AND version = @expected_version AND status = 'scheduled'
+RETURNING *;
+
 -- name: ListFeedback :many
 SELECT * FROM interview_feedback WHERE interview_id = ANY(@interview_ids::text[]) ORDER BY submitted_at;
 

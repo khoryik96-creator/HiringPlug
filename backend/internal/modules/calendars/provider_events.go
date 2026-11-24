@@ -214,9 +214,16 @@ func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
 	// Formatted notes are sent only when HiringPlug changed them (Outlook rewrites
 	// HTML, so they cannot be compared with what it holds).
 	formatted := row.NotesHtml != nil && *row.NotesHtml != ""
-	if row.Teams || sent.OnlineMeeting != nil || (formatted && !row.BodyDirty) ||
+	// A message rewritten in Outlook stays as Outlook has it.
+	if row.Teams || sent.OnlineMeeting != nil || (formatted && !row.BodyDirty) || (row.OutlookBody && !row.BodyDirty) ||
 		(!formatted && sent.Body.ContentType == "text" && strings.TrimSpace(sent.Body.Content) == strings.TrimSpace(row.Notes)) {
 		delete(patch, "body")
+	}
+	// The people of an interview invitation or hold are sent only when they
+	// are not those Outlook last had: people added in Outlook stay, even
+	// those HiringPlug cannot read.
+	if row.Source != "local" && len(row.RemoteSnapshot) > 0 && sent.ID != "" && sameAttendees(sent.attendees(), row.Attendees) {
+		delete(patch, "attendees")
 	}
 	return json.Marshal(patch)
 }

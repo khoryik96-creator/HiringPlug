@@ -10,7 +10,7 @@ const interview = {
   candidateName: "Nadia", jobId: "jo_1", jobTitle: "Engineer", title: "Technical interview",
   startsAt: "2026-12-15T03:00:00Z", durationMinutes: 45, mode: "video", location: null,
   instructions: null, status: "scheduled", interviewers: [], feedback: [], feedbackHidden: 0,
-  myFeedbackDue: false, createdAt: "2026-11-18T00:00:00Z", updatedAt: "2026-11-18T00:00:00Z",
+  myFeedbackDue: false, createdAt: "2026-11-18T00:00:00Z", updatedAt: "2026-11-18T00:00:00Z", outlookChangedAt: null,
 } satisfies Schemas["Interview"];
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -52,4 +52,16 @@ it("starts with Teams ticked for an interview scheduled as a Teams meeting", asy
   renderWithClient(<InterviewInvitation interview={{ ...interview, location: "https://zoom.us/j/1" }} />);
   fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
   expect((await screen.findByLabelText<HTMLInputElement>("Microsoft Teams meeting")).checked).toBe(false);
+});
+
+it("says an invitation changed in both places needs review in Outlook", async () => {
+  const state = {
+    status: "conflict", canSend: true, teamsAvailable: true, teams: false, reminderMinutes: 15,
+    recipient: "nadia@example.test", joinUrl: null, issue: null,
+  } satisfies Schemas["InterviewInvitation"];
+  vi.spyOn(api, "GET").mockResolvedValue(ok(state));
+  renderWithClient(<InterviewInvitation interview={interview} />);
+  fireEvent.click(screen.getByRole("button", { name: "Outlook invitation" }));
+  expect(await screen.findByText("Needs review in Outlook")).toBeTruthy();
+  expect(screen.queryByText("Changed in Outlook")).toBeNull();
 });

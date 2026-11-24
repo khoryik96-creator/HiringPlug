@@ -69,6 +69,7 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
               : iv.location && <> · {link ? <a href={iv.location} target="_blank" rel="noreferrer">join</a> : place}</>}
           </div>
           <div className="muted">With {iv.interviewers.map((p) => p.name).join(", ")}</div>
+          {iv.outlookChangedAt && <div className="small muted">Changed in Outlook {formatWhen(iv.outlookChangedAt)}</div>}
         </div>
         <div className="row">
           <button type="button" className="link" onClick={() => { void downloadFrom(`/v1/interviews/${iv.id}/calendar.ics`, "interview.ics", "text/calendar"); }}>

@@ -68,3 +68,33 @@ func TestCalendarFile(t *testing.T) {
 		assert.LessOrEqual(t, len(line), 75, "lines are folded")
 	}
 }
+
+func TestApplyOutlookChange(t *testing.T) {
+	start := time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
+	d := Details{Title: "Technical interview", StartsAt: start, Duration: 45, Mode: "video", Location: ptr("Room 4"), Interviewers: []string{"u1"}, Status: "scheduled"}
+	minutes := func(n int) *int { return &n }
+	_, errs := ApplyOutlookChange(d, OutlookChange{Duration: minutes(4)})
+	assert.Error(t, errs.Err(), "shorter than HiringPlug schedules")
+	_, errs = ApplyOutlookChange(d, OutlookChange{Duration: minutes(481)})
+	assert.Error(t, errs.Err(), "longer than HiringPlug schedules")
+
+	got, errs := ApplyOutlookChange(d, OutlookChange{Title: ptr("   ")})
+	assert.NoError(t, errs.Err())
+	assert.Equal(t, "Technical interview", got.Title, "an empty subject keeps the title")
+
+	got, errs = ApplyOutlookChange(d, OutlookChange{Title: ptr(strings.Repeat("a", 150))})
+	assert.NoError(t, errs.Err())
+	assert.Len(t, got.Title, 100, "bounded to what an interview title holds")
+
+	got, errs = ApplyOutlookChange(d, OutlookChange{Location: ptr("")})
+	assert.NoError(t, errs.Err())
+	assert.Nil(t, got.Location, "an empty place clears it")
+
+	later := start.Add(24 * time.Hour)
+	got, errs = ApplyOutlookChange(d, OutlookChange{StartsAt: &later, Duration: minutes(75), Instructions: ptr("  Bring   ID. ")})
+	assert.NoError(t, errs.Err())
+	assert.Equal(t, later, got.StartsAt)
+	assert.Equal(t, 75, got.Duration)
+	assert.Equal(t, "Bring   ID.", *got.Instructions)
+	assert.Equal(t, "Room 4", *got.Location, "what Outlook did not change stays")
+}

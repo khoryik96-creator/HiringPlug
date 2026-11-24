@@ -506,6 +506,7 @@ components:
       - webUrl
       - joinUrl
       - editable
+      - outlookChangedAt
       properties:
         id:
           $ref: '#/components/schemas/CalendarEventId'
@@ -572,6 +573,11 @@ components:
           nullable: true
         editable:
           type: boolean
+        outlookChangedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting.
     CalendarEventList:
       type: object
       required:

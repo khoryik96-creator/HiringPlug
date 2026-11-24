@@ -110,6 +110,7 @@ func toAPI(v View) api.Interview {
 		Instructions: c.OrNull(d.Instructions), Status: api.InterviewStatus(d.Status),
 		Interviewers: make([]api.Interviewer, len(v.Interviewers)), Feedback: make([]api.Feedback, len(v.Feedback)),
 		FeedbackHidden: v.FeedbackHidden, MyFeedbackDue: v.MyFeedbackDue, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
+		OutlookChangedAt: c.OrNull(v.OutlookChangedAt),
 	}
 	for i, p := range v.Interviewers {
 		out.Interviewers[i] = api.Interviewer{UserId: p.ID, Name: p.Name}

@@ -963,6 +963,12 @@ class CalendarEvent(BaseModel):
     webUrl: Annotated[str | None, Field(...)]
     joinUrl: Annotated[str | None, Field(...)]
     editable: bool
+    outlookChangedAt: Annotated[
+        AwareDatetime | None,
+        Field(
+            description="When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting."
+        ),
+    ]
 
 
 class CalendarEventList(BaseModel):
@@ -8464,6 +8470,12 @@ class Interview(BaseModel):
     ]
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
+    outlookChangedAt: Annotated[
+        AwareDatetime | None,
+        Field(
+            description="When HiringPlug last took a change its organizer made in Outlook to this interview."
+        ),
+    ]
 
 
 class InterviewList(BaseModel):

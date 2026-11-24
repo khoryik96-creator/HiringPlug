@@ -32,6 +32,11 @@ func (s *Service) syncInvitationProjection(ctx context.Context, tx pgx.Tx, row s
 	}
 	location = bounded(location, 500)
 	formatted := s.refillInterview(row.NotesHtml, meeting)
+	if row.OutlookBody {
+		// Its message was rewritten in Outlook: HiringPlug's copy (the
+		// instructions, a template) is not sent over it.
+		notes, formatted = row.Notes, row.NotesHtml
+	}
 	if title == row.Title && notes == row.Notes && location == row.Location && start.Equal(row.StartsAt) && end.Equal(row.EndsAt) && status == row.Status && text(formatted) == text(row.NotesHtml) {
 		return store.New(tx).AdvanceInterviewInvitationSource(ctx, store.AdvanceInterviewInvitationSourceParams{
 			ID: row.ID, SourceVersion: int32(meeting.Version), //nolint:gosec // source versions are int32

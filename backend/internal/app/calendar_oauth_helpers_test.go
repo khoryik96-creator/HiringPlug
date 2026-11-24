@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -42,6 +43,7 @@ type outlookFixture struct {
 	deleteStatus                int            // answer to deletes when not 0 (a broken or busy Outlook)
 	trialJoinURL                string
 	onWrite                     func() // runs as Outlook takes a create or change, before it answers
+	strictMatch                 bool   // a change or delete whose If-Match is not the event's changeKey is refused (412)
 	config                      calendars.Config
 }
 
@@ -114,6 +116,10 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(404)
 			return
 		}
+		if f.strictMatch && r.Method != "GET" && r.Header.Get("If-Match") != `W/"`+fmt.Sprint(e["changeKey"])+`"` {
+			w.WriteHeader(http.StatusPreconditionFailed) // changed in Outlook since that version
+			return
+		}
 		switch r.Method {
 		case "DELETE":
 			if f.deleteStatus != 0 {
@@ -138,7 +144,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			for key, v := range patch {
 				e[key] = v
 			}
-			e["changeKey"] = "v2"
+			e["changeKey"] = fmt.Sprintf("v%d", f.patches+1)
 		}
 		_ = json.NewEncoder(w).Encode(answered(r, e))
 	default:

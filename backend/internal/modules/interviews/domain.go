@@ -139,3 +139,49 @@ func FeedbackDue(viewer string, d Details, all []FeedbackEntry, now time.Time) b
 	}
 	return !slices.ContainsFunc(all, func(f FeedbackEntry) bool { return f.UserID == viewer })
 }
+
+// OutlookChange is what an interview's organizer changed in Outlook to its
+// invitation (nil: unchanged; "" clears the location or the instructions).
+type OutlookChange struct {
+	Title, Location, Instructions *string
+	StartsAt                      *time.Time
+	Duration                      *int // minutes
+}
+
+// ApplyOutlookChange takes an Outlook change into an interview, bounded to
+// what the interview holds (Outlook allows longer text): an empty title keeps
+// the old one, and a length HiringPlug does not schedule is refused.
+func ApplyOutlookChange(d Details, c OutlookChange) (Details, apperr.FieldErrors) {
+	if c.Title != nil {
+		if title := strings.Join(strings.Fields(*c.Title), " "); title != "" {
+			d.Title = boundedRunes(title, 100)
+		}
+	}
+	if c.Location != nil {
+		location := boundedRunes(strings.TrimSpace(*c.Location), 500)
+		d.Location = &location
+	}
+	if c.Instructions != nil {
+		instructions := boundedRunes(strings.TrimSpace(*c.Instructions), 2000)
+		d.Instructions = &instructions
+	}
+	if c.StartsAt != nil {
+		d.StartsAt = *c.StartsAt
+	}
+	if c.Duration != nil {
+		d.Duration = *c.Duration
+	}
+	var errs apperr.FieldErrors
+	if d.Duration < 5 || d.Duration > 480 {
+		errs.Add("durationMinutes", "an interview lasts 5 to 480 minutes")
+	}
+	d, more := Normalize(d)
+	return d, append(errs, more...)
+}
+
+func boundedRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return strings.TrimSpace(string(r[:n]))
+	}
+	return s
+}
