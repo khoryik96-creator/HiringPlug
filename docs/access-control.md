@@ -130,6 +130,8 @@ details get their own permissions.
 | `matching:create` (ask for fit scores; uses the AI allowance) | ✓ | ✓ | ✓ | ✓ | | |
 | `aiusage:read` (the company's AI use and its estimated cost, month by month) | ✓ | ✓ | | | | |
 | `aiusage:manage` (the monthly AI limit and the AI prices) | ✓ | ✓ | | | | |
+| `auditlog:read` (the company's audit log: who changed what, and when) | ✓ | ✓ | | | | |
+| `auditlog.salary_views:read` (who was shown a candidate's salary, and when; sensitive) | ✓ | ✓ | | | | |
 | `privacy:read`, `privacy:record` (a candidate's consent and data protection requests; record them) | ✓ | ✓ | ✓ | ✓ | | |
 | `privacy:manage` (the Data protection page, decide requests, download a copy of a candidate's data) | ✓ | ✓ | | | | |
 | `identity.roles:manage` (Roles and access: what each role may do and which candidates it sees) | ✓ | | | | | |
@@ -170,8 +172,7 @@ pages, the job board, dashboards and reports therefore only ever count and
 show what the user may see. `TestOwnScopeHidesOtherPeoplesCandidatesEverywhere`
 checks it through the API and with raw SQL.
 
-Coming later: new named roles (beyond editing the six), single sign-on, and a
-"who viewed salary" log.
+Coming later: new named roles (beyond editing the six) and single sign-on.
 
 ## Three layers of enforcement
 
@@ -194,7 +195,27 @@ Salary is the example; every sensitive field follows the same pattern.
 The same permissions also bound what leaves the system. Audit entries record
 that a salary changed but never the amounts, and the AI (the assistant and
 CV vs job matching) only receives what the user may see, never contact
-details or salary.
+details or salary. A formatted CV made with the salary is a copy of it: the
+documents module asks cvformats whether a document is one, and refuses to
+open, download, turn into a PDF, show the text of or attach it for anyone
+without `candidates.compensation:read`.
+
+**Who was shown a salary.** Each time a salary reaches a person (a page, a
+list or search that asked for salaries, an export, an email's fields or an
+email sent, a formatted CV, a screening call, an offer, a placement) it is
+counted in `salary_view` (see [features.md](features.md#audit-log-and-who-was-shown-a-salary--1450-the-api-the-page-follows)):
+who, which candidate, where and which day, never the amount, never for the
+system. Lines are written only by the database function
+`app_record_salary_view` (the app cannot add, change or delete one itself)
+and read with `auditlog.salary_views:read`, within the reader's candidate
+scope. Candidate lists return salaries only when asked (`includeSalary`), so
+screens that do not show them never receive them.
+
+The **audit log** page reads `audit_log` with `auditlog:read`. Row-level
+security still applies: entries about candidates and applications outside
+the reader's scope are left out; entries about other records (an offer, an
+email, an interview) about such a candidate are not, so give the permission
+only to roles that see every candidate.
 
 ## Company isolation
 

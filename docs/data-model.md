@@ -78,7 +78,8 @@ tenant ─┬─ app_user (role)
 | `claim_storage` | the company's claims storage: provider (google_drive/onedrive/dropbox), account, top folder, its tokens sealed (AES-GCM), the app it was connected through, status (disconnected/ok/reconnect), error, `version`; row-level security: `claims.storage:manage` |
 | `claim_storage_state` | a sign-in in progress, one per person: the PKCE verifier and then the provider's code (both sealed), a one-time ticket; row-level security: the person who started it |
 | `email_signature` | each person's email signature (formatted, with banners by id), `version`; row-level security: its owner only |
-| `audit_log` | actor, action (`candidate.updated`), entity, changes (from → to; sensitive fields redacted), request ID |
+| `audit_log` | actor (a user, an API key or `system`), action (`candidate.updated`), entity, changes (from → to, or the fields a new record was made with; sensitive fields redacted), request ID; indexed by company and time, and by company, actor and time, for the audit log page |
+| `salary_view` | who was shown a salary (auditlog module): user (a person or an API key; never `system`), kind (candidate/candidate_list/export/email_fields/email_sent/cv/screening/offer/placement), candidate (none for a list or export, whose candidates are kept in `candidate_ids`), day (the agency's), count, first and last time; one row per user, kind, candidate and day; never an amount; written only by `app_record_salary_view`, never changed or deleted by the app; read with `auditlog.salary_views:read` within the candidate scope |
 | `job` | queue (core/ai), kind, payload, status (pending/running/done/dead), attempts, lease, last error, request ID |
 
 The database repeats the important rules as constraints: the work-authorization

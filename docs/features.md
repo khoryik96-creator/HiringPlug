@@ -1666,6 +1666,56 @@ strengths, areas to improve, reason for leaving, would you rehire them; all
 changeable), a box each; saved as a *Reference check* note on the candidate's
 timeline, each answer after its question. One referee per note.
 
+## Audit log and who was shown a salary 🟡 (1.45.0: the API; the page follows)
+
+Built in 1.45.0 (the backend; the page comes once its layout is chosen).
+
+- **The audit log** (`GET /v1/audit-log`, `auditlog:read`: owners and admins
+  by default, any role can be given it in Roles and access): every change in
+  the company, newest first, with who made it (a person; "Automatic" for what
+  the app did on its own; an API key by its name, or "API key"), the action
+  (`candidate.updated`), the record and its name (candidates, jobs, companies,
+  contacts and people are named; others by kind and id) and what changed
+  (salaries only as "changed", never amounts). Filters: who, one action or
+  every action of a kind (`candidate`), the kind of record, one record, and a
+  range of days in the agency's time zone; cursor pages. Entries about
+  candidates (and their jobs) the user may not see are left out, as
+  everywhere. A new company, contact or job now records what it was made
+  with, not an empty change. `POST /v1/audit-log/export` downloads what the
+  filters find as Excel or CSV (at most 10,000 entries); the download is
+  itself audited (`auditlog.exported`).
+- **Who was shown a salary** (`GET /v1/salary-views`,
+  `auditlog.salary_views:read`, sensitive: owners and admins by default). A
+  salary counts as shown when it really reaches a person: a candidate's page
+  with it (`candidate`), their screening calls' salaries (`screening`), a
+  candidate list or search that asked for salaries (`candidate_list`), an
+  export of candidates or placements with them (`export`), an email being
+  written whose fields came back with it, or a draft from a template that
+  fills a salary field (`email_fields`), an email sent with it
+  (`email_sent`), a formatted CV with it made, opened, downloaded or attached
+  to an email (`cv`), an application's offers and the offers waiting for
+  approval (`offer`), an application's placement (`placement`). One line per
+  person, kind, candidate and day (the agency's day), with how often and the
+  first and last time; a list, search or export is one line a day with the
+  number of different candidates it showed. Never an amount. Filters: who,
+  candidate (lists and exports that showed them too), kind, days; Excel or
+  CSV download (audited). Lines about candidates the user may not see are
+  left out. Nothing in either log is deleted automatically.
+- **Not counted**: what the app reads for its own work (the AI never gets a
+  salary; automatic emails; the system), what a person just typed in (saving
+  a salary, an offer or a placement), lists that do not show it (offers sent
+  on the dashboard and pipeline, the placements dashboard), reading back a
+  sent email that shows a salary, invoices (their fee basis may name the
+  salary), the market map and a candidate's data copy (already audited).
+- **Lists ask for salaries.** `GET /v1/candidates` and
+  `POST /v1/candidates/search` return salaries only with `includeSalary`
+  (for roles that may see them); the candidate list asks only while a salary
+  column, a salary sort or the expected salary filter is used, so a name
+  search or a pick-a-candidate box gets none. Exports always have them.
+- **Formatted CVs made with the salary** open, download, turn into a PDF,
+  show their text or go with an email only for roles that may see salaries;
+  others see them listed but get "includes the candidate's salary".
+
 ## Import
 
 ✅ **CVs and LinkedIn PDFs** (menu: Import; permission `intake:create`): pick
