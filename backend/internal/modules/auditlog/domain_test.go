@@ -1,13 +1,17 @@
 package auditlog
 
 import (
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/sheet"
 )
 
 func TestActorsAreNamedByKind(t *testing.T) {
@@ -62,4 +66,20 @@ func TestEverySalaryViewKindIsKnown(t *testing.T) {
 
 func TestDistinctDropsBlanksAndRepeats(t *testing.T) {
 	assert.Equal(t, []string{"b", "a"}, Distinct([]string{"b", "", "a", "b"}))
+}
+
+// An entry whose changes are longer than an Excel cell holds is cut short,
+// saying so, and the workbook is still written.
+func TestALongChangeFitsInAnExcelCell(t *testing.T) {
+	long := strings.Repeat("ä", 40000)
+	table := LogTable([]Entry{{Logged: audit.Logged{ID: "aud_1", Action: "note.updated", EntityType: "note", EntityID: "note_1",
+		Changes: map[string]any{"body": map[string]any{"from": long, "to": "short"}}, CreatedAt: time.Now()}, ActorName: "Siti"}}, time.UTC)
+	cell := table.Rows[0][6]
+	assert.LessOrEqual(t, utf8.RuneCountInString(cell), CellLimit)
+	assert.True(t, strings.HasPrefix(cell, `{"body":{"from":"ää`))
+	assert.Contains(t, cell, "more characters: see the entry in the app)")
+	file, err := sheet.Write(sheet.XLSX, "Audit log", table)
+	require.NoError(t, err)
+	assert.NotEmpty(t, file.Data)
+	assert.Equal(t, "short", FitCell("short"))
 }

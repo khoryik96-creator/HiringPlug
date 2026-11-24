@@ -80,7 +80,7 @@ func LogTable(entries []Entry, loc *time.Location) sheet.Table {
 		changes := ""
 		if len(e.Changes) > 0 {
 			if raw, err := json.Marshal(e.Changes); err == nil {
-				changes = string(raw)
+				changes = FitCell(string(raw))
 			}
 		}
 		t.Rows = append(t.Rows, []string{moment(e.CreatedAt, loc), e.ActorName, e.Action, e.EntityType, sheet.Str(e.EntityName), e.EntityID, changes})

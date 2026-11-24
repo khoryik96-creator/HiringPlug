@@ -3,8 +3,10 @@ package auditlog
 // The rules, as pure functions on plain values.
 
 import (
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Actor kinds.
@@ -118,3 +120,23 @@ func Grouped(kind string) bool { return kind == "candidate_list" || kind == "exp
 // RecordKinds are the entity types whose names an entry shows (the others
 // have none); jobs are written as both job and job_order.
 var RecordKinds = []string{"candidate", "job", "job_order", "company", "contact"}
+
+// CellLimit is the most characters an Excel cell holds.
+const CellLimit = 32767
+
+// FitCell cuts text that would not fit in a spreadsheet cell, saying how
+// much was left out (the whole entry is in the app).
+func FitCell(text string) string {
+	n := utf8.RuneCountInString(text)
+	if n <= CellLimit {
+		return text
+	}
+	runes := []rune(text)
+	for keep := CellLimit - 60; keep > 0; keep -= 10 {
+		note := "… (" + strconv.Itoa(n-keep) + " more characters: see the entry in the app)"
+		if keep+utf8.RuneCountInString(note) <= CellLimit {
+			return string(runes[:keep]) + note
+		}
+	}
+	return string(runes[:CellLimit])
+}
