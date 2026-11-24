@@ -435,3 +435,22 @@ func SortPeople(people []PersonUse) {
 		return strings.Compare(a.Name, b.Name)
 	})
 }
+
+// LimitLevel is the level of a month's whole limit, for alerts (the warning
+// level is the company's warning percent).
+const LimitLevel = 100
+
+// LevelsReached is the alert levels a month's use has reached: the warning
+// percent once used at least that much, and LimitLevel once the whole limit
+// is used (both then, so a jump past the limit still counts as warned).
+func LevelsReached(l Limit, spent Spent) []int {
+	var out []int
+	reached := Reached(l, spent)
+	if reached || UsedPercent(l, spent) >= int64(l.WarnPercent) {
+		out = append(out, l.WarnPercent)
+	}
+	if reached {
+		out = append(out, LimitLevel)
+	}
+	return out
+}

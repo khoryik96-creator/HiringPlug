@@ -165,6 +165,11 @@ func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state
 			return nil, err
 		}
 	}
+	if p.Can(api.PermissionAiusageRead) && wants(KindAILimit) {
+		if in.AILimits, err = s.src.AILimits(ctx, tx, now); err != nil {
+			return nil, err
+		}
+	}
 	var ids []string
 	for _, r := range in.Applicants {
 		ids = append(ids, r.ApplicationID)

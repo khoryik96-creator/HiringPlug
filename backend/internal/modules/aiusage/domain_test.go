@@ -216,3 +216,14 @@ func TestEveryFeatureIsKnown(t *testing.T) {
 	}
 	assert.False(t, IsFeature("chat"))
 }
+
+func TestLevelsReached(t *testing.T) {
+	l := Limit{Kind: KindTokens, Tokens: 1000, WarnPercent: 80}
+	assert.Empty(t, LevelsReached(l, Spent{Input: 799}))
+	assert.Equal(t, []int{80}, LevelsReached(l, Spent{Input: 700, Output: 100}))
+	assert.Equal(t, []int{80}, LevelsReached(l, Spent{Input: 999}))
+	assert.Equal(t, []int{80, LimitLevel}, LevelsReached(l, Spent{Input: 1000}), "the limit counts as warned too")
+	assert.Equal(t, []int{80, LimitLevel}, LevelsReached(Limit{Kind: KindTokens, WarnPercent: 80}, Spent{}), "a limit of 0 is reached")
+	money := Limit{Kind: KindMoney, Money: 1000, Prices: twoAndEight, WarnPercent: 50}
+	assert.Equal(t, []int{50}, LevelsReached(money, Spent{Output: 625_000}), "5.00 of 10.00 at 8.00 per million output")
+}

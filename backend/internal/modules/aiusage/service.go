@@ -28,8 +28,9 @@ type Service struct {
 
 func (s *Service) loc() *time.Location { return s.config.TimeZone }
 
-// record inserts u as the system for tenantID; recorded is false when the
-// run was already recorded or used nothing.
+// record inserts u as the system for tenantID, then notes the alert levels
+// this month's use reached; recorded is false when the run was already
+// recorded or used nothing.
 func (s *Service) record(ctx context.Context, tx pgx.Tx, tenantID string, u Use) (recorded bool, err error) {
 	if !IsFeature(u.Feature) {
 		return false, fmt.Errorf("aiusage: unknown feature %q", u.Feature)
@@ -46,11 +47,15 @@ func (s *Service) record(ctx context.Context, tx pgx.Tx, tenantID string, u Use)
 		user = nil
 	}
 	err = database.AsSystem(ctx, tx, tenantID, func() error {
-		n, err := store.New(tx).RecordUse(ctx, store.RecordUseParams{
+		q := store.New(tx)
+		n, err := q.RecordUse(ctx, store.RecordUseParams{
 			Feature: u.Feature, UserID: user, SourceID: u.SourceID, RunKey: u.RunKey, InputTokens: in, OutputTokens: out,
 		})
-		recorded = n > 0
-		return err
+		if err != nil || n == 0 {
+			return err
+		}
+		recorded = true
+		return s.noteLevels(ctx, tx, q, tenantID)
 	})
 	return recorded, err
 }

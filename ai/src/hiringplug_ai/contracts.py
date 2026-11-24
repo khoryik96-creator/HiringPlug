@@ -5845,6 +5845,7 @@ class NotificationKind(StrEnum):
     offer_approval = "offer_approval"
     interview = "interview"
     cv_formatted = "cv_formatted"
+    ai_limit = "ai_limit"
 
 
 class Notification(BaseModel):
@@ -5893,7 +5894,7 @@ class NotificationSettings(BaseModel):
         list[NotificationKind],
         Field(
             description="The kinds you turned off. They show neither in the bell nor in the morning email.",
-            max_length=4,
+            max_length=6,
         ),
     ]
 

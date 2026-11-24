@@ -3,6 +3,7 @@ import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type Keybo
 
 import { api, ApiError, unwrap } from "./api/client";
 import { askSignIn, authLinkRoute, clearToken, getToken, setToken, shareSignIn } from "./auth";
+import { AiLimitNotice } from "./components/AiLimitNotice";
 import { AiNotice } from "./components/AiNotice";
 import { CloseIcon, DockRightIcon, IconButton, OutlookIcon } from "./components/ActionIcons";
 import { ErrorMessage } from "./components/ErrorMessage";
@@ -140,6 +141,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       <div className="shell-content">
         <div className="shell-page" inert={calendarModal}>
           <AiNotice permissions={permissions} />
+          <AiLimitNotice permissions={permissions} />
           <OpenTabs hash={hash} />
           <PageErrorBoundary key={pageKey}>
             <Suspense fallback={<p className="muted page-loading">Loading…</p>}>

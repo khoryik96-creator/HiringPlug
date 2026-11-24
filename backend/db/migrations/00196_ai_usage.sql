@@ -138,7 +138,17 @@ WHERE role = 'admin' AND NOT ('aiusage:read' = ANY (permissions));
 UPDATE role_setting SET permissions = array_append(permissions, 'aiusage:manage')
 WHERE role = 'admin' AND NOT ('aiusage:manage' = ANY (permissions));
 
+-- The bell's new kind, "this month's AI use reached the warning level or the
+-- limit", among those a user can turn off.
+ALTER TABLE notification_state DROP CONSTRAINT notification_state_muted_kinds_check;
+ALTER TABLE notification_state ADD CONSTRAINT notification_state_muted_kinds_check
+  CHECK (muted_kinds <@ ARRAY['applicant', 'task', 'offer_approval', 'interview', 'cv_formatted', 'ai_limit']);
+
 -- +goose Down
+UPDATE notification_state SET muted_kinds = array_remove(muted_kinds, 'ai_limit');
+ALTER TABLE notification_state DROP CONSTRAINT notification_state_muted_kinds_check;
+ALTER TABLE notification_state ADD CONSTRAINT notification_state_muted_kinds_check
+  CHECK (muted_kinds <@ ARRAY['applicant', 'task', 'offer_approval', 'interview', 'cv_formatted']);
 UPDATE role_setting SET permissions = array_remove(array_remove(permissions, 'aiusage:read'), 'aiusage:manage');
 DROP TABLE IF EXISTS ai_usage_alert;
 DROP TABLE IF EXISTS ai_usage_setting;

@@ -58,3 +58,17 @@ UPDATE ai_usage_setting SET limit_kind = @limit_kind, limit_tokens = sqlc.narg(l
   warn_percent = @warn_percent, version = version + 1, updated_by = app_current_user(), updated_at = now()
 WHERE tenant_id = app_current_tenant() AND version = @version
 RETURNING version;
+
+-- A month's use reached a level (the warning percent or 100): true the first
+-- time only. A month has one warning, so a warning percent changed later in
+-- the month does not warn again.
+-- name: ReachLevel :execrows
+INSERT INTO ai_usage_alert (tenant_id, month, level)
+SELECT app_current_tenant(), @month::date, @level::smallint
+WHERE @level::smallint = 100 OR NOT EXISTS (
+  SELECT 1 FROM ai_usage_alert WHERE tenant_id = app_current_tenant() AND month = @month::date AND level < 100)
+ON CONFLICT (tenant_id, month, level) DO NOTHING;
+
+-- The levels a month's use reached, and when.
+-- name: LevelsReached :many
+SELECT level, reached_at FROM ai_usage_alert WHERE month = @month::date ORDER BY level;

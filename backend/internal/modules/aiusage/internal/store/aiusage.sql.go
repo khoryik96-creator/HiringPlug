@@ -84,6 +84,60 @@ func (q *Queries) InsertSetting(ctx context.Context, arg InsertSettingParams) (i
 	return version, err
 }
 
+const levelsReached = `-- name: LevelsReached :many
+SELECT level, reached_at FROM ai_usage_alert WHERE month = $1::date ORDER BY level
+`
+
+type LevelsReachedRow struct {
+	Level     int16
+	ReachedAt time.Time
+}
+
+// The levels a month's use reached, and when.
+func (q *Queries) LevelsReached(ctx context.Context, month pgtype.Date) ([]LevelsReachedRow, error) {
+	rows, err := q.db.Query(ctx, levelsReached, month)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LevelsReachedRow
+	for rows.Next() {
+		var i LevelsReachedRow
+		if err := rows.Scan(&i.Level, &i.ReachedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const reachLevel = `-- name: ReachLevel :execrows
+INSERT INTO ai_usage_alert (tenant_id, month, level)
+SELECT app_current_tenant(), $1::date, $2::smallint
+WHERE $2::smallint = 100 OR NOT EXISTS (
+  SELECT 1 FROM ai_usage_alert WHERE tenant_id = app_current_tenant() AND month = $1::date AND level < 100)
+ON CONFLICT (tenant_id, month, level) DO NOTHING
+`
+
+type ReachLevelParams struct {
+	Month pgtype.Date
+	Level int16
+}
+
+// A month's use reached a level (the warning percent or 100): true the first
+// time only. A month has one warning, so a warning percent changed later in
+// the month does not warn again.
+func (q *Queries) ReachLevel(ctx context.Context, arg ReachLevelParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reachLevel, arg.Month, arg.Level)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const recordUse = `-- name: RecordUse :execrows
 
 INSERT INTO ai_use (tenant_id, feature, user_id, source_id, run_key, input_tokens, output_tokens)

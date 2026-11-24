@@ -82,7 +82,8 @@ type Use struct {
 // Record adds u to the ledger in the caller's transaction (any module's, a
 // user's or the system's): counts are kept within 0..MaxTokens, the insert
 // runs as the system for the company, and a run already recorded, or one
-// that used no tokens, adds nothing.
+// that used no tokens, adds nothing. When this month's use first reaches the
+// warning level or the whole limit, the level is stored (Alerts) and audited.
 func (m *Module) Record(ctx context.Context, tx pgx.Tx, tenantID string, u Use) error {
 	_, err := m.service.record(ctx, tx, tenantID, u)
 	return err
@@ -121,4 +122,11 @@ type Status struct {
 // transaction (as the system, so a user's visibility never hides use).
 func (m *Module) Status(ctx context.Context, tx pgx.Tx, tenantID string) (Status, error) {
 	return m.service.status(ctx, tx, tenantID)
+}
+
+// Alerts is the levels now's month reached so far (the warning percent,
+// LimitLevel), lowest first, read in the caller's transaction (the
+// notifications bell, as the user).
+func (m *Module) Alerts(ctx context.Context, tx pgx.Tx, now time.Time) ([]Alert, error) {
+	return m.service.alerts(ctx, tx, now)
 }

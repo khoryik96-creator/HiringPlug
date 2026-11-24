@@ -1,7 +1,7 @@
 package app
 
 // The notifications module reads its list from the modules that own the
-// records (jobs, pipeline, tasks, offers, interviews, formatted CVs) and emails through
+// records (jobs, pipeline, tasks, offers, interviews, formatted CVs, AI use) and emails through
 // identity and emails: these adapters are where they meet.
 
 import (
@@ -71,6 +71,15 @@ func (a notificationSources) FormattedCVs(ctx context.Context, tx pgx.Tx, userID
 		if b, ok := names[r.CandidateID]; ok { // a candidate since deleted is left out
 			out = append(out, notifications.FormattedCV{ID: r.ID, CandidateID: r.CandidateID, CandidateName: b.Name, Blind: r.Blind, Failed: r.Failed, At: r.At})
 		}
+	}
+	return out, err
+}
+
+func (a notificationSources) AILimits(ctx context.Context, tx pgx.Tx, now time.Time) ([]notifications.AILimit, error) {
+	rows, err := a.m.AIUsage.Alerts(ctx, tx, now)
+	out := make([]notifications.AILimit, len(rows))
+	for i, r := range rows {
+		out[i] = notifications.AILimit{Level: r.Level, At: r.ReachedAt, Month: r.Month, Until: r.ResetsAt}
 	}
 	return out, err
 }
