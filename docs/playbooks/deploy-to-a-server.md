@@ -20,7 +20,7 @@ What you get:
 
 | What | Example | Rough cost |
 |---|---|---|
-| A server: Ubuntu 24.04, 4 CPUs, 8 GB memory, 160 GB disk or more (200,000 CVs take 50–150 GB) | Hetzner, DigitalOcean, Vultr, AWS Lightsail; Singapore or Malaysia region (PDPA) | RM 250–500 / month |
+| A server: Ubuntu 24.04, 4 CPUs, 8 GB memory, 160 GB disk or more (200,000 CVs take 50–150 GB, and search by meaning about 15 GB more: 60–90 KB a candidate, not in backups) | Hetzner, DigitalOcean, Vultr, AWS Lightsail; Singapore or Malaysia region (PDPA) | RM 250–500 / month |
 | A web address | `app.youragency.com` | about RM 50 / year |
 | Email sending (SMTP) | Google Workspace, Microsoft 365, Amazon SES, Brevo, Mailgun | often included, or RM 0–60 / month |
 | Storage for the off-site backups (S3-compatible) | Wasabi, Backblaze B2, DigitalOcean Spaces, AWS S3 | RM 20–60 / month |
