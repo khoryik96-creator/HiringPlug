@@ -1541,6 +1541,7 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 /* The strip of open records above the page (components/OpenTabs.tsx): a band
    under the top bar, the tabs grouped by kind, the actions at its end. */
 .open-tabs { --kind: var(--accent, #6d4ae0); display: flex; align-items: center; gap: 1rem; margin: 0 0 1rem; padding: .4rem 1.5rem;
+  position: sticky; z-index: 9; /* under the top bar (its height is set as top), over the page as it scrolls */
   background: var(--surface, #fff); border-bottom: 1px solid var(--line, #ded8eb); }
 /* Wrapping, never scrolling: the "+N" lists open below their button. */
 .open-tab-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem 1.1rem; flex: 1 1 auto; min-width: 0; }

@@ -186,3 +186,21 @@ def test_a_label_and_its_value_are_not_the_name() -> None:
 def test_the_file_name_helps_find_the_name() -> None:
     text = "Kuala Lumpur Office\nAina Sofea Rahman\nSenior Auditor\n"
     assert v(parse_cv(text, file_name="AINA SOFEA-SEEK-Profile.pdf").fullName) == "Aina Sofea Rahman"
+
+
+def test_a_name_beside_its_email_and_with_letters_after_it() -> None:
+    # The top of a CV in a Word header: name and email on one line, letters after the name.
+    text = "Kavitha Ramasamy PMP mail: kavitha.r@example.com\nSAP FICO Consultant +60 12 345 6789\nProfessional Summary\n"
+    profile = parse_cv(text)
+    assert profile.fullName is not None
+    assert profile.fullName.value == "Kavitha Ramasamy"
+    for cv, name in (
+        ("Lim Mei Ling, ACCA, CPA\nlim.ml@example.com\n", "Lim Mei Ling"),
+        (
+            "Nurul Huda BINTI ISMAIL\nnurul@example.com\n",
+            "Nurul Huda BINTI ISMAIL",
+        ),  # capitals in a name stay
+    ):
+        found = parse_cv(cv).fullName
+        assert found is not None
+        assert found.value == name

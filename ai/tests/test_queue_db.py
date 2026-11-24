@@ -253,8 +253,8 @@ def test_the_other_slots_never_take_search_by_meanings_jobs(database: dict[str, 
     with psycopg.connect(database["admin"], autocommit=True) as admin:
         admin.execute("DELETE FROM job")
         row = admin.execute(
-            "SELECT job_enqueue(%s, 'ai', 'meaning.read_candidates', %s::jsonb, NULL, now() - interval '1 minute',"
-            " p_priority => 1::smallint)",
+            "SELECT job_enqueue(%s, 'ai', 'meaning.read_candidates', %s::jsonb, NULL,"
+            " now() - interval '1 minute', p_priority => 1::smallint)",
             (database["tenant"], json.dumps({"candidates": []})),
         ).fetchone()
         assert row is not None
@@ -263,6 +263,8 @@ def test_the_other_slots_never_take_search_by_meanings_jobs(database: dict[str, 
     kinds = ["meaning.read_query", "meaning.read_candidates"]
     job = queue.claim_except(60, kinds)
     assert job is not None
-    assert job.id == other, "the CV first, though the meaning read is more urgent: it waits for the meaning slot"
+    assert job.id == other, (
+        "the CV first, though the meaning read is more urgent: it waits for the meaning slot"
+    )
     assert queue.claim_except(60, kinds) is None, "and never the meaning read"
     queue.close()

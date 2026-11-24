@@ -159,9 +159,7 @@ def slot_id(worker_id: str, i: int, n: int) -> str:
     return worker_id if n == 1 else f"{worker_id}/{i + 1}"
 
 
-def run_slot(
-    queue: Queue, deps: Deps, config: Config, stop: threading.Event, meaning: bool = False
-) -> None:
+def run_slot(queue: Queue, deps: Deps, config: Config, stop: threading.Event, meaning: bool = False) -> None:
     """Runs jobs one after another until stop is set (one of several slots):
     the meaning slot only search by meaning's, the others all but those."""
     kinds = [k.value for k in MEANING_KINDS]
