@@ -1,42 +1,15 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { api, type Company, type Permission, type Schemas } from "../api/client";
+import { api } from "../api/client";
 import * as companion from "../companion";
-import { failure, ok, renderWithClient, sentBody } from "../test-utils";
-import { activeRuns, newRun } from "./findHrRun";
-import { LeadFindHR } from "./LeadFindHR";
+import { failure, ok, sentBody } from "../test-utils";
+import { ALL, company, lead, serve, show } from "./leadFindHRFixtures";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
-
-const lead: Schemas["JobLead"] = {
-  id: "lead_1", version: 4, sourceId: null, sourceKind: null, companyName: "Contoh Logistik Sdn Bhd", companyId: null,
-  title: "Warehouse Supervisor", location: "Shah Alam, MY", url: null, postedAt: null,
-  firstSeenAt: "2026-11-01T00:00:00Z", lastSeenAt: "2026-11-03T00:00:00Z", closedAt: null, status: "new", notes: null,
-};
-const company = {
-  id: "comp_1", version: 2, name: "Contoh Logistik Sdn Bhd", city: "Shah Alam", linkedinUrl: "https://www.linkedin.com/company/contoh-logistik",
-} as Company;
-const named: Schemas["CompanyNamedLike"][] = [
-  { id: "comp_1", name: "Contoh Logistik Sdn Bhd", city: "Shah Alam", website: null, linkedinUrl: company.linkedinUrl, industry: null, sameName: true },
-  { id: "comp_2", name: "Contoh Logistics Berhad", city: null, website: null, linkedinUrl: null, industry: null, sameName: false },
-];
-const ALL: Permission[] = ["leads:read", "leads:manage", "companies:read", "companies:create", "companies:update", "contacts:read", "contacts:create"];
-
-function serve({ matches = named, saved = company, version = "1.6.0" }: { matches?: Schemas["CompanyNamedLike"][]; saved?: Company; version?: string } = {}) {
-  vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: true, version });
-  return vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
-    path === "/v1/companies/named-like" ? { items: matches }
-      : path === "/v1/companies/{companyId}/hr-scan" ? { scan: null }
-        : path === "/v1/companies/{companyId}" ? saved : { items: [] },
-  ))) as never);
-}
-
-const show = (over: Partial<Schemas["JobLead"]> = {}, permissions = ALL, onClose = vi.fn()) =>
-  renderWithClient(<LeadFindHR lead={{ ...lead, ...over }} permissions={permissions} onClose={onClose} />);
 
 describe("a lead's Find HR panel", () => {
   it("lists the companies with the same or a similar name, and links the lead to the one chosen", async () => {
@@ -217,38 +190,6 @@ describe("a lead's Find HR panel", () => {
     } finally {
       bar.remove();
       tabs.remove();
-    }
-  });
-
-  it("keeps a scan started on the company's own page going when the panel closes", async () => {
-    serve();
-    vi.spyOn(companion, "companionCall").mockResolvedValue({});
-    const run = newRun(vi.fn());
-    activeRuns.set("comp_1", run);
-    try {
-      show({ companyId: "comp_1" });
-      expect(await screen.findByRole("region", { name: "Find HR" })).toBeTruthy();
-      cleanup();
-      expect(run.stopped).toBe(false);
-    } finally {
-      activeRuns.delete("comp_1");
-    }
-  });
-
-  it("stops a scan started in the panel when the panel closes", async () => {
-    serve();
-    const call = vi.spyOn(companion, "companionCall").mockResolvedValue({});
-    const run = newRun(vi.fn());
-    try {
-      show({ companyId: "comp_1" });
-      expect(await screen.findByRole("region", { name: "Find HR" })).toBeTruthy();
-      activeRuns.set("comp_1", run); // started from the panel
-      expect(run.stopped).toBe(false);
-      cleanup();
-      expect(run.stopped).toBe(true);
-      expect(call).toHaveBeenCalledWith("cancel", { operation_id: run.operation }, 5_000);
-    } finally {
-      activeRuns.delete("comp_1");
     }
   });
 
