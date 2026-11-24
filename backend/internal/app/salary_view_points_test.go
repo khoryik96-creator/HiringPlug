@@ -279,3 +279,38 @@ func TestACandidateSentBackWithTheirSalaryIsCounted(t *testing.T) {
 	assert.NotContains(t, seen, "candidate:"+notes.Id)
 	assert.NotContains(t, seen, "cv:"+notes.Id)
 }
+
+// Merging a duplicate moves who was shown its salary to the kept candidate:
+// a line of theirs for the same person, kind and day takes the duplicate's
+// count; lists name the kept candidate.
+func TestAMergeMovesWhoWasShownTheDuplicatesSalary(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
+	owner, admin, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin], tenant.Users[api.RoleRecruiter]
+	keep := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
+	dup := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Duplicate"})
+	for _, view := range []struct {
+		token, id string
+	}{{recruiter.Token, keep.Id}, {recruiter.Token, keep.Id}, {recruiter.Token, dup.Id}, {admin.Token, dup.Id}} {
+		require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+view.id, view.token, nil).Status)
+	}
+	res := a.request(http.MethodPost, "/v1/candidates/search", admin.Token, map[string]any{"q": "Duplicate", "includeSalary": true})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	res = a.request(http.MethodPost, "/v1/candidates/"+keep.Id+"/merge", owner, map[string]any{"duplicateId": dup.Id, "version": keep.Version})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	byRecruiter := a.seen(owner, recruiter.ID)
+	assert.Equal(t, 3, byRecruiter["candidate:"+keep.Id].Count, "their two views and the duplicate's")
+	assert.NotContains(t, byRecruiter, "candidate:"+dup.Id)
+	byAdmin := a.seen(owner, admin.ID)
+	assert.Equal(t, 1, byAdmin["candidate:"+keep.Id].Count, "the duplicate's line, now about the kept candidate")
+	assert.Equal(t, "Siti Aisyah", byAdmin["candidate:"+keep.Id].CandidateName.MustGet())
+	assert.Empty(t, a.salaryViews(owner, "?candidateId="+dup.Id).Items)
+	kinds := []api.SalaryViewKind{}
+	for _, v := range a.salaryViews(owner, "?user="+admin.ID+"&candidateId="+keep.Id).Items {
+		kinds = append(kinds, v.Kind)
+	}
+	assert.ElementsMatch(t, []api.SalaryViewKind{api.SalaryViewKindCandidate, api.SalaryViewKindCandidateList}, kinds, "the search that showed the duplicate")
+}

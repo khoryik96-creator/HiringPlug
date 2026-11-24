@@ -94,6 +94,21 @@ func (q *Queries) ListSalaryViews(ctx context.Context, arg ListSalaryViewsParams
 	return items, nil
 }
 
+const moveSalaryViews = `-- name: MoveSalaryViews :exec
+SELECT app_move_salary_views($1::text, $2::text)
+`
+
+type MoveSalaryViewsParams struct {
+	FromID string
+	ToID   string
+}
+
+// A candidate merge: the duplicate's salary views go to the kept candidate.
+func (q *Queries) MoveSalaryViews(ctx context.Context, arg MoveSalaryViewsParams) error {
+	_, err := q.db.Exec(ctx, moveSalaryViews, arg.FromID, arg.ToID)
+	return err
+}
+
 const recordSalaryView = `-- name: RecordSalaryView :exec
 
 SELECT app_record_salary_view($1::text, $2::text, $3::text[], $4::date, $5::timestamptz)

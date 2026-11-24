@@ -24,6 +24,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/auditlog/internal/store"
 )
 
 // Names looks up the names of records of one kind (missing ones are left
@@ -84,6 +86,12 @@ func New(pool *pgxpool.Pool, deps Deps, config Config) *Module {
 // candidate. Nothing is counted for the system. No amount is ever stored.
 func (m *Module) SalarySeen(ctx context.Context, tx pgx.Tx, kind string, candidateIDs ...string) error {
 	return m.service.record(ctx, tx, kind, candidateIDs)
+}
+
+// MoveCandidate moves a merged duplicate's salary views to the kept
+// candidate, in the merge's transaction (candidates.RecordMover).
+func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
+	return store.New(tx).MoveSalaryViews(ctx, store.MoveSalaryViewsParams{FromID: fromID, ToID: toID})
 }
 
 // UseClock sets the module's clock (tests: a day's boundaries).

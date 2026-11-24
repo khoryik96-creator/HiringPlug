@@ -70,6 +70,37 @@ $$;
 REVOKE ALL ON FUNCTION app_record_salary_view(text, text, text[], date, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app_record_salary_view(text, text, text[], date, timestamptz) TO hiringplug_app;
 
+-- A candidate merge moves the duplicate's salary views to the kept
+-- candidate: a line of theirs for the same person, kind and day takes the
+-- duplicate's count (and the duplicate's line goes, counted there); list
+-- and export lines name the kept candidate instead. Only for someone
+-- allowed to merge candidates (the app cannot change a line otherwise).
+-- +goose StatementBegin
+CREATE FUNCTION app_move_salary_views(p_from text, p_to text) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_tenant text := app_current_tenant();
+BEGIN
+  IF v_tenant IS NULL OR NOT app_has_permission('candidates:merge') THEN
+    RAISE EXCEPTION 'not allowed to merge candidates' USING ERRCODE = '42501';
+  END IF;
+  UPDATE salary_view k SET count = k.count + d.count, first_at = least(k.first_at, d.first_at), last_at = greatest(k.last_at, d.last_at)
+  FROM salary_view d
+  WHERE k.tenant_id = v_tenant AND d.tenant_id = v_tenant AND k.candidate_id = p_to AND d.candidate_id = p_from
+    AND k.user_id = d.user_id AND k.kind = d.kind AND k.day = d.day;
+  DELETE FROM salary_view d
+  WHERE d.tenant_id = v_tenant AND d.candidate_id = p_from AND EXISTS (
+    SELECT 1 FROM salary_view k
+    WHERE k.tenant_id = v_tenant AND k.candidate_id = p_to AND k.user_id = d.user_id AND k.kind = d.kind AND k.day = d.day);
+  UPDATE salary_view SET candidate_id = p_to WHERE tenant_id = v_tenant AND candidate_id = p_from;
+  UPDATE salary_view SET candidate_ids = ARRAY(SELECT DISTINCT unnest(array_replace(candidate_ids, p_from, p_to)) ORDER BY 1)
+  WHERE tenant_id = v_tenant AND p_from = ANY (candidate_ids);
+END
+$$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION app_move_salary_views(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app_move_salary_views(text, text) TO hiringplug_app;
+
 -- Admin roles a company has customised get the new permissions, as they would by default.
 UPDATE role_setting SET permissions = array_append(permissions, 'auditlog:read')
 WHERE role = 'admin' AND NOT ('auditlog:read' = ANY (permissions));
@@ -78,6 +109,7 @@ WHERE role = 'admin' AND NOT ('auditlog.salary_views:read' = ANY (permissions));
 
 -- +goose Down
 UPDATE role_setting SET permissions = array_remove(array_remove(permissions, 'auditlog:read'), 'auditlog.salary_views:read');
+DROP FUNCTION IF EXISTS app_move_salary_views(text, text);
 DROP FUNCTION IF EXISTS app_record_salary_view(text, text, text[], date, timestamptz);
 DROP TABLE IF EXISTS salary_view;
 DROP INDEX IF EXISTS audit_log_actor_time_idx;

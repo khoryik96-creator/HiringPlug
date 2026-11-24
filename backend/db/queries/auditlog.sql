@@ -7,6 +7,10 @@
 -- name: RecordSalaryView :exec
 SELECT app_record_salary_view(@kind::text, sqlc.narg(candidate_id)::text, @candidate_ids::text[], @day::date, @at::timestamptz);
 
+-- A candidate merge: the duplicate's salary views go to the kept candidate.
+-- name: MoveSalaryViews :exec
+SELECT app_move_salary_views(@from_id::text, @to_id::text);
+
 -- Salary views, newest day first (and the newest line first within a day),
 -- after the cursor's line. A list or export line counts, and is found by,
 -- only the candidates the reader sees (row-level security hides a line
