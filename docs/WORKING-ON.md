@@ -19,3 +19,11 @@ How to write an entry (newest at the top, one per task):
 ```
 
 ## In progress
+
+### Audit log page and "who viewed salary" log
+- Who: Claude (account A), session "Hiring Plug"
+- Branch: claude/relaxed-hopper-ex7y3v
+- Touches: a new Settings page for the audit log; reading audit_log (platform/audit); recording salary views in the candidates module (compensation reads) and anywhere salary is shown (offers, placements, exports)
+- Started: 24 Nov 2026    Last update: 24 Nov 2026
+- State: in progress
+- Next: map the audit log and salary reads; mockup with layout options for the owner; then build, review, verify, merge as 1.45.0
