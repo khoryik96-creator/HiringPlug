@@ -61,3 +61,36 @@ def test_a_headhunter_at_an_executive_search_firm() -> None:
         ("Headhunter", "Sampel Executive Search"),  # the firm's name, not a title for its "Executive"
         ("Executive Search Consultant", "Contoh Partners Sdn Bhd"),
     ]
+
+
+def test_executive_search_as_a_practice_is_part_of_the_title() -> None:
+    """With nothing or a title before it, "Executive Search" is the practice a
+    consultant works in, never the employer; a firm's name has its own name first."""
+    lines = {
+        "Senior Consultant - Executive Search | Contoh Sdn Bhd | Jan 2014 - Jul 2017": (
+            "Senior Consultant - Executive Search",
+            "Contoh Sdn Bhd",
+        ),
+        "Executive Search Partner | Contoh Partners Sdn Bhd | Jan 2014 - Jul 2017": (
+            "Executive Search Partner",
+            "Contoh Partners Sdn Bhd",
+        ),
+        "Partner, Executive Search | Contoh Partners Sdn Bhd | Jan 2014 - Jul 2017": (
+            "Partner, Executive Search",
+            "Contoh Partners Sdn Bhd",
+        ),
+        "Director - Executive Search | Contoh Sdn Bhd | Jan 2014 - Jul 2017": (
+            "Director - Executive Search",
+            "Contoh Sdn Bhd",
+        ),
+        "Sampel Executive Search | Senior Consultant | Jan 2014 - Jul 2017": (
+            "Senior Consultant",
+            "Sampel Executive Search",
+        ),
+        "Associate Director | Demo Executive Search Sdn Bhd | Jan 2014 - Jul 2017": (
+            "Associate Director",
+            "Demo Executive Search Sdn Bhd",
+        ),
+    }
+    for line, want in lines.items():
+        assert jobs(parse_cv(HEAD + line + "\n"))[0][:2] == want, line

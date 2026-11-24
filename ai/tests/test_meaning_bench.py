@@ -25,10 +25,9 @@ from hiringplug_ai.meaning import model as meaning_model
 from hiringplug_ai.meaning.families import NEAR
 from hiringplug_ai.meaning.recruiter import (
     expand,
-    family,
+    job_reading,
     level,
     read_search,
-    reading,
     reading_in_work,
     reading_with_work,
     said_level,
@@ -320,17 +319,17 @@ def test_possible_candidates_for_a_job_are_found_by_its_title_and_needs(
     r = read_bench(meaning_bench_a, model)
     results = []
     for title, needs, wanted in JOBS:
-        role = model.embed([reading(title)])[0]
+        asked, reading = job_reading(title, " ".join(needs))  # as the worker reads a job
+        role = model.embed([reading])[0]
         whole = model.embed([(expand(title) + ". " + " ".join(needs))])[0]
         need_v = model.embed(needs)
-        asked = family(title)
         roles, counts = best_roles(r, role, said_level(title), asked[0] if asked else None)
         met = (r.passages @ need_v.T).mean(axis=1)  # each need against their CV
         a, b, c = JOB
         scores = (a * roles + b * met + c * (r.profiles @ whole)) * counts
         grades = [grade(cand[3], cand[0], wanted) for cand in meaning_bench_a.C]
         results.append(ndcg(scores, grades))
-        assert family(title) is not None
+        assert asked is not None
     assert float(np.mean(results)) >= 0.93, (
         f"jobs NDCG@10 {np.mean(results):.3f}: {[round(x, 2) for x in results]}"
     )
