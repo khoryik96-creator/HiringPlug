@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { whatsAppTemplatesKey } from "../api/keys";
 import { renderWithClient } from "../test-utils";
 import { WhatsAppDialog } from "./WhatsApp";
-import { allowDialogs, mockWhatsAppApi } from "./whatsAppTestApi";
+import { allowDialogs, hold, mockWhatsAppApi } from "./whatsAppTestApi";
 
 beforeAll(allowDialogs);
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -144,5 +144,79 @@ describe("WhatsApp window: Templates", () => {
     const managing = await openTemplates();
     expect(await within(managing).findByRole("button", { name: "Change or rename" })).toBeTruthy();
     expect(within(managing).queryByRole("button", { name: "Add a template" })).toBeNull();
+  });
+
+  it("closes only the form a change belonged to, keeping what is typed in another", async () => {
+    const { post, store } = mockWhatsAppApi(all);
+    store.push({ id: "wtpl_2", version: 1, name: "Old one", body: "Hello", createdAt: "", updatedAt: "" });
+    const pane = await openTemplates();
+    const row = await within(pane).findByRole("group", { name: "Introduce a role" });
+    fireEvent.click(within(row).getByRole("button", { name: "Change or rename" }));
+    fireEvent.change(within(row).getByLabelText("Message"), { target: { value: "Half typed" } });
+
+    // Deleting another template leaves this form open.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(within(within(pane).getByRole("group", { name: "Old one" })).getByRole("button", { name: "Delete" }));
+    await waitFor(() => { expect(within(pane).queryByRole("group", { name: "Old one" })).toBeNull(); });
+    expect(within(row).getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Half typed");
+
+    // A new template saved while this form was opened again leaves it open too.
+    fireEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    const release = hold(post, "/v1/whatsapp-templates");
+    fireEvent.click(within(pane).getByRole("button", { name: "Add a template" }));
+    const form = within(pane).getByRole("group", { name: "New template" });
+    fireEvent.change(within(form).getByLabelText("Name"), { target: { value: "Follow up" } });
+    fireEvent.change(within(form).getByLabelText("Message"), { target: { value: "Any news?" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Change or rename" }));
+    fireEvent.change(within(row).getByLabelText("Message"), { target: { value: "Typed again" } });
+    release();
+    expect(await within(pane).findByRole("group", { name: "Follow up" })).toBeTruthy();
+    expect(within(row).getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Typed again");
+  });
+
+  it("sets the dropdown back to Blank message when the chosen template is deleted after leaving the pane, or by someone else", async () => {
+    const { post, del, store } = mockWhatsAppApi(all);
+    const { client } = renderWithClient(<WhatsAppDialog subject={siti} onClose={vi.fn()} />);
+    expect(await screen.findByText("To phone +60123456789")).toBeTruthy();
+    const lastDraft = () => post.mock.calls.filter((c) => c[0] === "/v1/whatsapp-drafts").map((c) => (c[1] as { body: Record<string, unknown> }).body).at(-1);
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "wtpl_1" } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("From Introduce a role"); });
+
+    fireEvent.click(screen.getByRole("button", { name: "Templates" }));
+    const release = hold(del, "/v1/whatsapp-templates/{templateId}");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(within(await screen.findByRole("group", { name: "Introduce a role" })).getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to the message" })); // before the delete is done
+    release();
+    await waitFor(() => { expect(templateNames()).toEqual(["Blank message"]); });
+    await waitFor(() => { expect(lastDraft()?.templateId).toBeUndefined(); }); // no later draft asks for the deleted template
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("From Introduce a role");
+
+    // Someone else deletes the chosen template; the list loads again.
+    store.push({ id: "wtpl_9", version: 1, name: "Theirs", body: "Hello", createdAt: "", updatedAt: "" });
+    await act(() => client.invalidateQueries({ queryKey: whatsAppTemplatesKey }));
+    await waitFor(() => { expect(templateNames()).toEqual(["Blank message", "Theirs"]); });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "wtpl_9" } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("From Theirs"); });
+    store.splice(0, store.length);
+    await act(() => client.invalidateQueries({ queryKey: whatsAppTemplatesKey }));
+    await waitFor(() => { expect(lastDraft()?.templateId).toBeUndefined(); });
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("From Theirs");
+  });
+
+  it("still says a template was saved when the pane was left while it was saving", async () => {
+    const { post } = mockWhatsAppApi(all);
+    renderWithClient(<WhatsAppDialog subject={siti} onClose={vi.fn()} />);
+    expect(await screen.findByText("To phone +60123456789")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Hi Siti, any news?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save as template" }));
+    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Any news" } });
+    const release = hold(post, "/v1/whatsapp-templates");
+    fireEvent.click(screen.getByRole("button", { name: "Save template" }));
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true })); // Escape, back to the message
+    release();
+    expect(await screen.findByText(/Saved as the .Any news. template/)).toBeTruthy();
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Hi Siti, any news?");
   });
 });

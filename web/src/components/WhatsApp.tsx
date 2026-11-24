@@ -15,7 +15,7 @@ import { useWhatsAppTemplates } from "./useWhatsAppTemplates";
 import { WhatsAppInsertField } from "./WhatsAppInsertField";
 import { WhatsAppSaveTemplate } from "./WhatsAppSaveTemplate";
 import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
-import { useInsertAtCursor } from "./whatsAppText";
+import { templateKeys, unfilledKeys, useInsertAtCursor } from "./whatsAppText";
 
 type Subject = { kind: "candidate" | "contact"; id: string; name: string };
 
@@ -99,6 +99,16 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
     } })),
   });
   const text = edited ?? draft.data?.text ?? "";
+  const source = templates.data?.items.find((t) => t.id === templateId);
+  // A template deleted (here or by someone else) sets the dropdown back to
+  // Blank message once the list loads without it; the message stays as it is.
+  if (templateId && templates.data && !source) {
+    setTemplateId("");
+    setEdited(edited ?? draft.data?.text ?? null);
+  }
+  const fields = draft.data?.fields ?? [];
+  // What the message itself still has unfilled ("[job.title]"), however it came to be.
+  const missing = unfilledKeys(text, [...fields.map((f) => f.key), ...(draft.data?.missing ?? [])]);
   // A field's value goes in where the cursor is; the message then counts as typed.
   const insert = useInsertAtCursor(box, text, setEdited);
   const numbers = draft.data?.numbers ?? [];
@@ -138,11 +148,11 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
       <Dialog title={`WhatsApp ${subject.name}`} onClose={onClose} onEscape={back}>
         <div ref={pane}>
           {view === "save" ? (
-            <WhatsAppSaveTemplate text={text} fields={draft.data?.fields ?? []} onCancel={back} onSaved={(name) => { setSaved(name); back(); }} />
+            <WhatsAppSaveTemplate text={text} fields={fields} sourceKeys={source ? templateKeys(source.body) : []} onCancel={back}
+              // Saved after the pane was left: the confirmation still shows, without changing the pane.
+              onSaved={(name) => { setSaved(name); setView((v) => (v === "save" ? "message" : v)); }} />
           ) : (
-            <WhatsAppTemplateManager canCreate={canCreate} canManage={canManage} onBack={back}
-              // The message stays as it is; only the dropdown goes back to Blank message.
-              onRemoved={(t) => { if (t.id === templateId) { setEdited(text); setTemplateId(""); } }} />
+            <WhatsAppTemplateManager canCreate={canCreate} canManage={canManage} onBack={back} />
           )}
         </div>
       </Dialog>
@@ -178,13 +188,13 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
           <textarea ref={box} rows={7} value={text} disabled={draft.isPending} onChange={(e) => { setEdited(e.target.value); }} />
         </label>
         <div className="row full whatsapp-tools">
-          <WhatsAppInsertField fields={draft.data?.fields ?? []} disabled={draft.isPending} onInsert={insert} />
+          <WhatsAppInsertField fields={fields} disabled={draft.isPending} onInsert={insert} />
           {canCreate && <button ref={saveButton} type="button" className="link" disabled={!text.trim()} onClick={() => { open("save"); }}>Save as template</button>}
           {(canCreate || canManage) && <button ref={templatesButton} type="button" className="link" onClick={() => { open("templates"); }}>Templates</button>}
         </div>
         {saved && <p className="full muted small" role="status">Saved as the &ldquo;{saved}&rdquo; template.</p>}
-        {(draft.data?.missing.length ?? 0) > 0 && (
-          <p className="full warning small" role="status">Not filled in: {draft.data?.missing.map((m) => `[${m}]`).join(", ")}. Change them before sending.</p>
+        {missing.length > 0 && (
+          <p className="full warning small" role="status">Not filled in: {missing.map((m) => `[${m}]`).join(", ")}. Change them before sending.</p>
         )}
         {draft.data && !chosen?.chatNumber && <p className="full warning small" role="status">No valid phone number: save it with its country code (e.g. +60 12 345 6789).</p>}
         <ErrorMessage error={templates.error ?? draft.error ?? log.error} />

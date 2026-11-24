@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { whatsAppTemplatesKey } from "../api/keys";
 import { renderWithClient, sentBody } from "../test-utils";
 import { WhatsAppDialog } from "./WhatsApp";
 import { allowDialogs, mockWhatsAppApi } from "./whatsAppTestApi";
@@ -147,5 +148,53 @@ describe("WhatsApp window: Save as template", () => {
     await openWindow();
     expect(await screen.findByRole("button", { name: "Templates" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save as template" })).toBeNull();
+  });
+});
+
+describe("WhatsApp window: what the message still has", () => {
+  it("warns of the fields still unfilled in the message itself, even once its template is deleted", async () => {
+    const { store } = mockWhatsAppApi(all, { draft: (t) => (t ? { text: "Hi Siti, a [job.title] role?", missing: ["job.title"] } : { text: "", missing: [] }) });
+    const { client } = renderWithClient(<WhatsAppDialog subject={siti} onClose={vi.fn()} />);
+    expect(await screen.findByText("To phone +60123456789")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "wtpl_1" } });
+    expect(await screen.findByText(/Not filled in: \[job.title\]/)).toBeTruthy();
+
+    store.splice(0, 1); // deleted by someone else
+    await act(() => client.invalidateQueries({ queryKey: whatsAppTemplatesKey }));
+    await waitFor(() => { expect(screen.getByLabelText<HTMLSelectElement>("Template").value).toBe(""); });
+    await waitFor(() => { expect(screen.getByLabelText("Message").hasAttribute("disabled")).toBe(false); });
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Hi Siti, a [job.title] role?");
+    expect(screen.getByText(/Not filled in: \[job.title\]/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Hi Siti, a Finance Manager role?" } });
+    expect(screen.queryByText(/Not filled in/)).toBeNull();
+  });
+
+  it("turns back the fields its template used, and points out their details still in a template's text", async () => {
+    const { store } = mockWhatsAppApi(all, {
+      values: { "candidate.nationality": "Malaysian" },
+      draft: (t) => ({ text: t ? "Hi Siti, a role for a Malaysian" : "", missing: [] }),
+    });
+    store.splice(0, 1, { id: "wtpl_1", version: 1, name: "Nationals", body: "Hi {{candidate.firstName}}, a role for a {{candidate.nationality}}", createdAt: "", updatedAt: "" });
+    await openWindow();
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "wtpl_1" } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Hi Siti, a role for a Malaysian"); });
+    fireEvent.click(screen.getByRole("button", { name: "Save as template" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Template text")).value).toBe("Hi {{candidate.firstName}}, a role for a {{candidate.nationality}}");
+    expect(screen.queryByText(/Still has/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    // Typed, not from a template: nationality stays as written, and is pointed out.
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "" } });
+    await waitFor(() => { expect(screen.getByLabelText("Message").hasAttribute("disabled")).toBe(false); });
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Hi Siti, a Malaysian role" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save as template" }));
+    const text = await screen.findByLabelText<HTMLTextAreaElement>("Template text");
+    expect(text.value).toBe("Hi {{candidate.firstName}}, a Malaysian role");
+    const warning = screen.getByText(/Still has/);
+    expect(warning.textContent).toBe("Still has Nationality: Malaysian — replace with the field?");
+    fireEvent.click(within(warning).getByRole("button", { name: "replace with the field?" }));
+    expect(text.value).toBe("Hi {{candidate.firstName}}, a {{candidate.nationality}} role");
+    expect(screen.queryByText(/Still has/)).toBeNull();
   });
 });

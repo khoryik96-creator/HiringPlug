@@ -158,6 +158,26 @@ describe("WhatsApp", () => {
     expect(message.value).toBe("Hi {{candidate.firstName}}, {{job.title}}?{{candidate.firstName}}");
   });
 
+  it("in Settings, a delete that finishes after another form was opened leaves that form open", async () => {
+    const two = { ...templates, items: [...templates.items, { ...templates.items[0], id: "wtpl_2", name: "Follow up", body: "Any news?" }] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/whatsapp-templates" ? two : me))) as never);
+    let finish: (value: unknown) => void = () => undefined;
+    vi.spyOn(api, "DELETE").mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<WhatsAppTemplates canCreate={false} canManage />);
+    const [first] = await screen.findAllByRole("button", { name: "Change or rename" });
+    if (!first) throw new Error("no template");
+    fireEvent.click(first);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" })); // still deleting...
+    fireEvent.click(screen.getByRole("button", { name: "Change or rename" })); // ...while the other is opened
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Half typed" } });
+    await act(async () => {
+      finish({ data: undefined, response: new Response(null, { status: 204 }) });
+      await new Promise((r) => setTimeout(r, 50)); // the delete finishes, and the list loads again
+    });
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Half typed");
+  });
+
   it("in Settings, saves with the version the form opened with, after the list loads again", async () => {
     const get = mockGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ ...templates.items[0], version: 3 }));

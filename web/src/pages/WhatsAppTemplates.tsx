@@ -16,7 +16,9 @@ export function WhatsAppTemplates({ canCreate, canManage }: { canCreate: boolean
   // "new", or the template as it was when its form opened: its version goes
   // with the change, so a change made meanwhile by someone else is not lost.
   const [editing, setEditing] = useState<Template | "new" | null>(null);
-  const done = { onSuccess: () => { setEditing(null); } };
+  // A finished change closes only its own form: another opened meanwhile keeps what is typed in it.
+  const close = (which: (e: Template | "new") => boolean) => ({ onSuccess: () => { setEditing((e) => (e !== null && which(e) ? null : e)); } });
+  const formOf = (t: Template) => (e: Template | "new") => e !== "new" && e.id === t.id;
   const fields = list.data?.fields ?? [];
   return (
     <main className="page">
@@ -29,15 +31,15 @@ export function WhatsAppTemplates({ canCreate, canManage }: { canCreate: boolean
       {editing === "new" && (
         <section className="panel" aria-label="New template">
           <WhatsAppTemplateForm initial={{ name: "", body: "" }} fields={fields} saving={create.isPending} error={create.error}
-            onSave={(v) => { create.mutate(v, done); }} onCancel={() => { setEditing(null); }} />
+            onSave={(v) => { create.mutate(v, close((e) => e === "new")); }} onCancel={() => { setEditing(null); }} />
         </section>
       )}
       {list.data?.items.map((t) => (
         <section key={t.id} className="panel whatsapp-template" aria-label={t.name}>
           {editing !== "new" && editing?.id === t.id ? (
             <WhatsAppTemplateForm initial={editing} fields={fields} saving={update.isPending || remove.isPending} error={update.error}
-              onSave={(v) => { update.mutate({ t: editing, v }, done); }} onCancel={() => { setEditing(null); }}
-              onDelete={() => { if (window.confirm(`Delete the "${t.name}" template?`)) remove.mutate(t, done); }} />
+              onSave={(v) => { update.mutate({ t: editing, v }, close(formOf(editing))); }} onCancel={() => { setEditing(null); }}
+              onDelete={() => { if (window.confirm(`Delete the "${t.name}" template?`)) remove.mutate(t, close(formOf(t))); }} />
           ) : (
             <>
               <div className="row spread">

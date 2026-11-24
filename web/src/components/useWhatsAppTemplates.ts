@@ -13,12 +13,16 @@ export function useWhatsAppTemplates() {
   return useQuery({ queryKey: whatsAppTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/whatsapp-templates")) });
 }
 
-export function useWhatsAppTemplateChanges() {
+/**
+ * `onCreated` runs once a new template is saved, even when the form that
+ * saved it has closed meanwhile (a callback given to mutate() would not).
+ */
+export function useWhatsAppTemplateChanges({ onCreated }: { onCreated?: (t: Template) => void } = {}) {
   const cache = useQueryClient();
   const reload = () => cache.invalidateQueries({ queryKey: whatsAppTemplatesKey });
   const create = useMutation({
     mutationFn: async (v: TemplateValues) => unwrap(await api.POST("/v1/whatsapp-templates", { body: v })),
-    onSuccess: reload,
+    onSuccess: async (t) => { await reload(); onCreated?.(t); },
   });
   const update = useMutation({
     mutationFn: async ({ t, v }: { t: Template; v: TemplateValues }) =>

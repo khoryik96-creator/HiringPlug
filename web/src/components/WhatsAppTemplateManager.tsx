@@ -10,21 +10,24 @@ import { WhatsAppTemplateForm } from "./WhatsAppTemplateForm";
 
 type Template = Schemas["WhatsAppTemplate"];
 
-export function WhatsAppTemplateManager({ canCreate, canManage, onRemoved, onBack }: {
-  canCreate: boolean; canManage: boolean; onRemoved: (t: Template) => void; onBack: () => void;
-}) {
+// Whether an open form is the one for this template.
+const formOf = (t: Template) => (e: Template | "new") => e !== "new" && e.id === t.id;
+
+export function WhatsAppTemplateManager({ canCreate, canManage, onBack }: { canCreate: boolean; canManage: boolean; onBack: () => void }) {
   const list = useWhatsAppTemplates();
   const { create, update, remove } = useWhatsAppTemplateChanges();
   // "new", or the template as it was when its form opened: its version goes
   // with the change, so a change made meanwhile by someone else is not lost.
   const [editing, setEditing] = useState<Template | "new" | null>(null);
-  const done = { onSuccess: () => { setEditing(null); } };
+  // A change done closes its own form only: another opened meanwhile keeps what is typed in it.
+  const close = (which: (e: Template | "new") => boolean) => ({ onSuccess: () => { setEditing((e) => (e !== null && which(e) ? null : e)); } });
   const fields = list.data?.fields ?? [];
   const items = list.data?.items ?? [];
   const busy = update.isPending || remove.isPending;
   const del = (t: Template) => {
     if (!window.confirm(`Delete the "${t.name}" template?`)) return;
-    remove.mutate(t, { onSuccess: () => { setEditing(null); onRemoved(t); } });
+    // The message window sets its Template dropdown back itself once the list loads without it.
+    remove.mutate(t, close(formOf(t)));
   };
   return (
     <section className="whatsapp-pane" aria-label="Templates">
@@ -36,7 +39,7 @@ export function WhatsAppTemplateManager({ canCreate, canManage, onRemoved, onBac
       {editing === "new" && (
         <div className="whatsapp-template" role="group" aria-label="New template">
           <WhatsAppTemplateForm initial={{ name: "", body: "" }} fields={fields} saving={create.isPending} error={create.error}
-            onSave={(v) => { create.mutate(v, done); }} onCancel={() => { setEditing(null); }} />
+            onSave={(v) => { create.mutate(v, close((e) => e === "new")); }} onCancel={() => { setEditing(null); }} />
         </div>
       )}
       {list.isSuccess && items.length === 0 && editing !== "new" && <p className="muted">No WhatsApp templates yet.</p>}
@@ -44,7 +47,7 @@ export function WhatsAppTemplateManager({ canCreate, canManage, onRemoved, onBac
         <div key={t.id} className="whatsapp-template" role="group" aria-label={t.name}>
           {editing !== "new" && editing?.id === t.id ? (
             <WhatsAppTemplateForm initial={editing} fields={fields} saving={busy} error={update.error}
-              onSave={(v) => { update.mutate({ t: editing, v }, done); }} onCancel={() => { setEditing(null); }} />
+              onSave={(v) => { update.mutate({ t: editing, v }, close(formOf(editing))); }} onCancel={() => { setEditing(null); }} />
           ) : (
             <>
               <div className="row spread">
