@@ -1075,7 +1075,9 @@ running.
   to the interview stage if it is at an earlier one; closed or placed
   applications get no new interviews. An interviewer already booked at that
   time is a clash, shown with the other interview, and "Schedule anyway"
-  overrides it. Interviews are changed, marked done, "did not come" or
+  overrides it. An interview's Outlook invitation changed in Outlook (people
+  added, a new time, place, title or notes) shows in HiringPlug on the next
+  refresh, the interview moving with it (1.43.0). Interviews are changed, marked done, "did not come" or
   cancelled, and every one has "Add to calendar" (an .ics file for Outlook,
   Google or Apple Calendar; importing it again after a change updates the
   event). Interviewers give feedback (strong yes / yes / no / strong no, and

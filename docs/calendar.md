@@ -87,7 +87,8 @@ shared/delegated calendars are not included.
   replaces it): Outlook still moves the meeting and tells the candidate, and
   the composer says so when such an interview is moved. A sent invitation's
   message and optional attendees are changed in Outlook, not on a retry (the
-  same first request again is simply answered).
+  same first request again is simply answered); those Outlook changes show in
+  HiringPlug, and a later HiringPlug change keeps the message rewritten there.
 - Scheduling an interview with Outlook connected sends the candidate's Outlook
   invitation in the same step (the **Outlook invitation** toggle, its reminder
   and **Email candidate a day before** sit in the toolbar as icons), with any
@@ -111,7 +112,8 @@ shared/delegated calendars are not included.
   interview when the connected default calendar supports Teams. The reminder
   choice sets the Outlook event reminder. Each attendee's calendar keeps its
   own notification settings.
-- HiringPlug updates that invitation when the interview moves and asks Outlook
+- HiringPlug updates that invitation when the interview moves (and a move
+  made in Outlook moves the interview) and asks Outlook
   to cancel it when the interview is cancelled. The original organizer and
   candidate address are pinned. A disconnected or switched account, a changed
   candidate address or withdrawn consent requires attention. In those cases,
@@ -126,7 +128,7 @@ shared/delegated calendars are not included.
   reminder, sent as the organizer's email (from their connected mailbox, else
   the configured mail server; replies go to them) and listed on the candidate's
   Emails tab. The organizer can turn it off
-  from the invitation panel. Moving an interview moves the reminder. At delivery
+  from the invitation panel. Moving an interview (in HiringPlug or in Outlook) moves the reminder. At delivery
   HiringPlug checks the latest schedule, organizer, address, known RSVP, and
   consent. If an interview is first invited within 24 hours, the email can go
   once Outlook confirms the invitation, while the interview is over an hour
@@ -137,10 +139,21 @@ shared/delegated calendars are not included.
   once Outlook confirms. A conflict stays marked once; a sync with nothing new
   in Outlook does not mark it again.
 - An Outlook change to an own appointment is reflected on the next refresh.
-  A changed/deleted interview or booking hold is flagged for review; its source
-  schedule stays in HiringPlug. **Keep HiringPlug details & sync** explicitly
-  resolves a conflict. Changes should otherwise be made in the original interview
-  or booking link. Concurrent edits use versions and Outlook conditional writes.
+  So is a change the organizer makes in Outlook to an interview invitation
+  HiringPlug sent (1.43.0), with nothing sent back: people added or removed
+  (other than the candidate), title, place or online link, notes, and time.
+  The interview takes the title, place and time, and the notes as its
+  instructions for a plain invitation (not a formatted or Teams message); a
+  moved interview's reminders move with it, its busy time and the panel's
+  holds follow, and the audit says it was changed in Outlook. The calendar
+  event and the interview show **Changed in Outlook** and when. People added
+  in Outlook are on the invitation, not the interview's panel. Deleting the
+  invitation in Outlook, removing the candidate from it, or a change made at
+  the same time in HiringPlug is still flagged for review and never cancels
+  the interview. A booking or panel hold keeps a rename, place, notes or
+  people changed in Outlook; a hold moved or deleted there is flagged (it is
+  one person's copy). **Keep HiringPlug details & sync** explicitly resolves a
+  conflict. Concurrent edits use versions and Outlook conditional writes.
 - Booking pages and interview clash checks use Outlook busy intervals. While a
   sync is late, failing or needs reconnecting, the last known busy times still
   count and nothing is blocked: a candidate's booking page keeps working, and
