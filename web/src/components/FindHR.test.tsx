@@ -145,4 +145,14 @@ describe("Find HR", () => {
     renderWithClient(<FindHR company={{ ...company, linkedinUrl: null }} canCreate canUseApollo={false} />);
     expect(screen.getByText(/Add the company's LinkedIn page/)).toBeTruthy();
   });
+
+  it("lays out the same scan for a narrow panel when compact", async () => {
+    serve();
+    renderWithClient(<FindHR company={company} canCreate canUseApollo={false} compact />);
+    expect((await screen.findByRole("status")).textContent).toContain("Done · 3 pages read · 5 found");
+    expect(screen.getByRole("region", { name: "Find HR" }).className).toBe("panel find-hr compact");
+    expect(screen.queryByRole("heading", { name: /Find HR/ }), "the panel's own title names it").toBeNull();
+    expect(screen.getByRole("link", { name: "Maju Bank Berhad on LinkedIn ↗" }).getAttribute("href")).toBe("https://www.linkedin.com/company/maju-bank/");
+    expect(screen.getByRole("button", { name: "All 3" })).toBeTruthy();
+  });
 });

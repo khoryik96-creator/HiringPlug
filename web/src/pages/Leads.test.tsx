@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
+import * as companion from "../companion";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { Leads } from "./Leads";
 
@@ -87,5 +88,39 @@ describe("leads", () => {
     reads();
     renderWithClient(<Leads permissions={["leads:read"]} />);
     expect(screen.queryByRole("button", { name: "+ Save a lead" })).toBeNull();
+  });
+
+  it("opens Find HR for a lead in a panel beside the list, one lead at a time", async () => {
+    const other = { ...lead, id: "lead_2", companyName: "Nusantara Logistik Sdn Bhd", title: "HR Executive" };
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok({ items: path === "/v1/job-leads" ? [lead, other] : [] }))) as never);
+    renderWithClient(<Leads permissions={[...manage, "companies:read", "companies:create", "contacts:read"]} />);
+    const find = await screen.findByRole("button", { name: "Find HR for Contoh Berhad" });
+    expect(find.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(find);
+    const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Berhad" });
+    expect(within(panel).getByRole("heading", { name: "1 · Which company is it?" })).toBeTruthy();
+    expect(find.getAttribute("aria-pressed")).toBe("true");
+    expect(find.closest("tr")?.className).toBe("lead-open");
+    // Another lead's button switches the panel to it.
+    fireEvent.click(screen.getByRole("button", { name: "Find HR for Nusantara Logistik Sdn Bhd" }));
+    expect(screen.getByRole("complementary", { name: "Find HR for Nusantara Logistik Sdn Bhd" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Find HR for Contoh Berhad" })).toBeNull();
+    expect(find.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.getByRole("region", { name: "Hiring leads" })).toBeTruthy();
+  });
+
+  it("offers Find HR only to those who may read companies and contacts", async () => {
+    reads();
+    renderWithClient(<Leads permissions={[...manage, "companies:read"]} />);
+    expect(await screen.findByText("Account Executive")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Find HR/ })).toBeNull();
+    cleanup();
+    reads();
+    renderWithClient(<Leads permissions={[...manage, "contacts:read"]} />);
+    expect(await screen.findByText("Account Executive")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Find HR/ })).toBeNull();
   });
 });
