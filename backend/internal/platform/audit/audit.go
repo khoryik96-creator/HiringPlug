@@ -53,9 +53,9 @@ func Record(ctx context.Context, tx pgx.Tx, e Entry) error {
 }
 
 // Diff returns {field: {"from": before, "to": after}} for every field whose
-// value differs. A field only in after (a record just made: Diff of an empty
-// map) is {"from": nil, "to": after} when it has a value; one with no value
-// (nil, or a nil pointer, map or slice) is left out.
+// value differs. Both maps should have the same keys. A record just made
+// (Diff of an empty map) gives {}: webhooks and automations receive these
+// changes, and must not start carrying a new record's every field.
 func Diff(before, after map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, b := range before {
@@ -63,25 +63,7 @@ func Diff(before, after map[string]any) map[string]any {
 			out[k] = map[string]any{"from": b, "to": a}
 		}
 	}
-	for k, a := range after {
-		if _, ok := before[k]; !ok && !isNil(a) {
-			out[k] = map[string]any{"from": nil, "to": a}
-		}
-	}
 	return out
-}
-
-// isNil: no value at all, or a nil pointer, map, slice or interface.
-func isNil(v any) bool {
-	if v == nil {
-		return true
-	}
-	switch r := reflect.ValueOf(v); r.Kind() {
-	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Interface:
-		return r.IsNil()
-	default:
-		return false
-	}
 }
 
 // Logged is one entry read back from the audit log.
