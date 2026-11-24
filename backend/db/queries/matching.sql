@@ -27,7 +27,7 @@ LIMIT 1;
 
 -- A match waiting for the AI, with what it was sent, locked while its answer is saved.
 -- name: GetQueuedForUpdate :one
-SELECT id, sent_job, sent_cv FROM job_match
+SELECT id, sent_job, sent_cv, created_by FROM job_match
 WHERE id = @id AND status = 'queued'
 FOR UPDATE;
 
@@ -38,11 +38,6 @@ SET status = @status, score = sqlc.narg(score), summary = sqlc.narg(summary), re
     error = sqlc.narg(error), model = sqlc.narg(model), input_tokens = @input_tokens, output_tokens = @output_tokens,
     scored_at = now(), sent_job = NULL, sent_cv = NULL
 WHERE id = @id AND status = 'queued';
-
--- Tokens the company used for matching since the start of the month.
--- name: TokensSince :one
-SELECT ((SELECT coalesce(sum(m.input_tokens + m.output_tokens), 0) FROM job_match m WHERE m.created_at >= @since::timestamptz)
-      + (SELECT coalesce(sum(t.tokens), 0) FROM talent_search t WHERE t.created_at >= @since::timestamptz))::bigint;
 
 -- AI candidate searches (CV Studio's AI Crawler). A user sees only their own.
 -- name: InsertTalentSearch :one

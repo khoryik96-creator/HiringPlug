@@ -14,7 +14,7 @@ const DRAFT = "aem_01jbz6w0m0k8q9x2r3s4t5v6w7";
 
 function serve(enabled: boolean, written: { subject: string | null; body: string } = { subject: "Interview on Thursday", body: "Hi ⟦NAME⟧,\n\nThe role pays ⟦1⟧. Could we meet on Thursday?\n\n⟦ME⟧" }) {
   vi.spyOn(api, "GET").mockImplementation(((path: string) => {
-    if (path === "/v1/assistant") return Promise.resolve(ok({ enabled, usedTokens: 0, monthlyTokens: 5000 }));
+    if (path === "/v1/assistant") return Promise.resolve(ok({ enabled, usedTokens: 0, monthlyTokens: 5000, usedPercent: 0 }));
     if (path === "/v1/me") return Promise.resolve(ok({ ...testMe([]), user: { ...testMe([]).user, name: "Nurul Huda" } }));
     return Promise.resolve(ok({ id: DRAFT, status: "done", subject: written.subject, body: written.body, error: null, createdAt: "2026-11-16T00:00:00Z" }));
   }) as never);
@@ -98,7 +98,7 @@ describe("AI help with an email", () => {
       serve(true);
       const get = vi.mocked(api.GET);
       get.mockImplementation(((path: string) => {
-        if (path === "/v1/assistant") return Promise.resolve(ok({ enabled: true, usedTokens: 0, monthlyTokens: 5000 }));
+        if (path === "/v1/assistant") return Promise.resolve(ok({ enabled: true, usedTokens: 0, monthlyTokens: 5000, usedPercent: 0 }));
         if (path === "/v1/me") return Promise.resolve(ok(testMe([])));
         return Promise.resolve(ok({ id: DRAFT, status: "queued", subject: null, body: null, error: null, createdAt: "2026-11-16T00:00:00Z" }));
       }) as never);

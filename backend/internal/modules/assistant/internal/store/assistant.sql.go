@@ -7,7 +7,6 @@ package store
 
 import (
 	"context"
-	"time"
 )
 
 const forgetAnswers = `-- name: ForgetAnswers :exec
@@ -183,11 +182,12 @@ func (q *Queries) ListAnswers(ctx context.Context, arg ListAnswersParams) ([]Ass
 	return items, nil
 }
 
-const saveAnswer = `-- name: SaveAnswer :execrows
+const saveAnswer = `-- name: SaveAnswer :one
 UPDATE assistant_answer
 SET status = $1, answer = $2, error = $3, model = $4,
     input_tokens = $5, output_tokens = $6, answered_at = now()
 WHERE id = $7 AND status = 'queued'
+RETURNING user_id
 `
 
 type SaveAnswerParams struct {
@@ -200,8 +200,9 @@ type SaveAnswerParams struct {
 	ID           string
 }
 
-func (q *Queries) SaveAnswer(ctx context.Context, arg SaveAnswerParams) (int64, error) {
-	result, err := q.db.Exec(ctx, saveAnswer,
+// Once: no row when it was answered already (a repeated result). Returns who asked.
+func (q *Queries) SaveAnswer(ctx context.Context, arg SaveAnswerParams) (string, error) {
+	row := q.db.QueryRow(ctx, saveAnswer,
 		arg.Status,
 		arg.Answer,
 		arg.Error,
@@ -210,17 +211,17 @@ func (q *Queries) SaveAnswer(ctx context.Context, arg SaveAnswerParams) (int64, 
 		arg.OutputTokens,
 		arg.ID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
 }
 
-const saveEmail = `-- name: SaveEmail :execrows
+const saveEmail = `-- name: SaveEmail :one
 UPDATE assistant_email
 SET status = $1, subject = $2, body = $3, error = $4, model = $5,
     input_tokens = $6, output_tokens = $7, written_at = now()
 WHERE id = $8 AND status = 'queued'
+RETURNING user_id
 `
 
 type SaveEmailParams struct {
@@ -234,8 +235,9 @@ type SaveEmailParams struct {
 	ID           string
 }
 
-func (q *Queries) SaveEmail(ctx context.Context, arg SaveEmailParams) (int64, error) {
-	result, err := q.db.Exec(ctx, saveEmail,
+// Once: no row when it was saved already (a repeated result). Returns who asked.
+func (q *Queries) SaveEmail(ctx context.Context, arg SaveEmailParams) (string, error) {
+	row := q.db.QueryRow(ctx, saveEmail,
 		arg.Status,
 		arg.Subject,
 		arg.Body,
@@ -245,22 +247,7 @@ func (q *Queries) SaveEmail(ctx context.Context, arg SaveEmailParams) (int64, er
 		arg.OutputTokens,
 		arg.ID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const tokensSince = `-- name: TokensSince :one
-SELECT (coalesce((SELECT sum(a.input_tokens + a.output_tokens) FROM assistant_answer a WHERE a.created_at >= $1::timestamptz), 0)
-      + coalesce((SELECT sum(m.input_tokens + m.output_tokens) FROM assistant_email m WHERE m.created_at >= $1::timestamptz), 0))::bigint
-`
-
-// Tokens the company used since the start of the month.
-// The assistant's answers and the emails it wrote.
-func (q *Queries) TokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, tokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
 }

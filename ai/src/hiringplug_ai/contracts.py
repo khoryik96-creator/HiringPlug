@@ -408,6 +408,17 @@ class AiProviderCheckJob(BaseModel):
     )
     provider: AiProviderName
     access: AiAccess
+    checkId: Annotated[
+        str | None,
+        Field(
+            description="Which check this is, sent back unchanged: its AI use is counted once.",
+            max_length=200,
+        ),
+    ] = None
+    askedBy: Annotated[
+        str | None,
+        Field(description="Who asked for the check (a user ID), sent back unchanged.", max_length=200),
+    ] = None
 
 
 class AiStatus(BaseModel):
@@ -450,6 +461,17 @@ class AiProviderCheckedJob(BaseModel):
     ]
     ok: bool
     message: Annotated[str | None, Field(...)]
+    checkId: Annotated[
+        str | None, Field(description="The check job's checkId, unchanged.", max_length=200)
+    ] = None
+    askedBy: Annotated[
+        str | None, Field(description="The check job's askedBy, unchanged.", max_length=200)
+    ] = None
+    inputTokens: Annotated[
+        int | None,
+        Field(description="Tokens the check's request took (counted in the monthly AI use).", ge=0),
+    ] = None
+    outputTokens: Annotated[int | None, Field(description="Tokens of the provider's answer.", ge=0)] = None
 
 
 class AiFeature(StrEnum):
@@ -637,8 +659,21 @@ class AssistantAnswerStatus(StrEnum):
 
 class AssistantStatus(BaseModel):
     enabled: Annotated[bool, Field(description="Whether an AI provider is set up.")]
-    usedTokens: Annotated[int, Field(description="Tokens the company used this calendar month.")]
-    monthlyTokens: Annotated[int, Field(description="The company's monthly allowance.")]
+    usedTokens: Annotated[
+        int,
+        Field(
+            description="Tokens the company used this calendar month, by every AI feature (the AI use ledger)."
+        ),
+    ]
+    monthlyTokens: Annotated[
+        int,
+        Field(
+            description="The company's monthly limit in tokens (its own, or the server's default); 0 when its limit is an amount of money."
+        ),
+    ]
+    usedPercent: Annotated[
+        int, Field(description="How much of this month's AI limit is used, in percent (can pass 100).", ge=0)
+    ]
 
 
 class AssistantQuestion(BaseModel):
@@ -3018,6 +3053,13 @@ class DocumentParseCvJob(BaseModel):
         AiAccess | None,
         Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
     ] = None
+    runKey: Annotated[
+        str | None,
+        Field(
+            description="Which reading of the document this is, sent back unchanged in the result: the AI use it took is counted once per reading, however often the result is delivered.\n",
+            max_length=200,
+        ),
+    ] = None
 
 
 class DocumentCvParsedJob(BaseModel):
@@ -3030,6 +3072,9 @@ class DocumentCvParsedJob(BaseModel):
     aiTokens: Annotated[
         int | None, Field(description="Tokens the AI used (counted in the monthly allowance).", ge=0)
     ] = None
+    runKey: Annotated[str | None, Field(description="The parse job's runKey, unchanged.", max_length=200)] = (
+        None
+    )
 
 
 class ToItem(RootModel[EmailStr]):

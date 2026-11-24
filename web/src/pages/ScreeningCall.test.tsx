@@ -28,7 +28,7 @@ function reads(c: Candidate) {
     if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(c));
     if (path === "/v1/candidates/{candidateId}/documents") return Promise.resolve(ok({ items: docs }));
     if (path === "/v1/documents/{documentId}") return Promise.resolve(ok(docs.find((d) => d.id === init?.params?.path?.documentId)));
-    return Promise.resolve(ok({ enabled: false, usedTokens: 0, monthlyTokens: 0 }));
+    return Promise.resolve(ok({ enabled: false, usedTokens: 0, monthlyTokens: 0, usedPercent: 0 }));
   }) as never);
 }
 

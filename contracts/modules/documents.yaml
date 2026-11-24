@@ -610,6 +610,13 @@ components:
         ai:
           allOf: [{ $ref: '#/components/schemas/AiAccess' }]
           description: The provider the company chose; left out = the server's own (HP_AI_*).
+        runKey:
+          type: string
+          maxLength: 200
+          description: >
+            Which reading of the document this is, sent back unchanged in the
+            result: the AI use it took is counted once per reading, however
+            often the result is delivered.
     DocumentCvParsedJob:
       type: object
       additionalProperties: false
@@ -619,3 +626,4 @@ components:
         profile: { allOf: [{ $ref: '#/components/schemas/ParsedProfile' }], nullable: true }
         errorMessage: { type: string, nullable: true }
         aiTokens: { type: integer, minimum: 0, description: Tokens the AI used (counted in the monthly allowance). }
+        runKey: { type: string, maxLength: 200, description: "The parse job's runKey, unchanged." }

@@ -10,18 +10,6 @@ import (
 	"time"
 )
 
-const aITokensSince = `-- name: AITokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= $1
-`
-
-// Tokens the AI used reading the company's CVs since a time.
-func (q *Queries) AITokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, aITokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const binDocument = `-- name: BinDocument :execrows
 UPDATE document SET binned_at = now(), updated_at = now() WHERE id = $1 AND binned_at IS NULL
 `
@@ -953,7 +941,7 @@ UPDATE document SET
   parsed_profile = $3,
   parser = $4,
   updated_at = now()
-WHERE id = $5
+WHERE id = $5 AND parse_status = 'queued'
 RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at
 `
 
@@ -965,6 +953,8 @@ type SaveParseParams struct {
 	ID            string
 }
 
+// The parser's result, once per reading: no row when the document is not
+// waiting for one (a repeated result).
 func (q *Queries) SaveParse(ctx context.Context, arg SaveParseParams) (Document, error) {
 	row := q.db.QueryRow(ctx, saveParse,
 		arg.ParseStatus,

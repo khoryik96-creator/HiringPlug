@@ -22,9 +22,12 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
-// AI is the company's AI provider, if it has one and allowance left this month.
+// AI is the company's AI provider, if it has one and allowance left this
+// month, and the company's AI use, where each run's tokens are recorded
+// (aiusage).
 type AI interface {
 	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+	RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 }
 
 // IndustryChoice is an industry or subindustry the AI may pick: its id and
@@ -122,7 +125,7 @@ func (s *Service) industried(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		return err
 	}
 	params := store.SaveIndustryPickParams{
-		ID: r.PickId, Status: "done", InputTokens: int32(min(r.InputTokens, 1<<30)), OutputTokens: int32(min(r.OutputTokens, 1<<30)), //nolint:gosec // capped
+		ID: r.PickId, Status: "done", InputTokens: int32(min(max(r.InputTokens, 0), 1<<30)), OutputTokens: int32(min(max(r.OutputTokens, 0), 1<<30)), //nolint:gosec // capped
 	}
 	choice, _ := r.ChoiceId.Get()
 	if choice != "" {
@@ -136,11 +139,20 @@ func (s *Service) industried(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	}
 	q := store.New(tx)
 	companyID, err := q.SaveIndustryPick(ctx, params)
-	if database.IsNoRows(err) {
-		return nil // answered already
-	}
-	if err != nil {
+	if err != nil && !database.IsNoRows(err) {
 		return err
+	}
+	// Asked by no one (the app picks on its own); one pick is one AI run, so
+	// an answer delivered again adds nothing, and one for a company deleted
+	// meanwhile is still counted.
+	if s.ai != nil {
+		if err := s.ai.RecordAI(ctx, tx, job.TenantID, "industry_pick", r.PickId, "", nil,
+			int64(params.InputTokens), int64(params.OutputTokens)); err != nil {
+			return err
+		}
+	}
+	if database.IsNoRows(err) {
+		return nil // answered already, or gone
 	}
 	if err := q.SetIndustryPickSince(ctx, store.SetIndustryPickSinceParams{ID: companyID}); err != nil { // answered: no longer awaited
 		return err
@@ -186,10 +198,4 @@ func blankNil(v *string) *string {
 func clipPtr(s string, n int) *string {
 	out := clip(s, n)
 	return &out
-}
-
-// TokensSince returns the AI tokens the company used for industry picks since
-// the given time, in the caller's transaction (counted in the shared allowance).
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).IndustryPickTokensSince(ctx, since)
 }

@@ -77,6 +77,11 @@ func (s *Service) scored(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 	if n, err := q.SaveScore(ctx, params); err != nil || n == 0 {
 		return err
 	}
+	// Each score is its own row: one AI run.
+	if err := s.deps.Usage.RecordAI(ctx, tx, job.TenantID, "fit_score", r.MatchId, "", &sent.CreatedBy,
+		int64(params.InputTokens), int64(params.OutputTokens)); err != nil {
+		return err
+	}
 	// No quotes or notes in the audit log: they are about a person.
 	changes := map[string]any{"status": params.Status, "requirements": len(reasons), "dropped": params.Dropped, "tokens": params.InputTokens + params.OutputTokens,
 		"dimensions": len(CheckDimensions(dims))}

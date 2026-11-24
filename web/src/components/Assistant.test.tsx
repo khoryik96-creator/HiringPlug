@@ -11,7 +11,7 @@ afterEach(() => {
   try { window.localStorage.clear(); } catch { /* not there */ }
 });
 
-const on: Schemas["AssistantStatus"] = { enabled: true, usedTokens: 1500, monthlyTokens: 2_000_000 };
+const on: Schemas["AssistantStatus"] = { enabled: true, usedTokens: 1_500_000, monthlyTokens: 2_000_000, usedPercent: 75 };
 const answer = (over: Partial<Schemas["AssistantAnswer"]>): Schemas["AssistantAnswer"] => ({
   id: "ask_1", subjectType: "candidate", subjectId: "cand_1", kind: "summary", question: null, status: "done",
   answer: "An experienced accountant.", error: null, model: "deepseek-chat", createdAt: "2026-11-03T02:00:00Z", answeredAt: null, ...over,
@@ -47,7 +47,9 @@ describe("AI assistant", () => {
     renderWithClient(<Assistant subjectType="candidate" subjectId="cand_1" permissions={[...USE]} />);
     expect((await screen.findByRole("article", { name: "Summary" })).textContent).toContain("An experienced accountant.");
     expect(screen.getByRole("article", { name: "Why did she leave?" }).textContent).toContain("No answer: the AI provider did not answer in time");
-    expect(screen.getByText(/tokens this month/).textContent).toContain("1,500 of 2,000,000 tokens");
+    // A share of the one monthly limit (tokens or money), not token counts.
+    expect(screen.getByText(/AI allowance used/).textContent).toBe("75% of this month's AI allowance used");
+    expect(screen.queryByText(/tokens/)).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Ask a question"), { target: { value: "  What should I ask?  " } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));

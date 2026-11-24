@@ -46,17 +46,6 @@ func (q *Queries) BinnedJobs(ctx context.Context, ids []string) ([]string, error
 	return items, nil
 }
 
-const blindRewriteTokensSince = `-- name: BlindRewriteTokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM job_ad_blind_rewrite WHERE created_at >= $1
-`
-
-func (q *Queries) BlindRewriteTokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, blindRewriteTokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const clearJobContacts = `-- name: ClearJobContacts :exec
 UPDATE job_order SET contact_id = NULL WHERE contact_id = ANY($1::text[])
 `
@@ -682,17 +671,6 @@ func (q *Queries) InsertJobSalary(ctx context.Context, arg InsertJobSalaryParams
 	return i, err
 }
 
-const jdReadTokensSince = `-- name: JdReadTokensSince :one
-SELECT coalesce(sum(ai_tokens), 0)::bigint FROM job_description_file WHERE created_at >= $1 AND ai_tokens > 0
-`
-
-func (q *Queries) JdReadTokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, jdReadTokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const jobOrderExists = `-- name: JobOrderExists :one
 SELECT EXISTS (SELECT 1 FROM job_order WHERE id = $1)
 `
@@ -1312,10 +1290,11 @@ func (q *Queries) SaveJdPdf(ctx context.Context, arg SaveJdPdfParams) (string, e
 	return id, err
 }
 
-const saveJdRead = `-- name: SaveJdRead :execrows
+const saveJdRead = `-- name: SaveJdRead :one
 UPDATE job_description_file
 SET status = $1, error = $2, text = $3, details = $4, ai_tokens = $5
 WHERE id = $6
+RETURNING created_by
 `
 
 type SaveJdReadParams struct {
@@ -1327,8 +1306,9 @@ type SaveJdReadParams struct {
 	ID       string
 }
 
-func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (int64, error) {
-	result, err := q.db.Exec(ctx, saveJdRead,
+// No row when the file is gone. Returns who uploaded it.
+func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (string, error) {
+	row := q.db.QueryRow(ctx, saveJdRead,
 		arg.Status,
 		arg.Error,
 		arg.Text,
@@ -1336,10 +1316,9 @@ func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (int64, 
 		arg.AiTokens,
 		arg.ID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var created_by string
+	err := row.Scan(&created_by)
+	return created_by, err
 }
 
 const setAdBlindText = `-- name: SetAdBlindText :one

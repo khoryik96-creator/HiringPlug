@@ -51,22 +51,28 @@ func (q *Queries) FinishTalentSearch(ctx context.Context, arg FinishTalentSearch
 }
 
 const getQueuedForUpdate = `-- name: GetQueuedForUpdate :one
-SELECT id, sent_job, sent_cv FROM job_match
+SELECT id, sent_job, sent_cv, created_by FROM job_match
 WHERE id = $1 AND status = 'queued'
 FOR UPDATE
 `
 
 type GetQueuedForUpdateRow struct {
-	ID      string
-	SentJob *string
-	SentCv  *string
+	ID        string
+	SentJob   *string
+	SentCv    *string
+	CreatedBy string
 }
 
 // A match waiting for the AI, with what it was sent, locked while its answer is saved.
 func (q *Queries) GetQueuedForUpdate(ctx context.Context, id string) (GetQueuedForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getQueuedForUpdate, id)
 	var i GetQueuedForUpdateRow
-	err := row.Scan(&i.ID, &i.SentJob, &i.SentCv)
+	err := row.Scan(
+		&i.ID,
+		&i.SentJob,
+		&i.SentCv,
+		&i.CreatedBy,
+	)
 	return i, err
 }
 
@@ -480,17 +486,4 @@ func (q *Queries) TalentSearchForAnswer(ctx context.Context, id string) (TalentS
 		&i.FinishedAt,
 	)
 	return i, err
-}
-
-const tokensSince = `-- name: TokensSince :one
-SELECT ((SELECT coalesce(sum(m.input_tokens + m.output_tokens), 0) FROM job_match m WHERE m.created_at >= $1::timestamptz)
-      + (SELECT coalesce(sum(t.tokens), 0) FROM talent_search t WHERE t.created_at >= $1::timestamptz))::bigint
-`
-
-// Tokens the company used for matching since the start of the month.
-func (q *Queries) TokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, tokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
 }

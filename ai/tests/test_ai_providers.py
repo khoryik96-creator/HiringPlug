@@ -339,6 +339,20 @@ def test_the_check_reports_back(reply: Completion | ProviderError, ok: bool, mes
     assert (r.ok, r.message, r.sealedKey, r.provider.value) == (ok, message, "v1.sealed", "openai")
 
 
+def test_the_check_reports_the_tokens_it_used_and_which_check_it_was() -> None:
+    access = AiAccess(provider="openai", model="gpt-5.5", sealedKey="v1.sealed")
+    job = AiProviderCheckJob(provider="openai", access=access, checkId="chk_one", askedBy="usr_owner")
+    reply = Completion(text="OK", model="m", input_tokens=21, output_tokens=2)
+    [f] = ai_check.run(job, deps(company=Fake(reply)))
+    r = AiProviderCheckedJob.model_validate(f.payload.model_dump(mode="json"))
+    assert (r.checkId, r.askedBy, r.inputTokens, r.outputTokens) == ("chk_one", "usr_owner", 21, 2)
+
+    # No answer: nothing to count, and the check is still named.
+    [f] = ai_check.run(job, deps(company=Fake(ProviderError("down"))))
+    r = AiProviderCheckedJob.model_validate(f.payload.model_dump(mode="json"))
+    assert (r.ok, r.checkId, r.inputTokens, r.outputTokens) == (False, "chk_one", 0, 0)
+
+
 def test_each_request_closes_its_connections() -> None:
     _, client = recording([message("fine")])
     Messages("claude", KEY, "claude-opus-5-5", http_client=client).complete("s", "u", max_tokens=10)

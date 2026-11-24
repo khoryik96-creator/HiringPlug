@@ -48,11 +48,9 @@ UPDATE interview_prep SET archived_at = sqlc.narg(archived_at) WHERE id = @id RE
 
 -- The AI's material (or why there is none), once; a late answer to a run
 -- already shown as failed still fills it.
--- name: FinishInterviewPrep :execrows
+-- name: FinishInterviewPrep :one
 UPDATE interview_prep SET
   status = @status, content = sqlc.narg(content), error = sqlc.narg(error), model = sqlc.narg(model),
   tokens = @tokens, finished_at = now()
-WHERE id = @id AND status = 'queued';
-
--- name: InterviewPrepTokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM interview_prep WHERE created_at >= @since;
+WHERE id = @id AND status = 'queued'
+RETURNING created_by;

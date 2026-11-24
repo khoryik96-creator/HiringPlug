@@ -24,9 +24,12 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
-// AI is the company's AI provider, if it has one and allowance left this month.
+// AI is the company's AI provider, if it has one and allowance left this
+// month, and the company's AI use, where each run's tokens are recorded
+// (aiusage).
 type AI interface {
 	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+	RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 }
 
 // RewriteOptions are how a blind ad is rewritten.
@@ -149,6 +152,10 @@ func (s *Service) saveBlindRewrite(ctx context.Context, tx pgx.Tx, job jobqueue.
 	}
 	q := store.New(tx)
 	run, err := q.GetBlindRewrite(ctx, r.RewriteId)
+	if database.IsNoRows(err) && s.ai != nil {
+		// The ad is gone: what the AI used is still counted (once).
+		return s.ai.RecordAI(ctx, tx, job.TenantID, "jd_blind", r.RewriteId, "", nil, int64(r.InputTokens), int64(r.OutputTokens))
+	}
 	if database.IsNoRows(err) || (err == nil && run.Status != "queued") {
 		return nil // a repeated result, or the ad is gone
 	}
@@ -161,11 +168,14 @@ func (s *Service) saveBlindRewrite(ctx context.Context, tx pgx.Tx, job jobqueue.
 	}
 	finish := func(status string, reason *string) error {
 		model, _ := r.Model.Get()
-		_, err := q.FinishBlindRewrite(ctx, store.FinishBlindRewriteParams{
+		if _, err := q.FinishBlindRewrite(ctx, store.FinishBlindRewriteParams{
 			ID: run.ID, Status: status, Error: reason, Warnings: warnings, Retried: r.Retried,
-			Model: nonEmpty(model), Tokens: int32(min(r.InputTokens+r.OutputTokens, 1<<30)), //nolint:gosec // bounded above
-		})
-		return err
+			Model: nonEmpty(model), Tokens: int32(min(max(r.InputTokens, 0)+max(r.OutputTokens, 0), 1<<30)), //nolint:gosec // bounded above
+		}); err != nil || s.ai == nil {
+			return err
+		}
+		// A rewrite run is one AI run: counted once, kept when the ad is deleted.
+		return s.ai.RecordAI(ctx, tx, job.TenantID, "jd_blind", run.ID, "", &run.CreatedBy, int64(r.InputTokens), int64(r.OutputTokens))
 	}
 	jd, err := r.Jd.Get()
 	if err != nil { // no rewrite: why
@@ -209,18 +219,6 @@ func (s *Service) saveBlindRewrite(ctx context.Context, tx pgx.Tx, job jobqueue.
 	return audit.Record(ctx, tx, audit.Entry{Action: "job_ad.blind_rewritten", EntityType: "job_ad", EntityID: ad.ID, Changes: map[string]any{
 		"rewriteId": run.ID, "warnings": len(warnings), "retried": r.Retried,
 	}})
-}
-
-// TokensSince is the AI tokens blind ad rewrites used since a time (the
-// company's monthly allowance), in the caller's transaction.
-func (s *Service) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	q := store.New(tx)
-	rewrites, err := q.BlindRewriteTokensSince(ctx, since)
-	if err != nil {
-		return 0, err
-	}
-	reads, err := q.JdReadTokensSince(ctx, since) // job descriptions the AI read
-	return rewrites + reads, err
 }
 
 func orNull(s *string) nullable.Nullable[string] {

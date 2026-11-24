@@ -2,6 +2,7 @@ package documents
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"strings"
 
@@ -114,7 +115,9 @@ func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, ro
 			return err
 		}
 	}
-	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI}
+	// The reading's own key comes back with its result: its AI use counts once.
+	runKey := rand.Text()
+	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI, RunKey: &runKey}
 	if row.Source != "formatted" { // often the candidate's name; a formatted CV's starts with the agency's
 		name := row.FileName
 		job.FileName = &name
@@ -149,7 +152,11 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 	row, err := q.GetDocument(ctx, result.DocumentId)
 	if database.IsNoRows(err) {
 		logx.From(ctx).Info("document no longer exists; dropping its parse result", "document_id", result.DocumentId)
-		return nil
+		if result.AiTokens == nil || result.RunKey == nil || *result.RunKey == "" {
+			return nil
+		}
+		// What the AI used is still counted, once per reading.
+		return s.recordAI(ctx, tx, job, store.Document{ID: result.DocumentId}, result.RunKey, int64(*result.AiTokens))
 	}
 	if err != nil {
 		return err
@@ -178,11 +185,17 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 			"skills": len(grounded.Skills), "dropped": grounded.Dropped,
 		}
 	}
-	if _, err := q.SaveParse(ctx, params); err != nil {
+	if _, err := q.SaveParse(ctx, params); database.IsNoRows(err) {
+		return nil // not waiting for a reading: a repeated result
+	} else if err != nil {
 		return err
 	}
 	if result.AiTokens != nil && *result.AiTokens > 0 {
-		if err := q.RecordAIUse(ctx, store.RecordAIUseParams{DocumentID: row.ID, Tokens: int32(min(*result.AiTokens, 1<<30))}); err != nil { //nolint:gosec // capped
+		tokens := min(*result.AiTokens, 1<<30)
+		if err := q.RecordAIUse(ctx, store.RecordAIUseParams{DocumentID: row.ID, Tokens: int32(tokens)}); err != nil { //nolint:gosec // capped
+			return err
+		}
+		if err := s.recordAI(ctx, tx, job, row, result.RunKey, int64(tokens)); err != nil {
 			return err
 		}
 		changes["aiTokens"] = *result.AiTokens
@@ -193,6 +206,24 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 		return err
 	}
 	return s.readDone(ctx, tx, job.TenantID, row.ID, kept)
+}
+
+// recordAI counts a reading's AI tokens once (by the run key its parse job
+// carried; a result queued before run keys existed uses its own job's ID),
+// for whoever added the CV.
+func (s *Service) recordAI(ctx context.Context, tx pgx.Tx, job jobqueue.Job, row store.Document, runKey *string, tokens int64) error {
+	if s.ai == nil {
+		return nil
+	}
+	key := job.ID
+	if runKey != nil && *runKey != "" {
+		key = *runKey
+	}
+	var who *string // nil: the document is gone
+	if row.CreatedBy != "" {
+		who = &row.CreatedBy
+	}
+	return s.ai.RecordAI(ctx, tx, job.TenantID, "cv_reading", row.ID, key, who, tokens, 0)
 }
 
 // readDone runs the hooks for a document whose reading has ended.

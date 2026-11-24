@@ -19,17 +19,13 @@ WHERE user_id = app_current_user() AND subject_type = @subject_type AND subject_
 ORDER BY created_at DESC, id DESC
 LIMIT 20;
 
--- Tokens the company used since the start of the month.
--- The assistant's answers and the emails it wrote.
--- name: TokensSince :one
-SELECT (coalesce((SELECT sum(a.input_tokens + a.output_tokens) FROM assistant_answer a WHERE a.created_at >= @since::timestamptz), 0)
-      + coalesce((SELECT sum(m.input_tokens + m.output_tokens) FROM assistant_email m WHERE m.created_at >= @since::timestamptz), 0))::bigint;
-
--- name: SaveAnswer :execrows
+-- Once: no row when it was answered already (a repeated result). Returns who asked.
+-- name: SaveAnswer :one
 UPDATE assistant_answer
 SET status = @status, answer = sqlc.narg(answer), error = sqlc.narg(error), model = sqlc.narg(model),
     input_tokens = @input_tokens, output_tokens = @output_tokens, answered_at = now()
-WHERE id = @id AND status = 'queued';
+WHERE id = @id AND status = 'queued'
+RETURNING user_id;
 
 -- name: InsertEmail :one
 INSERT INTO assistant_email (tenant_id, user_id, mode)
@@ -40,11 +36,13 @@ RETURNING *;
 -- name: GetEmail :one
 SELECT * FROM assistant_email WHERE id = @id AND user_id = app_current_user();
 
--- name: SaveEmail :execrows
+-- Once: no row when it was saved already (a repeated result). Returns who asked.
+-- name: SaveEmail :one
 UPDATE assistant_email
 SET status = @status, subject = sqlc.narg(subject), body = sqlc.narg(body), error = sqlc.narg(error), model = sqlc.narg(model),
     input_tokens = @input_tokens, output_tokens = @output_tokens, written_at = now()
-WHERE id = @id AND status = 'queued';
+WHERE id = @id AND status = 'queued'
+RETURNING user_id;
 
 -- What the AI said about records deleted for good (the Bin): it describes them.
 -- name: ForgetAnswers :exec

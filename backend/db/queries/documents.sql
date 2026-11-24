@@ -33,6 +33,8 @@ RETURNING *;
 -- name: QueueParse :one
 UPDATE document SET parse_status = 'queued', parse_error = NULL, updated_at = now() WHERE id = @id RETURNING *;
 
+-- The parser's result, once per reading: no row when the document is not
+-- waiting for one (a repeated result).
 -- name: SaveParse :one
 UPDATE document SET
   parse_status = @parse_status,
@@ -40,7 +42,7 @@ UPDATE document SET
   parsed_profile = sqlc.narg(parsed_profile),
   parser = sqlc.narg(parser),
   updated_at = now()
-WHERE id = @id
+WHERE id = @id AND parse_status = 'queued'
 RETURNING *;
 
 -- name: MoveDocumentsToCandidate :execrows
@@ -129,10 +131,6 @@ LIMIT @row_limit;
 
 -- name: RecordAIUse :exec
 INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current_tenant(), @document_id, @tokens);
-
--- Tokens the AI used reading the company's CVs since a time.
--- name: AITokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= @since;
 
 -- Advanced search: the candidates with a CV (read, not formatted) matching
 -- a boolean search (as a text search query), up to a limit of CVs. A

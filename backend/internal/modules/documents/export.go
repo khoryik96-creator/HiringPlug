@@ -75,11 +75,5 @@ func (m *Module) WhenReadDone(hooks ...ReadDoneHook) { m.service.whenDone = hook
 func (m *Module) WhenCVBinned(hooks ...CVBinnedHook) { m.service.whenBinned = hooks }
 
 // UseAI lets the AI fill in what the rules leave empty when reading CVs,
-// while ai allows it.
+// while ai allows it, and records what it used there.
 func (m *Module) UseAI(ai AIAllowance) { m.service.ai = ai }
-
-// TokensSince returns the AI tokens the company used reading CVs since a
-// time (part of its monthly allowance), in the caller's transaction.
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return store.New(tx).AITokensSince(ctx, since)
-}

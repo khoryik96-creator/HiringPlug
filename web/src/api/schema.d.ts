@@ -5866,6 +5866,10 @@ export interface components {
         AiProviderCheckJob: {
             provider: components["schemas"]["AiProviderName"];
             access: components["schemas"]["AiAccess"];
+            /** @description Which check this is, sent back unchanged: its AI use is counted once. */
+            checkId?: string;
+            /** @description Who asked for the check (a user ID), sent back unchanged. */
+            askedBy?: string;
         };
         AiStatus: {
             /** @description The latest call to the provider failed, within the last hour. */
@@ -5900,6 +5904,20 @@ export interface components {
             sealedKey: string;
             ok: boolean;
             message: string | null;
+            /** @description The check job's checkId, unchanged. */
+            checkId?: string;
+            /** @description The check job's askedBy, unchanged. */
+            askedBy?: string;
+            /**
+             * Format: int64
+             * @description Tokens the check's request took (counted in the monthly AI use).
+             */
+            inputTokens?: number;
+            /**
+             * Format: int64
+             * @description Tokens of the provider's answer.
+             */
+            outputTokens?: number;
         };
         /**
          * @description What the AI was used for: assistant (AI assistant answers), assistant_email (AI email writing), fit_score (CV vs job fit scores), talent_search (AI candidate search), cv_reading (reading CVs with the AI), cv_studio (formatted CVs), jd_blind (blind job ads), jd_reading (reading job descriptions with the AI), industry_pick (company industry picks), interview_prep (interview prep material), provider_check (AI provider checks in Settings).
@@ -6078,14 +6096,19 @@ export interface components {
             enabled: boolean;
             /**
              * Format: int64
-             * @description Tokens the company used this calendar month.
+             * @description Tokens the company used this calendar month, by every AI feature (the AI use ledger).
              */
             usedTokens: number;
             /**
              * Format: int64
-             * @description The company's monthly allowance.
+             * @description The company's monthly limit in tokens (its own, or the server's default); 0 when its limit is an amount of money.
              */
             monthlyTokens: number;
+            /**
+             * Format: int64
+             * @description How much of this month's AI limit is used, in percent (can pass 100).
+             */
+            usedPercent: number;
         };
         AssistantQuestion: {
             subjectType: components["schemas"]["AssistantSubjectType"];
@@ -8433,6 +8456,8 @@ export interface components {
             aiText?: string;
             /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
             ai?: components["schemas"]["AiAccess"];
+            /** @description Which reading of the document this is, sent back unchanged in the result: the AI use it took is counted once per reading, however often the result is delivered. */
+            runKey?: string;
         };
         DocumentCvParsedJob: {
             documentId: components["schemas"]["DocumentId"];
@@ -8440,6 +8465,8 @@ export interface components {
             errorMessage: string | null;
             /** @description Tokens the AI used (counted in the monthly allowance). */
             aiTokens?: number;
+            /** @description The parse job's runKey, unchanged. */
+            runKey?: string;
         };
         OutlookDraftInput: {
             subject?: string;

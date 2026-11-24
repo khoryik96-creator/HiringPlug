@@ -49,9 +49,12 @@ type Deps struct {
 	Companies interface {
 		ForInterviewPrep(ctx context.Context, tx pgx.Tx, companyID string) (Company, error)
 	}
-	// AI is the company's AI provider, if it has one and allowance left this month.
+	// AI is the company's AI provider, if it has one and allowance left this
+	// month, and the company's AI use, where each run's tokens are recorded
+	// (aiusage).
 	AI interface {
 		Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+		RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 	}
 }
 
@@ -73,10 +76,4 @@ func New(pool *pgxpool.Pool, deps Deps, zone *time.Location) *Module {
 // JobHandlers are the module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindInterviewPrepWritten: m.service.written}
-}
-
-// TokensSince is the AI tokens the company's prep material used since a time
-// (for the monthly allowance shared by every AI feature).
-func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return m.service.tokensSince(ctx, tx, since)
 }

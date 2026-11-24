@@ -7,7 +7,6 @@ package assistant
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
@@ -108,12 +107,6 @@ func CleanQuestion(q *string, person redact.Identity) *string {
 	}
 	clean := redact.WithoutMoney(redact.Scrub(*q, person))
 	return &clean
-}
-
-// MonthStart is when the month that holds now began, in loc.
-func MonthStart(now time.Time, loc *time.Location) time.Time {
-	t := now.In(loc)
-	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, loc)
 }
 
 // CandidateSections is what the AI sees of a candidate: the profile, work

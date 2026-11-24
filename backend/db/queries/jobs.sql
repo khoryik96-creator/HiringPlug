@@ -187,10 +187,12 @@ DELETE FROM job_description_file WHERE id = @id RETURNING job_id, file_name, sto
 -- name: LinkJdFileToJob :execrows
 UPDATE job_description_file SET job_id = @job_id WHERE id = @id AND job_id IS NULL;
 
--- name: SaveJdRead :execrows
+-- No row when the file is gone. Returns who uploaded it.
+-- name: SaveJdRead :one
 UPDATE job_description_file
 SET status = @status, error = sqlc.narg(error), text = sqlc.narg(text), details = sqlc.narg(details), ai_tokens = @ai_tokens
-WHERE id = @id;
+WHERE id = @id
+RETURNING created_by;
 
 -- AI rewrites of an ad's blind version (CV Studio's way).
 -- name: InsertBlindRewrite :one
@@ -210,12 +212,6 @@ UPDATE job_ad_blind_rewrite
        model = sqlc.narg(model), tokens = @tokens, finished_at = now()
  WHERE id = @id AND status = 'queued'
 RETURNING *;
-
--- name: BlindRewriteTokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM job_ad_blind_rewrite WHERE created_at >= @since;
-
--- name: JdReadTokensSince :one
-SELECT coalesce(sum(ai_tokens), 0)::bigint FROM job_description_file WHERE created_at >= @since AND ai_tokens > 0;
 
 -- The AI's rewrite becomes the ad's blind version, as a person's edit would
 -- (the ad's version moves on, so an open edit form sees the change).

@@ -530,17 +530,6 @@ func (q *Queries) IndustryEmployerID(ctx context.Context, name string) (string, 
 	return id, err
 }
 
-const industryPickTokensSince = `-- name: IndustryPickTokensSince :one
-SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM company_industry_pick WHERE created_at >= $1::timestamptz
-`
-
-func (q *Queries) IndustryPickTokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, industryPickTokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const insertCompany = `-- name: InsertCompany :one
 
 INSERT INTO company (

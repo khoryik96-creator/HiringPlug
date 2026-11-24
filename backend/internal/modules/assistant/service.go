@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,27 +21,26 @@ import (
 
 // Service holds the assistant's use cases.
 type Service struct {
-	pool     *pgxpool.Pool
-	deps     Deps
-	settings Settings
-	now      func() time.Time
+	pool *pgxpool.Pool
+	deps Deps
 }
 
-// Status is whether the assistant is on and how much the company used.
+// Status is whether the assistant is on and how much of this month's AI
+// limit the company used (every AI feature together).
 type Status struct {
-	Enabled                   bool
-	UsedTokens, MonthlyTokens int64
+	Enabled bool
+	MonthUse
 }
 
 // Status returns whether the assistant is on, and this month's use.
 func (s *Service) Status(ctx context.Context, p authz.Principal) (Status, error) {
-	out := Status{MonthlyTokens: s.settings.MonthlyTokens}
+	var out Status
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
 		if _, out.Enabled, err = s.deps.AI.Access(ctx, tx); err != nil {
 			return err
 		}
-		out.UsedTokens, err = s.used(ctx, tx, p.TenantID)
+		out.MonthUse, err = s.deps.Usage.ThisMonth(ctx, tx, p.TenantID)
 		return err
 	})
 	return out, err
@@ -113,28 +111,6 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 	return out, err
 }
 
-// used is the AI tokens the company used this month, the assistant's and
-// matching's together.
-func (s *Service) used(ctx context.Context, tx pgx.Tx, tenant string) (int64, error) {
-	var total int64
-	err := database.AsSystem(ctx, tx, tenant, func() error {
-		var err error
-		total, err = s.tenantUsage(ctx, tx)
-		return err
-	})
-	return total, err
-}
-
-func (s *Service) tenantUsage(ctx context.Context, tx pgx.Tx) (int64, error) {
-	since := MonthStart(s.now(), s.settings.TimeZone)
-	used, err := store.New(tx).TokensSince(ctx, since)
-	if err != nil || s.deps.OtherAIUse == nil {
-		return used, err
-	}
-	other, err := s.deps.OtherAIUse.TokensSince(ctx, tx, since)
-	return used + other, err
-}
-
 // sections gathers what the AI may see of the subject: only what the user
 // may see (a record they may not see is "not found"), and who the candidate
 // is (to take them out of the question too).
@@ -197,7 +173,7 @@ func (s *Service) answered(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 		return err
 	}
 	params := store.SaveAnswerParams{
-		ID: r.AnswerId, Status: "done", InputTokens: int32(min(r.InputTokens, 1<<30)), OutputTokens: int32(min(r.OutputTokens, 1<<30)), //nolint:gosec // capped
+		ID: r.AnswerId, Status: "done", InputTokens: tokens(r.InputTokens), OutputTokens: tokens(r.OutputTokens),
 	}
 	if v, err := r.Answer.Get(); err == nil && v != "" {
 		params.Answer = clipPtr(v, 20000)
@@ -210,14 +186,29 @@ func (s *Service) answered(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 	} else if params.Answer == nil {
 		params.Status, params.Error = "failed", clipPtr("The AI gave no answer.", 1000)
 	}
-	n, err := store.New(tx).SaveAnswer(ctx, params)
-	if err != nil || n == 0 {
-		return err // already answered (a repeated result): nothing to do
+	asker, err := store.New(tx).SaveAnswer(ctx, params)
+	if database.IsNoRows(err) {
+		// Already answered (counted then: this adds nothing), or forgotten
+		// meanwhile (what the AI used is still counted).
+		return s.deps.Usage.RecordAI(ctx, tx, job.TenantID, "assistant", r.AnswerId, "", nil,
+			int64(params.InputTokens), int64(params.OutputTokens))
+	}
+	if err != nil {
+		return err
+	}
+	if err := s.deps.Usage.RecordAI(ctx, tx, job.TenantID, "assistant", r.AnswerId, "", &asker,
+		int64(params.InputTokens), int64(params.OutputTokens)); err != nil {
+		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "assistant.answered", EntityType: "assistant_answer", EntityID: r.AnswerId,
 		Changes: map[string]any{"status": params.Status, "tokens": params.InputTokens + params.OutputTokens},
 	})
+}
+
+// tokens is a token count as saved: never below 0, at most 1<<30.
+func tokens(n int) int32 {
+	return int32(min(max(n, 0), 1<<30)) //nolint:gosec // within 0..1<<30
 }
 
 func clipPtr(s string, n int) *string {

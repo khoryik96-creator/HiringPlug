@@ -404,17 +404,6 @@ func (q *Queries) StudioCvRunning(ctx context.Context, candidateID string) (bool
 	return exists, err
 }
 
-const studioCvTokensSince = `-- name: StudioCvTokensSince :one
-SELECT coalesce(sum(tokens), 0)::bigint FROM studio_cv_ai_use WHERE created_at >= $1
-`
-
-func (q *Queries) StudioCvTokensSince(ctx context.Context, since time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, studioCvTokensSince, since)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const studioCvsFinishedBy = `-- name: StudioCvsFinishedBy :many
 SELECT id, candidate_id, status, blind, finished_at FROM studio_cv
 WHERE created_by = $1 AND status IN ('done', 'failed') AND finished_at >= $2

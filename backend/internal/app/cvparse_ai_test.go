@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/oapi-codegen/nullable"
@@ -71,8 +72,7 @@ func TestTheAIFillsCVReadingsOnlyWhenOnAndCounts(t *testing.T) {
 	t.Run("no AI once the allowance is used", func(t *testing.T) {
 		_, _, payload := readCV(t, on, conn, token, "AHMAD ALI") // the allowance is 5000; add another 4000
 		require.True(t, *payload.UseAi)
-		_, err := testutil.Current.Admin.Exec(ctx, `INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES ($1, $2, 4000)`, tenant.ID, doc.Id)
-		require.NoError(t, err)
+		usedEarlier(t, tenant.ID, "cv_reading", doc.Id, 4000, 0, time.Now())
 		_, _, payload = readCV(t, on, conn, token, "BALA KUMAR")
 		assert.False(t, *payload.UseAi)
 	})
