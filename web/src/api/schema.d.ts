@@ -6327,8 +6327,10 @@ export interface components {
             /** @example candidate */
             entityType: string;
             entityId: string;
-            /** @description The candidate's, job's, company's, contact's or user's name, when it can be looked up (null otherwise). */
+            /** @description The record's name, when it can be looked up (null otherwise): a candidate's, job's, company's, contact's, user's or job lead's ("Accountant · Maju Bhd"); for a candidate on a job (application), "Candidate name · Job title". */
             entityName: string | null;
+            /** @description For a candidate on a job (application), the candidate, whose page the record opens; null otherwise. */
+            candidateId: components["schemas"]["CandidateId"] | null;
             /** @description What changed: field -> {"from", "to"}, or details of the action. Never a salary amount. */
             changes: {
                 [key: string]: unknown;

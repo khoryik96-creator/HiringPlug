@@ -67,6 +67,7 @@ type Entry struct {
 	audit.Logged
 	ActorKind, ActorName string
 	EntityName           *string
+	CandidateID          *string // a candidate on a job: the candidate the record opens
 }
 
 // LogPage is one page of the audit log, newest first.
@@ -111,6 +112,12 @@ func (s *Service) logPage(ctx context.Context, tx pgx.Tx, f audit.Filter, cursor
 			return LogPage{}, err
 		}
 	}
+	apps := map[string]Application{}
+	if len(byType["application"]) > 0 && s.deps.Applications != nil {
+		if apps, err = s.deps.Applications.Applications(ctx, tx, Distinct(byType["application"])); err != nil {
+			return LogPage{}, err
+		}
+	}
 	if len(byType["api_key"]) > 0 && s.deps.Keys != nil {
 		if records["api_key"], err = s.deps.Keys.KeyNames(ctx, tx, Distinct(byType["api_key"])); err != nil {
 			return LogPage{}, err
@@ -121,6 +128,9 @@ func (s *Service) logPage(ctx context.Context, tx pgx.Tx, f audit.Filter, cursor
 		e := Entry{Logged: l, ActorKind: ActorKind(l.ActorID), ActorName: ActorName(l.ActorID, users, keys)}
 		if name, ok := records[l.EntityType][l.EntityID]; ok && name != "" {
 			e.EntityName = &name
+		}
+		if app, ok := apps[l.EntityID]; ok && l.EntityType == "application" {
+			e.EntityName, e.CandidateID = &app.Name, &app.CandidateID
 		}
 		out.Items[i] = e
 	}

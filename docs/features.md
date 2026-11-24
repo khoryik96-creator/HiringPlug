@@ -1675,7 +1675,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   the company, newest first, with who made it (a person; "Automatic" for what
   the app did on its own; an API key by its name, or "API key"), the action
   (`candidate.updated`), the record and its name (candidates, jobs, companies,
-  contacts and people are named; others by kind and id) and what changed
+  contacts, people and job leads are named, and a candidate on a job as
+  "Siti Aisyah · Accountant", opening the candidate; others by kind and id)
+  and what changed
   (salaries only as "changed", never amounts). Filters: who, one action or
   every action of a kind (`candidate`), the kind of record, one record, and a
   range of days in the agency's time zone; cursor pages. Entries about

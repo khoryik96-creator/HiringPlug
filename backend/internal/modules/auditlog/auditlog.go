@@ -53,8 +53,27 @@ type Deps struct {
 		KeyNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 	}
 	// Records names what an entry is about, by entity type (candidate, job,
-	// company, contact...): the user may see only some of them.
+	// company, contact, job lead...): the user may see only some of them.
 	Records map[string]Names
+	// Applications names candidates on jobs (pipeline module), with the
+	// candidate the record opens.
+	Applications interface {
+		Applications(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
+	}
+}
+
+// Application is a candidate on a job as an entry names it: "Siti Aisyah ·
+// Accountant", opening the candidate.
+type Application struct {
+	Name, CandidateID string
+}
+
+// ApplicationsFunc is a function as Deps.Applications.
+type ApplicationsFunc func(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
+
+// Applications calls f.
+func (f ApplicationsFunc) Applications(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error) {
+	return f(ctx, tx, ids)
 }
 
 // Config is how the server is set up.

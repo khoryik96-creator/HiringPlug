@@ -142,8 +142,9 @@ export function exportedList(action: string): string | null {
   return verb === "exported" ? `${capital(noun(kind))} list` : null;
 }
 
-/** Where a record opens in the app (candidates, jobs, companies and contacts); null for the others. */
-export function recordHref(entry: Pick<AuditEntry, "entityType" | "entityId">): string | null {
+/** Where a record opens in the app (candidates, jobs, companies and contacts; a candidate on a job opens the candidate); null for the others. */
+export function recordHref(entry: Pick<AuditEntry, "entityType" | "entityId" | "candidateId">): string | null {
+  if (entry.entityType === "application") return entry.candidateId ? `#/candidates/${entry.candidateId}` : null;
   const base: Record<string, string> = { candidate: "candidates", job: "jobs", job_order: "jobs", company: "companies", contact: "contacts" };
   const at = base[entry.entityType];
   return at && /^[a-z]+_[0-9a-z]+$/.test(entry.entityId) ? `#/${at}/${entry.entityId}` : null;

@@ -126,6 +126,34 @@ func TestTheAuditLogNamesWhoDidWhatToWhich(t *testing.T) {
 	assert.Len(t, seen, len(page.Items))
 }
 
+// A candidate on a job (an application) is named "Candidate · Job" and
+// opens the candidate; a job lead is named by its title and company.
+func TestTheAuditLogNamesCandidatesOnJobsAndJobLeads(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	company := a.createCompany(recruiter, map[string]any{"name": "Maju Bhd"})
+	job := a.createJob(recruiter, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	cand := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
+	appl := a.addToJob(recruiter, job.Id, cand.Id)
+	res := a.move(recruiter, appl, map[string]any{"stage": "interview"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res = a.request(http.MethodPost, "/v1/job-leads", recruiter, map[string]any{"companyName": "Contoh Logistik", "title": "Payroll Executive"})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var lead struct{ Id string }
+	res.JSON(&lead)
+
+	page := a.auditLog(owner, "")
+	for _, action := range []string{"application.created", "application.moved"} {
+		e := auditEntryOf(t, page, action, appl.Id)
+		assert.Equal(t, "Siti Aisyah · Accountant", e.EntityName.MustGet(), action)
+		assert.Equal(t, cand.Id, e.CandidateId.MustGet(), action)
+	}
+	assert.True(t, auditEntryOf(t, page, "candidate.created", cand.Id).CandidateId.IsNull(), "only a candidate on a job")
+	assert.Equal(t, "Payroll Executive · Contoh Logistik", auditEntryOf(t, page, "job_lead.created", lead.Id).EntityName.MustGet())
+}
+
 func TestTheAuditLogNamesTheSystemAndAPIKeys(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

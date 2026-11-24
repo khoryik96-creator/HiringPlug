@@ -117,9 +117,22 @@ var KindLabels = map[string]string{
 // Grouped kinds are one line a day for many candidates (salaryview.Grouped).
 func Grouped(kind string) bool { return kind == "candidate_list" || kind == "export" }
 
-// RecordKinds are the entity types whose names an entry shows (the others
-// have none); jobs are written as both job and job_order.
-var RecordKinds = []string{"candidate", "job", "job_order", "company", "contact"}
+// RecordKinds are the entity types whose names an entry shows through
+// Deps.Records (applications are named through Deps.Applications; the
+// others have none); jobs are written as both job and job_order.
+var RecordKinds = []string{"candidate", "job", "job_order", "company", "contact", "job_lead"}
+
+// ApplicationName is how an entry names a candidate on a job: "Siti Aisyah
+// · Accountant" (either alone when the other is missing).
+func ApplicationName(candidate, job string) string {
+	switch {
+	case candidate == "":
+		return job
+	case job == "":
+		return candidate
+	}
+	return candidate + " · " + job
+}
 
 // CellLimit is the most characters an Excel cell holds.
 const CellLimit = 32767

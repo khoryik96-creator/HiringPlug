@@ -872,39 +872,6 @@ class AuditActorKind(StrEnum):
     system = "system"
 
 
-class AuditEntry(BaseModel):
-    id: AuditEntryId
-    at: AwareDatetime
-    actorId: Annotated[str, Field(description='A user id, an API key id, or "system".')]
-    actorKind: AuditActorKind
-    actorName: Annotated[
-        str,
-        Field(
-            description='The person\'s name; "Automatic" for the system; an API key\'s name, or "API key" when it cannot be found.'
-        ),
-    ]
-    action: Annotated[str, Field(examples=["candidate.updated"])]
-    entityType: Annotated[str, Field(examples=["candidate"])]
-    entityId: str
-    entityName: Annotated[
-        str | None,
-        Field(
-            description="The candidate's, job's, company's, contact's or user's name, when it can be looked up (null otherwise)."
-        ),
-    ]
-    changes: Annotated[
-        dict[str, Any],
-        Field(
-            description='What changed: field -> {"from", "to"}, or details of the action. Never a salary amount.'
-        ),
-    ]
-
-
-class AuditLogPage(BaseModel):
-    items: list[AuditEntry]
-    nextCursor: Annotated[AuditEntryId | None, Field(...)]
-
-
 class AuditLogExport(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -7358,6 +7325,45 @@ class AiProviderEntry(BaseModel):
     ]
     updatedAt: Annotated[AwareDatetime | None, Field(...)]
     check: Annotated[AiProviderCheck | None, Field(...)]
+
+
+class AuditEntry(BaseModel):
+    id: AuditEntryId
+    at: AwareDatetime
+    actorId: Annotated[str, Field(description='A user id, an API key id, or "system".')]
+    actorKind: AuditActorKind
+    actorName: Annotated[
+        str,
+        Field(
+            description='The person\'s name; "Automatic" for the system; an API key\'s name, or "API key" when it cannot be found.'
+        ),
+    ]
+    action: Annotated[str, Field(examples=["candidate.updated"])]
+    entityType: Annotated[str, Field(examples=["candidate"])]
+    entityId: str
+    entityName: Annotated[
+        str | None,
+        Field(
+            description="The record's name, when it can be looked up (null otherwise): a candidate's, job's, company's, contact's, user's or job lead's (\"Accountant · Maju Bhd\"); for a candidate on a job (application), \"Candidate name · Job title\".\n"
+        ),
+    ]
+    candidateId: Annotated[
+        CandidateId | None,
+        Field(
+            description="For a candidate on a job (application), the candidate, whose page the record opens; null otherwise."
+        ),
+    ]
+    changes: Annotated[
+        dict[str, Any],
+        Field(
+            description='What changed: field -> {"from", "to"}, or details of the action. Never a salary amount.'
+        ),
+    ]
+
+
+class AuditLogPage(BaseModel):
+    items: list[AuditEntry]
+    nextCursor: Annotated[AuditEntryId | None, Field(...)]
 
 
 class SalaryView(BaseModel):

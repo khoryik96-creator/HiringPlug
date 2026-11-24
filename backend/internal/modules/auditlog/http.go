@@ -43,7 +43,8 @@ func entryToAPI(e Entry) api.AuditEntry {
 	}
 	return api.AuditEntry{
 		Id: e.ID, At: e.CreatedAt, ActorId: e.ActorID, ActorKind: api.AuditActorKind(e.ActorKind), ActorName: e.ActorName,
-		Action: e.Action, EntityType: e.EntityType, EntityId: e.EntityID, EntityName: c.OrNull(e.EntityName), Changes: changes,
+		Action: e.Action, EntityType: e.EntityType, EntityId: e.EntityID, EntityName: c.OrNull(e.EntityName), CandidateId: c.OrNull(e.CandidateID),
+		Changes: changes,
 	}
 }
 

@@ -9,7 +9,7 @@ const USERS = [{ id: "usr_aina", name: "Aina Rahman", role: "admin", canIntervie
 
 const entry = (over: Partial<Schemas["AuditEntry"]>): Schemas["AuditEntry"] => ({
   id: "aud_01", at: "2026-11-24T07:42:00Z", actorId: "usr_aina", actorKind: "user", actorName: "Aina Rahman",
-  action: "candidate.updated", entityType: "candidate", entityId: "cand_01daniel", entityName: "Daniel Lim", changes: {}, ...over,
+  action: "candidate.updated", entityType: "candidate", entityId: "cand_01daniel", entityName: "Daniel Lim", candidateId: null, changes: {}, ...over,
 });
 
 const view = (over: Partial<Schemas["SalaryView"]>): Schemas["SalaryView"] => ({
@@ -56,6 +56,14 @@ describe("Settings › Audit log", () => {
 
     renderWithClient(<AuditLog canSeeSalaryViews />);
     expect((await screen.findAllByRole("tab")).map((t) => t.textContent)).toEqual(["Changes", "Salary views"]);
+  });
+
+  it("names a candidate on a job and opens the candidate", async () => {
+    serve(() => ({ items: [entry({ action: "application.moved", entityType: "application", entityId: "appl_01siti",
+      entityName: "Siti Aisyah · Accountant", candidateId: "cand_01siti", changes: { stage: { from: "screening", to: "interview" } } })], nextCursor: null }));
+    renderWithClient(<AuditLog canSeeSalaryViews={false} />);
+    expect(await screen.findByText("Moved to Interview")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Siti Aisyah · Accountant" }).getAttribute("href")).toBe("#/candidates/cand_01siti");
   });
 
   it("sends the filters, with What as the action, and keeps them in the address", async () => {

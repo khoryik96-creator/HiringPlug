@@ -10082,7 +10082,7 @@ components:
       enum: [user, api_key, system]
     AuditEntry:
       type: object
-      required: [id, at, actorId, actorKind, actorName, action, entityType, entityId, entityName, changes]
+      required: [id, at, actorId, actorKind, actorName, action, entityType, entityId, entityName, candidateId, changes]
       properties:
         id: {$ref: '#/components/schemas/AuditEntryId'}
         at: {type: string, format: date-time}
@@ -10097,7 +10097,13 @@ components:
         entityName:
           type: string
           nullable: true
-          description: The candidate's, job's, company's, contact's or user's name, when it can be looked up (null otherwise).
+          description: >
+            The record's name, when it can be looked up (null otherwise): a candidate's, job's, company's, contact's, user's or job lead's ("Accountant · Maju Bhd"); for a candidate on a job (application), "Candidate name · Job title".
+
+        candidateId:
+          description: For a candidate on a job (application), the candidate, whose page the record opens; null otherwise.
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
         changes:
           type: object
           additionalProperties: true

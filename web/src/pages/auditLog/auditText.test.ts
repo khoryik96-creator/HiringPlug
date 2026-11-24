@@ -49,9 +49,11 @@ describe("audit log sentences", () => {
   });
 
   it("links candidates, jobs, companies and contacts to their pages", () => {
-    expect(recordHref({ entityType: "candidate", entityId: "cand_01abc" })).toBe("#/candidates/cand_01abc");
-    expect(recordHref({ entityType: "job_order", entityId: "jo_01abc" })).toBe("#/jobs/jo_01abc");
-    expect(recordHref({ entityType: "email", entityId: "em_01abc" })).toBeNull();
+    expect(recordHref({ entityType: "candidate", entityId: "cand_01abc", candidateId: null })).toBe("#/candidates/cand_01abc");
+    expect(recordHref({ entityType: "job_order", entityId: "jo_01abc", candidateId: null })).toBe("#/jobs/jo_01abc");
+    expect(recordHref({ entityType: "email", entityId: "em_01abc", candidateId: null })).toBeNull();
+    expect(recordHref({ entityType: "application", entityId: "appl_01abc", candidateId: "cand_01abc" }), "a candidate on a job").toBe("#/candidates/cand_01abc");
+    expect(recordHref({ entityType: "application", entityId: "appl_01abc", candidateId: null })).toBeNull();
     expect(exportedList("candidate.exported")).toBe("Candidate list");
     expect(exportedList("candidate.updated")).toBeNull();
   });

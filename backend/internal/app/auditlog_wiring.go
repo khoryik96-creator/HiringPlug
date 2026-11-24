@@ -36,7 +36,8 @@ func newAuditLog(d Deps, m *Modules) *auditlog.Module {
 				return out, err
 			}),
 			"job": jobTitles, "job_order": jobTitles,
-			"company": auditlog.NamesFunc(m.Companies.Names),
+			"company":  auditlog.NamesFunc(m.Companies.Names),
+			"job_lead": auditlog.NamesFunc(m.Leads.Names),
 			"contact": auditlog.NamesFunc(func(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
 				briefs, err := m.Contacts.Briefs(ctx, tx, ids)
 				out := make(map[string]string, len(briefs))
@@ -46,6 +47,14 @@ func newAuditLog(d Deps, m *Modules) *auditlog.Module {
 				return out, err
 			}),
 		},
+		Applications: auditlog.ApplicationsFunc(func(ctx context.Context, tx pgx.Tx, ids []string) (map[string]auditlog.Application, error) {
+			briefs, err := m.Pipeline.Briefs(ctx, tx, ids)
+			out := make(map[string]auditlog.Application, len(briefs))
+			for id, b := range briefs {
+				out[id] = auditlog.Application{Name: auditlog.ApplicationName(b.CandidateName, b.JobTitle), CandidateID: b.CandidateID}
+			}
+			return out, err
+		}),
 	}, auditlog.Config{TimeZone: d.Config.TimeZone})
 }
 
