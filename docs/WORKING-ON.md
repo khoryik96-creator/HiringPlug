@@ -19,12 +19,3 @@ How to write an entry (newest at the top, one per task):
 ```
 
 ## In progress
-
-### Outlook changes to an interview show in HiringPlug
-- Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v
-- Touches: calendars module (snapshot/merge of Outlook changes, invitation sync), interviews module (a time changed in Outlook), web calendar event details
-- Started: 24 Nov 2026    Last update: 24 Nov 2026
-- State: in progress
-- Next: people added, title, place, notes and time changed in Outlook on an interview HiringPlug sent are taken on the next refresh (the interview moves with its reminder); deleted or candidate removed stays flagged for review
-
