@@ -144,7 +144,7 @@ describe("Settings › AI usage", () => {
     reads(moneyUsage, moneySettings);
     vi.spyOn(api, "PUT").mockResolvedValue(invalidField("priceOutputPerMillion", "must be a price with at most 4 decimal places, e.g. 0.27"));
     renderWithClient(<AiUsage canManage />);
-    fireEvent.change(await screen.findByLabelText("Price per 1M tokens out"), { target: { value: "0.123456" } });
+    fireEvent.change(await screen.findByLabelText("Price per 1M tokens out"), { target: { value: "0.1234" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     const label = (await screen.findByText("must be a price with at most 4 decimal places, e.g. 0.27")).closest("label");
     expect(label?.textContent).toContain("Price per 1M tokens out");
@@ -205,7 +205,7 @@ describe("Settings › AI usage", () => {
     vi.spyOn(api, "PUT").mockResolvedValue(invalidField("limitMoney", "must be an amount with at most 2 decimal places, e.g. 50.00"));
     renderWithClient(<AiUsage canManage />);
     fireEvent.change(await screen.findByLabelText("Limit in"), { target: { value: "money" } });
-    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), { target: { value: "50.555" } });
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), { target: { value: "50.55" } });
     fireEvent.change(screen.getByLabelText("Limit in"), { target: { value: "tokens" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect((await screen.findByRole("alert")).textContent).toBe("Monthly limit (USD): must be an amount with at most 2 decimal places, e.g. 50.00");

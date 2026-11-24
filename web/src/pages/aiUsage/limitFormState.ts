@@ -40,6 +40,12 @@ function amount(value: string): string | null {
   return v === "" ? null : v;
 }
 
+/** Whether an amount is empty or a plain decimal the API accepts (the contract's DecimalAmount and AiPrice). */
+function decimal(value: string, whole: number, places: number): boolean {
+  const v = amount(value);
+  return v === null || new RegExp(`^(0|[1-9][0-9]{0,${whole - 1}})(\\.[0-9]{1,${places}})?$`).test(v);
+}
+
 /** The body to save; FormInvalid for whole numbers that are not (the API checks the rest). Both limits are
  * sent whichever kind is in use, so a problem with the other kind's limit is shown too (see hiddenField). */
 export function bodyOf(d: Draft): SettingsUpdate {
@@ -47,6 +53,9 @@ export function bodyOf(d: Draft): SettingsUpdate {
   const tokens = d.tokens.replace(/[\s,]/g, "");
   if (!d.useDefault && !/^\d+$/.test(tokens)) problems.limitTokens = "Enter a whole number of tokens, or use the server default.";
   if (!/^\d+$/.test(d.warn.trim())) problems.warnPercent = "Enter a whole percentage between 1 and 99.";
+  if (!decimal(d.money, 12, 2)) problems.limitMoney = "Enter an amount with at most 2 decimal places, e.g. 50.00.";
+  if (!decimal(d.priceIn, 10, 4)) problems.priceInputPerMillion = "Enter a price with at most 4 decimal places, e.g. 0.2700.";
+  if (!decimal(d.priceOut, 10, 4)) problems.priceOutputPerMillion = "Enter a price with at most 4 decimal places, e.g. 0.4200.";
   if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
   return {
     limitKind: d.kind,

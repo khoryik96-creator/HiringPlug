@@ -40,4 +40,16 @@ describe("AI usage numbers", () => {
     expect(() => bodyOf({ ...d, tokens: "" })).toThrow("Some fields need attention.");
     expect(bodyOf({ ...d, tokens: "", useDefault: true }).limitTokens).toBeNull();
   });
+
+  it("checks amounts and prices before sending, so no raw format error reaches the form", () => {
+    const d = draftOf({ limitKind: "money", limitTokens: null, serverDefaultTokens: 2_000_000, limitMoney: "10.00", currency: "USD",
+      priceInputPerMillion: "0.2800", priceOutputPerMillion: "0.4200", warnPercent: 80, version: 1, updatedAt: null });
+    expect(bodyOf({ ...d, money: "1,000.50" }).limitMoney).toBe("1000.50");
+    const problems = (draft: typeof d) => { try { bodyOf(draft); return {}; } catch (e) { return (e as { fields: Record<string, string> }).fields; } };
+    expect(problems({ ...d, money: "10.555" })).toHaveProperty("limitMoney", "Enter an amount with at most 2 decimal places, e.g. 50.00.");
+    expect(problems({ ...d, money: "-5" })).toHaveProperty("limitMoney");
+    expect(problems({ ...d, priceIn: "0.12345" })).toHaveProperty("priceInputPerMillion");
+    expect(problems({ ...d, priceOut: "abc" })).toHaveProperty("priceOutputPerMillion");
+    expect(problems({ ...d, priceIn: "", priceOut: "" })).toEqual({});
+  });
 });
