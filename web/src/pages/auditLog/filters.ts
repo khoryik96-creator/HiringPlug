@@ -31,7 +31,7 @@ export const CHANGE_KINDS: { key: string; label: string; action: string }[] = [
   { key: "documents", label: "Documents and CVs", action: "document,cv,cv_template,cv_import" },
   { key: "notes", label: "Notes", action: "note" },
   { key: "sign-ins", label: "Sign-ins", action: "user.signed_in" },
-  { key: "settings", label: "Settings", action: "settings,invoice_settings,tenant.renamed,ai_usage.settings_saved,aiprovider" },
+  { key: "settings", label: "Settings", action: "settings,invoice_settings,tenant.renamed,ai_usage.settings_saved,aiprovider,reports.settings_saved,agency.two_step_required" },
   { key: "roles", label: "Roles and access", action: "role" },
 ];
 

@@ -82,7 +82,7 @@ describe("audit log filters", () => {
     // Some kinds are written under several actions: formatted CVs, and each settings page's own.
     expect(changesQuery({ ...f, who: "", what: "documents" }, later).action?.split(",")).toEqual(expect.arrayContaining(["document", "cv"]));
     expect(changesQuery({ ...f, who: "", what: "settings" }, later).action?.split(",")).toEqual(
-      expect.arrayContaining(["settings", "invoice_settings", "tenant.renamed"]));
+      expect.arrayContaining(["settings", "invoice_settings", "tenant.renamed", "reports.settings_saved", "agency.two_step_required"]));
     expect(salaryQuery({ ...f, who: "usr_1", what: "candidate_list" }, later)).toEqual({ user: "usr_1", kind: "candidate_list", from: "2026-11-01", to: "2026-11-24" });
   });
 
