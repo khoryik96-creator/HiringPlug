@@ -68,13 +68,20 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(preview, "candidateId", bare.Id)), http.StatusOK)
 	assert.Equal(t, 1, counted(recruiter.ID, "email_fields", c.Id))
 	assert.Zero(t, counted(recruiter.ID, "email_fields", bare.Id))
-	// A draft from a template that fills a salary field; one that fills none is not counted.
-	var withPay, plain api.EmailTemplate
-	ok(a.request(http.MethodPost, "/v1/email-templates", rt, map[string]any{"name": "Pay", "subject": "[Full name]", "body": "Expecting [Expected salary]"}), http.StatusCreated).JSON(&withPay)
+	// A draft from a template counts only when it comes back with the salary
+	// filled in ({{placeholders}}); [Field] tokens are left for the composer.
+	var withPay, token, plain api.EmailTemplate
+	ok(a.request(http.MethodPost, "/v1/email-templates", rt, map[string]any{"name": "Pay", "subject": "{{candidate.fullName}}", "body": "Expecting {{candidate.expectedSalary}}"}), http.StatusCreated).JSON(&withPay)
+	ok(a.request(http.MethodPost, "/v1/email-templates", rt, map[string]any{"name": "Pay later", "subject": "[Full name]", "body": "Expecting [Expected salary]"}), http.StatusCreated).JSON(&token)
 	ok(a.request(http.MethodPost, "/v1/email-templates", rt, map[string]any{"name": "Hello", "subject": "Hi [First name]", "body": "Hello"}), http.StatusCreated).JSON(&plain)
 	draft := map[string]any{"candidateId": c.Id, "timeZone": "Asia/Kuala_Lumpur"}
-	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", withPay.Id)), http.StatusOK)
+	var got api.EmailDraft
+	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", token.Id)), http.StatusOK).JSON(&got)
+	assert.Contains(t, got.Body, "[Expected salary]", "no salary in this draft")
 	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", plain.Id)), http.StatusOK)
+	assert.Equal(t, 1, counted(recruiter.ID, "email_fields", c.Id))
+	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", withPay.Id)), http.StatusOK).JSON(&got)
+	assert.Contains(t, got.Body, "10,913", "the draft shows the salary")
 	assert.Equal(t, 2, counted(recruiter.ID, "email_fields", c.Id))
 
 	// An email sent with the salary; one without it is not counted.

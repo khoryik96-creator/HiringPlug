@@ -41,11 +41,17 @@ func tokensShowSalary(byToken map[string]string) bool {
 	return false
 }
 
-// salaryFilled: one of the texts has a salary field that values fill.
+// salaryFilled: Fill or FillHTML put a salary into one of the texts, that
+// is, a {{placeholder}} of a salary field that values fill. A draft leaves
+// [Field] tokens as they are (the composer fills them, and counts that).
 func salaryFilled(values map[string]string, texts ...string) bool {
 	for _, t := range texts {
-		if t != "" && FillFields(t, values, false).Salary {
-			return true
+		for _, m := range placeholderRe.FindAllStringSubmatch(t, -1) {
+			if f, ok := fieldByKey(m[1]); ok && f.Salary {
+				if _, filled := values[m[1]]; filled {
+					return true
+				}
+			}
 		}
 	}
 	return false
