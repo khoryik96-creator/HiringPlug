@@ -101,17 +101,26 @@ type NamedLike struct {
 
 // NamedLike returns up to 5 companies named like name (a lead's company):
 // the same name once its legal form is set aside first, then the most
-// similar. A blank name is refused.
+// similar. A blank name, or one with control characters, is refused.
 func (s *Service) NamedLike(ctx context.Context, p authz.Principal, name string) ([]NamedLike, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		var errs apperr.FieldErrors
+	var errs apperr.FieldErrors
+	switch {
+	case name == "":
 		errs.Add("name", "is required")
-		return nil, errs.Err()
+	case !plainText(name):
+		errs.Add("name", "must be plain text, without control characters")
+	}
+	if err := errs.Err(); err != nil {
+		return nil, err
 	}
 	out := []NamedLike{}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		rows, err := store.New(tx).CompaniesNamedLike(ctx, name)
+		q := store.New(tx)
+		if err := q.SetNamedLikeThreshold(ctx); err != nil {
+			return err
+		}
+		rows, err := q.CompaniesNamedLike(ctx, name)
 		for _, r := range rows {
 			out = append(out, NamedLike{ID: r.ID, Name: r.Name, City: r.City, Website: r.Website, LinkedinURL: r.LinkedinUrl, Industry: r.Industry, SameName: r.SameName})
 		}

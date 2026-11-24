@@ -96,8 +96,8 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
 
   const send = () => {
     if (!chosen?.chatNumber) return;
-    window.open(chatLink(chosen.chatNumber, text), "_blank", "noopener,noreferrer"); // before anything async: not a blocked pop-up
-    // A blank message opens the chat to type in WhatsApp itself.
+    // A blank message (spaces only too) opens the chat to type in WhatsApp itself.
+    window.open(chatLink(chosen.chatNumber, text.trim() ? text : ""), "_blank", "noopener,noreferrer"); // before anything async: not a blocked pop-up
     log.mutate(text.trim() ? `WhatsApp to ${chosen.number}:\n${text}` : `WhatsApp chat opened with ${chosen.number} (no message typed).`);
   };
 

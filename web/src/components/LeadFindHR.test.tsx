@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type Company, type Permission, type Schemas } from "../api/client";
 import * as companion from "../companion";
 import { failure, ok, renderWithClient, sentBody } from "../test-utils";
+import { activeRuns, newRun } from "./findHrRun";
 import { LeadFindHR } from "./LeadFindHR";
 
 afterEach(() => {
@@ -194,6 +195,104 @@ describe("a lead's Find HR panel", () => {
       expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Find HR · Contoh Logistik Sdn Bhd" }));
       const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Logistik Sdn Bhd" });
       expect(panel.style.getPropertyValue("--lead-hr-top")).toBe("108px");
+      await screen.findByText("Contoh Logistics Berhad");
+    } finally {
+      bar.remove();
+      tabs.remove();
+    }
+  });
+
+  it("stops a scan running in the panel when the panel closes", async () => {
+    serve();
+    const call = vi.spyOn(companion, "companionCall").mockResolvedValue({});
+    const run = newRun(vi.fn());
+    activeRuns.set("comp_1", run);
+    try {
+      show({ companyId: "comp_1" });
+      expect(await screen.findByRole("region", { name: "Find HR" })).toBeTruthy();
+      expect(run.stopped).toBe(false);
+      cleanup();
+      expect(run.stopped).toBe(true);
+      expect(call).toHaveBeenCalledWith("cancel", { operation_id: run.operation }, 5_000);
+    } finally {
+      activeRuns.delete("comp_1");
+    }
+  });
+
+  it("says which company has the LinkedIn page already instead of saving it to a second", async () => {
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/companies/{companyId}" ? { ...company, linkedinUrl: null }
+        : path === "/v1/companies" ? { items: [{ id: "comp_7", name: "Contoh Group" }] } : { items: [] },
+    ))) as never);
+    const patch = vi.spyOn(api, "PATCH");
+    show({ companyId: "comp_1" });
+    const form = await screen.findByRole("form", { name: "Its LinkedIn page" });
+    fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/contoh-logistik" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save page" }));
+    expect(await within(form).findByText(/Contoh Group in HiringPlug has this LinkedIn page/)).toBeTruthy();
+    expect(get).toHaveBeenCalledWith("/v1/companies", { params: { query: { linkedinCompany: "contoh-logistik", limit: 1 } } });
+    expect(within(form).getByRole("link", { name: "Open Contoh Group ↗" }).getAttribute("href")).toBe("#/companies/comp_7");
+    expect(within(form).getByRole<HTMLButtonElement>("button", { name: "Save page" }).disabled).toBe(true);
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it("saves the page again with the company's current version after someone else changed it", async () => {
+    let version = 2;
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/companies/{companyId}" ? { ...company, version, linkedinUrl: null } : { items: [] },
+    ))) as never);
+    const companyReads = () => get.mock.calls.filter((c) => c[0] === "/v1/companies/{companyId}").length;
+    const patch = vi.spyOn(api, "PATCH")
+      .mockImplementationOnce((() => { version = 3; return Promise.resolve(failure("CONFLICT_STALE_VERSION", "This company was changed by someone else.", undefined, 409)); }) as never)
+      .mockResolvedValueOnce(ok({ ...company, version: 4 }));
+    show({ companyId: "comp_1" });
+    const form = await screen.findByRole("form", { name: "Its LinkedIn page" });
+    fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/contoh-logistik" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save page" }));
+    expect(await within(form).findByText(/changed by someone else/)).toBeTruthy();
+    // Read again: the company as it is now.
+    await waitFor(() => { expect(companyReads()).toBe(2); });
+    await waitFor(() => { expect(within(form).getByRole<HTMLButtonElement>("button", { name: "Save page" }).disabled).toBe(false); });
+    fireEvent.click(within(form).getByRole("button", { name: "Save page" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
+    expect(sentBody(patch, 1)).toEqual({ version: 3, linkedinUrl: "https://www.linkedin.com/company/contoh-logistik/" });
+  });
+
+  it("shows a saved link that is not a company page, and replaces it only once asked", async () => {
+    serve({ saved: { ...company, linkedinUrl: "https://lnkd.in/contoh" } });
+    const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(company));
+    show({ companyId: "comp_1" });
+    const form = await screen.findByRole("form", { name: "Its LinkedIn page" });
+    expect(form.textContent).toContain("Its link in HiringPlug, https://lnkd.in/contoh, is not a LinkedIn company page.");
+    fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/contoh-logistik" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save page" }));
+    expect(await within(form).findByText("Replace https://lnkd.in/contoh with https://www.linkedin.com/company/contoh-logistik/?")).toBeTruthy();
+    expect(patch).not.toHaveBeenCalled();
+    fireEvent.click(within(form).getByRole("button", { name: "Replace it" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalled(); });
+    expect(sentBody(patch)).toEqual({ version: 2, linkedinUrl: "https://www.linkedin.com/company/contoh-logistik/" });
+  });
+
+  it("sticks under the open records bar once it shows", async () => {
+    const bar = document.createElement("header");
+    bar.className = "topbar";
+    Object.defineProperty(bar, "offsetHeight", { value: 56 });
+    document.body.append(bar);
+    const tabs = document.createElement("nav");
+    tabs.className = "open-tabs";
+    Object.defineProperty(tabs, "offsetHeight", { value: 40 });
+    try {
+      serve();
+      show();
+      const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Logistik Sdn Bhd" });
+      expect(panel.style.getPropertyValue("--lead-hr-top")).toBe("68px");
+      // The first record opened: its bar shows under the top bar.
+      document.body.append(tabs);
+      await waitFor(() => { expect(panel.style.getPropertyValue("--lead-hr-top")).toBe("108px"); });
+      tabs.remove();
+      await waitFor(() => { expect(panel.style.getPropertyValue("--lead-hr-top")).toBe("68px"); });
       await screen.findByText("Contoh Logistics Berhad");
     } finally {
       bar.remove();

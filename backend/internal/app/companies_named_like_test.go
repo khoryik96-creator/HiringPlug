@@ -59,6 +59,11 @@ func TestCompaniesNamedLikeALeadsCompany(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, res.Status, "blank %q: %s", blank, res.Body)
 	}
 	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/companies/named-like", owner, nil).Status, "no name")
+	for _, bad := range []string{"Maju%00Foods", "Maju%0AFoods", "Maju%FFFoods"} {
+		res := a.request(http.MethodGet, "/v1/companies/named-like?name="+bad, owner, nil)
+		require.Equal(t, http.StatusBadRequest, res.Status, "%q: %s", bad, res.Body)
+		assert.Equal(t, []string{"name"}, fieldNames(t, res.Error()), "%q", bad)
+	}
 }
 
 func TestCompaniesNamedLikeNeedsCompaniesRead(t *testing.T) {

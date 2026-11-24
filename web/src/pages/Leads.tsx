@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -32,16 +32,18 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
   const shown = inList && finding && inList.version >= finding.version ? inList : finding;
   const savedLead = useCallback((saved: Lead) => { setFinding((f) => (f?.id === saved.id && saved.version >= f.version ? saved : f)); }, []);
   const findingId = finding?.id;
+  const heading = useRef<HTMLHeadingElement>(null);
   const closeFinding = useCallback(() => {
     setFinding(null);
-    // Back to the lead's Find HR button, where the panel was opened from.
-    if (findingId) document.getElementById(findHrButtonId(findingId))?.focus();
+    // Back to the lead's Find HR button, where the panel was opened from; to the list's title once a filter hides its row.
+    const from = findingId ? document.getElementById(findHrButtonId(findingId)) : null;
+    (from ?? heading.current)?.focus();
   }, [findingId]);
   return (
     <main className="list-page">
       {/* Like the other lists: the filters and the buttons beside the title. */}
       <div className="row spread">
-        <h2>Leads</h2>
+        <h2 ref={heading} tabIndex={-1}>Leads</h2>
         <div className="row">
           <input aria-label="Search leads" placeholder="Search" value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} />
           <select aria-label="Status" value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}>
@@ -71,7 +73,7 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
             </table>
           )}
         </section>
-        {shown && <LeadFindHR key={shown.id} lead={shown} permissions={permissions} onClose={closeFinding} />}
+        {shown && <LeadFindHR key={shown.id} lead={shown} permissions={permissions} onClose={closeFinding} onSaved={savedLead} />}
       </div>
     </main>
   );

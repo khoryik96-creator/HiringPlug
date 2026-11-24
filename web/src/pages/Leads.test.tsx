@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import * as companion from "../companion";
-import { ok, renderWithClient, sentBody } from "../test-utils";
+import { failure, ok, renderWithClient, sentBody } from "../test-utils";
 import { Leads } from "./Leads";
 
 afterEach(() => {
@@ -141,6 +141,45 @@ describe("leads", () => {
     fireEvent.click(await within(panel).findByRole("button", { name: "This one: Contoh Berhad" }));
     await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
     expect(sentBody(patch, 1)).toEqual({ version: 2, companyId: "comp_1" });
+  });
+
+  it("reads the lead again when a link fails, so trying again sends its current version even where the filter hides it", async () => {
+    let changed = false;
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/job-leads/{jobLeadId}" ? { ...lead, version: 2, status: "contacted" }
+        : { items: path === "/v1/job-leads" ? (changed ? [] : [lead])
+          : path === "/v1/companies/named-like" ? [{ id: "comp_1", name: "Contoh Berhad", city: null, website: null, linkedinUrl: null, industry: null, sameName: true }] : [] },
+    ))) as never);
+    // Someone else marked it contacted (the list shows new leads only, say): the first link is refused.
+    const patch = vi.spyOn(api, "PATCH")
+      .mockImplementationOnce((() => { changed = true; return Promise.resolve(failure("CONFLICT_STALE_VERSION", "This lead was changed by someone else. Reload it and try again.", undefined, 409)); }) as never)
+      .mockResolvedValueOnce(ok({ ...lead, version: 3, status: "contacted", companyId: "comp_1" }));
+    renderWithClient(<Leads permissions={[...manage, "companies:read", "contacts:read"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Find HR for Contoh Berhad" }));
+    const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Berhad" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "This one: Contoh Berhad" }));
+    expect(await within(panel).findByText(/changed by someone else/)).toBeTruthy();
+    await waitFor(() => { expect(screen.queryByRole("button", { name: "Find HR for Contoh Berhad" })).toBeNull(); });
+    expect(get).toHaveBeenCalledWith("/v1/job-leads/{jobLeadId}", { params: { path: { jobLeadId: "lead_1" } } });
+    fireEvent.click(within(panel).getByRole("button", { name: "This one: Contoh Berhad" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
+    expect(sentBody(patch, 0)).toEqual({ version: 1, companyId: "comp_1" });
+    expect(sentBody(patch, 1)).toEqual({ version: 2, companyId: "comp_1" });
+  });
+
+  it("puts the focus on the list's title when the panel closes and a filter hides its lead's row", async () => {
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    let contacted = false;
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok({ items: path === "/v1/job-leads" && !contacted ? [lead] : [] }))) as never);
+    vi.spyOn(api, "PATCH").mockImplementation((() => { contacted = true; return Promise.resolve(ok({ ...lead, version: 2, status: "contacted" })); }) as never);
+    renderWithClient(<Leads permissions={[...manage, "companies:read", "contacts:read"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Find HR for Contoh Berhad" }));
+    fireEvent.change(screen.getByLabelText("Status of Account Executive at Contoh Berhad"), { target: { value: "contacted" } });
+    await waitFor(() => { expect(screen.queryByRole("button", { name: "Find HR for Contoh Berhad" })).toBeNull(); });
+    fireEvent.click(within(screen.getByRole("complementary", { name: "Find HR for Contoh Berhad" })).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Leads" }));
   });
 
   it("offers Find HR only to those who may read companies and contacts", async () => {

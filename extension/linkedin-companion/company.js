@@ -97,15 +97,27 @@
     };
   }
 
+  // The visible text of root outside the given cards.
+  function pageWords(root, cards) {
+    if (!root) return '';
+    const parts = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (visible(node.parentElement) && !cards.some(card => card.contains(node))) parts.push(node.nodeValue);
+    }
+    return compact(parts.join(' '));
+  }
+
   // A companies search (Find HR for a lead): the result cards, each with the
   // company's own page, its name and the line under it (industry, place).
   // Links to anything but a company page (a school, a showcase, a person)
-  // are left out, and a company shown twice is listed once.
+  // are left out, and a company shown twice is listed once. Only cards in the
+  // search results themselves count, never another list on the page (the
+  // side rail's suggestions).
   function readSearch(expectedName) {
     if (location.origin !== 'https://www.linkedin.com') return {failed: true};
     const main = document.querySelector('main');
     const scope = main?.querySelector('[aria-label="Primary content"]') || main;
-    const selector = '[componentkey^="SearchResults_"] [role="listitem"], [role="list"] > [role="listitem"], li.reusable-search__result-container, .entity-result';
+    const selector = '[componentkey^="SearchResults_"] [role="listitem"], li.reusable-search__result-container, .entity-result';
     const cards = scope ? [...scope.querySelectorAll(selector)].filter(n => visible(n) && !n.parentElement?.closest(selector)) : [];
     const problem = issue(!cards.length);
     if (problem) return {blocked: problem};
@@ -127,11 +139,15 @@
       companies.push({url, name, subtitle});
       if (companies.length >= 10) break;
     }
-    const empty = /\b(?:no results found|no results|0 results)\b/i.test(text(scope));
+    // LinkedIn saying it found nothing for this name, or that it shows
+    // results for another (a spelling it corrected), means no company of this
+    // name, whatever cards it shows instead. Only the page's own words count,
+    // not what a card says of its company.
+    if (/\b(?:no results found|no results|0 results|showing results for)\b/i.test(pageWords(main, cards))) return {companies: [], empty: true};
     // Cards that show no company yet may still be drawing: wait (the worker
     // says, if it stays so, that LinkedIn showed no company page).
-    if (!companies.length && !empty) return {loading: true, cards: cards.length};
-    return {companies, empty: !companies.length};
+    if (!companies.length) return {loading: true, cards: cards.length};
+    return {companies, empty: false};
   }
 
   globalThis.HiringplugCompany = {readAbout, readSearch};

@@ -83,4 +83,46 @@ describe("a lead's company, step 1", () => {
     expect(post).toHaveBeenCalledTimes(1);
     expect(sentBody(patch, 1)).toEqual({ version: 4, companyId: "comp_new" });
   });
+
+  it("offers to try the lookup again, and adding the company, when finding the companies with the name fails", async () => {
+    let fails = true;
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/companies/named-like" && fails
+      ? failure("INTERNAL", "Something went wrong on our side.", undefined, 500)
+      : ok({ items: path === "/v1/companies/named-like" ? [{ id: "comp_1", name: "Maju Foods Berhad", city: null, website: null, linkedinUrl: null, industry: null, sameName: true }] : [] }))) as never);
+    show();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Something went wrong on our side.");
+    expect(screen.getByRole("form", { name: "New company" })).toBeTruthy();
+    fails = false;
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "This one: Maju Foods Berhad" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows why a link failed beside the button used, even while the lookup's own error shows", async () => {
+    serve({ named: () => [{ id: "comp_1", name: "Maju Foods Berhad", city: null, website: null, linkedinUrl: null, industry: null, sameName: true }] });
+    vi.spyOn(api, "PATCH").mockResolvedValue(failure("CONFLICT_STALE_VERSION", "This lead was changed by someone else. Reload it and try again.", undefined, 409));
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "This one: Maju Foods Berhad" }));
+    const row = screen.getByRole("button", { name: "This one: Maju Foods Berhad" }).closest("li") as HTMLElement;
+    expect(await within(row).findByText(/changed by someone else/)).toBeTruthy();
+    cleanup();
+    // The lookup failed, and the LinkedIn page's owner is linked from the form.
+    vi.restoreAllMocks();
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/companies/named-like"
+      ? failure("INTERNAL", "Something went wrong on our side.", undefined, 500)
+      : ok({ items: [{ id: "comp_mfb", name: "MFB Group" }] }))) as never);
+    vi.spyOn(api, "PATCH").mockResolvedValue(failure("CONFLICT_STALE_VERSION", "This lead was changed by someone else. Reload it and try again.", undefined, 409));
+    show();
+    const form = await screen.findByRole("form", { name: "New company" });
+    fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: page } });
+    fireEvent.click(within(form).getByRole("button", { name: "Add and link" }));
+    fireEvent.click(await within(form).findByRole("button", { name: "Link the lead to MFB Group" }));
+    const owner = within(form).getByText("MFB Group in HiringPlug has this LinkedIn page.").closest("div") as HTMLElement;
+    expect(await within(owner).findByText(/changed by someone else/)).toBeTruthy();
+    expect(screen.getByText("Something went wrong on our side.")).toBeTruthy();
+  });
 });
+

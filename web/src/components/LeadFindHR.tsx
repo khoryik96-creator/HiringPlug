@@ -2,19 +2,22 @@
 // Step 1 settles which company it is (LeadCompanyChoice); step 2 is the
 // company's Find HR scan, laid out for the panel. A lead linked already
 // starts at step 2, asking first for the company's LinkedIn page if it has none.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-import { api, type Company, type Permission, type Schemas, unwrap } from "../api/client";
+import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { companyKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
 import { FindHR } from "./FindHR";
+import { activeRuns, stopRun } from "./findHrRun";
 import { LeadCompanyChoice } from "./LeadCompanyChoice";
+import { CompanyLinkedin } from "./LeadCompanyLinkedin";
 import { companyPage } from "./linkedinCompany";
-import { LinkedinPageFinder } from "./LinkedinPageFinder";
 
-/** Render it with key={lead.id}: another lead starts again at its own step. */
-export function LeadFindHR({ lead, permissions, onClose }: { lead: Schemas["JobLead"]; permissions: Permission[]; onClose: () => void }) {
+type Lead = Schemas["JobLead"];
+
+/** Render it with key={lead.id}: another lead starts again at its own step. `onSaved` gets the lead as saved or read again here. */
+export function LeadFindHR({ lead, permissions, onClose, onSaved }: { lead: Lead; permissions: Permission[]; onClose: () => void; onSaved?: (lead: Lead) => void }) {
   // Linked here: step 2 at once, before the list is read again.
   const [linkedId, setLinkedId] = useState<string | null>(null);
   const companyId = linkedId ?? lead.companyId;
@@ -38,22 +41,34 @@ export function LeadFindHR({ lead, permissions, onClose }: { lead: Schemas["JobL
         <button type="button" className="icon-action" aria-label="Close" onClick={onClose}>✕</button>
       </div>
       {companyId ? <LinkedCompany id={companyId} permissions={permissions} />
-        : <LeadCompanyChoice lead={lead} permissions={permissions} onLinked={setLinkedId} />}
+        : <LeadCompanyChoice lead={lead} permissions={permissions} onLinked={setLinkedId} onSaved={onSaved} />}
     </aside>
   );
 }
 
-/** The height of the bars kept at the top as the page scrolls (the top bar, the open records), so the panel sticks under them. */
+/**
+ * The height of the bars kept at the top as the page scrolls (the top bar, the open records), so the panel
+ * sticks under them. The open records bar comes and goes (the first record opened, the last closed): watched for.
+ */
 function useUnderBars(): number | null {
   const [height, setHeight] = useState<number | null>(null);
   useEffect(() => {
-    const bars = [".topbar", ".open-tabs"].flatMap((s) => document.querySelector<HTMLElement>(s) ?? []);
-    const measure = () => { setHeight(bars.reduce((sum, b) => sum + b.offsetHeight, 0)); };
+    let bars: HTMLElement[] = [];
+    const sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { measure(); });
+    function measure() { setHeight(bars.reduce((sum, b) => sum + b.offsetHeight, 0)); }
+    const find = () => {
+      const now = [".topbar", ".open-tabs"].flatMap((s) => document.querySelector<HTMLElement>(s) ?? []);
+      if (now.length === bars.length && now.every((b, i) => b === bars[i])) return;
+      bars = now;
+      sizes?.disconnect();
+      bars.forEach((b) => { sizes?.observe(b); });
+      measure();
+    };
+    find();
     measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const watch = new ResizeObserver(measure);
-    bars.forEach((b) => { watch.observe(b); });
-    return () => { watch.disconnect(); };
+    const added = typeof MutationObserver === "undefined" ? null : new MutationObserver(find);
+    added?.observe(document.body, { childList: true, subtree: true });
+    return () => { added?.disconnect(); sizes?.disconnect(); };
   }, []);
   return height;
 }
@@ -63,6 +78,11 @@ function LinkedCompany({ id, permissions }: { id: string; permissions: Permissio
     queryKey: companyKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId: id } } })),
   });
+  // A scan started here has no Stop once the panel is gone (closed, or another lead's opened): it stops with it.
+  useEffect(() => () => {
+    const run = activeRuns.get(id);
+    if (run) stopRun(run);
+  }, [id]);
   const c = company.data;
   if (!c) return company.error ? <ErrorMessage error={company.error} /> : <p className="muted small">Loading…</p>;
   const hasPage = companyPage(c.linkedinUrl ?? "") !== "";
@@ -81,31 +101,5 @@ function LinkedCompany({ id, permissions }: { id: string; permissions: Permissio
           : <p className="muted small">Add its LinkedIn page first.</p>}
       </div>
     </>
-  );
-}
-
-/** The company has no LinkedIn page in HiringPlug yet: pasted or found, then saved. */
-function CompanyLinkedin({ company, canUpdate }: { company: Company; canUpdate: boolean }) {
-  const queryClient = useQueryClient();
-  const [url, setUrl] = useState("");
-  const save = useMutation({
-    mutationFn: async () => unwrap(await api.PATCH("/v1/companies/{companyId}", {
-      params: { path: { companyId: company.id } }, body: { version: company.version, linkedinUrl: companyPage(url) },
-    })),
-    onSuccess: (saved) => {
-      queryClient.setQueryData(companyKey(company.id), saved);
-      void queryClient.invalidateQueries({ queryKey: ["companies"] });
-    },
-  });
-  if (!canUpdate) return <p className="muted small">{company.name} has no LinkedIn page in HiringPlug yet, and adding it needs the permission to edit companies.</p>;
-  return (
-    <form className="lead-hr-step" aria-label="Its LinkedIn page" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-      <h4>Its LinkedIn page</h4>
-      <LinkedinPageFinder name={company.name} value={url} onChange={setUrl} disabled={save.isPending} />
-      <ErrorMessage error={save.error} />
-      <div className="row">
-        <button type="submit" className="primary" disabled={save.isPending || !companyPage(url)}>{save.isPending ? "Saving…" : "Save page"}</button>
-      </div>
-    </form>
   );
 }

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
@@ -187,4 +188,18 @@ func squeezedOrNil(s *string) *string {
 		return nil
 	}
 	return &t
+}
+
+// plainText reports whether s is valid UTF-8 without control characters
+// (a tab is allowed), which the database could not compare or store.
+func plainText(s string) bool {
+	if !utf8.ValidString(s) {
+		return false
+	}
+	for _, r := range s {
+		if (r < 0x20 && r != '\t') || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }

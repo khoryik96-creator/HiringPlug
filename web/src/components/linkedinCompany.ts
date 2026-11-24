@@ -26,6 +26,11 @@ export function companyPage(raw: string): string {
   }
 }
 
+/** The company's name in its LinkedIn page's address ("contoh-logistik"), or undefined if it is not a company page. */
+export function companySlug(raw: string): string | undefined {
+  return /\/company\/([A-Za-z0-9_-]+)\//.exec(companyPage(raw))?.[1];
+}
+
 /**
  * LinkedIn's size ("2-10 employees", "1,001-5,000 employees", "10,001+
  * employees") as one of ours, by its lower figure; null if it is not one.

@@ -2,7 +2,7 @@
 // companion (its companySearch reads LinkedIn's company search in the
 // recruiter's own browser). Picking one of the companies found fills the box.
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 
 import { companionAtLeast, companionCall, operationId, useCompanion } from "../companion";
 import { ErrorMessage } from "./ErrorMessage";
@@ -22,12 +22,12 @@ export function LinkedinPageFinder({ name, value, onChange, disabled = false }: 
   // The search running in the companion: stopped when the box goes away or
   // another starts, or the companion stays busy until it ends on its own.
   const running = useRef<string | null>(null);
-  const stop = () => {
+  const stop = useCallback(() => {
     const op = running.current;
     running.current = null;
     if (op) void companionCall("cancel", { operation_id: op }, 5_000).catch(() => undefined);
-  };
-  useEffect(() => stop, []);
+  }, []);
+  useEffect(() => stop, [stop]);
   const search = useMutation({
     mutationFn: async () => {
       stop();
@@ -40,6 +40,16 @@ export function LinkedinPageFinder({ name, value, onChange, disabled = false }: 
       }
     },
   });
+  // Another name: what was found for the last one goes (and a search for it still running stops).
+  const { reset } = search;
+  const searchedName = name.trim();
+  const named = useRef(searchedName);
+  useEffect(() => {
+    if (named.current === searchedName) return;
+    named.current = searchedName;
+    stop();
+    reset();
+  }, [searchedName, stop, reset]);
   const found = search.data;
   const wrong = value.trim() !== "" && companyPage(value) === "";
   return (

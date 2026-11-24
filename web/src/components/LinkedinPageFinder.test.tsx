@@ -25,4 +25,16 @@ describe("finding a company's LinkedIn page with the companion", () => {
     await waitFor(() => { expect(call).toHaveBeenCalledWith("cancel", { operation_id: "op_1" }, 5_000); });
     expect(call.mock.calls.filter((c) => c[0] === "cancel")).toHaveLength(1);
   });
+
+  it("drops what was found for a name once the name changes", async () => {
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: true, version: "1.6.0" });
+    vi.spyOn(companion, "companionCall").mockResolvedValue({ companies: [{ url: "https://www.linkedin.com/company/nusantara-logistik/", name: "Nusantara Logistik", subtitle: "" }] });
+    const { rerender } = renderWithClient(<LinkedinPageFinder name="Nusantara Logistik" value="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Find on LinkedIn" }));
+    expect(await screen.findByRole("list", { name: "Found on LinkedIn" })).toBeTruthy();
+    rerender(<LinkedinPageFinder name="Nusantara Logistik " value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("list", { name: "Found on LinkedIn" }), "the same name, spaced differently").toBeTruthy();
+    rerender(<LinkedinPageFinder name="Nusantara Freight" value="" onChange={vi.fn()} />);
+    await waitFor(() => { expect(screen.queryByRole("list", { name: "Found on LinkedIn" })).toBeNull(); });
+  });
 });
