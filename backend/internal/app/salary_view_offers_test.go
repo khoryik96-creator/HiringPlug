@@ -59,3 +59,47 @@ func TestChangesSendOffersAndPlacementsBackWithoutTheirSalary(t *testing.T) {
 	assert.NotContains(t, seen, "offer:"+c.Id)
 	assert.NotContains(t, seen, "placement:"+c.Id)
 }
+
+// An invoice whose fee is a share of the salary prints the annual salary:
+// opened (its preview, or the copy sent) or sent by a person, it counts as
+// the placement's salary shown. A fee typed in as an amount shows none.
+func TestAnInvoiceThatPrintsTheSalaryCountsIt(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.sameSalaryDay()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	rt := recruiter.Token
+	company := a.createCompany(rt, map[string]any{"name": "Contoh Berhad"})
+	billing := a.createContact(rt, map[string]any{"companyId": company.Id, "firstName": "Ken", "email": "ken." + tenant.ID + "@contoh.test"})
+	job := a.createJob(rt, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	today := time.Now().In(a.deps.Config.TimeZone).Format(time.DateOnly)
+	placed := func(name string, money map[string]any) (api.Candidate, api.Placement) {
+		c := a.createCandidate(rt, map[string]any{"firstName": name})
+		app := a.addToJob(rt, job.Id, c.Id)
+		p := a.placement(http.MethodPost, "/v1/applications/"+app.Id+"/placement", rt, map[string]any{"startDate": today, "money": money}, http.StatusCreated)
+		a.placement(http.MethodPut, "/v1/placements/"+p.Id+"/invoicing", rt, map[string]any{"contactId": billing.Id, "paymentTermsDays": 30, "dueOn": nil, "autoSend": false}, http.StatusOK)
+		return c, p
+	}
+	share, p := placed("Siti", map[string]any{"salary": map[string]any{"amount": "7345", "currency": "MYR", "period": "month"}, "feePercent": "20"})
+	flat, q := placed("Ali", map[string]any{"salary": map[string]any{"amount": "6211", "currency": "MYR", "period": "month"}, "feeAmount": "15000", "feeCurrency": "MYR"})
+	file := func(id string) {
+		t.Helper()
+		res := a.request(http.MethodGet, "/v1/placements/"+id+"/invoice/file?format=pdf", rt, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+	counted := func(c api.Candidate) int { return a.seen(owner, recruiter.ID)["placement:"+c.Id].Count }
+
+	file(p.Id)
+	assert.Equal(t, 1, counted(share), "the preview")
+	res := a.request(http.MethodPost, "/v1/placements/"+p.Id+"/invoice", rt, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, 2, counted(share), "sent to the client")
+	file(p.Id)
+	assert.Equal(t, 3, counted(share), "the copy sent")
+
+	file(q.Id)
+	res = a.request(http.MethodPost, "/v1/placements/"+q.Id+"/invoice", rt, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Zero(t, counted(flat), "a fee typed in as an amount: no salary on the invoice")
+}
