@@ -22,7 +22,7 @@
 .audit-row { cursor: pointer; }
 .audit-row:hover > td { background: var(--soft); }
 .audit-row.open > td { background: var(--soft); border-bottom-color: transparent; }
-.audit-toggle { color: var(--text); font-weight: 500; display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.audit-table .audit-toggle { color: var(--text); font-weight: 500; display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
 .audit-chevron { display: inline-block; width: 0.7rem; color: var(--muted); font-weight: 700; transition: transform 0.12s; }
 .audit-toggle[aria-expanded=true] .audit-chevron { transform: rotate(90deg); color: var(--accent); }
 
@@ -39,5 +39,8 @@
   .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .audit-table :is(td, th) { padding: 0.5rem 0.6rem; }
+  /* One line a row; the table scrolls sideways in its box, and an opened row's changes stay in view. */
+  .audit-table :is(td, th) { padding: 0.5rem 0.6rem; white-space: nowrap; }
+  .audit-table .audit-diff-row > td { white-space: normal; }
+  .audit-diff { position: sticky; left: 0.6rem; max-width: calc(100vw - 5.5rem); box-sizing: border-box; }
 }

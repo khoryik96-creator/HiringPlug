@@ -136,6 +136,12 @@ export function changeLines(changes: AuditEntry["changes"]): ChangeLine[] {
   });
 }
 
+/** The Record column for an export: which list it was ("Candidate list"), not who exported it. */
+export function exportedList(action: string): string | null {
+  const [kind = "", verb] = action.split(".");
+  return verb === "exported" ? `${capital(noun(kind))} list` : null;
+}
+
 /** Where a record opens in the app (candidates, jobs, companies and contacts); null for the others. */
 export function recordHref(entry: Pick<AuditEntry, "entityType" | "entityId">): string | null {
   const base: Record<string, string> = { candidate: "candidates", job: "jobs", job_order: "jobs", company: "companies", contact: "contacts" };

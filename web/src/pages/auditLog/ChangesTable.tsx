@@ -5,7 +5,7 @@ import { Fragment, useState } from "react";
 
 import { api, unwrap } from "../../api/client";
 import { ErrorMessage } from "../../components/ErrorMessage";
-import { type AuditEntry, changeLines, recordHref, whatHappened } from "./auditText";
+import { type AuditEntry, changeLines, exportedList, recordHref, whatHappened } from "./auditText";
 import { auditLogKey, changesQuery, type Filters, PAGE_SIZE } from "./filters";
 import { ListHead } from "./FilterBar";
 import { fullWhen, whenText } from "./when";
@@ -32,7 +32,9 @@ export function ChangesTable({ filters }: { filters: Filters }) {
       <ErrorMessage error={list.error} />
       {list.isPending && <p className="muted" role="status">Loading…</p>}
       {list.data && rows.length === 0 && (
-        <p className="audit-empty">Nothing was changed by {filters.who ? "this person" : "anyone"} in these days. Try other filters or more days.</p>
+        <p className="audit-empty">
+          {filters.who || filters.what ? "Nothing matches these filters in these days." : "Nothing was changed in these days."} Try other filters or more days.
+        </p>
       )}
       {rows.length > 0 && (
         <div className="table-scroll">
@@ -71,6 +73,8 @@ export function ChangesTable({ filters }: { filters: Filters }) {
 }
 
 function Record({ entry }: { entry: AuditEntry }) {
+  const list = exportedList(entry.action);
+  if (list) return <>{list}</>;
   if (!entry.entityName) return <span className="muted">–</span>;
   const href = recordHref(entry);
   return href ? <a href={href} onClick={(ev) => { ev.stopPropagation(); }}>{entry.entityName}</a> : <>{entry.entityName}</>;

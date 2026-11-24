@@ -29,7 +29,10 @@ export function SalaryViewsTable({ filters }: { filters: Filters }) {
       <ErrorMessage error={list.error} />
       {list.isPending && <p className="muted" role="status">Loading…</p>}
       {list.data && rows.length === 0 && (
-        <p className="audit-empty">No one{filters.who ? " you picked" : ""} was shown a salary in these days. Try other filters or more days.</p>
+        <p className="audit-empty">
+          {filters.who || filters.what ? "No salary was shown that matches these filters in these days." : "No one was shown a salary in these days."} Try
+          other filters or more days.
+        </p>
       )}
       {rows.length > 0 && (
         <div className="table-scroll">

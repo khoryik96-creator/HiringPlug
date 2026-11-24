@@ -59,7 +59,7 @@ export function ListHead({ shown, more, noun, path, body }: {
     setError(null);
     downloadExport(path, { format: "xlsx", ...body }).catch(setError).finally(() => { setBusy(false); });
   };
-  const count = shown === null ? "" : `${shown.toLocaleString("en")} ${shown === 1 ? noun[0] : noun[1]}${more ? " shown, more below" : ""}`;
+  const count = !shown ? "" : `${shown.toLocaleString("en")} ${shown === 1 ? noun[0] : noun[1]}${more ? " shown, more below" : ""}`;
   return (
     <>
       <div className="audit-head">

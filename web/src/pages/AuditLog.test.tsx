@@ -143,7 +143,7 @@ describe("Settings › Audit log", () => {
   it("says when nothing was found", async () => {
     serve(() => ({ items: [], nextCursor: null }));
     renderWithClient(<AuditLog canSeeSalaryViews={false} />);
-    expect(await screen.findByText(/Nothing was changed by anyone in these days/)).toBeTruthy();
+    expect(await screen.findByText(/Nothing was changed in these days/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download Excel" }).hasAttribute("disabled")).toBe(true);
   });
 

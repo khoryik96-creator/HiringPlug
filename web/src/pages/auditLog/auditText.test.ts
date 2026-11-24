@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { changeLines, recordHref, whatHappened } from "./auditText";
+import { changeLines, exportedList, recordHref, whatHappened } from "./auditText";
 import { changesQuery, defaultFilters, readView, salaryQuery, viewHash } from "./filters";
 import { dayText } from "./when";
 
@@ -52,6 +52,8 @@ describe("audit log sentences", () => {
     expect(recordHref({ entityType: "candidate", entityId: "cand_01abc" })).toBe("#/candidates/cand_01abc");
     expect(recordHref({ entityType: "job_order", entityId: "jo_01abc" })).toBe("#/jobs/jo_01abc");
     expect(recordHref({ entityType: "email", entityId: "em_01abc" })).toBeNull();
+    expect(exportedList("candidate.exported")).toBe("Candidate list");
+    expect(exportedList("candidate.updated")).toBeNull();
   });
 });
 
