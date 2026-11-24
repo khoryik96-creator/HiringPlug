@@ -43,6 +43,12 @@ describe("open records", () => {
     const other = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
     act(() => { screen.getByText("Reports").dispatchEvent(other); });
     expect(other.defaultPrevented).toBe(false); // not a record: the browser does as usual
+    // Middle-click on a tab here goes to it, not to a browser tab.
+    const tab = screen.getByRole("navigation", { name: "Open records" }).querySelector<HTMLAnchorElement>('a[href="#/jobs/jo_01acc"]');
+    const onTab = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+    act(() => { tab?.dispatchEvent(onTab); });
+    expect(onTab.defaultPrevented).toBe(true);
+    expect(window.location.hash).toBe("#/jobs/jo_01acc");
   });
 
   it("knows which record a page is about", () => {

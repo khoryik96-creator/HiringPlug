@@ -6,8 +6,9 @@
 // any by name. A tab lights green
 // when something finished on its record (a CV formatted), until you open it.
 // Ctrl-, Shift- or middle-click on a link to a record anywhere opens it as a
-// tab here, behind the page you are on, never as a browser tab (dragging a
-// link out of the window still makes a browser tab). The strip stays at the
+// tab here, behind the page you are on, never as a browser tab; middle-click
+// on a tab here goes to it (dragging a link or a tab out of the window still
+// makes a browser tab). The strip stays at the
 // top as the page scrolls.
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 
@@ -60,7 +61,12 @@ export function OpenTabs({ hash }: { hash: string }) {
     const inBackground = (e: globalThis.MouseEvent) => {
       if (e.defaultPrevented || !(e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) return;
       const link = (e.target as Element | null)?.closest("a[href]");
-      if (!link || link.closest(".open-tabs")) return;
+      if (!link) return;
+      if (link.closest(".open-tabs")) {
+        // Middle-click on a tab here goes to it; Ctrl and Shift select tabs.
+        if (e.button === 1) { e.preventDefault(); window.location.assign(link.getAttribute("href") ?? "#/"); }
+        return;
+      }
       const record = recordOf(link.getAttribute("href") ?? "");
       if (!record) return;
       e.preventDefault();
