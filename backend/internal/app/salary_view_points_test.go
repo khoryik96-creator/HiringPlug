@@ -238,12 +238,13 @@ func TestAShortlistEmailToACandidateCountsTheRecipientsOwnSalary(t *testing.T) {
 // as their page does: a profile change, their history, a merge and a
 // screening call that did not set the salary are counted; a call that set
 // it is not (what they just typed in). Salary notes alone, or a formatted
-// CV "with the salary" of a candidate who has none, show no salary.
+// CV "with the salary" of a candidate who has none, show no salary: such a
+// CV is kept as one without it (opened by anyone who may see the CV).
 func TestACandidateSentBackWithTheirSalaryIsCounted(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	a.sameSalaryDay()
-	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter, api.RoleSourcer)
 	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
 	rt := recruiter.Token
 	c := a.withSalary(rt, map[string]any{"firstName": "Siti", "email": "siti@example.com"})
@@ -286,7 +287,15 @@ func TestACandidateSentBackWithTheirSalaryIsCounted(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+notes.Id, rt, nil).Status)
-	require.Equal(t, http.StatusCreated, a.request(http.MethodPost, "/v1/candidates/"+notes.Id+"/formatted-cvs", rt, map[string]any{"includeSalary": true}).Status)
+	var cv api.FormattedCv
+	res = a.request(http.MethodPost, "/v1/candidates/"+notes.Id+"/formatted-cvs", rt, map[string]any{"includeSalary": true})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	res.JSON(&cv)
+	for range 2 { // opened again and again: still no salary in it
+		require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/documents/"+cv.DocumentId+"/file", rt, nil).Status)
+	}
+	res = a.request(http.MethodGet, "/v1/documents/"+cv.DocumentId+"/file", tenant.Users[api.RoleSourcer].Token, nil)
+	assert.Equal(t, http.StatusOK, res.Status, "no salary in it: open to those who may not see salaries; %s", res.Body)
 	seen := a.seen(owner, recruiter.ID)
 	assert.NotContains(t, seen, "candidate:"+notes.Id)
 	assert.NotContains(t, seen, "cv:"+notes.Id)

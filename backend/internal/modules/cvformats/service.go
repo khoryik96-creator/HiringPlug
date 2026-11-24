@@ -237,12 +237,15 @@ func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID str
 		if err != nil {
 			return err
 		}
+		// Kept as a CV with the salary (opened only by those who may see
+		// salaries, counted each time) only when a salary is really in it.
+		withSalary := o.IncludeSalary && (cand.CurrentSalary != nil || cand.ExpectedSalary != nil)
 		if err := store.New(tx).RecordFormattedCv(ctx, store.RecordFormattedCvParams{
-			DocumentID: docID, CandidateID: candidateID, Blind: o.Blind, IncludeSalary: o.IncludeSalary,
+			DocumentID: docID, CandidateID: candidateID, Blind: o.Blind, IncludeSalary: withSalary,
 		}); err != nil {
 			return err
 		}
-		if o.IncludeSalary && (cand.CurrentSalary != nil || cand.ExpectedSalary != nil) { // a salary is in the file made
+		if withSalary {
 			if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.CV, candidateID); err != nil {
 				return err
 			}
