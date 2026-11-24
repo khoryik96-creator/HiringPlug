@@ -49,6 +49,7 @@ WORDS = 0.06  # the search's own words in the CV
 WORDS_EXACT = 0.25  # ... when it names a tool, qualification or code (S/4HANA, ACCA)
 LEVEL_STEP, LEVEL_MAX_STEPS = 0.03, 3
 OLD_ROLE_STEP, OLD_ROLE_FLOOR = 0.05, 0.55
+PAST_UNKNOWN = 0.8  # a past job whose end year is not known
 OTHER_FIELD = 0.75  # their best title in another field, not a neighbour (families.NEAR)
 GOOD = 0.5  # what a score must reach to be called a good match
 
@@ -63,8 +64,14 @@ def model() -> meaning_model.MeaningModel:
     return loaded
 
 
-def recency(end: int | None) -> float:
-    return 1.0 if end is None else max(OLD_ROLE_FLOOR, 1 - OLD_ROLE_STEP * (THIS_YEAR - end))
+def recency(end: int | None, now: bool) -> float:
+    """Go's meaning.Recency: their job now, or one ending this year or later,
+    counts in full; a past job with no end year as about four years ago."""
+    if now or (end is not None and end >= THIS_YEAR):
+        return 1.0
+    if end is None:
+        return PAST_UNKNOWN
+    return max(OLD_ROLE_FLOOR, 1 - OLD_ROLE_STEP * (THIS_YEAR - end))
 
 
 def level_fit(want: int | None, have: int | None) -> float:
@@ -101,7 +108,8 @@ def read_bench(bench: ModuleType, m: meaning_model.MeaningModel) -> Read:
 def role_score(r: Read, i: int, role: np.ndarray, want: int | None) -> tuple[float, str | None]:
     """Their best title's score for the role asked for, and its family."""
     return max(
-        (max(float(f @ role), float(w @ role)) * recency(end) * level_fit(want, lvl), fam)
+        # The benches write their job now with no end year.
+        (max(float(f @ role), float(w @ role)) * recency(end, now=end is None) * level_fit(want, lvl), fam)
         for f, w, lvl, end, fam in r.roles[i]
     )
 
