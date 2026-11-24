@@ -49,7 +49,9 @@ placement sends it back without the salary unless the change set it. Every
 answer with salaries, and every page sorted or filtered by salary, is
 counted against the key in the log of who was shown a salary (Settings ›
 Audit log › Salary views), so ask only for what the program uses. Exports
-and a candidate's own page (`GET /v1/candidates/{id}`) are unchanged.
+and a candidate's own page (`GET /v1/candidates/{id}`) are unchanged. To
+watch emails being sent, ask `GET /v1/emails` with `statusOnly=true`: how
+each is getting on, without subjects or messages, and not counted.
 
 **Webhooks.** Choose the events (candidate created or updated, application
 added or moved, careers applications, interviews scheduled or changed,

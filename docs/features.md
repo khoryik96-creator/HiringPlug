@@ -1715,14 +1715,14 @@ scrolled sideways.
   (`email_sent`), a sent email with it read again on a candidate's or
   contact's emails or in a copy of their data (`email_read`: once for the
   list, for the candidates whose salary it may show; for an email to a
-  candidate, only theirs), the salary section of a copy of a candidate's
+  candidate, only theirs, even when they are on its list), the salary section of a copy of a candidate's
   data (`candidate`), a formatted CV with it made, opened, downloaded or
   attached to an email (`cv`), a list of offers that asked for their salaries
   (an application's offers, the offers waiting for approval: `offer`), a list
   of placements that asked for theirs (an application's placement, one being
-  changed on the dashboard), or an invoice whose fee is a share of the
-  salary (it prints the annual salary) opened or sent by a person
-  (`placement`). One line per
+  changed on the dashboard), or an invoice that prints the annual salary
+  (its fee is a share of the salary) opened by a person, or sent by one when
+  it or its email prints it (`placement`). One line per
   person, kind, candidate and day (the agency's day), with how often and the
   first and last time; a list, search or export is one line a day with the
   number of different candidates it showed. A salary is a current or
@@ -1742,9 +1742,14 @@ scrolled sideways.
   offer is open, the placements dashboard), an offer or placement sent back
   after a change that did not set its salary (moving it on, approving it,
   choosing who is invoiced, sending the invoice), opening the email composer
-  or choosing a shortlist's candidates, and an invoice's status read while
-  it is queued (the screen keeps the salary it read first, and does not read
-  offers or a placement again when the window gets focus). Known gaps: the
+  or choosing a shortlist's candidates, an invoice's status read while
+  it is queued, and emails' status read while one is being sent
+  (`GET /v1/emails?statusOnly=true`: no subjects or messages). The screens
+  keep the salary they read first and never read anything that showed one
+  again just because the window got focus (a candidate's page, their
+  screening calls and emails, offers, a placement, a candidate list with
+  salaries or sorted or found by salary); a search by meaning asked again
+  while its words are read finds no one yet, so counts nothing. Known gaps: the
   placements dashboard's fee and fee percentage (the salary can be worked
   out from them) and the market map.
 - **Lists ask for salaries.** `GET /v1/candidates` and
@@ -1760,7 +1765,9 @@ scrolled sideways.
   fee stays); a change to an offer or placement sends it back without the
   salary unless the change set it. `POST /v1/email-previews` returns the
   salary fields' values only with `includeSalary`, naming the others in
-  `withheldFields` (the subject and message are filled either way).
+  `withheldFields` (the subject and message are filled either way). In
+  Outlook, a salary field (in the message or the subject) goes in once its
+  value comes, and sending waits for it.
 - **Formatted CVs made with the salary** open, download, turn into a PDF,
   show their text or go with an email only for roles that may see salaries;
   others see them listed but get "includes the candidate's salary". A copy
