@@ -19,11 +19,3 @@ How to write an entry (newest at the top, one per task):
 ```
 
 ## In progress
-
-### Find HR for a lead not linked to a company (owner chose layout A)
-- Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v
-- Touches: Leads page (web/src/pages/Leads.tsx, new LeadFindHR panel), FindHR component (a compact mode), companies module (a "named like" lookup), the LinkedIn companion (a company search action)
-- Started: 24 Nov 2026    Last update: 24 Nov 2026
-- State: in progress
-- Next: a Find HR side panel on Leads: pick the company (one in HiringPlug with a like name, or add it, its LinkedIn page found by the companion), link the lead, then the company's Find HR scan in the panel
