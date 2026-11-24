@@ -1666,9 +1666,15 @@ strengths, areas to improve, reason for leaving, would you rehire them; all
 changeable), a box each; saved as a *Reference check* note on the candidate's
 timeline, each answer after its question. One referee per note.
 
-## Audit log and who was shown a salary 🟡 (1.45.0: the API; the page follows)
+## Audit log and who was shown a salary 🟡 (1.45.0)
 
-Built in 1.45.0 (the backend; the page comes once its layout is chosen).
+Built in 1.45.0: the API and the page, **Settings › Audit log** (owners and
+admins), with two tabs, Changes and Salary views: filters across the top
+(who, what, from, to; kept in the address), newest first, a row opens to
+show what changed, and Download Excel of what the filters find. "To" left at
+today asks with no end date (the API's days are the agency's). On a phone
+each row is a small card (when and who, then what and the record), never
+scrolled sideways.
 
 - **The audit log** (`GET /v1/audit-log`, `auditlog:read`: owners and admins
   by default, any role can be given it in Roles and access): every change in
