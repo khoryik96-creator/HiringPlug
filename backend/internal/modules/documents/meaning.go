@@ -53,9 +53,15 @@ func (m *Module) NewestCVKeys(ctx context.Context, tx pgx.Tx, candidateIDs []str
 	return out, nil
 }
 
+// DocumentOwner returns whose a document is and its source (no text), in the caller's transaction.
+func (m *Module) DocumentOwner(ctx context.Context, tx pgx.Tx, id string) (candidateID, source string, err error) {
+	row, err := store.New(tx).DocumentOwner(ctx, id)
+	return row.CandidateID, row.Source, err
+}
+
 // DocumentExists says whether a document is still there, in the caller's transaction.
 func (m *Module) DocumentExists(ctx context.Context, tx pgx.Tx, id string) (bool, error) {
-	_, err := store.New(tx).CVTextOf(ctx, id)
+	_, err := store.New(tx).DocumentOwner(ctx, id)
 	if database.IsNoRows(err) {
 		return false, nil
 	}

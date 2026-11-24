@@ -207,6 +207,10 @@ LIMIT 500;
 DELETE FROM document WHERE candidate_id = @candidate_id RETURNING storage_key, pdf_key;
 
 -- A document's candidate, kind and text (for other modules reading a CV just read).
+-- Whose a document is and what kind, without its text.
+-- name: DocumentOwner :one
+SELECT candidate_id, source FROM document WHERE id = @id;
+
 -- name: CVTextOf :one
 SELECT candidate_id, source, coalesce(extracted_text, '')::text AS text FROM document WHERE id = @id;
 

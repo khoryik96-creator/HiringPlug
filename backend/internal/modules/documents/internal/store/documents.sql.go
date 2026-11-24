@@ -90,7 +90,6 @@ type CVTextOfRow struct {
 	Text        string
 }
 
-// A document's candidate, kind and text (for other modules reading a CV just read).
 func (q *Queries) CVTextOf(ctx context.Context, id string) (CVTextOfRow, error) {
 	row := q.db.QueryRow(ctx, cVTextOf, id)
 	var i CVTextOfRow
@@ -180,6 +179,24 @@ func (q *Queries) DeleteFormattedDocument(ctx context.Context, id string) (Delet
 	row := q.db.QueryRow(ctx, deleteFormattedDocument, id)
 	var i DeleteFormattedDocumentRow
 	err := row.Scan(&i.StorageKey, &i.PdfKey)
+	return i, err
+}
+
+const documentOwner = `-- name: DocumentOwner :one
+SELECT candidate_id, source FROM document WHERE id = $1
+`
+
+type DocumentOwnerRow struct {
+	CandidateID string
+	Source      string
+}
+
+// A document's candidate, kind and text (for other modules reading a CV just read).
+// Whose a document is and what kind, without its text.
+func (q *Queries) DocumentOwner(ctx context.Context, id string) (DocumentOwnerRow, error) {
+	row := q.db.QueryRow(ctx, documentOwner, id)
+	var i DocumentOwnerRow
+	err := row.Scan(&i.CandidateID, &i.Source)
 	return i, err
 }
 

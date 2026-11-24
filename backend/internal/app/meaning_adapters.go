@@ -73,7 +73,7 @@ func (a meaningCVs) NewestCVKeys(ctx context.Context, tx pgx.Tx, candidateIDs []
 }
 
 func (a meaningCVs) CandidateOf(ctx context.Context, tx pgx.Tx, documentID string) (string, error) {
-	candidateID, source, _, err := a.documents.CVTextOf(ctx, tx, documentID)
+	candidateID, source, err := a.documents.DocumentOwner(ctx, tx, documentID)
 	if database.IsNoRows(err) || source == "formatted" {
 		return "", nil
 	}
