@@ -59,10 +59,11 @@ type Deps struct {
 	}
 	// Interviews takes into an interview what its organizer changed in Outlook
 	// (title, place, instructions, time), in the caller's transaction, and
-	// answers with the interview as it is now. Without it, an interview
-	// changed in Outlook is flagged for review.
+	// answers with the interview as it is now; organizer is the user who
+	// changed it (for the audit). Without it, an invitation moved in Outlook
+	// is flagged for review and its other changes are left as they are.
 	Interviews interface {
-		ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id string, version int, c MeetingChange) (Meeting, error)
+		ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id, organizer string, version int, c MeetingChange) (Meeting, error)
 	}
 }
 type Provider struct{ AuthorizeURL, TokenURL, GraphURL string }

@@ -78,8 +78,10 @@ func (m *Module) StandingIDs(ctx context.Context, tx pgx.Tx, ids []string) (map[
 // the calendar refresh's transaction, which holds the interview's calendar
 // lock. Nothing is sent back to Outlook and no calendar job is queued here:
 // the calendars module, which called, does both as needed. The audit entry is
-// an ordinary update (webhooks and automations follow it) marked via Outlook.
-func (m *Module) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id string, version int, c OutlookChange) (CalendarMeeting, error) {
+// an ordinary update (webhooks and automations follow it) marked via Outlook
+// and by the organizer who changed it there (the refresh itself runs as the
+// system).
+func (m *Module) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id, organizer string, version int, c OutlookChange) (CalendarMeeting, error) {
 	s := m.service
 	q := store.New(tx)
 	row, err := getRow(ctx, q, id)
@@ -115,7 +117,7 @@ func (m *Module) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id st
 	if err != nil {
 		return calendarMeeting(row), err
 	}
-	changes["via"] = "outlook"
+	changes["via"], changes["by"] = "outlook", organizer
 	if err := audit.Record(ctx, tx, audit.Entry{Action: "interview.updated", EntityType: "interview", EntityID: id, Changes: changes}); err != nil {
 		return calendarMeeting(row), err
 	}

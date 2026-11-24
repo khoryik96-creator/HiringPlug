@@ -44,9 +44,10 @@ func (s *Service) mergeManaged(ctx context.Context, tx pgx.Tx, tenant string, ro
 	known := knownEvent(row)
 	diff := diffOutlook(row, known, e, start, end)
 	if teamsArrived(row, known, e) {
-		// Outlook filled in the Teams meeting HiringPlug asked for: its join
-		// details in the message (and maybe its place) are no organizer change.
-		diff.Body, diff.Location = false, false
+		// Outlook filled in the Teams meeting HiringPlug asked for: the join
+		// details it added to the message, and its Teams place, are no
+		// organizer change (what the organizer changed besides is).
+		diff = withoutTeamsArrival(diff, *known, e)
 	}
 	if row.Source == invitationSource && !diff.Time && responseOnly(row, e) {
 		return q.AcceptInvitationResponseReceipt(ctx, store.AcceptInvitationResponseReceiptParams{
@@ -81,20 +82,21 @@ func (s *Service) mergeManaged(ctx context.Context, tx pgx.Tx, tenant string, ro
 
 // takeHoldChange keeps on a hold what was changed in Outlook other than its
 // time. A later change of its interview or booking sets its title and place
-// again, as the meeting has them.
+// again, as the meeting has them. People added in Outlook stay in Outlook
+// (and in the receipt) but never on the hold: a hold made again (in another
+// account, after a reconnect) would invite them.
 func (s *Service) takeHoldChange(ctx context.Context, tx pgx.Tx, row store.CalendarEvent, e graphEvent, snapshot []byte, diff outlookDiff) error {
 	notes := row.Notes
 	if diff.Body && e.Body.ContentType == "text" {
 		notes = bounded(strings.TrimSpace(e.Body.Content), 4000)
 	}
-	attendees, _ := json.Marshal(e.attendees())
 	title := bounded(strings.TrimSpace(e.Subject), 200)
 	if title == "" {
 		title = row.Title
 	}
 	n, err := store.New(tx).AcceptOutlookHoldChange(ctx, store.AcceptOutlookHoldChangeParams{
 		ID: row.ID, ExpectedVersion: row.Version, Title: title, Notes: notes, Location: bounded(strings.TrimSpace(e.Location.DisplayName), 500),
-		Attendees: attendees, RemoteKey: e.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(e.WebLink),
+		RemoteKey: e.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(e.WebLink),
 	})
 	if err != nil || n == 0 {
 		return err
@@ -104,14 +106,38 @@ func (s *Service) takeHoldChange(ctx context.Context, tx pgx.Tx, row store.Calen
 }
 
 // takeInvitationChange takes an Outlook change into an interview invitation
-// and its interview. It never waits for the interview's lock: a HiringPlug
-// edit or a calendar job holding it may be waiting for this invitation's row,
-// which this refresh may already have written. A busy interview, or one with a
-// HiringPlug change not yet sent, is left for the next refresh (when both
-// sides changed, that change meets Outlook's and is flagged for review).
+// and its interview, as its organizer's: only while they may still schedule
+// interviews and see this one (its candidate in their scope, not binned), and
+// only into a scheduled interview. Otherwise it is as before: a move waits for
+// review, anything else is left. It never waits for the interview's lock: a
+// HiringPlug edit or a calendar job holding it may be waiting for this
+// invitation's row, which this refresh may already have written. A busy
+// interview, or one with a HiringPlug change not yet sent, is left for the
+// next refresh (when both sides changed, that change meets Outlook's and is
+// flagged for review).
 func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant string, row store.CalendarEvent, e graphEvent, snapshot []byte, known *graphEvent, diff outlookDiff, conflict func() error) error {
 	q := store.New(tx)
 	id := text(row.SourceID)
+	people := e.attendees()
+	if len(people) > maxEventAttendees {
+		return conflict() // more people than an invitation holds
+	}
+	notTaken := func() error {
+		if diff.Time {
+			return conflict()
+		}
+		return nil
+	}
+	if s.deps.Users == nil {
+		return notTaken()
+	}
+	organizer, active, err := s.deps.Users.PrincipalFor(ctx, tx, row.UserID)
+	if err != nil {
+		return err
+	}
+	if !active || !organizer.Can(api.PermissionInterviewsSchedule) || !organizer.Can(api.PermissionCalendarsUse) {
+		return notTaken()
+	}
 	if free, err := q.TryLockCalendarSource(ctx, store.TryLockCalendarSourceParams{Kind: "interview", SourceID: id}); err != nil || !free {
 		return err
 	}
@@ -123,12 +149,21 @@ func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant st
 	if current.Version != row.Version || current.Version != current.SentVersion || current.SyncStatus != "synced" || text(current.RemoteKey) != text(row.RemoteKey) {
 		return nil
 	}
-	meeting, err := s.deps.Sources.Meeting(ctx, tx, "interview", id)
+	// Read as the organizer: an interview they no longer see is not theirs to change.
+	var meeting Meeting
+	err = database.AsPrincipal(ctx, tx, organizer, func() error {
+		var err error
+		meeting, err = s.deps.Sources.Meeting(ctx, tx, "interview", id)
+		return err
+	})
 	if database.IsNoRows(err) {
-		return nil // deleted: its invitation is cancelled by the calendar job
+		return notTaken() // deleted (its invitation is cancelled by the calendar job), binned or out of their scope
 	}
 	if err != nil {
 		return err
+	}
+	if !meeting.Scheduled {
+		return notTaken() // completed, no-show or cancelled: HiringPlug no longer schedules it
 	}
 	if meeting.Version != int(row.SourceVersion) {
 		return nil // a HiringPlug change not projected yet
@@ -160,7 +195,7 @@ func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant st
 		if err != nil {
 			return err
 		}
-		changed, err := s.deps.Interviews.ChangeFromOutlook(ctx, sp, tenant, id, meeting.Version, change)
+		changed, err := s.deps.Interviews.ChangeFromOutlook(ctx, sp, tenant, id, row.UserID, meeting.Version, change)
 		if problem, ok := apperr.As(err); ok {
 			if err := sp.Rollback(ctx); err != nil {
 				return err
@@ -201,10 +236,12 @@ func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant st
 			notes, rewritten = bounded(body, 4000), true
 		}
 	}
-	attendees, _ := json.Marshal(e.attendees())
+	attendees, _ := json.Marshal(people)
 	updated, err := q.ApplyOutlookInvitationChange(ctx, store.ApplyOutlookInvitationChangeParams{
 		ID: row.ID, ExpectedVersion: row.Version, Title: title, Notes: notes, OutlookBody: rewritten, Location: location,
 		StartsAt: start, EndsAt: end, Attendees: attendees, Online: e.OnlineMeeting != nil, JoinUrl: e.join(), WebUrl: safeWebURL(e.WebLink),
+		// The Teams meeting turned off in Outlook: a later change must not ask for a new one.
+		TeamsOff:  known != nil && known.OnlineMeeting != nil && e.OnlineMeeting == nil,
 		RemoteKey: e.key(), RemoteSnapshot: snapshot, SourceVersion: int32(after.Version), //nolint:gosec // source versions are int32
 	})
 	if database.IsNoRows(err) {
@@ -227,8 +264,6 @@ func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant st
 			return err
 		}
 	}
-	var people []api.CalendarAttendee
-	_ = json.Unmarshal(attendees, &people)
 	return audit.Record(ctx, tx, audit.Entry{Action: "interview.outlook_invitation_changed", EntityType: "interview", EntityID: id,
-		Changes: map[string]any{"fields": diff.fields(), "attendees": len(people), "interviewChanged": after.Version != meeting.Version}})
+		Changes: map[string]any{"fields": diff.fields(), "attendees": len(people), "interviewChanged": after.Version != meeting.Version, "by": row.UserID}})
 }

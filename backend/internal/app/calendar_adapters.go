@@ -153,7 +153,7 @@ func (a calendarRecipients) InterviewRecipient(ctx context.Context, tx pgx.Tx, a
 // Outlook to its invitation.
 type calendarInterviews struct{ m *interviews.Module }
 
-func (a calendarInterviews) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id string, version int, c calendars.MeetingChange) (calendars.Meeting, error) {
+func (a calendarInterviews) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id, organizer string, version int, c calendars.MeetingChange) (calendars.Meeting, error) {
 	change := interviews.OutlookChange{Title: c.Title, Location: c.Location, Instructions: c.Instructions, StartsAt: c.Start}
 	if c.Start != nil && c.End != nil {
 		length := c.End.Sub(*c.Start)
@@ -163,6 +163,6 @@ func (a calendarInterviews) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, te
 		minutes := int(length / time.Minute)
 		change.Duration = &minutes
 	}
-	m, err := a.m.ChangeFromOutlook(ctx, tx, tenant, id, version, change)
+	m, err := a.m.ChangeFromOutlook(ctx, tx, tenant, id, organizer, version, change)
 	return interviewMeeting(m), err
 }

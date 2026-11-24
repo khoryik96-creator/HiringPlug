@@ -161,6 +161,44 @@ func teamsArrived(row store.CalendarEvent, known *graphEvent, e graphEvent) bool
 	return row.Teams && known != nil && known.OnlineMeeting == nil && e.OnlineMeeting != nil
 }
 
+// teamsPlace is the place Outlook gives a Teams meeting.
+const teamsPlace = "Microsoft Teams Meeting"
+
+// withoutTeamsArrival leaves out of d what Outlook itself added when it filled
+// in the Teams meeting since known: its Teams place (instead of the place, or
+// after it) and the join details it appends to the message. Anything else
+// changed meanwhile is the organizer's and stays.
+func withoutTeamsArrival(d outlookDiff, known, e graphEvent) outlookDiff {
+	place := strings.TrimSpace(e.Location.DisplayName)
+	kept := []string{}
+	for _, part := range strings.Split(place, ";") {
+		if part = strings.TrimSpace(part); part != "" && !strings.EqualFold(part, teamsPlace) {
+			kept = append(kept, part)
+		}
+	}
+	if strings.EqualFold(place, teamsPlace) || strings.Join(kept, "; ") == strings.TrimSpace(known.Location.DisplayName) {
+		d.Location = false
+	}
+	if added, ok := strings.CutPrefix(strings.TrimSpace(e.Body.Content), strings.TrimSpace(known.Body.Content)); ok && joinDetails(added, e) {
+		d.Body = false
+	}
+	return d
+}
+
+// joinDetails: text added to the end of a message is the Teams join block
+// Outlook appends (after its line of underscores, if any), not the
+// organizer's words.
+func joinDetails(added string, e graphEvent) bool {
+	block := strings.TrimLeft(added, " _\t\r\n")
+	if block == "" {
+		return false
+	}
+	if e.OnlineMeeting != nil && e.OnlineMeeting.JoinURL != "" && strings.HasPrefix(block, e.OnlineMeeting.JoinURL) {
+		return true
+	}
+	return strings.HasPrefix(strings.ToLower(block), "microsoft teams")
+}
+
 // knownEvent is the event's last receipt from Outlook, if it has a usable one.
 func knownEvent(row store.CalendarEvent) *graphEvent {
 	var known graphEvent

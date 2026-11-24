@@ -83,3 +83,37 @@ func TestPatchKeepsThePeopleOutlookHas(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "attendees", "an own appointment sends its people as before")
 }
+
+func TestTeamsArrivalMasksOnlyWhatOutlookAdded(t *testing.T) {
+	known := syntheticOutlookEvent(t, `{"id":"e1","subject":"Technical interview","location":{"displayName":"Room 4"},
+		"body":{"contentType":"text","content":"Please bring your portfolio."}}`)
+	arrived := func(place, body string) graphEvent {
+		e := known
+		e.OnlineMeeting = &struct{ JoinURL string }{JoinURL: "https://teams.example.test/join/1"}
+		e.Location.DisplayName, e.Body.Content = place, body
+		return e
+	}
+	all := outlookDiff{Location: true, Body: true}
+	join := "\n\n________________\nMicrosoft Teams meeting\nJoin on your computer or mobile app\nhttps://teams.example.test/join/1"
+
+	assert.True(t, withoutTeamsArrival(all, known, arrived("Microsoft Teams Meeting", "Please bring your portfolio."+join)).empty(),
+		"Outlook's Teams place and join block are no organizer change")
+	assert.True(t, withoutTeamsArrival(all, known, arrived("Room 4; Microsoft Teams Meeting", "Please bring your portfolio."+join)).empty(),
+		"Teams after the place there was")
+	assert.Equal(t, outlookDiff{Location: true}, withoutTeamsArrival(all, known, arrived("Level 12, Orbit Tower", "Please bring your portfolio."+join)),
+		"a place the organizer set at the same time is kept")
+	assert.Equal(t, outlookDiff{Body: true}, withoutTeamsArrival(all, known, arrived("Microsoft Teams Meeting", "Please bring your portfolio.\nUse the side entrance."+join)),
+		"words the organizer added at the same time are kept")
+	assert.Equal(t, outlookDiff{Body: true}, withoutTeamsArrival(all, known, arrived("Microsoft Teams Meeting", "Bring two forms of ID."+join)),
+		"a message the organizer rewrote is kept")
+}
+
+func TestPatchOfAHoldNeverSendsPeople(t *testing.T) {
+	for _, source := range []string{"interview", "booking"} {
+		row := store.CalendarEvent{Source: source, Attendees: []byte(`[]`),
+			RemoteSnapshot: []byte(`{"id":"e1","attendees":[{"emailAddress":{"address":"assistant@example.test"},"type":"optional"}]}`)}
+		out, err := patchBody(row, []byte(`{"subject":"x","attendees":[]}`))
+		require.NoError(t, err)
+		assert.NotContains(t, string(out), "attendees", "people added to a hold in Outlook stay there")
+	}
+}

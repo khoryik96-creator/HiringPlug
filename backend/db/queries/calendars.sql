@@ -215,17 +215,21 @@ UPDATE calendar_event SET title= @title,notes= @notes,
  notes_html=CASE WHEN @outlook_body::boolean THEN NULL ELSE notes_html END,
  outlook_body=outlook_body OR @outlook_body::boolean,
  location= @location,starts_at= @starts_at,ends_at= @ends_at,attendees= @attendees,
- -- The online meeting as Outlook has it: removed there, its link goes too.
- join_url=CASE WHEN @online::boolean THEN coalesce(sqlc.narg(join_url),join_url) END,web_url=coalesce(sqlc.narg(web_url),web_url),
+ -- The online meeting as Outlook has it: removed there, its link goes too,
+ -- and a later HiringPlug change no longer asks for a Teams meeting.
+ join_url=CASE WHEN @online::boolean THEN coalesce(sqlc.narg(join_url),join_url) END,
+ teams=teams AND NOT @teams_off::boolean,web_url=coalesce(sqlc.narg(web_url),web_url),
  remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot,
  source_version=GREATEST(source_version,@source_version::integer),outlook_changed_at=now(),
  version=version+1,sent_version=version+1,sync_status='synced',sync_error=NULL,body_dirty=false,updated_at=now()
 WHERE id= @id AND source='interview_invitation' AND version= @expected_version AND version=sent_version
 RETURNING *;
 -- A change made in Outlook to a private interview or booking hold other than
--- its time (a rename, a place, notes, people): kept on the hold, not pushed back.
+-- its time (a rename, a place, notes): kept on the hold, not pushed back.
+-- People added in Outlook stay only in its receipt: a hold made again (in
+-- another account, after a reconnect) never invites them.
 -- name: AcceptOutlookHoldChange :execrows
-UPDATE calendar_event SET title= @title,notes= @notes,location= @location,attendees= @attendees,
+UPDATE calendar_event SET title= @title,notes= @notes,location= @location,
  remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot,web_url=coalesce(sqlc.narg(web_url),web_url),
  outlook_changed_at=now(),version=version+1,sent_version=version+1,updated_at=now()
 WHERE id= @id AND version= @expected_version AND version=sent_version AND sync_status='synced' AND source IN ('interview','booking');

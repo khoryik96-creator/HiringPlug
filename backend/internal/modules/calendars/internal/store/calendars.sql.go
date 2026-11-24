@@ -33,17 +33,16 @@ func (q *Queries) AcceptInvitationResponseReceipt(ctx context.Context, arg Accep
 }
 
 const acceptOutlookHoldChange = `-- name: AcceptOutlookHoldChange :execrows
-UPDATE calendar_event SET title= $1,notes= $2,location= $3,attendees= $4,
- remote_key=$5,remote_snapshot= $6,web_url=coalesce($7,web_url),
+UPDATE calendar_event SET title= $1,notes= $2,location= $3,
+ remote_key=$4,remote_snapshot= $5,web_url=coalesce($6,web_url),
  outlook_changed_at=now(),version=version+1,sent_version=version+1,updated_at=now()
-WHERE id= $8 AND version= $9 AND version=sent_version AND sync_status='synced' AND source IN ('interview','booking')
+WHERE id= $7 AND version= $8 AND version=sent_version AND sync_status='synced' AND source IN ('interview','booking')
 `
 
 type AcceptOutlookHoldChangeParams struct {
 	Title           string
 	Notes           string
 	Location        string
-	Attendees       []byte
 	RemoteKey       *string
 	RemoteSnapshot  []byte
 	WebUrl          *string
@@ -52,13 +51,14 @@ type AcceptOutlookHoldChangeParams struct {
 }
 
 // A change made in Outlook to a private interview or booking hold other than
-// its time (a rename, a place, notes, people): kept on the hold, not pushed back.
+// its time (a rename, a place, notes): kept on the hold, not pushed back.
+// People added in Outlook stay only in its receipt: a hold made again (in
+// another account, after a reconnect) never invites them.
 func (q *Queries) AcceptOutlookHoldChange(ctx context.Context, arg AcceptOutlookHoldChangeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, acceptOutlookHoldChange,
 		arg.Title,
 		arg.Notes,
 		arg.Location,
-		arg.Attendees,
 		arg.RemoteKey,
 		arg.RemoteSnapshot,
 		arg.WebUrl,
@@ -193,12 +193,14 @@ UPDATE calendar_event SET title= $1,notes= $2,
  notes_html=CASE WHEN $3::boolean THEN NULL ELSE notes_html END,
  outlook_body=outlook_body OR $3::boolean,
  location= $4,starts_at= $5,ends_at= $6,attendees= $7,
- -- The online meeting as Outlook has it: removed there, its link goes too.
- join_url=CASE WHEN $8::boolean THEN coalesce($9,join_url) END,web_url=coalesce($10,web_url),
- remote_key=$11,remote_snapshot= $12,
- source_version=GREATEST(source_version,$13::integer),outlook_changed_at=now(),
+ -- The online meeting as Outlook has it: removed there, its link goes too,
+ -- and a later HiringPlug change no longer asks for a Teams meeting.
+ join_url=CASE WHEN $8::boolean THEN coalesce($9,join_url) END,
+ teams=teams AND NOT $10::boolean,web_url=coalesce($11,web_url),
+ remote_key=$12,remote_snapshot= $13,
+ source_version=GREATEST(source_version,$14::integer),outlook_changed_at=now(),
  version=version+1,sent_version=version+1,sync_status='synced',sync_error=NULL,body_dirty=false,updated_at=now()
-WHERE id= $14 AND source='interview_invitation' AND version= $15 AND version=sent_version
+WHERE id= $15 AND source='interview_invitation' AND version= $16 AND version=sent_version
 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
@@ -212,6 +214,7 @@ type ApplyOutlookInvitationChangeParams struct {
 	Attendees       []byte
 	Online          bool
 	JoinUrl         *string
+	TeamsOff        bool
 	WebUrl          *string
 	RemoteKey       *string
 	RemoteSnapshot  []byte
@@ -234,6 +237,7 @@ func (q *Queries) ApplyOutlookInvitationChange(ctx context.Context, arg ApplyOut
 		arg.Attendees,
 		arg.Online,
 		arg.JoinUrl,
+		arg.TeamsOff,
 		arg.WebUrl,
 		arg.RemoteKey,
 		arg.RemoteSnapshot,

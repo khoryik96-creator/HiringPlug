@@ -157,8 +157,12 @@ func TestOutlookTitlePlaceAndNotesChangeTheInterview(t *testing.T) {
 	assert.Equal(t, patches, c.patches(), "Outlook already sent the update: nothing goes back")
 	var audited int
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
-		"SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND entity_id=$2 AND action='interview.updated' AND changes->>'via'='outlook' AND actor_id='system'",
-		c.tenant, c.iv.Id).Scan(&audited))
+		"SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND entity_id=$2 AND action='interview.updated' AND changes->>'via'='outlook' AND actor_id='system' AND changes->>'by'=$3",
+		c.tenant, c.iv.Id, c.userID).Scan(&audited))
+	assert.Equal(t, 1, audited, "the audit names the organizer who changed it in Outlook")
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND entity_id=$2 AND action='interview.outlook_invitation_changed' AND changes->>'by'=$3",
+		c.tenant, c.iv.Id, c.userID).Scan(&audited))
 	assert.Equal(t, 1, audited)
 
 	stamp := func() (xmin string, version int) {
@@ -294,6 +298,24 @@ func TestOutlookFillingInTheTeamsMeetingIsNoOrganizerChange(t *testing.T) {
 	assert.Equal(t, c.iv.Location, c.interview().Location)
 }
 
+func TestOutlookChangesMadeAsTheTeamsMeetingArrivesAreKept(t *testing.T) {
+	t.Parallel()
+	c := startOutlookInvitation(t, outlookInvite{lateTeams: true})
+	c.editInOutlook(func(e map[string]any) {
+		content := ""
+		if body, ok := e["body"].(map[string]any); ok {
+			content, _ = body["content"].(string)
+		}
+		e["onlineMeeting"] = map[string]any{"joinUrl": trialJoin}
+		e["body"] = map[string]any{"contentType": "text", "content": content + "\nUse the side entrance.\n\nMicrosoft Teams meeting\nJoin on your computer or mobile app\n" + trialJoin}
+		e["location"] = map[string]any{"displayName": "Level 12, Orbit Tower; Microsoft Teams Meeting"}
+	})
+	assert.Equal(t, trialJoin, c.invitation().JoinUrl.MustGet())
+	location, _ := c.interview().Location.Get()
+	assert.Equal(t, "Level 12, Orbit Tower; Microsoft Teams Meeting", location, "the place the organizer set is taken")
+	assert.Contains(t, c.event("interview_invitation").Notes, "side entrance", "and the words they added")
+}
+
 func TestOutlookOnlineMeetingRemovedTakesItsLinkAway(t *testing.T) {
 	t.Parallel()
 	c := startOutlookInvitation(t, outlookInvite{teams: true})
@@ -306,5 +328,15 @@ func TestOutlookOnlineMeetingRemovedTakesItsLinkAway(t *testing.T) {
 	event := c.event("interview_invitation")
 	assert.Equal(t, "We will meet at the office instead.", event.Notes)
 	assert.True(t, event.JoinUrl.IsNull(), "the calendar event no longer joins a meeting that is gone")
+	assert.False(t, event.Teams, "the event is no longer a Teams meeting")
 	assert.True(t, c.invitation().JoinUrl.IsNull())
+
+	moved := c.iv.StartsAt.Add(time.Hour)
+	c.a.interview(http.MethodPatch, c.path, c.user, map[string]any{"version": c.interview().Version, "startsAt": moved}, http.StatusOK)
+	runCoreJobsUntilIdle(t, c.a, c.tenant)
+	c.f.mu.Lock()
+	defer c.f.mu.Unlock()
+	assert.Contains(t, c.f.lastPatch, "start", "the move reaches Outlook")
+	assert.NotContains(t, c.f.lastPatch, "isOnlineMeeting", "without asking for a new Teams meeting")
+	assert.NotContains(t, c.f.lastPatch, "onlineMeetingProvider")
 }

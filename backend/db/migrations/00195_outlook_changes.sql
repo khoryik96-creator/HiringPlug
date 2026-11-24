@@ -29,13 +29,20 @@ ALTER TABLE calendar_event DROP CONSTRAINT calendar_invitation_details,
 ALTER TABLE interview ADD COLUMN outlook_changed_at timestamptz;
 
 -- +goose Down
--- People added in Outlook are dropped (the candidate and the Cc stay); an
--- invitation the old rule cannot hold is deleted.
-UPDATE calendar_event SET attendees = coalesce((SELECT jsonb_agg(a) FROM jsonb_array_elements(attendees) a
+-- The old rule holds the candidate and up to 20 Cc: people added in Outlook
+-- as required attendees are dropped, and optional ones past the first 20 too
+-- (they stay invited in Outlook). Only an invitation whose candidate is no
+-- longer among its attendees (taken off in Outlook, waiting for review)
+-- cannot be held by the old rule and is deleted.
+UPDATE calendar_event SET attendees = coalesce((SELECT jsonb_agg(a ORDER BY n) FROM jsonb_array_elements(attendees) WITH ORDINALITY AS t(a, n)
     WHERE coalesce((a->>'optional')::boolean, false) OR lower(a->>'email') = lower(candidate_email)), '[]'::jsonb)
   WHERE source = 'interview_invitation' AND candidate_email IS NOT NULL;
-DELETE FROM calendar_event WHERE source = 'interview_invitation'
-  AND (calendar_required_attendees(attendees) <> 1 OR jsonb_array_length(attendees) > 21);
+UPDATE calendar_event SET attendees = (SELECT jsonb_agg(a ORDER BY n) FROM (
+      SELECT a, n, row_number() OVER (PARTITION BY coalesce((a->>'optional')::boolean, false) ORDER BY n) AS k
+      FROM jsonb_array_elements(attendees) WITH ORDINALITY AS t(a, n)) kept
+    WHERE NOT coalesce((a->>'optional')::boolean, false) OR k <= 20)
+  WHERE source = 'interview_invitation' AND jsonb_array_length(attendees) > 21;
+DELETE FROM calendar_event WHERE source = 'interview_invitation' AND calendar_required_attendees(attendees) <> 1;
 ALTER TABLE calendar_event DROP CONSTRAINT calendar_invitation_details,
   ADD CONSTRAINT calendar_invitation_details CHECK (source <> 'interview_invitation' OR
     (source_id IS NOT NULL AND invitation_calendar IS NOT NULL AND invitation_subject IS NOT NULL

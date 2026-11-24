@@ -228,3 +228,30 @@ func TestCalendarHoldRenamedInOutlookIsKeptButMovedIsFlagged(t *testing.T) {
 		})
 	}
 }
+
+// People added in Outlook to a private hold stay there, but a hold made again
+// (in another account, after a reconnect) never invites them.
+func TestCalendarHoldMadeAgainNeverInvitesPeopleAddedInOutlook(t *testing.T) {
+	t.Parallel()
+	c, source := holdInOutlook(t, false)
+	c.editInOutlook(func(e map[string]any) {
+		e["subject"] = "Blocked: renamed in Outlook"
+		e["attendees"] = []any{outlookAttendee("assistant@example.test", "optional")}
+	})
+	require.Equal(t, "Blocked: renamed in Outlook", c.event(source).Title)
+	c.f.mu.Lock()
+	c.f.account = "new-work-account"
+	c.f.mu.Unlock()
+	connectOutlook(t, c.a, c.user)
+	runCoreJobsUntilIdle(t, c.a, c.tenant)
+	c.f.mu.Lock()
+	defer c.f.mu.Unlock()
+	made := 0
+	for _, e := range c.f.events {
+		if accountOf(e) == "new-work-account" {
+			made++
+			assert.Empty(t, e["attendees"], "the hold is made again without the people added in Outlook")
+		}
+	}
+	assert.Equal(t, 1, made)
+}
