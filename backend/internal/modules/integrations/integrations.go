@@ -82,6 +82,21 @@ func (m *Module) Authenticate(ctx context.Context, key string) (authz.Principal,
 	return authz.NewPrincipalWithAccess(row.TenantID, row.KeyID, "", "API key: "+row.KeyName, api.Role(row.KeyRole), perms, KeyScope(all)), nil
 }
 
+// KeyNames returns the names of the given API keys (revoked ones too;
+// missing ones are left out), in the caller's transaction: for the audit
+// log's "who".
+func (m *Module) KeyNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
+	rows, err := store.New(tx).ApiKeyNames(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.ID] = r.Name
+	}
+	return out, nil
+}
+
 // JobHandlers returns the module's handlers for the core queue (none run in
 // the queue's transaction: see OutsideJobHandlers).
 func (m *Module) JobHandlers() jobqueue.Handlers { return jobqueue.Handlers{} }

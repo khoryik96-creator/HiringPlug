@@ -640,6 +640,135 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/AssistantOff'}
         '429': {$ref: '#/components/responses/AssistantLimitReached'}
+  /v1/audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [auditlog]
+      summary: The company's audit log, newest first
+      description: >
+        Entries about candidates and their jobs the user may not see are left out (row-level security). Salary values are never in the log, only that they changed.
+
+      x-permission: auditlog:read
+      parameters:
+        - $ref: '#/components/parameters/AuditActor'
+        - $ref: '#/components/parameters/AuditAction'
+        - $ref: '#/components/parameters/AuditEntityType'
+        - $ref: '#/components/parameters/AuditEntityId'
+        - $ref: '#/components/parameters/AuditFrom'
+        - $ref: '#/components/parameters/AuditTo'
+        - name: cursor
+          in: query
+          description: The `nextCursor` of the previous page.
+          schema: {$ref: '#/components/schemas/AuditEntryId'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuditLogPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/audit-log/export:
+    post:
+      operationId: exportAuditLog
+      tags: [auditlog]
+      summary: The audit log the filters find, as Excel or CSV (at most 10,000 entries)
+      x-permission: auditlog:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuditLogExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/salary-views:
+    get:
+      operationId: listSalaryViews
+      tags: [auditlog]
+      summary: Who was shown a salary, newest day first
+      description: >
+        One line per person, kind, candidate and day, with how often. A list, search or export is one line a day with the number of different candidates whose salary it showed. Lines about candidates the user may not see are left out (row-level security). No amounts.
+
+      x-permission: auditlog.salary_views:read
+      parameters:
+        - name: user
+          in: query
+          description: Only what this person (a user id, or an API key id) was shown.
+          schema: {type: string, minLength: 1, maxLength: 40}
+        - name: candidateId
+          in: query
+          description: Only this candidate's salary (lists and exports that showed it included).
+          schema: {$ref: '#/components/schemas/CandidateId'}
+        - name: kind
+          in: query
+          schema: {$ref: '#/components/schemas/SalaryViewKind'}
+        - $ref: '#/components/parameters/AuditFrom'
+        - $ref: '#/components/parameters/AuditTo'
+        - name: cursor
+          in: query
+          description: The `nextCursor` of the previous page.
+          schema: {$ref: '#/components/schemas/SalaryViewId'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SalaryViewPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/salary-views/export:
+    post:
+      operationId: exportSalaryViews
+      tags: [auditlog]
+      summary: The salary views the filters find, as Excel or CSV (at most 10,000 lines)
+      x-permission: auditlog.salary_views:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SalaryViewExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/automations:
     get:
       operationId: listAutomations
@@ -9191,6 +9320,8 @@ components:
         - aiusage:manage
         - aiusage:read
         - assistant:use
+        - auditlog.salary_views:read
+        - auditlog:read
         - automations.tasks:read
         - automations.tasks:update
         - automations:approve
@@ -9919,6 +10050,103 @@ components:
         model: {type: string, nullable: true}
         inputTokens: {type: integer, minimum: 0}
         outputTokens: {type: integer, minimum: 0}
+    AuditEntryId:
+      type: string
+      pattern: '^aud_[0-9a-hjkmnp-tv-z]{26}$'
+      example: aud_01jbz6w0m0k8q9x2r3s4t5v6w7
+    SalaryViewId:
+      type: string
+      pattern: '^sv_[0-9a-hjkmnp-tv-z]{26}$'
+      example: sv_01jbz6w0m0k8q9x2r3s4t5v6w7
+    AuditActorKind:
+      type: string
+      description: user (a person), api_key (a program using an API key) or system (what happened automatically).
+      enum: [user, api_key, system]
+    AuditEntry:
+      type: object
+      required: [id, at, actorId, actorKind, actorName, action, entityType, entityId, entityName, changes]
+      properties:
+        id: {$ref: '#/components/schemas/AuditEntryId'}
+        at: {type: string, format: date-time}
+        actorId: {type: string, description: 'A user id, an API key id, or "system".'}
+        actorKind: {$ref: '#/components/schemas/AuditActorKind'}
+        actorName:
+          type: string
+          description: 'The person''s name; "Automatic" for the system; an API key''s name, or "API key" when it cannot be found.'
+        action: {type: string, example: candidate.updated}
+        entityType: {type: string, example: candidate}
+        entityId: {type: string}
+        entityName:
+          type: string
+          nullable: true
+          description: The candidate's, job's, company's, contact's or user's name, when it can be looked up (null otherwise).
+        changes:
+          type: object
+          additionalProperties: true
+          description: 'What changed: field -> {"from", "to"}, or details of the action. Never a salary amount.'
+    AuditLogPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+        nextCursor:
+          allOf: [{$ref: '#/components/schemas/AuditEntryId'}]
+          nullable: true
+    AuditLogExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        actor: {type: string, minLength: 1, maxLength: 40}
+        action: {type: string, pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$', maxLength: 80}
+        entityType: {type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40}
+        entityId: {type: string, minLength: 1, maxLength: 60}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+    SalaryViewKind:
+      type: string
+      description: >
+        Where the salary was shown: candidate (their page), candidate_list (a list or search with salary), export (a file of candidates or placements with salary), email_fields (an email being written, filled with it), email_sent (an email sent with it), cv (a formatted CV with it made, opened, downloaded or attached), screening (a screening call's salary), offer (an offer's salary), placement (a placement's salary).
+
+      enum: [candidate, candidate_list, export, email_fields, email_sent, cv, screening, offer, placement]
+    SalaryView:
+      type: object
+      required: [id, day, userId, userName, kind, candidateId, candidateName, candidates, count, firstAt, lastAt]
+      properties:
+        id: {$ref: '#/components/schemas/SalaryViewId'}
+        day: {type: string, format: date, description: "The day, in the agency's time zone."}
+        userId: {type: string, description: Who was shown it (a user id or an API key id).}
+        userName: {type: string, description: 'Their name; an API key''s name, or "API key".'}
+        kind: {$ref: '#/components/schemas/SalaryViewKind'}
+        candidateId:
+          description: Whose salary (null for a list, search or export).
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        candidateName: {type: string, nullable: true}
+        candidates: {type: integer, description: 'How many different candidates'' salaries a list, search or export showed that day (1 for one candidate).'}
+        count: {type: integer, description: How often that day.}
+        firstAt: {type: string, format: date-time}
+        lastAt: {type: string, format: date-time}
+    SalaryViewPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SalaryView'}}
+        nextCursor:
+          allOf: [{$ref: '#/components/schemas/SalaryViewId'}]
+          nullable: true
+    SalaryViewExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        user: {type: string, minLength: 1, maxLength: 40}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        kind: {$ref: '#/components/schemas/SalaryViewKind'}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
     AutomationId:
       type: string
       pattern: '^aut_[0-9a-hjkmnp-tv-z]{26}$'
@@ -18231,6 +18459,38 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/AiProviderName'}
+    AuditActor:
+      name: actor
+      in: query
+      description: Only what this actor did - a user id, an API key id, or "system" (what happened automatically).
+      schema: {type: string, minLength: 1, maxLength: 40}
+    AuditAction:
+      name: action
+      in: query
+      description: >
+        Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...).
+
+      schema: {type: string, pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$', maxLength: 80}
+    AuditEntityType:
+      name: entityType
+      in: query
+      description: Only entries about this kind of record (candidate, job, company, contact, email...).
+      schema: {type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40}
+    AuditEntityId:
+      name: entityId
+      in: query
+      description: Only entries about this record.
+      schema: {type: string, minLength: 1, maxLength: 60}
+    AuditFrom:
+      name: from
+      in: query
+      description: From this day on (in the agency's time zone).
+      schema: {type: string, format: date}
+    AuditTo:
+      name: to
+      in: query
+      description: Up to and including this day (in the agency's time zone).
+      schema: {type: string, format: date}
     AutomationIdPath:
       name: automationId
       in: path
@@ -18419,6 +18679,16 @@ x-permissions:
     description: Ask the AI assistant about candidates, jobs and applications you may see.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  auditlog.salary_views:read:
+    module: auditlog
+    description: See who was shown a candidate's salary, and when.
+    sensitive: true
+    roles: [owner, admin]
+  auditlog:read:
+    module: auditlog
+    description: See the company's audit log (who changed what, and when).
+    sensitive: false
+    roles: [owner, admin]
   automations.tasks:read:
     module: automations
     description: See your tasks.
@@ -19280,6 +19550,8 @@ x-modules:
     description: 'One ledger of every AI use: which feature used the AI, for whom and how many tokens (input and output), kept when the record it was for is deleted. Each company sets its monthly AI limit (in tokens, or in money at its prices) and the prices per million tokens; without its own limit the server''s default (HP_AI_MONTHLY_TOKENS) applies. Costs are estimates at the current prices: the AI provider''s bill is final. A month is a calendar month in the agency''s time zone (HP_TIME_ZONE).'
   - name: assistant
     description: The AI assistant. Go gathers what the asking user may see (never contact details, never salary), queues it for the Python AI worker, which asks the AI provider; the answer comes back on the queue. Answers are shown only to the person who asked. Off until an AI provider is set up; each company has a monthly token limit.
+  - name: auditlog
+    description: 'Reads the company''s audit log (every change, who made it and when), and keeps the log of who was shown a salary: one line per person, kind, candidate and day (in the agency''s time zone, HP_TIME_ZONE), counted. A salary is counted when it is really returned to a person: a candidate''s page, a list or search with salary columns, an export, an email''s fields or an email sent with it, a formatted CV with it, a screening call''s salary, an offer or a placement. Neither log ever holds an amount, and nothing in either is deleted automatically.'
   - name: automations
     description: 'An automation is a rule: WHEN something happens (an application arrives, a candidate moves to a stage, an interview is booked, a placement starts, its guarantee ends, its invoice falls due), IF the job is at a given client (optional), THEN after some days (or before, for dates) email the candidate, the client''s hiring contact or the recruiter, or give the recruiter a task. Emails go from the recruiter''s mailbox, on their own or after a recruiter approves them (a choice per automation, with a default in Settings). Every run is logged; what happened is checked again when it is due, so a moved interview or a paid invoice sends nothing.'
   - name: bin

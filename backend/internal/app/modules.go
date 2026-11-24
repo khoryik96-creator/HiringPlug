@@ -18,6 +18,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiusage"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/auditlog"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/automations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/bin"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars"
@@ -93,6 +94,7 @@ type Modules struct {
 	InterviewPrep *interviewprep.Module
 	Notifications *notifications.Module
 	Shortlists    *shortlists.Module
+	AuditLog      *auditlog.Module
 	// scaffold:fields
 }
 
@@ -243,6 +245,8 @@ func NewModules(d Deps) *Modules {
 	}, d.Config.TimeZone)
 	m.Notifications = notifications.New(d.Pool, notificationSources{m}, m.Identity, notificationMailer{m}, notifications.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	m.Shortlists = newShortlists(d, m)
+	m.AuditLog = newAuditLog(d, m)
+	recordSalaryViews(m) // every module that shows a salary counts it there
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims, m.Shortlists)
@@ -300,6 +304,7 @@ type (
 	interviewprepHTTP = interviewprep.HTTP
 	notificationsHTTP = notifications.HTTP
 	shortlistsHTTP    = shortlists.HTTP
+	auditlogHTTP      = auditlog.HTTP
 	// scaffold:aliases
 )
 
@@ -343,6 +348,7 @@ type Server struct {
 	*interviewprepHTTP
 	*notificationsHTTP
 	*shortlistsHTTP
+	*auditlogHTTP
 	// scaffold:embeds
 }
 
@@ -387,6 +393,7 @@ func (m *Modules) Server() *Server {
 		interviewprepHTTP: m.InterviewPrep.HTTP,
 		notificationsHTTP: m.Notifications.HTTP,
 		shortlistsHTTP:    m.Shortlists.HTTP,
+		auditlogHTTP:      m.AuditLog.HTTP,
 		// scaffold:server-fields
 	}
 }

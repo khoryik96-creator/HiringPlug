@@ -1737,6 +1737,19 @@ type RoleSetting struct {
 	KnownPermissions []string
 }
 
+type SalaryView struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	Kind         string
+	CandidateID  *string
+	CandidateIds []string
+	Day          pgtype.Date
+	Count        int32
+	FirstAt      time.Time
+	LastAt       time.Time
+}
+
 type Schedule struct {
 	TenantID        string
 	UserID          string

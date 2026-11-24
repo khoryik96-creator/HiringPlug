@@ -7,6 +7,10 @@ FROM app_api_key(sqlc.arg(key_hash)::text);
 -- name: ListApiKeys :many
 SELECT * FROM api_key WHERE revoked_at IS NULL ORDER BY id DESC LIMIT 200;
 
+-- API keys' names (revoked ones too), for the audit log's "who".
+-- name: ApiKeyNames :many
+SELECT id, name FROM api_key WHERE id = ANY (@ids::text[]);
+
 -- name: InsertApiKey :one
 INSERT INTO api_key (tenant_id, name, role, key_hash, prefix, created_by)
 VALUES (app_current_tenant(), @name, @role, @key_hash, @prefix, app_current_user())

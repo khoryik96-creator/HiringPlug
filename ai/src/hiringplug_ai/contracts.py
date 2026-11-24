@@ -22,6 +22,8 @@ class Permission(StrEnum):
     aiusage_manage = "aiusage:manage"
     aiusage_read = "aiusage:read"
     assistant_use = "assistant:use"
+    auditlog_salary_views_read = "auditlog.salary_views:read"
+    auditlog_read = "auditlog:read"
     automations_tasks_read = "automations.tasks:read"
     automations_tasks_update = "automations.tasks:update"
     automations_approve = "automations:approve"
@@ -850,6 +852,84 @@ class AssistantAnsweredJob(BaseModel):
     model: Annotated[str | None, Field(...)]
     inputTokens: Annotated[int, Field(ge=0)]
     outputTokens: Annotated[int, Field(ge=0)]
+
+
+class AuditEntryId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["aud_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^aud_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class SalaryViewId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["sv_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^sv_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class AuditActorKind(StrEnum):
+    user = "user"
+    api_key = "api_key"
+    system = "system"
+
+
+class AuditEntry(BaseModel):
+    id: AuditEntryId
+    at: AwareDatetime
+    actorId: Annotated[str, Field(description='A user id, an API key id, or "system".')]
+    actorKind: AuditActorKind
+    actorName: Annotated[
+        str,
+        Field(
+            description='The person\'s name; "Automatic" for the system; an API key\'s name, or "API key" when it cannot be found.'
+        ),
+    ]
+    action: Annotated[str, Field(examples=["candidate.updated"])]
+    entityType: Annotated[str, Field(examples=["candidate"])]
+    entityId: str
+    entityName: Annotated[
+        str | None,
+        Field(
+            description="The candidate's, job's, company's, contact's or user's name, when it can be looked up (null otherwise)."
+        ),
+    ]
+    changes: Annotated[
+        dict[str, Any],
+        Field(
+            description='What changed: field -> {"from", "to"}, or details of the action. Never a salary amount.'
+        ),
+    ]
+
+
+class AuditLogPage(BaseModel):
+    items: list[AuditEntry]
+    nextCursor: Annotated[AuditEntryId | None, Field(...)]
+
+
+class AuditLogExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    actor: Annotated[str | None, Field(max_length=40, min_length=1)] = None
+    action: Annotated[str | None, Field(max_length=80, pattern="^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$")] = (
+        None
+    )
+    entityType: Annotated[str | None, Field(max_length=40, pattern="^[a-z][a-z0-9_]*$")] = None
+    entityId: Annotated[str | None, Field(max_length=60, min_length=1)] = None
+    from_: Annotated[date | None, Field(alias="from")] = None
+    to: date | None = None
+
+
+class SalaryViewKind(StrEnum):
+    candidate = "candidate"
+    candidate_list = "candidate_list"
+    export = "export"
+    email_fields = "email_fields"
+    email_sent = "email_sent"
+    cv = "cv"
+    screening = "screening"
+    offer = "offer"
+    placement = "placement"
 
 
 class AutomationId(RootModel[str]):
@@ -7273,6 +7353,44 @@ class AiProviderEntry(BaseModel):
     ]
     updatedAt: Annotated[AwareDatetime | None, Field(...)]
     check: Annotated[AiProviderCheck | None, Field(...)]
+
+
+class SalaryView(BaseModel):
+    id: SalaryViewId
+    day: Annotated[date, Field(description="The day, in the agency's time zone.")]
+    userId: Annotated[str, Field(description="Who was shown it (a user id or an API key id).")]
+    userName: Annotated[str, Field(description='Their name; an API key\'s name, or "API key".')]
+    kind: SalaryViewKind
+    candidateId: Annotated[
+        CandidateId | None, Field(description="Whose salary (null for a list, search or export).")
+    ]
+    candidateName: Annotated[str | None, Field(...)]
+    candidates: Annotated[
+        int,
+        Field(
+            description="How many different candidates' salaries a list, search or export showed that day (1 for one candidate)."
+        ),
+    ]
+    count: Annotated[int, Field(description="How often that day.")]
+    firstAt: AwareDatetime
+    lastAt: AwareDatetime
+
+
+class SalaryViewPage(BaseModel):
+    items: list[SalaryView]
+    nextCursor: Annotated[SalaryViewId | None, Field(...)]
+
+
+class SalaryViewExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    user: Annotated[str | None, Field(max_length=40, min_length=1)] = None
+    candidateId: CandidateId | None = None
+    kind: SalaryViewKind | None = None
+    from_: Annotated[date | None, Field(alias="from")] = None
+    to: date | None = None
 
 
 class Automation(BaseModel):
