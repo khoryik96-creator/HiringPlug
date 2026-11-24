@@ -106,6 +106,8 @@ describe("Settings › Audit log", () => {
     renderWithClient(<AuditLog canSeeSalaryViews={false} />);
     const row = (await screen.findByText("Changed a candidate")).closest("tr");
     expect(document.querySelector(".audit-diff")).toBeNull();
+    const toggle = screen.getByRole("button", { name: /Today/ });
+    expect(toggle.hasAttribute("aria-controls"), "closed: it points at nothing that is not there").toBe(false);
     fireEvent.click(row as HTMLElement);
     const box = await waitFor(() => {
       const found = document.querySelector<HTMLElement>(".audit-diff");
@@ -115,7 +117,9 @@ describe("Settings › Audit log", () => {
     expect(box.textContent).toContain("Notice period: 1 month → 2 months");
     expect(box.textContent).toContain("Compensation: changed (amounts are never kept here)");
     expect(box.textContent).not.toMatch(/\d{4}/);
-    expect(screen.getByRole("button", { name: /Today/ }).getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const controls = toggle.getAttribute("aria-controls") ?? "";
+    expect(document.getElementById(controls)?.contains(box)).toBe(true);
   });
 
   it("loads more with the cursor", async () => {

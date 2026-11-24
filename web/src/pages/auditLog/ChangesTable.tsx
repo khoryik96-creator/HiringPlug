@@ -45,7 +45,7 @@ export function ChangesTable({ filters }: { filters: Filters }) {
                 <Fragment key={e.id}>
                   <tr className={open.has(e.id) ? "audit-row open" : "audit-row"} onClick={() => { toggle(e.id); }}>
                     <td className="audit-when">
-                      <button type="button" className="link audit-toggle" aria-expanded={open.has(e.id)} aria-controls={`audit-diff-${e.id}`}
+                      <button type="button" className="link audit-toggle" aria-expanded={open.has(e.id)} aria-controls={open.has(e.id) ? `audit-diff-${e.id}` : undefined}
                         title={fullWhen(e.at)} onClick={(ev) => { ev.stopPropagation(); toggle(e.id); }}>
                         <span aria-hidden="true" className="audit-chevron">›</span>{whenText(e.at)}
                       </button>
