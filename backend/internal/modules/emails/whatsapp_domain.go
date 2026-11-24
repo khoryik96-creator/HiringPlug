@@ -53,6 +53,58 @@ func NormalizeWhatsAppTemplate(t WhatsAppTemplate) (WhatsAppTemplate, apperr.Fie
 	return t, errs
 }
 
+// WhatsAppField is a field a WhatsApp message may use, with its label and,
+// in a draft, the person's value ("" when it is not known).
+type WhatsAppField struct{ Key, Label, Value string }
+
+// WhatsAppFields lists the fields a WhatsApp template may use, in the order
+// they are offered, with their values from values; salary is never among
+// them.
+func WhatsAppFields(values map[string]string) []WhatsAppField {
+	values = WithoutSalary(values)
+	out := make([]WhatsAppField, 0, len(WhatsAppPlaceholders))
+	for _, key := range WhatsAppPlaceholders {
+		if slices.Contains(salaryPlaceholders, key) {
+			continue
+		}
+		out = append(out, WhatsAppField{Key: key, Label: fieldLabel(key), Value: values[key]})
+	}
+	slices.SortStableFunc(out, func(a, b WhatsAppField) int { return fieldOrder(a.Key) - fieldOrder(b.Key) })
+	return out
+}
+
+// fieldOrder is a key's place in Fields; keys not there come last.
+func fieldOrder(key string) int {
+	if i := slices.IndexFunc(Fields, func(f Field) bool { return f.Key == key }); i >= 0 {
+		return i
+	}
+	return len(Fields)
+}
+
+// fieldLabel is a field's label, or one made from its key ("interview.title"
+// is "Interview title") when it is not in Fields.
+func fieldLabel(key string) string {
+	if f, ok := fieldByKey(key); ok {
+		return f.Label
+	}
+	var words []string
+	for _, part := range strings.Split(key, ".") {
+		start := 0
+		for i, r := range part {
+			if i > 0 && r >= 'A' && r <= 'Z' {
+				words = append(words, strings.ToLower(part[start:i]))
+				start = i
+			}
+		}
+		words = append(words, strings.ToLower(part[start:]))
+	}
+	label := strings.Join(words, " ")
+	if label == "" {
+		return key
+	}
+	return strings.ToUpper(label[:1]) + label[1:]
+}
+
 // WithoutSalary drops the salary values from a draft's values, so they stay
 // in brackets.
 func WithoutSalary(values map[string]string) map[string]string {

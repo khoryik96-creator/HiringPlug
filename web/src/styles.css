@@ -1487,7 +1487,13 @@ dialog.whatsapp-dialog { width: min(34rem, calc(100% - 2rem)); max-height: calc(
 button.whatsapp-send { background: #128c4b; border-color: #128c4b; color: #fff; }
 button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .whatsapp-fields { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.whatsapp-fields .chip { border: 0; cursor: pointer; font-family: var(--mono, monospace); font-weight: 500; }
+.whatsapp-fields { align-items: center; }
+.whatsapp-fields .chip { border: 0; cursor: pointer; font-weight: 500; }
+.whatsapp-tools { gap: 0.75rem; }
+.whatsapp-pane { display: grid; gap: 0.6rem; margin-top: 0.5rem; }
+.whatsapp-pane h4 { margin: 0; }
+.whatsapp-pane .whatsapp-template { border-top: 1px solid var(--line); padding-top: 0.6rem; }
+.whatsapp-pane .whatsapp-bubble { margin-top: 0.35rem; font-size: 0.9rem; }
 .whatsapp-template h3 { margin: 0; }
 .whatsapp-bubble { white-space: pre-wrap; background: #e7f8ee; border-radius: 0.75rem 0.75rem 0.75rem 0.2rem; padding: 0.6rem 0.8rem; margin: 0.5rem 0 0; max-width: 40rem; }
 

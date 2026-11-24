@@ -14,7 +14,13 @@ func (h *HTTP) ListWhatsAppTemplates(ctx context.Context, _ api.ListWhatsAppTemp
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListWhatsAppTemplates200JSONResponse{Items: make([]api.WhatsAppTemplate, len(rows)), Placeholders: WhatsAppPlaceholders}
+	fields := WhatsAppFields(nil)
+	out := api.ListWhatsAppTemplates200JSONResponse{
+		Items: make([]api.WhatsAppTemplate, len(rows)), Placeholders: WhatsAppPlaceholders, Fields: make([]api.WhatsAppField, len(fields)),
+	}
+	for i, f := range fields {
+		out.Fields[i] = api.WhatsAppField{Key: f.Key, Label: f.Label}
+	}
 	for i, r := range rows {
 		out.Items[i] = whatsAppTemplateToAPI(r)
 	}
@@ -57,7 +63,12 @@ func (h *HTTP) DraftWhatsApp(ctx context.Context, req api.DraftWhatsAppRequestOb
 	if err != nil {
 		return nil, err
 	}
-	out := api.DraftWhatsApp200JSONResponse{Text: d.Text, Missing: d.Missing, Numbers: make([]api.WhatsAppNumber, len(d.Numbers))}
+	out := api.DraftWhatsApp200JSONResponse{
+		Text: d.Text, Missing: d.Missing, Numbers: make([]api.WhatsAppNumber, len(d.Numbers)), Fields: make([]api.WhatsAppFieldValue, len(d.Fields)),
+	}
+	for i, f := range d.Fields {
+		out.Fields[i] = api.WhatsAppFieldValue{Key: f.Key, Label: f.Label, Value: f.Value}
+	}
 	for i, n := range d.Numbers {
 		out.Numbers[i] = api.WhatsAppNumber{Label: n.Label, Number: n.Number}
 		if n.Chat != "" {

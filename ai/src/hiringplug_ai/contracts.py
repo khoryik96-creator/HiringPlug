@@ -3201,11 +3201,19 @@ class WhatsAppTemplate(BaseModel):
     updatedAt: AwareDatetime
 
 
-class WhatsAppTemplateList(BaseModel):
-    items: list[WhatsAppTemplate]
-    placeholders: Annotated[
-        list[str], Field(description="The placeholders WhatsApp templates may use (no salary fields).")
+class WhatsAppField(BaseModel):
+    key: Annotated[
+        str, Field(description='The placeholder, written {{key}} in a template, e.g. "candidate.firstName".')
     ]
+    label: Annotated[str, Field(examples=["First name"])]
+
+
+class WhatsAppFieldValue(BaseModel):
+    key: Annotated[
+        str, Field(description='The placeholder, written {{key}} in a template, e.g. "candidate.firstName".')
+    ]
+    label: Annotated[str, Field(examples=["First name"])]
+    value: Annotated[str, Field(description="The person's value; empty when it is not known.")]
 
 
 class WhatsAppTemplateInput(BaseModel):
@@ -3238,6 +3246,12 @@ class WhatsAppNumber(BaseModel):
 
 class WhatsAppDraft(BaseModel):
     text: str
+    fields: Annotated[
+        list[WhatsAppFieldValue],
+        Field(
+            description="Every field a WhatsApp template may use, with this person's value (never salary), in the order they are offered."
+        ),
+    ]
     missing: list[str]
     numbers: list[WhatsAppNumber]
 
@@ -8172,6 +8186,19 @@ class MailApps(BaseModel):
     ]
     microsoft: MailApp
     google: MailApp
+
+
+class WhatsAppTemplateList(BaseModel):
+    items: list[WhatsAppTemplate]
+    placeholders: Annotated[
+        list[str], Field(description="The placeholders WhatsApp templates may use (no salary fields).")
+    ]
+    fields: Annotated[
+        list[WhatsAppField],
+        Field(
+            description="The same placeholders with their labels, in the order they are offered (no salary fields)."
+        ),
+    ]
 
 
 class WhatsAppDraftRequest(BaseModel):

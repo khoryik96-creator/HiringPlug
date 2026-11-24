@@ -50,3 +50,23 @@ func TestWhatsAppStartersAreValid(t *testing.T) {
 		assert.Empty(t, errs, s.Name)
 	}
 }
+
+func TestWhatsAppFieldsHaveLabelsAndNoSalary(t *testing.T) {
+	fields := WhatsAppFields(map[string]string{
+		"candidate.firstName": "Siti", "job.title": "Finance Manager", "candidate.expectedSalary": "RM 12,000 per month",
+	})
+	keys := make([]string, len(fields))
+	for i, f := range fields {
+		keys[i] = f.Key
+		assert.NotEqual(t, "RM 12,000 per month", f.Value, f.Key)
+		assert.NotEmpty(t, f.Label, f.Key)
+	}
+	assert.ElementsMatch(t, WhatsAppPlaceholders, keys, "one per field a template may use")
+	assert.NotContains(t, keys, "candidate.expectedSalary")
+	assert.Equal(t, WhatsAppField{Key: "candidate.firstName", Label: "First name", Value: "Siti"}, fields[0], "in the order of Fields")
+	assert.Contains(t, fields, WhatsAppField{Key: "job.title", Label: "Job title", Value: "Finance Manager"})
+	assert.Contains(t, fields, WhatsAppField{Key: "candidate.lastName", Label: "Last name", Value: ""}, "unknown values are empty")
+
+	assert.Equal(t, "Interview title", fieldLabel("interview.title"), "a key not in Fields gets a label from its key")
+	assert.Equal(t, "Candidate work permit", fieldLabel("candidate.workPermit"))
+}

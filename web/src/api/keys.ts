@@ -53,3 +53,6 @@ export const screeningCallsKey = (candidateId: string) => ["screening-calls", ca
 export const stageTemplatesKey = ["stage-templates"] as const;
 export const jobStagesKey = (jobId: string) => ["job-stages", jobId] as const;
 export const clientShortlistsKey = (jobId: string) => ["client-shortlists", jobId] as const;
+export const whatsAppTemplatesKey = ["whatsapp-templates"] as const;
+/** WhatsApp messages filled in for one person (all of them start with this). */
+export const whatsAppDraftsKey = ["whatsapp-draft"] as const;

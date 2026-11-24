@@ -8500,6 +8500,22 @@ export interface components {
             items: components["schemas"]["WhatsAppTemplate"][];
             /** @description The placeholders WhatsApp templates may use (no salary fields). */
             placeholders: string[];
+            /** @description The same placeholders with their labels, in the order they are offered (no salary fields). */
+            fields: components["schemas"]["WhatsAppField"][];
+        };
+        WhatsAppField: {
+            /** @description The placeholder, written {{key}} in a template, e.g. "candidate.firstName". */
+            key: string;
+            /** @example First name */
+            label: string;
+        };
+        WhatsAppFieldValue: {
+            /** @description The placeholder, written {{key}} in a template, e.g. "candidate.firstName". */
+            key: string;
+            /** @example First name */
+            label: string;
+            /** @description The person's value; empty when it is not known. */
+            value: string;
         };
         WhatsAppTemplateInput: {
             name: string;
@@ -8529,6 +8545,8 @@ export interface components {
         };
         WhatsAppDraft: {
             text: string;
+            /** @description Every field a WhatsApp template may use, with this person's value (never salary), in the order they are offered. */
+            fields: components["schemas"]["WhatsAppFieldValue"][];
             missing: string[];
             numbers: components["schemas"]["WhatsAppNumber"][];
         };

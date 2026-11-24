@@ -139,6 +139,7 @@ type WhatsAppDraft struct {
 	Text    string
 	Missing []string
 	Numbers []WhatsAppNumber
+	Fields  []WhatsAppField // every field a template may use, with the person's value
 }
 
 // WhatsAppDraft fills a template (or starts blank) for a candidate or a
@@ -190,6 +191,7 @@ func (s *Service) WhatsAppDraft(ctx context.Context, p authz.Principal, r WhatsA
 			errs.Add("candidateId", "give candidateId or contactId")
 			return errs.Err()
 		}
+		out.Fields = WhatsAppFields(values)
 		if text, missing := Fill(body, WithoutSalary(values)); missing != nil {
 			out.Text, out.Missing = text, missing
 		} else {

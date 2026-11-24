@@ -1993,7 +1993,15 @@ WhatsApp templates; three to start with) filled with their name, the job
 chosen and yours. Salary fields are never filled. "Open in WhatsApp" opens the
 recruiter's own WhatsApp (app or web, a wa.me chat link) with the message
 typed in (a blank message just opens the chat, 1.41.0), and keeps it on their
-timeline as a **WhatsApp** note. Numbers saved
+timeline as a **WhatsApp** note. In the window (1.42.0): **Insert field** puts
+the person's own value (their name, the job and client chosen, your name and
+more; never salary) where the cursor is; **Save as template** saves the
+message as a template for anyone, their name, job and company (and any field
+a template filled) turned back into fields, to check and name first; and
+**Templates** adds, changes or renames, and deletes templates without leaving
+the window (adding needs permission to add templates, changing or deleting to
+manage them). In Settings › WhatsApp templates the fields go in where the
+cursor is. Numbers saved
 without a country code are read as `HP_DEFAULT_PHONE_REGION`'s. Nothing is
 sent by HiringPlug itself, so no WhatsApp Business account is needed.
 
