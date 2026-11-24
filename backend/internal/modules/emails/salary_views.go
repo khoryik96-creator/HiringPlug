@@ -3,15 +3,18 @@ package emails
 // Who was shown a salary (salaryview): an email being written whose fields
 // came back filled with a candidate's salary (a preview's field values, a
 // draft from a template), and an email sent with a salary in it, are
-// counted for the candidates whose salary it was. Automatic emails (the
-// system's) are never counted.
+// counted for the candidates whose salary it was; so is a sent email with a
+// salary read again (a candidate's or contact's emails, a copy of a
+// candidate's data). Automatic emails (the system's) are never counted.
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
@@ -109,4 +112,53 @@ func (s *Service) salarySent(ctx context.Context, tx pgx.Tx, salary bool, values
 		whose = append(whose, *valuesOf)
 	}
 	return salaryview.In(ctx, tx, s.salaryViews, salaryview.EmailSent, whose...)
+}
+
+// salaryReaders are the candidates whose salary sent emails with one may
+// show, by email: the shortlisted candidates of an email about several (a
+// salary in it may be any of theirs); only the recipient, for one to a
+// candidate about others (it never shows another candidate's salary,
+// salaryOnlyTheirOwn); otherwise the candidate it is about. The stored
+// message no longer marks whose each salary is.
+func salaryReaders(emails []store.Email, shortlisted []store.EmailCandidateIDsRow) []string {
+	listed := map[string][]string{}
+	for _, r := range shortlisted {
+		listed[r.EmailID] = append(listed[r.EmailID], r.CandidateID)
+	}
+	var out []string
+	for _, e := range emails {
+		if !e.Salary {
+			continue
+		}
+		list := listed[e.ID]
+		toCandidate := e.CandidateID != nil && len(list) > 0 && !slices.Contains(list, *e.CandidateID)
+		switch {
+		case toCandidate || len(list) == 0:
+			if e.CandidateID != nil {
+				out = append(out, *e.CandidateID)
+			}
+		default:
+			out = append(out, list...)
+		}
+	}
+	return out
+}
+
+// salaryEmailsRead counts sent emails with a salary that are read again,
+// once for the list, for each candidate whose salary they may show.
+func (s *Service) salaryEmailsRead(ctx context.Context, tx pgx.Tx, emails []store.Email) error {
+	var ids []string
+	for _, e := range emails {
+		if e.Salary {
+			ids = append(ids, e.ID)
+		}
+	}
+	if len(ids) == 0 || s.salaryViews == nil {
+		return nil
+	}
+	shortlisted, err := store.New(tx).EmailCandidateIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	return salaryview.In(ctx, tx, s.salaryViews, salaryview.EmailRead, salaryReaders(emails, shortlisted)...)
 }

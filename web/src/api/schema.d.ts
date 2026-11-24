@@ -6356,10 +6356,10 @@ export interface components {
             to?: string;
         };
         /**
-         * @description Where the salary was shown: candidate (their page), candidate_list (a list or search with salary), export (a file of candidates or placements with salary), email_fields (an email being written, filled with it), email_sent (an email sent with it), cv (a formatted CV with it made, opened, downloaded or attached), screening (a screening call's salary), offer (an offer's salary), placement (a placement's salary).
+         * @description Where the salary was shown: candidate (their page), candidate_list (a list or search with salary), export (a file of candidates or placements with salary), email_fields (an email being written, filled with it), email_sent (an email sent with it), email_read (a sent email with it, read on a candidate's or contact's emails or in a copy of their data), cv (a formatted CV with it made, opened, downloaded or attached), screening (a screening call's salary), offer (an offer's salary), placement (a placement's salary).
          * @enum {string}
          */
-        SalaryViewKind: "candidate" | "candidate_list" | "export" | "email_fields" | "email_sent" | "cv" | "screening" | "offer" | "placement";
+        SalaryViewKind: "candidate" | "candidate_list" | "export" | "email_fields" | "email_sent" | "email_read" | "cv" | "screening" | "offer" | "placement";
         SalaryView: {
             id: components["schemas"]["SalaryViewId"];
             /**

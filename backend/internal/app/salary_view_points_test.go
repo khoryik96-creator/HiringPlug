@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -155,10 +156,18 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	for _, amount := range []string{"8517", "8,517", "10913", "10,913", "6211", "6,211", "9123", "9,123", "7345", "7,345"} {
 		for name, text := range map[string]string{"salary views": string(views), "audit log": string(log), "salary views file": string(viewsFile),
 			"audit log file": string(logFile), "salary_view rows": rows} {
-			assert.False(t, strings.Contains(text, amount), "%s holds %s", name, amount)
+			assert.False(t, strings.Contains(withoutIDsAndTimes(text), amount), "%s holds %s", name, amount)
 		}
 	}
 }
+
+// withoutIDsAndTimes is text without record ids and times, whose digits
+// may happen to spell an amount ("…T04:00:00.851712Z").
+func withoutIDsAndTimes(text string) string {
+	return idsAndTimes.ReplaceAllString(text, "")
+}
+
+var idsAndTimes = regexp.MustCompile(`[a-z]+_[0-9a-hjkmnp-tv-z]{26}|\d{4}-\d{2}-\d{2}[T ][0-9:.]+(Z|[+-]\d{2}(:?\d{2})?)?`)
 
 // with is body with one more field.
 func with(body map[string]any, key string, value any) map[string]any {
@@ -340,4 +349,44 @@ func TestASalaryCVThatCannotBeOpenedIsNotCounted(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+cv.DocumentId+"/file", recruiter.Token, nil).Status)
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+cv.DocumentId+"/pdf", recruiter.Token, nil).Status)
 	assert.Equal(t, 1, a.seen(owner, recruiter.ID)["cv:"+c.Id].Count, "nothing was shown")
+}
+
+// A sent email with a salary, read again on a candidate's emails, shows the
+// salary again: counted once for the list, for the candidates whose salary
+// it may show (to a candidate: only theirs). Emails without one are not.
+func TestReadingASentEmailWithASalaryCountsIt(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.sameSalaryDay()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
+	owner, admin, rt := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin], tenant.Users[api.RoleRecruiter].Token
+	c := a.withSalary(rt, map[string]any{"firstName": "Siti", "email": "siti@example.com"})
+	bare := a.createCandidate(rt, map[string]any{"firstName": "Bare", "email": "bare@example.com"})
+	recipient := a.withSalary(rt, map[string]any{"firstName": "Ravi", "email": "ravi@example.com"})
+	send := func(body map[string]any) {
+		t.Helper()
+		body["subject"], body["timeZone"] = "Hello", "Asia/Kuala_Lumpur"
+		res := a.request(http.MethodPost, "/v1/emails", rt, body)
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	}
+	send(map[string]any{"candidateId": c.Id, "to": []string{"hr@client.example"}, "bodyHtml": "<p>Expecting [Expected salary]</p>"})
+	send(map[string]any{"candidateId": c.Id, "to": []string{"hr@client.example"}, "bodyHtml": "<p>Hello again</p>"})
+	send(map[string]any{"candidateId": bare.Id, "to": []string{"hr@client.example"}, "bodyHtml": "<p>Hello</p>"})
+	send(map[string]any{"recipientCandidateId": recipient.Id, "candidates": []map[string]any{{"candidateId": c.Id}},
+		"to": []string{"ravi@example.com"}, "bodyHtml": "<p>Your expected salary: [Expected salary]</p>"})
+	read := func(query string) {
+		t.Helper()
+		res := a.request(http.MethodGet, "/v1/emails?"+query, admin.Token, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+
+	read("candidateId=" + bare.Id)
+	assert.Empty(t, a.seen(owner, admin.ID), "no salary in those emails")
+	read("candidateId=" + c.Id) // their two emails, and the one to Ravi they are in
+	seen := a.seen(owner, admin.ID)
+	assert.Equal(t, 1, seen["email_read:"+c.Id].Count, "once for the list")
+	assert.Equal(t, 1, seen["email_read:"+recipient.Id].Count, "the email to Ravi shows only his salary")
+	read("candidateId=" + recipient.Id)
+	assert.Equal(t, 2, a.seen(owner, admin.ID)["email_read:"+recipient.Id].Count)
+	assert.Equal(t, 1, a.seen(owner, admin.ID)["email_read:"+c.Id].Count)
 }

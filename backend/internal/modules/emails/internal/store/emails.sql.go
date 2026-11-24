@@ -242,6 +242,36 @@ func (q *Queries) EmailAttachments(ctx context.Context, emailIds []string) ([]Em
 	return items, nil
 }
 
+const emailCandidateIDs = `-- name: EmailCandidateIDs :many
+SELECT email_id, candidate_id FROM email_candidate WHERE email_id = ANY ($1::text[]) ORDER BY email_id, position
+`
+
+type EmailCandidateIDsRow struct {
+	EmailID     string
+	CandidateID string
+}
+
+// The candidates each of these emails is about (several: a shortlist).
+func (q *Queries) EmailCandidateIDs(ctx context.Context, emailIds []string) ([]EmailCandidateIDsRow, error) {
+	rows, err := q.db.Query(ctx, emailCandidateIDs, emailIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailCandidateIDsRow
+	for rows.Next() {
+		var i EmailCandidateIDsRow
+		if err := rows.Scan(&i.EmailID, &i.CandidateID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const finishMailboxState = `-- name: FinishMailboxState :execrows
 DELETE FROM email_mailbox_state WHERE state_hash = $1 AND consumed
 `

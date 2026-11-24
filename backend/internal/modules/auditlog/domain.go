@@ -164,7 +164,7 @@ func InLockOrder(ids []string) []string {
 // KindLabels are the words for each salary view kind (salaryview.Kinds).
 var KindLabels = map[string]string{
 	"candidate": "Candidate page", "candidate_list": "Candidate list or search", "export": "Export",
-	"email_fields": "Email being written", "email_sent": "Email sent", "cv": "Formatted CV",
+	"email_fields": "Email being written", "email_sent": "Email sent", "email_read": "Email read", "cv": "Formatted CV",
 	"screening": "Screening call", "offer": "Offer", "placement": "Placement",
 }
 

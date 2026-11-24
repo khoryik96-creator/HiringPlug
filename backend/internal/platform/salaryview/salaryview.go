@@ -19,6 +19,7 @@ const (
 	Export        = "export"         // a file of candidates or placements with salary (one line for all)
 	EmailFields   = "email_fields"   // an email being written, its fields filled with the salary
 	EmailSent     = "email_sent"     // an email sent with the salary
+	EmailRead     = "email_read"     // a sent email with the salary, read again
 	CV            = "cv"             // a formatted CV with the salary: made, opened, downloaded or attached
 	Screening     = "screening"      // a screening call's salary
 	Offer         = "offer"          // an offer's salary
@@ -26,7 +27,7 @@ const (
 )
 
 // Kinds are every kind, in the order they are offered.
-var Kinds = []string{Candidate, CandidateList, Export, EmailFields, EmailSent, CV, Screening, Offer, Placement}
+var Kinds = []string{Candidate, CandidateList, Export, EmailFields, EmailSent, EmailRead, CV, Screening, Offer, Placement}
 
 // Grouped kinds are one line a day for many candidates; the others one line
 // per candidate.

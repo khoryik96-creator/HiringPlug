@@ -44,6 +44,7 @@ export const SALARY_KIND: Record<SalaryKind, string> = {
   export: "Exported with salary",
   email_fields: "Writing an email with salary",
   email_sent: "Sent an email with salary",
+  email_read: "Read an email with salary",
   cv: "Formatted CV with salary",
   screening: "Screening call salary",
   offer: "Offer salary",

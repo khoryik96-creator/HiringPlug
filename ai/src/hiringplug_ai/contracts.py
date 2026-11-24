@@ -909,6 +909,7 @@ class SalaryViewKind(StrEnum):
     export = "export"
     email_fields = "email_fields"
     email_sent = "email_sent"
+    email_read = "email_read"
     cv = "cv"
     screening = "screening"
     offer = "offer"

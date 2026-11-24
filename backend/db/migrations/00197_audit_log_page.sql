@@ -16,8 +16,8 @@ CREATE TABLE salary_view (
   tenant_id     text NOT NULL REFERENCES tenant (id),
   -- Who was shown it: a user (usr_...) or an API key (akey_...); never the system.
   user_id       text NOT NULL CHECK (length(user_id) BETWEEN 1 AND 40 AND user_id <> 'system'),
-  kind          text NOT NULL CHECK (kind IN ('candidate', 'candidate_list', 'export', 'email_fields', 'email_sent', 'cv',
-                  'screening', 'offer', 'placement')),
+  kind          text NOT NULL CHECK (kind IN ('candidate', 'candidate_list', 'export', 'email_fields', 'email_sent', 'email_read',
+                  'cv', 'screening', 'offer', 'placement')),
   -- Whose salary; NULL for a list, search or export (candidate_ids holds them).
   candidate_id  text CHECK (length(candidate_id) <= 40),
   candidate_ids text[] NOT NULL DEFAULT '{}',

@@ -49,6 +49,10 @@ WHERE e.candidate_id = @candidate_id
    OR e.id IN (SELECT ec.email_id FROM email_candidate ec WHERE ec.candidate_id = @candidate_id::text)
 ORDER BY e.id DESC LIMIT 200;
 
+-- The candidates each of these emails is about (several: a shortlist).
+-- name: EmailCandidateIDs :many
+SELECT email_id, candidate_id FROM email_candidate WHERE email_id = ANY (@email_ids::text[]) ORDER BY email_id, position;
+
 -- name: InsertEmailCandidate :exec
 INSERT INTO email_candidate (tenant_id, email_id, candidate_id, application_id, position)
 VALUES (app_current_tenant(), @email_id, @candidate_id, sqlc.narg(application_id), @position);

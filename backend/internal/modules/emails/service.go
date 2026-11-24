@@ -336,6 +336,9 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, cont
 		if err != nil {
 			return err
 		}
+		if err := s.salaryEmailsRead(ctx, tx, rows); err != nil {
+			return err
+		}
 		out = make([]EmailView, len(rows))
 		for i, r := range rows {
 			out[i] = EmailView{Email: r}
