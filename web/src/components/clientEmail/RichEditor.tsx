@@ -12,6 +12,7 @@ import { exec, fillTypedFields, insertHtml, insertValue, plainToHtml, restoreRan
 
 const NONE: Record<string, string> = {};
 const NO_FIELDS: Schemas["EmailField"][] = [];
+const NO_TOKENS: readonly string[] = [];
 const FONTS = ["Calibri", "Arial", "Georgia", "Times New Roman", "Verdana", "Tahoma"];
 const SIZES = ["10", "11", "12", "14", "16", "18", "24"];
 
@@ -36,6 +37,11 @@ type Props = {
    * a field without one stays as [Field] and is reported when sending.
    */
   values?: Record<string, string>;
+  /**
+   * Fields that have a value not asked for yet (a salary's: asked for, and counted as shown, only once
+   * put in). Put in as their token, they are filled when their value comes.
+   */
+  withheld?: readonly string[];
   /** Something to put in where the cursor was (a booking link); a new id puts it in. */
   inserting?: { id: number; html: string; managed?: boolean; removeIds?:string[];order?:string[] } | undefined;
   /**
@@ -47,7 +53,7 @@ type Props = {
   onFocus?: () => void;
 };
 
-export function RichEditor({ compact = false, iconTools = false, invalid = false, readOnly = false, plainPaste = false, focusAtStart = false, html, resetKey, onChange, fields: fieldOptions, banners, bannerUrls = NONE, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
+export function RichEditor({ compact = false, iconTools = false, invalid = false, readOnly = false, plainPaste = false, focusAtStart = false, html, resetKey, onChange, fields: fieldOptions, banners, bannerUrls = NONE, onUploadBanner, values, withheld = NO_TOKENS, inserting, insertElsewhere, onFocus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const extras = !compact || expanded;
   const vals = values ?? NONE;
@@ -196,13 +202,13 @@ export function RichEditor({ compact = false, iconTools = false, invalid = false
           const value = field && vals[field.token];
           if (!field || !box.current) return;
           if (insertElsewhere?.(field, value || undefined)) return;
-          if (!value) { insert(field.token); return; } // no value: the field stays, and sending says so
+          if (!value) { insert(field.token); return; } // no value (or not asked for yet: filled when it comes); sending says so
           back();
           insertValue(box.current, field.key, value);
           changed();
         }}>
           <option value="">Insert field…</option>
-          {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}{values && !values[f.token] ? " — no value" : ""}</option>)}
+          {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}{values && !values[f.token] && !withheld.includes(f.token) ? " — no value" : ""}</option>)}
         </select>}
         {banners && <span className="extra-formatting" hidden={!extras}><select aria-label="Insert banner" value="" onChange={(e) => {
           if (e.target.value) insert(`<img data-banner-id="${e.target.value}" alt="banner"><br>`);

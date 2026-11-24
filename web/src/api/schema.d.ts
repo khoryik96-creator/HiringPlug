@@ -2730,7 +2730,7 @@ export interface paths {
         put?: never;
         /**
          * Fill an email's fields for a candidate (and a job or interview), to see before sending
-         * @description Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them).
+         * @description Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them). Salary fields' values come back in `fieldValues` only with includeSalary.
          */
         post: operations["previewEmail"];
         delete?: never;
@@ -9029,6 +9029,8 @@ export interface components {
             candidates?: components["schemas"]["EmailCandidate"][];
             /** @example Asia/Kuala_Lumpur */
             timeZone: string;
+            /** @description Put the salary fields' values in `fieldValues` (for roles that may see salaries; false unless given). Ask only when they are shown or put in the message (a salary field inserted, salary details for a shortlist): each answer with a salary is counted in the log of who was shown a salary. Without it they are left out and named in `withheldFields`. The subject and message are filled either way (and counted when a salary field in them is filled). */
+            includeSalary?: boolean;
         };
         EmailBatch: {
             recipients: components["schemas"]["EmailRecipient"][];
@@ -9074,10 +9076,12 @@ export interface components {
         EmailPreview: {
             candidateVersion?: number;
             compensationVersion?: number;
-            /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
+            /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries, and only with includeSalary). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
             fieldValues: {
                 [key: string]: string;
             };
+            /** @description Salary fields that have a value but were left out of fieldValues (includeSalary was not given), by token: ask again with includeSalary to put one in. */
+            withheldFields?: string[];
             /** @description The job's hiring contact, to send to (when an application is given and its job has one). */
             clientEmail: string | null;
             subject: string;

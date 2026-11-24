@@ -64,12 +64,24 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	assert.Equal(t, 1, counted(recruiter.ID, "screening", screened.Id))
 	assert.Zero(t, counted(recruiter.ID, "screening", bare.Id))
 
-	// An email being written: the composer's field values hold the salary.
+	// An email being written: opening the composer gets the field values
+	// without the salary (it names the salary fields that have one); a
+	// salary field put in asks for them (counted), as does a preview that
+	// fills one into the message.
 	preview := map[string]any{"subject": "", "bodyHtml": "", "timeZone": "Asia/Kuala_Lumpur"}
-	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(preview, "candidateId", c.Id)), http.StatusOK)
-	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(preview, "candidateId", bare.Id)), http.StatusOK)
+	var opened api.EmailPreview
+	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(preview, "candidateId", c.Id)), http.StatusOK).JSON(&opened)
+	assert.NotContains(t, opened.FieldValues, "[Expected salary]", "the composer just opened")
+	assert.Equal(t, "Siti Aisyah", opened.FieldValues["[Full name]"])
+	assert.Contains(t, *opened.WithheldFields, "[Expected salary]")
+	assert.Zero(t, counted(recruiter.ID, "email_fields", c.Id), "nothing shown yet")
+	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(with(preview, "candidateId", c.Id), "includeSalary", true)), http.StatusOK).JSON(&opened)
+	assert.Contains(t, opened.FieldValues["[Expected salary]"], "10,913", "a salary field put in")
+	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(with(preview, "candidateId", bare.Id), "includeSalary", true)), http.StatusOK)
 	assert.Equal(t, 1, counted(recruiter.ID, "email_fields", c.Id))
-	assert.Zero(t, counted(recruiter.ID, "email_fields", bare.Id))
+	assert.Zero(t, counted(recruiter.ID, "email_fields", bare.Id), "no salary to show")
+	ok(a.request(http.MethodPost, "/v1/email-previews", rt, with(with(preview, "candidateId", c.Id), "bodyHtml", "<p>Expecting [Expected salary]</p>")), http.StatusOK)
+	assert.Equal(t, 2, counted(recruiter.ID, "email_fields", c.Id), "the preview shows it filled in")
 	// A draft from a template counts only when it comes back with the salary
 	// filled in ({{placeholders}}); [Field] tokens are left for the composer.
 	var withPay, token, plain api.EmailTemplate
@@ -81,10 +93,10 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", token.Id)), http.StatusOK).JSON(&got)
 	assert.Contains(t, got.Body, "[Expected salary]", "no salary in this draft")
 	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", plain.Id)), http.StatusOK)
-	assert.Equal(t, 1, counted(recruiter.ID, "email_fields", c.Id))
+	assert.Equal(t, 2, counted(recruiter.ID, "email_fields", c.Id))
 	ok(a.request(http.MethodPost, "/v1/email-drafts", rt, with(draft, "templateId", withPay.Id)), http.StatusOK).JSON(&got)
 	assert.Contains(t, got.Body, "10,913", "the draft shows the salary")
-	assert.Equal(t, 2, counted(recruiter.ID, "email_fields", c.Id))
+	assert.Equal(t, 3, counted(recruiter.ID, "email_fields", c.Id))
 
 	// An email sent with the salary; one without it is not counted.
 	send := map[string]any{"candidateId": c.Id, "to": []string{"hr@client.example"}, "subject": "Siti", "timeZone": "Asia/Kuala_Lumpur"}

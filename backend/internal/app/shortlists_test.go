@@ -38,6 +38,12 @@ func (a *testApp) shortlistJob(token, tenantID string, people map[string]map[str
 		c := a.createCandidate(token, map[string]any{
 			"firstName": first, "lastName": "Tan", "email": strings.ToLower(first) + "." + tenantID + "@mail.test", "phone": "+60123456789",
 		})
+		if cv["includeSalary"] == true { // a CV with a salary in it
+			res := a.request(http.MethodPut, "/v1/candidates/"+c.Id+"/compensation", token, map[string]any{
+				"expectedVersion": 0, "currentSalary": map[string]any{"amount": "8000", "currency": "MYR", "period": "month"}, "expectedSalary": nil,
+			})
+			require.Equal(a.t, http.StatusOK, res.Status, "%s", res.Body)
+		}
 		app := a.addToJob(token, out.job.Id, c.Id)
 		res := a.move(token, app, map[string]any{"stage": "submitted"})
 		require.Equal(a.t, http.StatusOK, res.Status, "%s", res.Body)

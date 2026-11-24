@@ -31,6 +31,19 @@ const reads = (emails: Schemas["Email"][]) =>
   }) as never);
 
 const preview = { subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: {} };
+const salaryFields = [
+  { token: "[First name]", key: "candidate.firstName", label: "First name", salary: false },
+  { token: "[Current salary]", key: "candidate.currentSalary", label: "Current salary", salary: true },
+  { token: "[Expected salary]", key: "candidate.expectedSalary", label: "Expected salary", salary: true },
+];
+/** A preview as the API answers it: the salary's value only when asked for, otherwise named as withheld. */
+const asServer = (body: { includeSalary?: boolean }) => body.includeSalary
+  ? { ...preview, fieldValues: { "[First name]": "Siti", "[Expected salary]": "RM 12,000 per month" }, withheldFields: [] }
+  : { ...preview, fieldValues: { "[First name]": "Siti" }, withheldFields: ["[Expected salary]"] };
+/** Whether each field-value preview asked for the salary, in order. */
+const previewsAsked = (post: { mock: { calls: unknown[][] } }) => post.mock.calls
+  .filter((c) => c[0] === "/v1/email-previews")
+  .map((c) => (c[1] as { body: { includeSalary?: boolean } }).body.includeSalary === true);
 /** The body sent to path (the composer also asks for a preview of the fields' values). */
 const bodyTo = (post: { mock: { calls: unknown[][] } }, path: string) =>
   (post.mock.calls.find((c) => c[0] === path)?.[1] as { body: unknown } | undefined)?.body;
@@ -110,23 +123,40 @@ describe("candidate emails", () => {
     expect(screen.getByRole("textbox", { name: "Message" }).innerHTML).toContain("<li>Bring your IC</li>");
   });
 
-  it("fills a template's fields with the candidate's values, salary too, in the subject and the message", async () => {
+  it("fills a template's fields with the candidate's values, salary too (asked for then), in the subject and the message", async () => {
     reads([]);
-    const fieldValues = { "[First name]": "Siti", "[Expected salary]": "RM 12,000 per month" };
-    vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-drafts"
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string, init: { body: { includeSalary?: boolean } }) => Promise.resolve(ok(path === "/v1/email-drafts"
       ? { to: ["siti@example.com"], subject: "[First name] - [Expected salary]", body: "x", bodyHtml: "<p>Hi [First name], you expect [Expected salary].</p>", missing: [] }
-      : { ...preview, fieldValues }))) as never);
+      : asServer(init.body)))) as never);
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-templates"
-      ? { items: [template("Interview invitation", "etpl_1")], placeholders: [], fields: [
-        { token: "[First name]", key: "candidate.firstName", label: "First name", salary: false },
-        { token: "[Expected salary]", key: "candidate.expectedSalary", label: "Expected salary", salary: true }] }
+      ? { items: [template("Interview invitation", "etpl_1")], placeholders: [], fields: salaryFields }
       : { items: [] }))) as never);
     renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
     await screen.findByRole("option", { name: "Interview invitation" });
+    await waitFor(() => { expect(previewsAsked(post)).toEqual([false]); }); // opening the composer does not ask for the salary
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "etpl_1" } });
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Subject").value).toBe("Siti - RM 12,000 per month"); });
     expect(screen.getByRole("textbox", { name: "Message" }).textContent.replaceAll("\u200b", "")).toBe("Hi Siti, you expect RM 12,000 per month.");
+    expect(previewsAsked(post)).toEqual([false, true]); // once, when the template put a salary field in
+  });
+
+  it("asks for the salary only when a salary field is put in, then puts its value in", async () => {
+    reads([]);
+    const post = vi.spyOn(api, "POST").mockImplementation(((_: string, init: { body: { includeSalary?: boolean } }) => Promise.resolve(ok(asServer(init.body)))) as never);
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-templates"
+      ? { items: [], placeholders: [], fields: salaryFields } : { items: [] }))) as never);
+    renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
+    // Its value is not asked for yet, so it is not "no value".
+    expect(await screen.findByRole("option", { name: "Expected salary (salary)" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Current salary (salary) — no value" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Insert field"), { target: { value: "[First name]" } });
+    expect(previewsAsked(post)).toEqual([false]);
+    fireEvent.change(screen.getByLabelText("Insert field"), { target: { value: "[Expected salary]" } });
+    await waitFor(() => { expect(screen.getByRole("textbox", { name: "Message" }).textContent).toContain("RM 12,000 per month"); });
+    expect(previewsAsked(post)).toEqual([false, true]);
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent).not.toContain("[Expected salary]");
   });
 
   it("saves the email as a new template, the candidate's details back as fields", async () => {

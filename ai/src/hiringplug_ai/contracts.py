@@ -3639,9 +3639,15 @@ class EmailPreview(BaseModel):
     fieldValues: Annotated[
         dict[str, str],
         Field(
-            description='Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate\'s record is not changed.'
+            description='Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries, and only with includeSalary). The composer puts the value in the message, where it can be edited; the candidate\'s record is not changed.'
         ),
     ]
+    withheldFields: Annotated[
+        list[str] | None,
+        Field(
+            description="Salary fields that have a value but were left out of fieldValues (includeSalary was not given), by token: ask again with includeSalary to put one in."
+        ),
+    ] = None
     clientEmail: Annotated[
         str | None,
         Field(
@@ -9789,6 +9795,12 @@ class EmailPreviewRequest(BaseModel):
         ),
     ] = None
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
+    includeSalary: Annotated[
+        bool | None,
+        Field(
+            description="Put the salary fields' values in `fieldValues` (for roles that may see salaries; false unless given). Ask only when they are shown or put in the message (a salary field inserted, salary details for a shortlist): each answer with a salary is counted in the log of who was shown a salary. Without it they are left out and named in `withheldFields`. The subject and message are filled either way (and counted when a salary field in them is filled).\n"
+        ),
+    ] = None
 
 
 class Preferences(BaseModel):

@@ -1,8 +1,9 @@
 package emails
 
-// Who was shown a salary (salaryview): an email being written whose fields
-// came back filled with a candidate's salary (a preview's field values, a
-// draft from a template), and an email sent with a salary in it, are
+// Who was shown a salary (salaryview): an email being written that came
+// back with a candidate's salary (a preview's field values when asked for
+// them, a preview or a draft from a template that fills a salary field),
+// and an email sent with a salary in it, are
 // counted for the candidates whose salary it was; so is a sent email with a
 // salary read again (a candidate's or contact's emails, a copy of a
 // candidate's data). Automatic emails (the system's) are never counted.
@@ -22,15 +23,22 @@ import (
 // auditlog module).
 func (m *Module) RecordSalaryViewsWith(r salaryview.Recorder) { m.service.salaryViews = r }
 
-// fieldValues are the values by field token, for the composer.
-func fieldValues(values map[string]string) map[string]string {
-	out := map[string]string{}
+// fieldValues are the values by field token, for the composer; a salary
+// field's only withSalary, and otherwise its token is withheld (it has a
+// value, not asked for).
+func fieldValues(values map[string]string, withSalary bool) (byToken map[string]string, withheld []string) {
+	byToken, withheld = map[string]string{}, []string{}
 	for _, f := range Fields {
-		if v, ok := values[f.Key]; ok && v != "" {
-			out[f.Token()] = v
+		v, ok := values[f.Key]
+		switch {
+		case !ok || v == "":
+		case f.Salary && !withSalary:
+			withheld = append(withheld, f.Token())
+		default:
+			byToken[f.Token()] = v
 		}
 	}
-	return out
+	return byToken, withheld
 }
 
 // tokensShowSalary: a salary field has a value among the composer's field
@@ -71,10 +79,10 @@ func whoseFields(about, recipient *string) *string {
 	return about
 }
 
-// salaryFieldsShown counts the composer's field values when they hold the
-// candidate's salary.
-func (s *Service) salaryFieldsShown(ctx context.Context, tx pgx.Tx, byToken map[string]string, candidateID *string) error {
-	if candidateID == nil || !tokensShowSalary(byToken) {
+// salaryFieldsShown counts an email being written that came back with the
+// candidate's salary (shown).
+func (s *Service) salaryFieldsShown(ctx context.Context, tx pgx.Tx, shown bool, candidateID *string) error {
+	if candidateID == nil || !shown {
 		return nil
 	}
 	return salaryview.In(ctx, tx, s.salaryViews, salaryview.EmailFields, *candidateID)

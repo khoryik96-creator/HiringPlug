@@ -111,11 +111,18 @@ func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (a
 // PreviewEmail handles POST /v1/email-previews.
 func (h *HTTP) PreviewEmail(ctx context.Context, req api.PreviewEmailRequestObject) (api.PreviewEmailResponseObject, error) {
 	b := req.Body
-	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.ContactId, shortlistFrom(b.Candidates), b.TimeZone, b.RecipientCandidateId)
+	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), PreviewRequest{
+		Subject: b.Subject, BodyHTML: b.BodyHtml, CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, InterviewID: b.InterviewId,
+		ContactID: b.ContactId, RecipientCandidateID: b.RecipientCandidateId, Candidates: shortlistFrom(b.Candidates), TimeZone: b.TimeZone,
+		IncludeSalary: deref(b.IncludeSalary),
+	})
 	if err != nil {
 		return nil, err
 	}
-	return api.PreviewEmail200JSONResponse{Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail), FieldValues: p.FieldValues, CandidateVersion: p.CandidateVersion, CompensationVersion: p.CompensationVersion}, nil
+	return api.PreviewEmail200JSONResponse{
+		Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail),
+		FieldValues: p.FieldValues, WithheldFields: &p.WithheldFields, CandidateVersion: p.CandidateVersion, CompensationVersion: p.CompensationVersion,
+	}, nil
 }
 
 // DeleteEmailTemplate handles DELETE /v1/email-templates/{templateId}.

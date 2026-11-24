@@ -12,20 +12,28 @@ function setup(recipient:"contact"|"candidate"="contact"){
   if(path==="/v1/candidates/{candidateId}/documents"){const id=init?.params?.path?.candidateId ?? "";return Promise.resolve(ok({items:[{id:`doc_${id}`,fileName:`${id}.docx`,source:"formatted",createdAt:"2026-11-01T10:00:00Z",pdfStatus:"ready"}]}));}
   return Promise.resolve(ok({items:[]}));
  }) as never);
- const post=vi.spyOn(api,"POST").mockImplementation(((path:string,init:{body:{candidateId?:string}})=>{
-  if(path==="/v1/email-previews"){const id=init.body.candidateId;return Promise.resolve(ok({subject:"",bodyHtml:"",missing:[],salary:!!id,clientEmail:null,candidateVersion:3,compensationVersion:id==="cand_one"?4:5,fieldValues:id?{"[Full name]":id==="cand_one"?"First Person":"Second Person","[Current salary]":id==="cand_one"?"RM 10,000":"RM 20,000","[Expected salary]":id==="cand_one"?"RM 12,000":"RM 24,000"}:{}}));}
+ // As the API answers: salary values only when asked for (includeSalary), otherwise named as withheld.
+ const post=vi.spyOn(api,"POST").mockImplementation(((path:string,init:{body:{candidateId?:string;includeSalary?:boolean}})=>{
+  if(path==="/v1/email-previews"){const id=init.body.candidateId;const salary:Record<string,string>=id?{"[Current salary]":id==="cand_one"?"RM 10,000":"RM 20,000","[Expected salary]":id==="cand_one"?"RM 12,000":"RM 24,000"}:{};
+   return Promise.resolve(ok({subject:"",bodyHtml:"",missing:[],salary:!!id,clientEmail:null,candidateVersion:3,compensationVersion:id==="cand_one"?4:5,
+    fieldValues:id?{"[Full name]":id==="cand_one"?"First Person":"Second Person",...(init.body.includeSalary?salary:{})}:{},withheldFields:init.body.includeSalary?[]:Object.keys(salary)}));}
   return Promise.resolve(ok({id:"eml_sent"}));
  }) as never);
  renderWithClient(<EmailComposer {...(recipient==="contact"?{contactId:"contact_client"}:{candidateId:"cand_recipient"})} defaultTo="client@example.test" permissions={permissions} canManageTemplates={false} onDone={vi.fn()}/>);
  fireEvent.click(screen.getByText("Candidates and CVs (0)"));
  return post;
 }
+/** The candidates whose field values were asked for with their salary, in order. */
+const salaryAskedFor=(post:{mock:{calls:unknown[][]}})=>post.mock.calls.filter((c)=>c[0]==="/v1/email-previews" && (c[1] as {body:{includeSalary?:boolean}}).body.includeSalary).map((c)=>(c[1] as {body:{candidateId?:string}}).body.candidateId);
 async function add(){fireEvent.change(screen.getByLabelText("Add candidates"),{target:{value:"Person"}});fireEvent.click(await screen.findByRole("button",{name:"First Person · Analyst"}));fireEvent.change(screen.getByLabelText("Add candidates"),{target:{value:"Person"}});fireEvent.click(await screen.findByRole("button",{name:"Second Person · Engineer"}));await waitFor(()=>{expect(screen.getByRole<HTMLButtonElement>("button",{name:"Insert candidates into the message"}).disabled).toBe(false);});}
 it("puts multiple candidates with their own salary versions and chosen CVs into a contact email",async()=>{
  const post=setup();await add();fireEvent.change(screen.getByLabelText("Profile to attach for Second Person"),{target:{value:"doc_cand_two:file"}});
  const editor=screen.getByRole("textbox",{name:"Message"});editor.innerHTML="<p>Intro to keep.</p>";fireEvent.input(editor);
+ expect(salaryAskedFor(post)).toEqual([]); // choosing candidates does not read their salaries
+ expect(screen.getByText(/Not on record/).textContent).not.toMatch(/salary/i); // a salary not read yet is still on record
  fireEvent.click(screen.getByRole("button",{name:"Insert candidates into the message"}));
  await waitFor(()=>{expect(editor.textContent).toContain("RM 12,000");});expect(editor.textContent).toContain("RM 24,000");
+ expect(salaryAskedFor(post)).toEqual(["cand_one","cand_two"]); // read when put in: counted as shown
  fireEvent.change(screen.getByLabelText("Subject"),{target:{value:"Candidate profiles"}});fireEvent.click(screen.getByRole("button",{name:"Send"}));
  await waitFor(()=>{expect(post.mock.calls.some((c)=>(c as unknown[])[0]==="/v1/emails")).toBe(true);});const index=post.mock.calls.findIndex((c)=>(c as unknown[])[0]==="/v1/emails");
  expect(sentBody(post,index)).toMatchObject({contactId:"contact_client",candidates:[{candidateId:"cand_one",candidateVersion:3,compensationVersion:4},{candidateId:"cand_two",candidateVersion:3,compensationVersion:5}],cvs:[{documentId:"doc_cand_one",asPdf:true},{documentId:"doc_cand_two",asPdf:false}]});
@@ -40,11 +48,12 @@ it("updates one managed section and removes deselected candidate details without
  fireEvent.click(screen.getByRole("button",{name:"Insert candidates into the message"}));await waitFor(()=>{expect(editor.textContent).toContain("First Person");});expect(editor.textContent).not.toContain("Second Person");
 });
 it("never offers other candidates' salary in an email to a candidate",async()=>{
- setup("candidate");await add();
+ const post=setup("candidate");await add();
  expect(screen.queryByRole("checkbox",{name:"Expected salary"})).toBeNull();
  expect(screen.getByText(/Salary details are left out: this email goes to a candidate/)).toBeTruthy();
  const editor=screen.getByRole("textbox",{name:"Message"});
  fireEvent.click(screen.getByRole("button",{name:"Insert candidates into the message"}));
  await waitFor(()=>{expect(editor.textContent).toContain("Second Person");});
  expect(editor.textContent).not.toContain("RM 24,000");
+ expect(salaryAskedFor(post)).toEqual([]); // nor read
 });

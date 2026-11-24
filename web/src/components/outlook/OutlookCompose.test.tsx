@@ -39,9 +39,11 @@ function serve(sig = signature) {
       : path === "/v1/email-templates" ? ok({ items: [template], fields })
         : ok({ items: [] }),
   ));
-  return vi.spyOn(api, "POST").mockImplementation((path) => Promise.resolve(
+  // As the API answers: the salary's value only when asked for, otherwise named as withheld.
+  return vi.spyOn(api, "POST").mockImplementation((path, init?: { body?: { includeSalary?: boolean } }) => Promise.resolve(
     path === "/v1/email-previews" ? ok({ subject: "", bodyHtml: "", missing: [], salary: false,
-      fieldValues: { "[Full name]": "Safwat Ahmad", "[Expected salary]": "RM 6,700 / month" } })
+      fieldValues: { "[Full name]": "Safwat Ahmad", ...(init?.body?.includeSalary ? { "[Expected salary]": "RM 6,700 / month" } : {}) },
+      withheldFields: init?.body?.includeSalary ? [] : ["[Expected salary]"] })
       : ok({ ...template, id: "etp_new", name: "Shortlist follow-up" }),
   ));
 }
@@ -62,11 +64,13 @@ describe("HiringPlug tools in the Outlook editor", () => {
       permissions={["candidates:read", "candidates.compensation:read", "emails.templates:create"]} />);
     await waitFor(() => { expect(bodiesTo(post, "/v1/email-previews")).not.toHaveLength(0); });
     expect(bodiesTo(post, "/v1/email-previews")[0]).toMatchObject({ candidateId: "cand_safwat" });
+    expect(bodiesTo(post, "/v1/email-previews")[0]).not.toHaveProperty("includeSalary"); // not read until a salary field is in
     const tools = screen.getByRole("group", { name: "HiringPlug tools" });
     fireEvent.change(await within(tools).findByLabelText("Template"), { target: { value: "etp_profiles" } });
     fireEvent.click(within(tools).getByRole("button", { name: "Use template" }));
     const message = screen.getByRole("textbox", { name: "Message" });
     await waitFor(() => { expect(message.textContent).toContain("RM 6,700 / month"); });
+    expect(bodiesTo(post, "/v1/email-previews").filter((b) => b.includeSalary === true)).toHaveLength(1); // the template's salary field asked for it
     expect(message.textContent).toContain("Safwat Ahmad");
     expect(screen.getByLabelText<HTMLInputElement>("Subject").value).toBe("Profiles for [Job title]");
     expect(screen.getByRole("combobox", { name: "Insert field" })).toBeTruthy();

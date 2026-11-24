@@ -15,6 +15,7 @@ import { RichEditor } from "./clientEmail/RichEditor";
 import { SaveAsTemplate } from "./clientEmail/SaveAsTemplate";
 import { atCursor, editorText as textOf, fillTokens, plainToHtml, showBanners, withoutCaretMarks } from "./clientEmail/richText";
 import { useBanners } from "./clientEmail/useBanners";
+import { useFieldValues } from "./clientEmail/useFieldValues";
 import { ErrorMessage } from "./ErrorMessage";
 import { emailFieldErrors } from "./clientEmail/emailFieldErrors";
 import { SaveError } from "./SaveError";
@@ -77,18 +78,18 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
   const [booking, setBooking] = useState(false);
   const { banners, urls, upload: uploadBanner } = useBanners();
   useEffect(()=>{showBanners(previewBox.current,urls);},[preview,urls]);
-  // The candidate's value for each field, so a field picked from the toolbar goes in as its value.
-  const context = useQuery({
-    queryKey: ["email-context", candidateId ?? "", contactId ?? "", about, interviewId ?? ""],
-    queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: "", bodyHtml: "", ...who, applicationId: about || undefined, interviewId, timeZone: timeZone() },
-    })),
+  // The candidate's value for each field, so a field picked from the toolbar goes in as its value
+  // (salary fields' once one is in the message or subject: asked for then, and counted as shown).
+  const context = useFieldValues({
+    key: ["email-context", candidateId ?? "", contactId ?? "", about, interviewId ?? ""],
+    body: { subject: "", bodyHtml: "", ...who, applicationId: about || undefined, interviewId, timeZone: timeZone() },
+    html, subject: form.subject,
   });
   // A booking link to put in where the cursor was in the message (at its end when it had none).
   // "Insert field" puts a field where the cursor last was: the subject or the message.
   const subjectBox = useRef<HTMLInputElement>(null);
   const inSubject = useRef(false);
-  const values = context.data?.fieldValues;
+  const values = context.values;
   const fields = templates.data?.fields ?? [];
   // A template's fields in the subject show the candidate's values (the message's are filled by the editor).
   const subject = values ? fillTokens(form.subject, fields, values) : form.subject;
@@ -184,7 +185,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
         <span>Message</span>
         <RichEditor compact iconTools={iconTools} invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0 || (tried && !textOf(html))} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
-          values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
+          values={values} withheld={context.withheld} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f, value) => {
             if (!inSubject.current) return false;
             setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, subject, value ?? f.token) }));

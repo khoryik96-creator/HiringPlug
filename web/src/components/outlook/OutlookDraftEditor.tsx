@@ -88,7 +88,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   const [editorReset, setEditorReset] = useState(0);
   const [candidate, setCandidate] = useState<{ id: string; name: string } | null>(null);
   const [aboutPage, setAboutPage] = useState(about);
-  const tools = useComposeData(candidate ? { candidateId: candidate.id } : aboutPage);
+  const tools = useComposeData(candidate ? { candidateId: candidate.id } : aboutPage, form);
   // The page's candidate is ready to have their details put in (their name shows once read).
   const packages = useCandidatePackages(about.candidateId ? [{ candidateId: about.candidateId, name: "This candidate" }] : []);
   /** Puts new content in the message (a template, the signature), and shows it. */
@@ -240,7 +240,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
             <span>Message</span>
             <RichEditor compact iconTools plainPaste focusAtStart={focusMessage || fresh} readOnly={locked || action.isPending} html={form.html} resetKey={editorReset}
               invalid={!!(errorFor("bodyHtml") ?? errorFor("body"))} onChange={(html) => { update("html", html); }}
-              fields={tools.fields} values={tools.values} banners={tools.banners} bannerUrls={tools.bannerUrls} inserting={packages.inserting}
+              fields={tools.fields} values={tools.values} withheld={tools.withheld} banners={tools.banners} bannerUrls={tools.bannerUrls} inserting={packages.inserting}
               onUploadBanner={permissions.includes("emails.templates:manage") ? (file) => { tools.uploadBanner.mutate(file); } : undefined} />
           </div>}
       </fieldset>

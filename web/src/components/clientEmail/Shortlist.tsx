@@ -1,14 +1,16 @@
 // The candidates an email to the client is about: each one's profile to
 // attach, their order, more from the job, and their details put in the
 // message as a block each or as a table.
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { loadApplications } from "../../api/applications";
 import { jobApplicationsKey } from "../../api/keys";
 import { EmailCandidateSearch } from "./EmailCandidateSearch";
+import { salaryValues } from "./useFieldValues";
 import { STAGE } from "../../labels";
+import { ErrorMessage } from "../ErrorMessage";
 import { blocksHtml, choiceKey, type CvChoice, DEFAULT_DETAILS, DETAILS, type Layout, missingDetails, type Person, type Profile, profilesOf, tableHtml } from "./shortlistHtml";
 
 /** A candidate on the email; profile undefined: their newest profile (none if they have none). */
@@ -26,8 +28,12 @@ export type Shortlisted = {
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/** Each candidate's profiles and values (as the sender may see them), and the CVs chosen. */
+/**
+ * Each candidate's profiles and values (as the sender may see them; their salary only when salary details
+ * are put in: withSalary), and the CVs chosen.
+ */
 export function useShortlist(people: Shortlisted[], canSeeCvs: boolean) {
+  const queryClient = useQueryClient();
   const docs = useQueries({
     queries: people.map((p) => ({
       queryKey: ["documents", p.candidateId],
@@ -50,21 +56,38 @@ export function useShortlist(people: Shortlisted[], canSeeCvs: boolean) {
     return chosen === undefined ? profiles[i]?.[0]?.choice ?? null : chosen;
   };
   const cvs = people.map((_, i) => profileOf(i)).filter((c): c is CvChoice => c !== null);
-  const personAt = (i: number): Person => ({
+  const personAt = (i: number, read = values[i]?.data): Person => ({
     id: people[i]?.candidateId,
-    name: values[i]?.data?.fieldValues["[Full name]"] ?? people[i]?.name ?? "",
-    values: values[i]?.data?.fieldValues ?? {},
+    name: read?.fieldValues["[Full name]"] ?? people[i]?.name ?? "",
+    values: read?.fieldValues ?? {},
   });
+  /** As personAt, a salary field with a value not asked for yet counted as there (what is not on record). */
+  const knownAt = (i: number): Person => {
+    const p = personAt(i);
+    const withheld = values[i]?.data?.withheldFields ?? [];
+    return { ...p, values: { ...Object.fromEntries(withheld.map((t) => [t, t])), ...p.values } };
+  };
+  /**
+   * Everyone's values with their salary's, asked for now (each counted as shown): salary details to put
+   * in. The reads are kept for the versions their details were read at.
+   */
+  const withSalary = async (): Promise<{ people: Person[]; reads: Schemas["EmailPreview"][] }> => {
+    const reads = await Promise.all(people.map((p) => queryClient.query({
+      queryKey: ["email-context", p.applicationId ?? p.candidateId, "salary"], staleTime: 0,
+      queryFn: () => salaryValues({ subject: "", bodyHtml: "", candidateId: p.candidateId, applicationId: p.applicationId, timeZone: timeZone() }),
+    })));
+    return { people: reads.map((r, i) => personAt(i, r)), reads };
+  };
   // A candidate sent with "No attachment" needs no documents.
   const wantsDocs = (i: number) => people[i]?.profile !== null;
   const loading = values.some((v) => v.isPending) || (canSeeCvs && docs.some((d, i) => wantsDocs(i) && d.isPending));
-  /** The people with the versions their details were read at (salary's only when shown). */
-  const snapshot = (includeSalary: boolean): Shortlisted[] => people.map((p, i) => {
-    const read = values[i]?.data;
+  /** The people with the versions their details were read at (salary's only when shown: salaryReads). */
+  const snapshot = (salaryReads?: Schemas["EmailPreview"][]): Shortlisted[] => people.map((p, i) => {
+    const read = salaryReads?.[i] ?? values[i]?.data;
     return {
       ...p,
       ...(read?.candidateVersion !== undefined ? { candidateVersion: read.candidateVersion } : {}),
-      compensationVersion: includeSalary ? read?.compensationVersion : undefined,
+      compensationVersion: salaryReads ? read?.compensationVersion : undefined,
     };
   });
   const refresh = () => Promise.all([
@@ -72,7 +95,7 @@ export function useShortlist(people: Shortlisted[], canSeeCvs: boolean) {
     ...(canSeeCvs ? docs.map((q) => q.refetch()) : []),
   ]);
   const error = values.find((v) => v.error)?.error ?? docs.find((d, i) => wantsDocs(i) && d.error)?.error;
-  return { profiles, profileOf, cvs, personAt, loading, snapshot, refresh, error };
+  return { profiles, profileOf, cvs, personAt, knownAt, withSalary, loading, snapshot, refresh, error };
 }
 
 const read = <T,>(key: string, fallback: T): T => {
@@ -113,7 +136,23 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
   const available = DETAILS.filter((d) => !d.salary || canSeeSalary);
   const chosen = available.filter((d) => details.includes(d.id));
   const shown = people.map((_, i) => list.personAt(i));
-  const gaps = list.loading ? [] : missingDetails(shown, chosen);
+  const gaps = list.loading ? [] : missingDetails(people.map((_, i) => list.knownAt(i)), chosen);
+  // Salary details are read when they are put in (counted as shown), not before.
+  const [putting, setPutting] = useState(false);
+  const [putError, setPutError] = useState<unknown>(null);
+  const put = async () => {
+    setPutting(true);
+    setPutError(null);
+    try {
+      const salary = chosen.some((d) => d.salary) ? await list.withSalary() : null;
+      const who = salary?.people ?? shown;
+      onInsert(layout === "blocks" ? blocksHtml(who, chosen) : tableHtml(who, chosen), list.snapshot(salary?.reads));
+    } catch (e) {
+      setPutError(e);
+    } finally {
+      setPutting(false);
+    }
+  };
   const move = (i: number, by: number) => {
     const next = [...people];
     const [p] = next.splice(i, 1);
@@ -186,11 +225,8 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
         <button
           type="button"
           aria-label="Insert candidates into the message"
-          disabled={list.loading || !!list.error || people.length === 0}
-          onClick={() => {
-            const html = layout === "blocks" ? blocksHtml(shown, chosen) : tableHtml(shown, chosen);
-            onInsert(html, list.snapshot(chosen.some((d) => d.salary)));
-          }}
+          disabled={list.loading || !!list.error || people.length === 0 || putting}
+          onClick={() => { void put(); }}
         >
           Insert
         </button>
@@ -202,6 +238,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
         </button>
       )}
       {gaps.length > 0 && <p className="warning small">Not on record (shown as —): {gaps.join("; ")}.</p>}
+      <ErrorMessage error={putError} />
     </fieldset>
   );
 }

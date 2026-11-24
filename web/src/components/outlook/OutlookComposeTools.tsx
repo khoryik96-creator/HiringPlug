@@ -10,6 +10,7 @@ import { emailTemplatesKey } from "../../api/keys";
 import { ErrorMessage } from "../ErrorMessage";
 import { plainToHtml, valuesToTokens } from "../clientEmail/richText";
 import { useBanners } from "../clientEmail/useBanners";
+import { useFieldValues } from "../clientEmail/useFieldValues";
 import { atStart, ownPart } from "./outlookSignature";
 
 export const emailSignatureKey = ["email-signature"] as const;
@@ -17,19 +18,21 @@ const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export type ComposeContext = { candidateId?: string; contactId?: string };
 
-/** What the editor needs: templates' fields, the chosen candidate's values, banners, the signature. */
-export function useComposeData(about: ComposeContext) {
+/**
+ * What the editor needs: templates' fields, the chosen candidate's values (salary fields' once one is in
+ * the message or subject: asked for then, and counted as shown), banners, the signature.
+ */
+export function useComposeData(about: ComposeContext, message: { html: string; subject: string }) {
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const banners = useBanners();
   const signature = useQuery({ queryKey: emailSignatureKey, queryFn: async () => unwrap(await api.GET("/v1/email-signature")) });
-  const context = useQuery({
-    queryKey: ["email-context", "outlook", about.candidateId ?? "", about.contactId ?? ""],
-    queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: "", bodyHtml: "", timeZone: timeZone(), ...(about.candidateId ? { candidateId: about.candidateId } : {}), ...(about.contactId ? { contactId: about.contactId } : {}) },
-    })),
+  const context = useFieldValues({
+    key: ["email-context", "outlook", about.candidateId ?? "", about.contactId ?? ""],
+    body: { subject: "", bodyHtml: "", timeZone: timeZone(), ...(about.candidateId ? { candidateId: about.candidateId } : {}), ...(about.contactId ? { contactId: about.contactId } : {}) },
+    html: message.html, subject: message.subject,
   });
   return {
-    templates: templates.data?.items ?? [], fields: templates.data?.fields ?? [], values: context.data?.fieldValues,
+    templates: templates.data?.items ?? [], fields: templates.data?.fields ?? [], values: context.values, withheld: context.withheld,
     banners: banners.banners, bannerUrls: banners.urls, uploadBanner: banners.upload,
     signature: signature.data?.bodyHtml ?? "", signatureLoaded: signature.isSuccess, error: templates.error ?? context.error ?? banners.upload.error,
   };
