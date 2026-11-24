@@ -1,6 +1,6 @@
 // Package salaryview names the moments a candidate's salary is shown to a
 // person, for the log of who was shown a salary (the auditlog module keeps
-// it). A module calls Record where salary really leaves the server for a
+// it). A module calls In where salary really leaves the server for a
 // person: in a response they see, a file they download or an email they
 // send. The recorder is passed in from internal/app (modules do not import
 // each other); it never stores an amount, and never counts the system.
@@ -10,9 +10,6 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 // Kinds: where a salary was shown.
@@ -49,18 +46,4 @@ func In(ctx context.Context, tx pgx.Tx, r Recorder, kind string, candidateIDs ..
 		return nil
 	}
 	return r.SalarySeen(ctx, tx, kind, candidateIDs...)
-}
-
-// Record counts a showing to p in a transaction of its own (after the read,
-// before the response: if it cannot be counted, nothing is shown). Nothing
-// for the system, without a recorder or without a candidate.
-func Record(ctx context.Context, pool interface {
-	Begin(context.Context) (pgx.Tx, error)
-}, p authz.Principal, r Recorder, kind string, candidateIDs ...string) error {
-	if r == nil || len(candidateIDs) == 0 || p.UserID == "" || p.UserID == authz.SystemUserID {
-		return nil
-	}
-	return database.InTx(ctx, pool, p, func(tx pgx.Tx) error {
-		return r.SalarySeen(ctx, tx, kind, candidateIDs...)
-	})
 }
