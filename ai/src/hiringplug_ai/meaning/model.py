@@ -9,14 +9,17 @@ matters when it first reads every CV on an ordinary computer.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
-import onnxruntime as ort  # type: ignore[import-untyped]
-from tokenizers import Tokenizer
+
+from .folder import default_folder
+
+log = logging.getLogger(__name__)
 
 # The reading rules' version (recruiter.py, families.py, passages.py): raise it
 # when they change, and every candidate is read again with the new rules.
@@ -29,20 +32,15 @@ MAX_TOKENS = 256  # the model's own limit; longer texts are cut
 BATCH = 32
 
 
-def default_folder(env: dict[str, str] | None = None) -> Path:
-    """HP_AI_MEANING_MODEL_DIR, else ai/.models/all-MiniLM-L6-v2 in a checkout
-    (where `task setup` puts it)."""
-    env = dict(os.environ) if env is None else env
-    chosen = env.get("HP_AI_MEANING_MODEL_DIR", "").strip()
-    if chosen:
-        return Path(chosen)
-    return Path(__file__).resolve().parents[3] / ".models" / "all-MiniLM-L6-v2"
-
-
 class MeaningModel:
     """Thread-safe: the worker's slots share one."""
 
     def __init__(self, folder: Path) -> None:
+        # Loaded here, not when the module is imported: a worker on a computer
+        # the ONNX runtime does not support still runs, without this search.
+        import onnxruntime as ort  # type: ignore[import-untyped]  # noqa: PLC0415
+        from tokenizers import Tokenizer  # noqa: PLC0415
+
         self._tokenizer = Tokenizer.from_file(str(folder / "tokenizer.json"))
         self._tokenizer.enable_truncation(MAX_TOKENS)
         self._tokenizer.enable_padding()
@@ -101,7 +99,11 @@ def load(folder: Path | None = None) -> MeaningModel | None:
         if folder not in _loaded:
             if not installed(folder):
                 return None
-            _loaded[folder] = MeaningModel(folder)
+            try:
+                _loaded[folder] = MeaningModel(folder)
+            except ImportError as e:
+                log.warning("search by meaning is off: the ONNX runtime cannot be loaded here (%s)", e)
+                return None
         return _loaded[folder]
 
 

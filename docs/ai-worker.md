@@ -360,11 +360,10 @@ decide.
 
 Scores are asked for automatically too (on joining a job, on a new CV), and
 marked outdated when the job's text changes (`job_match.job_hash`). Possible
-candidates for a job come from a PostgreSQL full-text search of CVs
-(`cv_search`, kept by a trigger), not from the model.
-
-**Next:** embeddings (PostgreSQL with pgvector) to find possible candidates by
-meaning; the model then explains the top ones the same way.
+candidates for a job are found by meaning (below; `matching/suggest_meaning.go`
+reads the job's title and the needs its description lists, without salary),
+with the job's distinctive words in CVs (`cv_search`, kept by a trigger)
+counted too; the model then explains the ones a recruiter scores.
 
 ## AI assistant (built)
 
@@ -399,6 +398,15 @@ by revision and checked by SHA-256; `python -m hiringplug_ai.meaning.fetch`
 downloads it, `task setup` and the AI image do so) runs in the worker: no AI
 provider, nothing sent away. It has its own slot (`job_claim_kinds`), so
 searches are read in a moment even while CVs are being read; searches first.
+The other slots never take its jobs (`job_claim_except_kinds`), so reading a
+whole company in the background never holds up CV reading or AI jobs. The
+model uses at most half the cores (up to 4), without spinning while idle, and
+reads texts in batches of about the same length.
+
+The ONNX runtime is loaded only when the model is: reading the settings or
+fetching the model does not load it. It has packages for Linux, Windows and
+Apple-silicon Macs (macOS 14 or later); on an Intel Mac the worker installs
+and runs without it, and search by meaning is off there (the app says so).
 
 Before the model reads anything, `meaning/recruiter.py` reads it as a
 recruiter would (rules tested in `tests/test_meaning_recruiter.py`):

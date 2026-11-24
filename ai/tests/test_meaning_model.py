@@ -5,6 +5,8 @@ batched, and comes back in the order asked for."""
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -36,3 +38,22 @@ def test_texts_come_back_in_the_order_asked_whatever_their_length(model: meaning
         alone = model.embed([text])[0]
         assert np.allclose(together[i], alone, atol=1e-4), text[:20]
     assert np.allclose(together[0], together[5]), "the same text, the same reading"
+
+
+def test_reading_the_settings_or_fetching_the_model_never_loads_the_onnx_runtime() -> None:
+    import subprocess  # noqa: PLC0415
+
+    code = (
+        "import sys, hiringplug_ai.config, hiringplug_ai.meaning.fetch; print('onnxruntime' in sys.modules)"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)  # noqa: S603
+    assert out.stdout.strip() == "False"
+
+
+def test_without_the_onnx_runtime_search_by_meaning_is_off_not_the_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "model.onnx").write_bytes(b"x")
+    (tmp_path / "tokenizer.json").write_text("{}")
+    monkeypatch.setitem(sys.modules, "onnxruntime", None)  # importing it raises ImportError
+    assert meaning_model.load(tmp_path) is None

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import httpx
 
-from .model import default_folder
+from .folder import default_folder
 
 REPO = "sentence-transformers/all-MiniLM-L6-v2"
 REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
