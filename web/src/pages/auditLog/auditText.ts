@@ -12,7 +12,7 @@ export type AuditEntry = Schemas["AuditEntry"];
 /** Record kinds with a nicer name than their id ("job_ad" -> "job ad" needs none). */
 const NOUN: Record<string, string> = {
   user: "team member", tenant: "company", job_order: "job", application: "candidate on a job", jd_file: "job description",
-  assistant: "AI assistant", aiprovider: "AI provider", ai_usage: "AI usage", cv: "formatted CV", jd: "job description",
+  auditlog: "audit log", assistant: "AI assistant", aiprovider: "AI provider", ai_usage: "AI usage", cv: "formatted CV", jd: "job description",
 };
 
 /** Past-tense verbs in action names, in plain words. */

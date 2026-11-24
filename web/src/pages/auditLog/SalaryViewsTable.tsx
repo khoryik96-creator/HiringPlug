@@ -35,8 +35,8 @@ export function SalaryViewsTable({ filters }: { filters: Filters }) {
         </p>
       )}
       {rows.length > 0 && (
-        <div className="table-scroll">
-          <table className="audit-table" aria-label="Salary views">
+        <div className="table-scroll audit-scroll">
+          <table className="audit-table audit-salary" aria-label="Salary views">
             <thead><tr><th>When</th><th>Who</th><th>Saw</th><th>Candidate</th><th className="num">Times that day</th></tr></thead>
             <tbody>
               {rows.map((v) => (
@@ -44,10 +44,12 @@ export function SalaryViewsTable({ filters }: { filters: Filters }) {
                   <td className="audit-when" title={v.count > 1 ? `First ${fullWhen(v.firstAt)}, last ${fullWhen(v.lastAt)}` : fullWhen(v.lastAt)}>
                     {dayText(v.day)} {timeText(v.lastAt)}
                   </td>
-                  <td>{v.userName}</td>
-                  <td>{SALARY_KIND[v.kind]}</td>
-                  <td><Candidate view={v} /></td>
-                  <td className="num">{v.count.toLocaleString("en")}</td>
+                  <td className="audit-who">{v.userName}</td>
+                  <td className="audit-what">{SALARY_KIND[v.kind]}</td>
+                  <td className="audit-record"><Candidate view={v} /></td>
+                  <td className="num audit-count">
+                    {v.count.toLocaleString("en")}<span className="audit-phone-only"> {v.count === 1 ? "time" : "times"}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>

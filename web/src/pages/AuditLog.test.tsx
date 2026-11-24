@@ -142,9 +142,9 @@ describe("Settings › Audit log", () => {
     const table = await screen.findByRole("table", { name: "Salary views" });
     const rows = within(table).getAllByRole("row").slice(1).map((r) => [...r.querySelectorAll("td")].slice(1).map((td) => td.textContent));
     expect(rows).toEqual([
-      ["Aina Rahman", "Opened the candidate", "Daniel Lim", "3"],
-      ["Priya Nair", "Exported with salary", "212 candidates", "1"],
-      ["Aina Rahman", "Candidate list with salary", "1 candidate", "6"],
+      ["Aina Rahman", "Opened the candidate", "Daniel Lim", "3 times"], // "times" shows only on a phone, where the heading is hidden
+      ["Priya Nair", "Exported with salary", "212 candidates", "1 time"],
+      ["Aina Rahman", "Candidate list with salary", "1 candidate", "6 times"],
     ]);
     expect(within(table).getAllByRole("row")[3]?.textContent).toMatch(/^Yesterday/);
     expect(within(table).getByRole("link", { name: "Daniel Lim" }).getAttribute("href")).toBe("#/candidates/cand_01daniel");

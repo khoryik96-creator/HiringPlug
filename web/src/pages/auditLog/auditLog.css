@@ -1,5 +1,6 @@
 /* Settings › Audit log (option A): tabs, the filters across the top, the
-   count and download, then the table, which scrolls inside its box on a phone. */
+   count and download, then the table; on a phone each row is a small card
+   (when and who on one line, what and the record below), never scrolled sideways. */
 .audit-log { --audit-from: #b91c1c; --audit-to: #157a3c; }
 .audit-log > .panel { padding-top: 0.5rem; }
 .audit-log .candidate-tablist { margin-bottom: 1rem; }
@@ -38,9 +39,27 @@
 @media (max-width: 760px) {
   .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.audit-phone-only { display: none; }
+
 @media (max-width: 600px) {
-  /* One line a row; the table scrolls sideways in its box, and an opened row's changes stay in view. */
-  .audit-table :is(td, th) { padding: 0.5rem 0.6rem; white-space: nowrap; }
-  .audit-table .audit-diff-row > td { white-space: normal; }
-  .audit-diff { position: sticky; left: 0.6rem; max-width: calc(100vw - 5.5rem); box-sizing: border-box; }
+  /* Each row a card: When · Who (· Times) on the first line, What and the record below. */
+  .audit-scroll { overflow: visible; }
+  .audit-table, .audit-table tbody { display: block; width: 100%; }
+  .audit-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .audit-table tr { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 0.15rem 0.75rem;
+    padding: 0.65rem 0.35rem; border-bottom: 1px solid var(--line); }
+  .audit-table.audit-salary tr { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .audit-table td { display: block; padding: 0; border: 0; min-width: 0; overflow-wrap: anywhere; }
+  .audit-table .audit-when { color: var(--muted); font-size: 0.85rem; }
+  .audit-table .audit-toggle { font-size: 0.85rem; }
+  .audit-table .audit-who { text-align: right; font-size: 0.85rem; }
+  .audit-table.audit-salary .audit-who { text-align: left; }
+  .audit-table :is(.audit-what, .audit-record) { grid-column: 1 / -1; }
+  .audit-table .audit-what { font-weight: 500; color: var(--ink); }
+  .audit-table .audit-count { grid-row: 1; grid-column: 3; font-size: 0.85rem; color: var(--muted); }
+  .audit-phone-only { display: inline; }
+  .audit-row:hover > td, .audit-row.open > td { background: none; }
+  .audit-row.open { background: var(--soft); border-bottom-color: transparent; }
+  .audit-table tr.audit-diff-row { display: block; padding: 0 0.35rem 0.65rem; background: var(--soft); }
+  .audit-diff-row > td { padding: 0; }
 }

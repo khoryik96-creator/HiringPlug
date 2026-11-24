@@ -56,6 +56,7 @@ describe("audit log sentences", () => {
     expect(recordHref({ entityType: "application", entityId: "appl_01abc", candidateId: null })).toBeNull();
     expect(exportedList("candidate.exported")).toBe("Candidate list");
     expect(exportedList("candidate.updated")).toBeNull();
+    expect(exportedList("auditlog.exported")).toBe("Audit log list");
   });
 });
 

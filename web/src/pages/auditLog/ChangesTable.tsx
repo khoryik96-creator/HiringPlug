@@ -37,8 +37,8 @@ export function ChangesTable({ filters }: { filters: Filters }) {
         </p>
       )}
       {rows.length > 0 && (
-        <div className="table-scroll">
-          <table className="audit-table" aria-label="Changes">
+        <div className="table-scroll audit-scroll">
+          <table className="audit-table audit-changes" aria-label="Changes">
             <thead><tr><th>When</th><th>Who</th><th>What</th><th>Record</th></tr></thead>
             <tbody>
               {rows.map((e) => (
@@ -50,9 +50,9 @@ export function ChangesTable({ filters }: { filters: Filters }) {
                         <span aria-hidden="true" className="audit-chevron">›</span>{whenText(e.at)}
                       </button>
                     </td>
-                    <td>{e.actorKind === "user" ? e.actorName : <span className="muted">{e.actorName}</span>}</td>
-                    <td>{whatHappened(e)}</td>
-                    <td><Record entry={e} /></td>
+                    <td className="audit-who">{e.actorKind === "user" ? e.actorName : <span className="muted">{e.actorName}</span>}</td>
+                    <td className="audit-what">{whatHappened(e)}</td>
+                    <td className="audit-record"><Record entry={e} /></td>
                   </tr>
                   {open.has(e.id) && (
                     <tr className="audit-diff-row"><td colSpan={4} id={`audit-diff-${e.id}`}><Diff entry={e} /></td></tr>
