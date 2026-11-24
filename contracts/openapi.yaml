@@ -13537,7 +13537,7 @@ components:
         updatedAt: {type: string, format: date-time}
     WhatsAppTemplateList:
       type: object
-      required: [items, placeholders]
+      required: [items, placeholders, fields]
       properties:
         items:
           type: array
@@ -13546,6 +13546,23 @@ components:
           type: array
           description: The placeholders WhatsApp templates may use (no salary fields).
           items: {type: string}
+        fields:
+          type: array
+          description: The same placeholders with their labels, in the order they are offered (no salary fields).
+          items: {$ref: '#/components/schemas/WhatsAppField'}
+    WhatsAppField:
+      type: object
+      required: [key, label]
+      properties:
+        key: {type: string, description: 'The placeholder, written {{key}} in a template, e.g. "candidate.firstName".'}
+        label: {type: string, example: First name}
+    WhatsAppFieldValue:
+      type: object
+      required: [key, label, value]
+      properties:
+        key: {type: string, description: 'The placeholder, written {{key}} in a template, e.g. "candidate.firstName".'}
+        label: {type: string, example: First name}
+        value: {type: string, description: "The person's value; empty when it is not known."}
     WhatsAppTemplateInput:
       type: object
       additionalProperties: false
@@ -13583,9 +13600,13 @@ components:
           description: Country code and number, digits only (https://wa.me/<chatNumber>); missing when the number is not valid.
     WhatsAppDraft:
       type: object
-      required: [text, missing, numbers]
+      required: [text, missing, numbers, fields]
       properties:
         text: {type: string}
+        fields:
+          type: array
+          description: Every field a WhatsApp template may use, with this person's value (never salary), in the order they are offered.
+          items: {$ref: '#/components/schemas/WhatsAppFieldValue'}
         missing:
           type: array
           items: {type: string}

@@ -1,19 +1,23 @@
 // WhatsApp: a message to a candidate or a contact, from a template or blank,
 // opened in the recruiter's own WhatsApp (a wa.me chat link) and kept as a
-// WhatsApp note on their timeline.
+// WhatsApp note on their timeline. Their details can be put in at the cursor,
+// the message saved as a template, and templates managed from the window.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { loadApplications } from "../api/applications";
 import { api, unwrap } from "../api/client";
-import { candidateApplicationsKey, notesKey } from "../api/keys";
+import { candidateApplicationsKey, notesKey, whatsAppDraftsKey } from "../api/keys";
 import { IconButton } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 import { useCan } from "./useCan";
+import { useWhatsAppTemplates } from "./useWhatsAppTemplates";
+import { WhatsAppInsertField } from "./WhatsAppInsertField";
+import { WhatsAppSaveTemplate } from "./WhatsAppSaveTemplate";
+import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
+import { useInsertAtCursor } from "./whatsAppText";
 
 type Subject = { kind: "candidate" | "contact"; id: string; name: string };
-
-export const whatsAppTemplatesKey = ["whatsapp-templates"] as const;
 
 /** The chat link that opens WhatsApp (app or web) with the message typed in. */
 export const chatLink = (chatNumber: string, text: string) =>
@@ -44,7 +48,8 @@ export function WhatsAppButton({ subject, hasNumber }: { subject: Subject; hasNu
   );
 }
 
-function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/** The window; Escape calls onEscape (by default, closing it). */
+function Dialog({ title, onClose, onEscape = onClose, children }: { title: string; onClose: () => void; onEscape?: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useLayoutEffect(() => {
     const node = dialog.current;
@@ -56,7 +61,7 @@ function Dialog({ title, onClose, children }: { title: string; onClose: () => vo
     };
   }, []);
   return (
-    <dialog ref={dialog} className="panel whatsapp-dialog" aria-labelledby="whatsapp-title" onCancel={(e) => { e.preventDefault(); onClose(); }}>
+    <dialog ref={dialog} className="panel whatsapp-dialog" aria-labelledby="whatsapp-title" onCancel={(e) => { e.preventDefault(); onEscape(); }}>
       <div className="row spread"><h3 id="whatsapp-title">{title}</h3><button type="button" className="link" onClick={onClose}>Close</button></div>
       {children}
     </dialog>
@@ -66,17 +71,26 @@ function Dialog({ title, onClose, children }: { title: string; onClose: () => vo
 export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose: () => void }) {
   const cache = useQueryClient();
   const canPipeline = useCan("pipeline:read");
+  const canCreate = useCan("emails.templates:create");
+  const canManage = useCan("emails.templates:manage");
+  const [view, setView] = useState<"message" | "save" | "templates">("message");
+  const [saved, setSaved] = useState("");
+  const box = useRef<HTMLTextAreaElement>(null);
+  const pane = useRef<HTMLDivElement>(null);
+  const saveButton = useRef<HTMLButtonElement>(null);
+  const templatesButton = useRef<HTMLButtonElement>(null);
+  const openedFrom = useRef<"save" | "templates" | null>(null);
   const [templateId, setTemplateId] = useState("");
   const [applicationId, setApplicationId] = useState("");
   const [edited, setEdited] = useState<string | null>(null);
   const [numberIndex, setNumberIndex] = useState(0);
-  const templates = useQuery({ queryKey: whatsAppTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/whatsapp-templates")) });
+  const templates = useWhatsAppTemplates();
   const jobs = useQuery({
     queryKey: candidateApplicationsKey(subject.id), enabled: subject.kind === "candidate" && canPipeline,
     queryFn: ({ signal }) => loadApplications("candidate", subject.id, signal),
   });
   const draft = useQuery({
-    queryKey: ["whatsapp-draft", subject.kind, subject.id, templateId, applicationId],
+    queryKey: [...whatsAppDraftsKey, subject.kind, subject.id, templateId, applicationId],
     staleTime: Infinity, gcTime: 0,
     queryFn: async () => unwrap(await api.POST("/v1/whatsapp-drafts", { body: {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kuala_Lumpur",
@@ -85,6 +99,8 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
     } })),
   });
   const text = edited ?? draft.data?.text ?? "";
+  // A field's value goes in where the cursor is; the message then counts as typed.
+  const insert = useInsertAtCursor(box, text, setEdited);
   const numbers = draft.data?.numbers ?? [];
   const chosen = numbers.length > 0 ? numbers[Math.min(numberIndex, numbers.length - 1)] : undefined;
   const log = useMutation({
@@ -100,6 +116,38 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
     window.open(chatLink(chosen.chatNumber, text.trim() ? text : ""), "_blank", "noopener,noreferrer"); // before anything async: not a blocked pop-up
     log.mutate(text.trim() ? `WhatsApp to ${chosen.number}:\n${text}` : `WhatsApp chat opened with ${chosen.number} (no message typed).`);
   };
+
+  // Focus follows the pane shown: its name box or heading, and back at the
+  // message, the button that opened it (or the message itself).
+  useLayoutEffect(() => {
+    if (view !== "message") {
+      pane.current?.querySelector<HTMLElement>(view === "save" ? "input" : "h4")?.focus();
+      return;
+    }
+    const from = openedFrom.current;
+    openedFrom.current = null;
+    if (!from) return;
+    const opener = (from === "save" ? saveButton : templatesButton).current;
+    (opener && !opener.disabled ? opener : box.current)?.focus();
+  }, [view]);
+  const open = (next: "save" | "templates") => { setSaved(""); openedFrom.current = next; setView(next); };
+  const back = () => { setView("message"); };
+  if (view !== "message") {
+    // Escape here goes back to the message rather than losing it.
+    return (
+      <Dialog title={`WhatsApp ${subject.name}`} onClose={onClose} onEscape={back}>
+        <div ref={pane}>
+          {view === "save" ? (
+            <WhatsAppSaveTemplate text={text} fields={draft.data?.fields ?? []} onCancel={back} onSaved={(name) => { setSaved(name); back(); }} />
+          ) : (
+            <WhatsAppTemplateManager canCreate={canCreate} canManage={canManage} onBack={back}
+              // The message stays as it is; only the dropdown goes back to Blank message.
+              onRemoved={(t) => { if (t.id === templateId) { setEdited(text); setTemplateId(""); } }} />
+          )}
+        </div>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog title={`WhatsApp ${subject.name}`} onClose={onClose}>
@@ -127,8 +175,14 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
         )}
         {numbers.length === 1 && chosen && <p className="field muted small">To {chosen.label.toLowerCase()} {chosen.number}</p>}
         <label className="field full">Message
-          <textarea rows={7} value={text} disabled={draft.isPending} onChange={(e) => { setEdited(e.target.value); }} />
+          <textarea ref={box} rows={7} value={text} disabled={draft.isPending} onChange={(e) => { setEdited(e.target.value); }} />
         </label>
+        <div className="row full whatsapp-tools">
+          <WhatsAppInsertField fields={draft.data?.fields ?? []} disabled={draft.isPending} onInsert={insert} />
+          {canCreate && <button ref={saveButton} type="button" className="link" disabled={!text.trim()} onClick={() => { open("save"); }}>Save as template</button>}
+          {(canCreate || canManage) && <button ref={templatesButton} type="button" className="link" onClick={() => { open("templates"); }}>Templates</button>}
+        </div>
+        {saved && <p className="full muted small" role="status">Saved as the &ldquo;{saved}&rdquo; template.</p>}
         {(draft.data?.missing.length ?? 0) > 0 && (
           <p className="full warning small" role="status">Not filled in: {draft.data?.missing.map((m) => `[${m}]`).join(", ")}. Change them before sending.</p>
         )}

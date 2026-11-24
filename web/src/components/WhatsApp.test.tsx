@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
+import { whatsAppTemplatesKey } from "../api/keys";
 import { WhatsAppTemplates } from "../pages/WhatsAppTemplates";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { chatLink, WhatsAppButton, WhatsAppDialog } from "./WhatsApp";
@@ -24,6 +25,7 @@ const me = { permissions: ["emails:send", "notes:create", "pipeline:read"] };
 const templates = {
   items: [{ id: "wtpl_1", version: 1, name: "Introduce a role", body: "Hi {{candidate.firstName}}, {{job.title}}?", createdAt: "", updatedAt: "" }],
   placeholders: ["candidate.firstName", "job.title"],
+  fields: [{ key: "candidate.firstName", label: "First name" }, { key: "job.title", label: "Job title" }],
 };
 const applications = { items: [{ id: "appl_1", jobId: "job_1", jobTitle: "Finance Manager", companyName: "Contoh Berhad" }], nextCursor: null };
 
@@ -112,17 +114,61 @@ describe("WhatsApp", () => {
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Open in WhatsApp" }).disabled).toBe(true);
   });
 
-  it("adds a WhatsApp template with fields", async () => {
+  it("adds a WhatsApp template, its field chips putting the field at the cursor", async () => {
     mockGets();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(templates.items[0]));
     renderWithClient(<WhatsAppTemplates canCreate canManage />);
     expect(await screen.findByText("Hi {{candidate.firstName}}, {{job.title}}?")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add a template" }));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Shortlisted" } });
-    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Hi " } });
-    fireEvent.click(screen.getByRole("button", { name: "{{candidate.firstName}}" }));
+    const message = screen.getByLabelText<HTMLTextAreaElement>("Message");
+    fireEvent.change(message, { target: { value: "Hi , you are shortlisted." } });
+    message.focus();
+    message.setSelectionRange(3, 3);
+    fireEvent.click(screen.getByRole("button", { name: "First name" }));
+    expect(message.value).toBe("Hi {{candidate.firstName}}, you are shortlisted.");
+    expect(document.activeElement).toBe(message);
+    expect(message.selectionStart).toBe(26); // just after the field
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
-    expect(sentBody(post)).toEqual({ name: "Shortlisted", body: "Hi {{candidate.firstName}}" });
+    expect(sentBody(post)).toEqual({ name: "Shortlisted", body: "Hi {{candidate.firstName}}, you are shortlisted." });
+  });
+
+  it("renames a template from Change or rename in Settings", async () => {
+    mockGets();
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ ...templates.items[0], name: "Introduce a job", version: 2 }));
+    renderWithClient(<WhatsAppTemplates canCreate={false} canManage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change or rename" }));
+    const name = screen.getByLabelText<HTMLInputElement>("Name");
+    expect(name.value).toBe("Introduce a role");
+    fireEvent.change(name, { target: { value: "Introduce a job" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({ version: 1, name: "Introduce a job", body: "Hi {{candidate.firstName}}, {{job.title}}?" });
+    expect(screen.queryByRole("button", { name: "Add a template" })).toBeNull();
+  });
+
+  it("in Settings, a chip clicked before clicking in the message puts the field at the end", async () => {
+    mockGets();
+    renderWithClient(<WhatsAppTemplates canCreate={false} canManage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change or rename" }));
+    const message = screen.getByLabelText<HTMLTextAreaElement>("Message");
+    message.setSelectionRange(0, 0); // what a browser reports for a box never in focus
+    fireEvent.click(screen.getByRole("button", { name: "First name" }));
+    expect(message.value).toBe("Hi {{candidate.firstName}}, {{job.title}}?{{candidate.firstName}}");
+  });
+
+  it("in Settings, saves with the version the form opened with, after the list loads again", async () => {
+    const get = mockGets();
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ ...templates.items[0], version: 3 }));
+    const { client } = renderWithClient(<WhatsAppTemplates canCreate={false} canManage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change or rename" }));
+    get.mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/whatsapp-templates"
+      ? { ...templates, items: [{ ...templates.items[0], version: 2, body: "Their change" }, { ...templates.items[0], id: "wtpl_2", name: "Theirs" }] } : me))) as never);
+    await act(() => client.invalidateQueries({ queryKey: whatsAppTemplatesKey }));
+    expect(await screen.findByRole("heading", { name: "Theirs" })).toBeTruthy(); // the list has loaded again
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toMatchObject({ version: 1, body: "Hi {{candidate.firstName}}, {{job.title}}?" });
   });
 });
