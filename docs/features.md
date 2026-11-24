@@ -196,8 +196,10 @@ engineers"), and candidates are found by what they do, whatever their
 titles say and whether or not their CVs use your words. A recruiter's
 reading comes first: abbreviations spelt out (TA, AR/AP, HRBP), tools and
 qualifications placed (S/4HANA is SAP, ACCA is accounting, HACCP is food
-quality, Android is mobile), every title put in its job family (about 55:
-recruitment, accounting, software testing, factory quality...), and titles
+quality, Android is mobile, CISSP is cyber security, Snowflake is data),
+every title put in its job family (about 57, covering the agency's
+verticals: software, data, DevOps, cyber security, sales, marketing,
+finance, operations, compliance and more), and titles
 that mislead read by the work under them: an Account Executive who keeps
 the books is accounting, one who sells is sales; a "Principal Consultant"
 placing accountants is a recruiter. The newest title counts most, an old one

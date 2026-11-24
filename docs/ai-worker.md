@@ -425,6 +425,10 @@ exactly and ranks (`domain.go`; the same weights as
 carries the rules' version (`model.READING`): raising it makes every company
 read everyone again, and searches are read again (cached by model).
 
+The agency's verticals (software, data, DevOps, cyber security, sales,
+marketing, finance, operations, compliance) have their typical titles, tools
+and qualifications checked in `tests/test_meaning_verticals.py`.
+
 Measured by three recruiter benches (`tests/meaning_bench_*.py`, made up):
 NDCG@10 0.97 / 0.95 / 0.96 against 0.62 / 0.66 / 0.61 for keywords; bench C
 was written after the rules were tuned and measured once. Set

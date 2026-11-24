@@ -74,7 +74,7 @@ FAMILIES: list[tuple[str, str, str]] = [
     ),
     (
         "accounting",
-        r"accountant|accounts|account assistant|bookkeep|general ledger|accounts payable|"
+        r"accountant|accounts|\baccounting\b|account assistant|bookkeep|general ledger|accounts payable|"
         r"accounts receivable|akauntan|cost account|finance (executive|officer|assistant|clerk)|"
         r"credit control|"
         r"\bfinance\b",
@@ -94,7 +94,8 @@ FAMILIES: list[tuple[str, str, str]] = [
     ("risk", r"\brisk\b", "risk management: identifying and controlling business and financial risks"),
     (
         "compliance",
-        r"compliance|\baml\b|anti-money|regulatory",
+        r"compliance|\baml\b|anti-money|regulatory|\bkyc\b|know your customer|sanctions|fraud|"
+        r"financial crime|data protection|privacy|\bpdpa\b|\bgdpr\b|\bdpo\b",
         "compliance: regulations, anti-money laundering and controls",
     ),
     (
@@ -129,8 +130,20 @@ FAMILIES: list[tuple[str, str, str]] = [
     # Technology
     (
         "software testing",
-        r"software test|\btester\b|test automation|software quality",
+        r"software test|\btester\b|test automation|software quality|(qa|quality assurance) automation|"
+        r"automation (tester|test engineer|qa)|"
+        r"\bsdet\b|engineer in test",
         "software testing: testing applications and finding bugs",
+    ),
+    (
+        "cyber security",
+        r"cyber|information security|infosec|"
+        r"(information technology|network|cloud|application|data|product|endpoint|offensive) security|"
+        r"security (engineer|analyst|architect|consultant|specialist|operations|researcher|tester|auditor)|"
+        r"\bsoc\b|penetration test(er|ing)?|pen ?test(er|ing)?|ethical hack|red team|blue team|\bgrc\b|"
+        r"threat|vulnerabilit|incident response|identity and access|\biam\b|\bsiem\b|appsec|"
+        r"chief information security",
+        "cyber security: protecting systems and data, security monitoring, penetration testing and controls",
     ),
     (
         "data",
@@ -138,19 +151,21 @@ FAMILIES: list[tuple[str, str, str]] = [
         # (first: at the same place the longer reading wins).
         r"(power bi|tableau|etl|\bbi|business intelligence|data dashboards)( \w+){0,2} "
         r"(developer|engineer|analyst)|"
-        r"\bdata\b|business intelligence|analytics|\bmis\b|management information|reporting analyst",
+        r"\bdata\b|business intelligence|analytics|\bmis\b|management information|reporting analyst|"
+        r"machine learning|\bml\b|\bai\b|artificial intelligence|deep learning|computer vision|\bnlp\b|mlops",
         "data and analytics: analysing data and building reports and dashboards",
     ),
     (
         "cloud and devops",
-        r"devops|site reliability|\bsre\b|cloud|platform engineer|solutions? architect|"
+        r"devops|devsecops|site reliability|\bsre\b|cloud|platform engineer|solutions? architect|"
         r"infrastructure architect|kubernetes",
         "cloud and DevOps engineering: cloud platforms, deployment pipelines and system architecture",
     ),
     (
         "software",
         r"software|developer|programmer|full stack|backend|back end|frontend|front end|"
-        r"web develop|mobile develop|\bsde\b|\bswe\b|coder",
+        r"web develop|mobile develop|\bsde\b|\bswe\b|coder|chief technology|tech(nical)? lead|"
+        r"software architect|technical architect",
         "software development: writing code and building applications",
     ),
     (
@@ -162,7 +177,7 @@ FAMILIES: list[tuple[str, str, str]] = [
     (
         "it support",
         r"it support|helpdesk|help desk|desktop support|service desk|technical support|"
-        r"information technology|\bict\b",
+        r"information technology( operations)?|\bict\b",
         "IT support: fixing computers, accounts and user problems",
     ),
     (
@@ -238,6 +253,11 @@ FAMILIES: list[tuple[str, str, str]] = [
         "logistics",
         r"logistic|shipping|freight|warehouse|forward|customs|transport|distribution|delivery|fleet",
         "logistics: shipments, warehouses, deliveries and transport",
+    ),
+    (
+        "operations",
+        r"\boperations\b|\bops\b|chief operating|\brevops\b",
+        "operations: running a business's day-to-day processes, teams and service delivery",
     ),
     # Marketing, office, law, care, teaching
     (
@@ -354,6 +374,9 @@ _NEAR = {
     "customer service": "retail, hospitality",
     "retail": "hospitality",
     "software testing": "software",
+    "cyber security": "it infrastructure, cloud and devops, software, it support, compliance, risk",
+    "operations": "logistics, supply chain planning, procurement, project management, general management, "
+    "customer service, administration, sales, it support",
     "data": "software, business analysis, cloud and devops",
     "cloud and devops": "software, it infrastructure",
     "it infrastructure": "it support",

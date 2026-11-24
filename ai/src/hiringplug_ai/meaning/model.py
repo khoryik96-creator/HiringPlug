@@ -20,7 +20,7 @@ from tokenizers import Tokenizer
 
 # The reading rules' version (recruiter.py, families.py, passages.py): raise it
 # when they change, and every candidate is read again with the new rules.
-READING = 4
+READING = 5
 # Reported with every result: vectors of another model (or other rules) are
 # never compared; a new name makes the app read everyone again.
 NAME = f"all-MiniLM-L6-v2@1110a243/r{READING}"

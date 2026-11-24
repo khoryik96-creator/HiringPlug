@@ -85,6 +85,11 @@ queue. Every module's API is a contract in `contracts/modules/*.yaml`.
 ## How the owner works with us
 
 - The owner is a recruiter, not a developer: write to them in plain words.
+- The agency: 20 to 30 consultants, each with their own vertical (software,
+  data, DevOps, security, sales, marketing, finance, operations,
+  compliance...). Search by meaning must read each vertical's titles, tools
+  and qualifications in the right field (`ai/tests/test_meaning_verticals.py`
+  lists the typical ones; add to it when a vertical's titles are misread).
 - Build on a branch and push it; **main moves only when the owner says
   "merge"** (fast-forward, no pull requests unless asked). Raise `VERSION`
   with every update (minor for features, patch for fixes).
