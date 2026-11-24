@@ -22,11 +22,14 @@ package leads
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -51,4 +54,22 @@ func New(pool *pgxpool.Pool, companies Companies, allowPrivate bool) *Module {
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindLeadSourceCheck: m.service.check}
+}
+
+// Names returns job leads' names, "Accountant · Maju Bhd" (missing ones are
+// left out), in the caller's transaction.
+func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
+	out := make(map[string]string, len(ids))
+	q := store.New(tx)
+	for _, id := range ids {
+		row, err := q.GetLead(ctx, id)
+		if database.IsNoRows(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[id] = strings.TrimSuffix(row.Title+" · "+row.CompanyName, " · ")
+	}
+	return out, nil
 }

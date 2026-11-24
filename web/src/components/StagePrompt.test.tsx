@@ -43,6 +43,8 @@ describe("moving to offer or placed asks for the details first", () => {
     const post = board();
     await moveTo("offer");
     const prompt = await screen.findByRole("region", { name: "Offer for Siti Aisyah" });
+    const offerReads = vi.mocked(api.GET).mock.calls.map((c) => c as unknown[]).filter((c) => c[0] === "/v1/offers");
+    expect(offerReads.map((c) => c[1]), "only whether one is open: no salary asked for").toEqual([{ params: { query: { applicationId: siti.id } } }]);
     fireEvent.click(within(prompt).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("region", { name: "Offer for Siti Aisyah" })).toBeNull();
     expect(post).not.toHaveBeenCalled(); // not moved

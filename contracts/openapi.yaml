@@ -640,6 +640,129 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/AssistantOff'}
         '429': {$ref: '#/components/responses/AssistantLimitReached'}
+  /v1/audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [auditlog]
+      summary: The company's audit log, newest first
+      description: >
+        Entries about candidates and their jobs the user may not see are left out (row-level security). Salary values are never in the log, only that they changed.
+
+      x-permission: auditlog:read
+      parameters:
+        - $ref: '#/components/parameters/AuditActor'
+        - $ref: '#/components/parameters/AuditAction'
+        - $ref: '#/components/parameters/AuditEntityType'
+        - $ref: '#/components/parameters/AuditEntityId'
+        - $ref: '#/components/parameters/AuditFrom'
+        - $ref: '#/components/parameters/AuditTo'
+        - $ref: '#/components/parameters/AuditCursor'
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuditLogPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/audit-log/export:
+    post:
+      operationId: exportAuditLog
+      tags: [auditlog]
+      summary: The audit log the filters find, as Excel or CSV (at most 10,000 entries)
+      x-permission: auditlog:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuditLogExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/salary-views:
+    get:
+      operationId: listSalaryViews
+      tags: [auditlog]
+      summary: Who was shown a salary, newest day first
+      description: >
+        One line per person, kind, candidate and day, with how often. A list, search or export is one line a day with the number of different candidates whose salary it showed. Lines about candidates the user may not see are left out (row-level security). No amounts.
+
+      x-permission: auditlog.salary_views:read
+      parameters:
+        - name: user
+          in: query
+          description: Only what this person (a user id, or an API key id) was shown.
+          schema: {type: string, minLength: 1, maxLength: 40}
+        - name: candidateId
+          in: query
+          description: Only this candidate's salary (lists and exports that showed it included).
+          schema: {$ref: '#/components/schemas/CandidateId'}
+        - name: kind
+          in: query
+          schema: {$ref: '#/components/schemas/SalaryViewKind'}
+        - $ref: '#/components/parameters/AuditFrom'
+        - $ref: '#/components/parameters/AuditTo'
+        - $ref: '#/components/parameters/AuditCursor'
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SalaryViewPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/salary-views/export:
+    post:
+      operationId: exportSalaryViews
+      tags: [auditlog]
+      summary: The salary views the filters find, as Excel or CSV (at most 10,000 lines)
+      x-permission: auditlog.salary_views:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SalaryViewExport'}
+      responses:
+        '200':
+          description: The file (an Excel workbook or a CSV)
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Too many rows (EXPORT_TOO_LARGE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/automations:
     get:
       operationId: listAutomations
@@ -1278,6 +1401,12 @@ paths:
           in: query
           description: With a sort other than newest, the `nextOffset` of the previous page.
           schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}
+        - name: includeSalary
+          in: query
+          description: >
+            Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it both are null (sorting by salary still works, and a page sorted by salary is counted too, with every candidate on it: the order tells about their salaries).
+
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
@@ -4714,7 +4843,7 @@ paths:
       tags: [emails]
       summary: Fill an email's fields for a candidate (and a job or interview), to see before sending
       description: >
-        Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them).
+        Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them). Salary fields' values come back in `fieldValues` only with includeSalary.
 
       x-permission: emails:send
       requestBody:
@@ -4920,6 +5049,12 @@ paths:
       parameters:
         - {name: candidateId, in: query, required: false, schema: {$ref: '#/components/schemas/CandidateId'}}
         - {name: contactId, in: query, required: false, schema: {$ref: '#/components/schemas/ContactId'}}
+        - name: statusOnly
+          in: query
+          description: >
+            Only how each email is getting on (to look again while some are on their way): the subject and message come back empty, and reading the list is not counted in the log of who was shown a salary (a list with an email that shows salary is counted otherwise).
+
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
@@ -7488,6 +7623,12 @@ paths:
       parameters:
         - {name: applicationId, in: query, required: false, schema: {$ref: '#/components/schemas/ApplicationId'}}
         - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/OfferStatus'}}
+        - name: includeSalary
+          in: query
+          description: >
+            Return the salaries offered (only with offers.salary:read). Ask only when they are shown: each list with salaries is counted in the log of who was shown a salary. Without it every salary is null.
+
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
@@ -7529,7 +7670,9 @@ paths:
       operationId: updateOffer
       tags: [offers]
       summary: Change an offer's terms (an offer waiting for approval or approved goes back to draft)
-      description: "Fields left out stay as they are. `salary` needs offers.salary:update."
+      description: >
+        Fields left out stay as they are. `salary` needs offers.salary:update. The offer comes back with its salary only when this change set it (otherwise null: read it with GET /v1/offers and includeSalary).
+
       x-permission: offers:manage
       requestBody:
         required: true
@@ -7555,7 +7698,9 @@ paths:
       operationId: stepOffer
       tags: [offers]
       summary: Move an offer on (ask for approval, send, record the answer, withdraw)
-      description: Sending without approval needs offers:approve.
+      description: >
+        Sending without approval needs offers:approve. The offer comes back without its salary (null: read it with GET /v1/offers and includeSalary).
+
       x-permission: offers:manage
       requestBody:
         required: true
@@ -7581,7 +7726,9 @@ paths:
       operationId: decideOffer
       tags: [offers]
       summary: Approve an offer waiting for approval, or send it back to draft
-      description: You cannot decide on an offer you asked approval for.
+      description: >
+        You cannot decide on an offer you asked approval for. The offer comes back without its salary (null: read it with GET /v1/offers and includeSalary).
+
       x-permission: offers:approve
       requestBody:
         required: true
@@ -7940,6 +8087,12 @@ paths:
         - {name: invoiceStatus, in: query, required: false, schema: {$ref: '#/components/schemas/InvoiceStatus'}}
         - {name: startFrom, in: query, required: false, description: Started on or after this day., schema: {type: string, format: date}}
         - {name: startTo, in: query, required: false, description: Started on or before this day., schema: {type: string, format: date}}
+        - name: includeSalary
+          in: query
+          description: >
+            Return the agreed salary in `money` (only with placements.fees:read). Ask only when it is shown: each list with salaries is counted in the log of who was shown a salary. Without it `money.salary` is null (the fee is still there).
+
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
@@ -8044,7 +8197,9 @@ paths:
       operationId: updatePlacement
       tags: [placements]
       summary: Change a placement (start, guarantee, status, invoice, money)
-      description: "Fields left out stay as they are. `money` needs placements.fees:update."
+      description: >
+        Fields left out stay as they are. `money` needs placements.fees:update. The agreed salary comes back only when this change set `money` (otherwise null: read it with GET /v1/placements and includeSalary).
+
       x-permission: placements:manage
       requestBody:
         required: true
@@ -8088,6 +8243,7 @@ paths:
       operationId: putPlacementInvoicing
       tags: [placements]
       summary: Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date
+      description: The placement comes back without its agreed salary (`money.salary` null; the fee is there).
       x-permission: placements:manage
       requestBody:
         required: true
@@ -8111,7 +8267,9 @@ paths:
       operationId: sendPlacementInvoice
       tags: [placements]
       summary: Email the invoice now (numbered from the template; the placement is then invoiced)
-      description: Needs placements.fees:read too (the invoice shows the fee).
+      description: >
+        Needs placements.fees:read too (the invoice shows the fee). The placement comes back without its agreed salary (`money.salary` null). Sent by a person, an invoice whose fee is a share of the salary counts as showing it (the log of who was shown a salary).
+
       x-permission: placements:manage
       responses:
         '200':
@@ -9191,6 +9349,8 @@ components:
         - aiusage:manage
         - aiusage:read
         - assistant:use
+        - auditlog.salary_views:read
+        - auditlog:read
         - automations.tasks:read
         - automations.tasks:update
         - automations:approve
@@ -9919,6 +10079,119 @@ components:
         model: {type: string, nullable: true}
         inputTokens: {type: integer, minimum: 0}
         outputTokens: {type: integer, minimum: 0}
+    AuditActionFilter:
+      type: string
+      description: One action or kind of action, or several separated by commas (at most 20).
+      pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?(,[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?){0,19}$'
+      maxLength: 400
+    AuditCursor:
+      type: string
+      description: Where a page ended (read it as an opaque value).
+      minLength: 1
+      maxLength: 100
+    AuditEntryId:
+      type: string
+      pattern: '^aud_[0-9a-hjkmnp-tv-z]{26}$'
+      example: aud_01jbz6w0m0k8q9x2r3s4t5v6w7
+    SalaryViewId:
+      type: string
+      pattern: '^sv_[0-9a-hjkmnp-tv-z]{26}$'
+      example: sv_01jbz6w0m0k8q9x2r3s4t5v6w7
+    AuditActorKind:
+      type: string
+      description: user (a person), api_key (a program using an API key) or system (what happened automatically).
+      enum: [user, api_key, system]
+    AuditEntry:
+      type: object
+      required: [id, at, actorId, actorKind, actorName, action, entityType, entityId, entityName, candidateId, changes]
+      properties:
+        id: {$ref: '#/components/schemas/AuditEntryId'}
+        at: {type: string, format: date-time}
+        actorId: {type: string, description: 'A user id, an API key id, or "system".'}
+        actorKind: {$ref: '#/components/schemas/AuditActorKind'}
+        actorName:
+          type: string
+          description: 'The person''s name; "Automatic" for the system; an API key''s name, or "API key" when it cannot be found.'
+        action: {type: string, example: candidate.updated}
+        entityType: {type: string, example: candidate}
+        entityId: {type: string}
+        entityName:
+          type: string
+          nullable: true
+          description: >
+            The record's name, when it can be looked up (null otherwise): a candidate's, job's, company's, contact's, user's or job lead's ("Accountant · Maju Bhd"); for a candidate on a job (application), "Candidate name · Job title".
+
+        candidateId:
+          description: For a candidate on a job (application), the candidate, whose page the record opens; null otherwise.
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        changes:
+          type: object
+          additionalProperties: true
+          description: 'What changed: field -> {"from", "to"}, or details of the action. Never a salary amount.'
+    AuditLogPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+        nextCursor:
+          allOf: [{$ref: '#/components/schemas/AuditCursor'}]
+          nullable: true
+    AuditLogExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        actor: {type: string, minLength: 1, maxLength: 40}
+        action: {$ref: '#/components/schemas/AuditActionFilter'}
+        entityType: {type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40}
+        entityId: {type: string, minLength: 1, maxLength: 60}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+    SalaryViewKind:
+      type: string
+      description: >
+        Where the salary was shown: candidate (their page), candidate_list (a list or search with salary), export (a file of candidates or placements with salary), email_fields (an email being written, filled with it), email_sent (an email sent with it), email_read (a sent email with it, read on a candidate's or contact's emails or in a copy of their data), cv (a formatted CV with it made, opened, downloaded or attached), screening (a screening call's salary), offer (an offer's salary), placement (a placement's salary).
+
+      enum: [candidate, candidate_list, export, email_fields, email_sent, email_read, cv, screening, offer, placement]
+    SalaryView:
+      type: object
+      required: [id, day, userId, userName, kind, candidateId, candidateName, candidates, count, firstAt, lastAt]
+      properties:
+        id: {$ref: '#/components/schemas/SalaryViewId'}
+        day: {type: string, format: date, description: "The day, in the agency's time zone."}
+        userId: {type: string, description: Who was shown it (a user id or an API key id).}
+        userName: {type: string, description: 'Their name; an API key''s name, or "API key".'}
+        kind: {$ref: '#/components/schemas/SalaryViewKind'}
+        candidateId:
+          description: Whose salary (null for a list, search or export).
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        candidateName: {type: string, nullable: true}
+        candidates: {type: integer, description: 'How many different candidates'' salaries a list, search or export showed that day (1 for one candidate).'}
+        count: {type: integer, description: How often that day.}
+        firstAt: {type: string, format: date-time}
+        lastAt: {type: string, format: date-time}
+    SalaryViewPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SalaryView'}}
+        nextCursor:
+          allOf: [{$ref: '#/components/schemas/AuditCursor'}]
+          nullable: true
+    SalaryViewExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {$ref: '#/components/schemas/ExportFormat'}
+        user: {type: string, minLength: 1, maxLength: 40}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        kind: {$ref: '#/components/schemas/SalaryViewKind'}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
     AutomationId:
       type: string
       pattern: '^aut_[0-9a-hjkmnp-tv-z]{26}$'
@@ -10855,14 +11128,14 @@ components:
           allOf: [{$ref: '#/components/schemas/NoticePeriod'}]
           nullable: true
         currentSalary:
-          description: Needs candidates.compensation:read (see salaryRestricted).
+          description: Needs candidates.compensation:read (see salaryRestricted), and includeSalary.
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
           nullable: true
         expectedSalary:
-          description: Needs candidates.compensation:read (see salaryRestricted).
+          description: Needs candidates.compensation:read (see salaryRestricted), and includeSalary.
           allOf: [{$ref: '#/components/schemas/SalaryRange'}]
           nullable: true
-        salaryRestricted: {type: boolean, description: "true: you may not see salaries, so both are left out."}
+        salaryRestricted: {type: boolean, description: "true: you may not see salaries, so both are left out (false says only that you may, not that they were asked for)."}
         id: {$ref: '#/components/schemas/CandidateId'}
         fullName: {type: string}
         email: {type: string, nullable: true}
@@ -10922,6 +11195,11 @@ components:
         cursor: {$ref: '#/components/schemas/CandidateId'}
         sort: {$ref: '#/components/schemas/CandidateSort'}
         offset: {type: integer, minimum: 0, maximum: 1000000, description: "With a sort other than newest, the nextOffset of the previous page."}
+        includeSalary:
+          type: boolean
+          description: >
+            Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work, and such a page is counted too, with every candidate on it (being found, or the order, tells about their salaries). An export always has them, for roles that may see them.
+
     SalaryCap:
       type: object
       additionalProperties: false
@@ -13954,6 +14232,11 @@ components:
           description: As for sending to the client about several candidates; fieldValues are then the job's, its client's and the sender's.
           items: {$ref: '#/components/schemas/EmailCandidate'}
         timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
+        includeSalary:
+          type: boolean
+          description: >
+            Put the salary fields' values in `fieldValues` (for roles that may see salaries; false unless given). Ask only when they are shown or put in the message (a salary field inserted, salary details for a shortlist): each answer with a salary is counted in the log of who was shown a salary. Without it they are left out and named in `withheldFields`. The subject and message are filled either way (and counted when a salary field in them is filled).
+
     EmailBatch:
       type: object
       additionalProperties: false
@@ -14019,7 +14302,11 @@ components:
         fieldValues:
           type: object
           additionalProperties: {type: string}
-          description: "Each field that has a value for this candidate, by its token: \"[Expected salary]\" -> \"RM 12,000 / month\" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed."
+          description: "Each field that has a value for this candidate, by its token: \"[Expected salary]\" -> \"RM 12,000 / month\" (salary only for roles that may see salaries, and only with includeSalary). The composer puts the value in the message, where it can be edited; the candidate's record is not changed."
+        withheldFields:
+          type: array
+          description: "Salary fields that have a value but were left out of fieldValues (includeSalary was not given), by token: ask again with includeSalary to put one in."
+          items: {type: string}
         clientEmail:
           type: string
           nullable: true
@@ -16637,7 +16924,9 @@ components:
         companyName: {type: string}
         status: {$ref: '#/components/schemas/OfferStatus'}
         salary:
-          description: Left out (and listed in restrictedFields) without offers.salary:read. null means none set.
+          description: >
+            Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or that it was not asked for (GET /v1/offers without includeSalary; a change that did not set it).
+
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
           nullable: true
         startDate: {type: string, format: date, nullable: true}
@@ -17214,7 +17503,9 @@ components:
           allOf: [{$ref: '#/components/schemas/PlacementRetainer'}]
           nullable: true
         salary:
-          description: The agreed salary.
+          description: >
+            The agreed salary (in GET /v1/placements only with includeSalary; after a change only when it set `money`).
+
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
           nullable: true
         feePercent:
@@ -18231,6 +18522,45 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/AiProviderName'}
+    AuditCursor:
+      name: cursor
+      in: query
+      description: >
+        The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since).
+
+      schema: {$ref: '#/components/schemas/AuditCursor'}
+    AuditActor:
+      name: actor
+      in: query
+      description: Only what this actor did - a user id, an API key id, or "system" (what happened automatically).
+      schema: {type: string, minLength: 1, maxLength: 40}
+    AuditAction:
+      name: action
+      in: query
+      description: >
+        Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). Several, separated by commas, find any of them ("settings,invoice_settings,tenant.renamed").
+
+      schema: {$ref: '#/components/schemas/AuditActionFilter'}
+    AuditEntityType:
+      name: entityType
+      in: query
+      description: Only entries about this kind of record (candidate, job, company, contact, email...).
+      schema: {type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40}
+    AuditEntityId:
+      name: entityId
+      in: query
+      description: Only entries about this record.
+      schema: {type: string, minLength: 1, maxLength: 60}
+    AuditFrom:
+      name: from
+      in: query
+      description: From this day on (in the agency's time zone).
+      schema: {type: string, format: date}
+    AuditTo:
+      name: to
+      in: query
+      description: Up to and including this day (in the agency's time zone).
+      schema: {type: string, format: date}
     AutomationIdPath:
       name: automationId
       in: path
@@ -18419,6 +18749,16 @@ x-permissions:
     description: Ask the AI assistant about candidates, jobs and applications you may see.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  auditlog.salary_views:read:
+    module: auditlog
+    description: See who was shown a candidate's salary, and when.
+    sensitive: true
+    roles: [owner, admin]
+  auditlog:read:
+    module: auditlog
+    description: See the company's audit log (who changed what, and when).
+    sensitive: false
+    roles: [owner, admin]
   automations.tasks:read:
     module: automations
     description: See your tasks.
@@ -19280,6 +19620,8 @@ x-modules:
     description: 'One ledger of every AI use: which feature used the AI, for whom and how many tokens (input and output), kept when the record it was for is deleted. Each company sets its monthly AI limit (in tokens, or in money at its prices) and the prices per million tokens; without its own limit the server''s default (HP_AI_MONTHLY_TOKENS) applies. Costs are estimates at the current prices: the AI provider''s bill is final. A month is a calendar month in the agency''s time zone (HP_TIME_ZONE).'
   - name: assistant
     description: The AI assistant. Go gathers what the asking user may see (never contact details, never salary), queues it for the Python AI worker, which asks the AI provider; the answer comes back on the queue. Answers are shown only to the person who asked. Off until an AI provider is set up; each company has a monthly token limit.
+  - name: auditlog
+    description: 'Reads the company''s audit log (every change, who made it and when), and keeps the log of who was shown a salary: one line per person, kind, candidate and day (in the agency''s time zone, HP_TIME_ZONE), counted. A salary is counted when it is really returned to a person: a candidate''s page, a list or search with salary columns or sorted or filtered by salary, an export, an email''s fields, an email sent with it or read again, a copy of a candidate''s data, a formatted CV with it, a screening call''s salary, an offer, a placement or an invoice that prints it. Neither log ever holds an amount, and nothing in either is deleted automatically (a candidate merge moves the duplicate''s lines).'
   - name: automations
     description: 'An automation is a rule: WHEN something happens (an application arrives, a candidate moves to a stage, an interview is booked, a placement starts, its guarantee ends, its invoice falls due), IF the job is at a given client (optional), THEN after some days (or before, for dates) email the candidate, the client''s hiring contact or the recruiter, or give the recruiter a task. Emails go from the recruiter''s mailbox, on their own or after a recruiter approves them (a choice per automation, with a default in Settings). Every run is logged; what happened is checked again when it is due, so a moved interview or a paid invoice sends nothing.'
   - name: bin

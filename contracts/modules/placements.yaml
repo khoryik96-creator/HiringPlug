@@ -83,6 +83,14 @@ paths:
         - { name: invoiceStatus, in: query, required: false, schema: { $ref: '#/components/schemas/InvoiceStatus' } }
         - { name: startFrom, in: query, required: false, description: Started on or after this day., schema: { type: string, format: date } }
         - { name: startTo, in: query, required: false, description: Started on or before this day., schema: { type: string, format: date } }
+        - name: includeSalary
+          in: query
+          description: >
+            Return the agreed salary in `money` (only with placements.fees:read).
+            Ask only when it is shown: each list with salaries is counted in the
+            log of who was shown a salary. Without it `money.salary` is null
+            (the fee is still there).
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: OK
@@ -193,7 +201,10 @@ paths:
       operationId: updatePlacement
       tags: [placements]
       summary: Change a placement (start, guarantee, status, invoice, money)
-      description: "Fields left out stay as they are. `money` needs placements.fees:update."
+      description: >
+        Fields left out stay as they are. `money` needs placements.fees:update.
+        The agreed salary comes back only when this change set `money`
+        (otherwise null: read it with GET /v1/placements and includeSalary).
       x-permission: placements:manage
       requestBody:
         required: true
@@ -239,6 +250,7 @@ paths:
       operationId: putPlacementInvoicing
       tags: [placements]
       summary: Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date
+      description: The placement comes back without its agreed salary (`money.salary` null; the fee is there).
       x-permission: placements:manage
       requestBody:
         required: true
@@ -263,7 +275,11 @@ paths:
       operationId: sendPlacementInvoice
       tags: [placements]
       summary: Email the invoice now (numbered from the template; the placement is then invoiced)
-      description: Needs placements.fees:read too (the invoice shows the fee).
+      description: >
+        Needs placements.fees:read too (the invoice shows the fee). The
+        placement comes back without its agreed salary (`money.salary` null).
+        Sent by a person, an invoice whose fee is a share of the salary
+        counts as showing it (the log of who was shown a salary).
       x-permission: placements:manage
       responses:
         '200':
@@ -583,7 +599,9 @@ components:
           allOf: [{ $ref: '#/components/schemas/PlacementRetainer' }]
           nullable: true
         salary:
-          description: The agreed salary.
+          description: >
+            The agreed salary (in GET /v1/placements only with includeSalary;
+            after a change only when it set `money`).
           allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
           nullable: true
         feePercent:

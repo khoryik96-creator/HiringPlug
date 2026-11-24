@@ -53,7 +53,9 @@ func Record(ctx context.Context, tx pgx.Tx, e Entry) error {
 }
 
 // Diff returns {field: {"from": before, "to": after}} for every field whose
-// value differs. Both maps should have the same keys.
+// value differs. Both maps should have the same keys. A record just made
+// (Diff of an empty map) gives {}: webhooks and automations receive these
+// changes, and must not start carrying a new record's every field.
 func Diff(before, after map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, b := range before {
@@ -66,11 +68,13 @@ func Diff(before, after map[string]any) map[string]any {
 
 // Logged is one entry read back from the audit log.
 type Logged struct {
-	ID        string
-	ActorID   string
-	Action    string
-	Changes   map[string]any
-	CreatedAt time.Time
+	ID         string
+	ActorID    string
+	Action     string
+	EntityType string // filled by Page
+	EntityID   string // filled by Page
+	Changes    map[string]any
+	CreatedAt  time.Time
 }
 
 // List returns the newest entries about one entity (at most limit), in the

@@ -100,11 +100,17 @@ func (h *HTTP) HighlightDocument(ctx context.Context, req api.HighlightDocumentR
 	}
 	var marked string
 	err = database.InTx(ctx, h.svc.pool, authz.MustFromContext(ctx), func(tx pgx.Tx) error {
-		var err error
-		marked, err = store.New(tx).HighlightDocumentText(ctx, store.HighlightDocumentTextParams{Ts: q.TSQuery(), ID: req.DocumentId})
+		row, err := store.New(tx).GetDocument(ctx, req.DocumentId)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("document")
 		}
+		if err != nil {
+			return err
+		}
+		if err := h.svc.openCV(ctx, tx, row); err != nil { // its text holds the salary
+			return err
+		}
+		marked, err = store.New(tx).HighlightDocumentText(ctx, store.HighlightDocumentTextParams{Ts: q.TSQuery(), ID: req.DocumentId})
 		return err
 	})
 	if err != nil {

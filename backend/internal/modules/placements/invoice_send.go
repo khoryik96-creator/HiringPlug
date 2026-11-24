@@ -19,6 +19,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // SendNow emails a placement's invoice at once.
@@ -64,7 +65,7 @@ func (s *Service) SendNow(ctx context.Context, p authz.Principal, id string) (Vi
 		if err != nil {
 			return err
 		}
-		out, err = s.one(ctx, tx, p, row)
+		out, err = s.changed(ctx, tx, p, row, false)
 		return err
 	})
 	return out, err
@@ -77,6 +78,8 @@ func (e *notReady) Error() string { return e.message }
 
 // invoice is an invoice made up: its fields' values, who it is to and the document.
 type invoice struct {
+	salary  bool // the document prints the annual salary (InvoiceShowsSalary)
+	mailed  bool // so does the document or the email it is sent with
 	values  map[string]string
 	contact Contact
 	app     Application
@@ -171,7 +174,7 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 	}
 	billTo := []string{app.CompanyName, contact.Name, *contact.Email}
 	doc := InvoiceDoc(settings, values, billTo, totals.Tax != "0.00")
-	out := invoice{values: values, contact: contact, app: app, from: agency, number: number, due: due}
+	out := invoice{salary: InvoiceShowsSalary(settings, values, false), mailed: InvoiceShowsSalary(settings, values, true), values: values, contact: contact, app: app, from: agency, number: number, due: due}
 	if format != "pdf" {
 		out.docx, err = doc.Docx()
 		if err != nil {
@@ -243,6 +246,11 @@ func (s *Service) send(ctx context.Context, tx pgx.Tx, tenantID string, row stor
 	if err := q.QueueInvoiceDelivery(ctx, store.QueueInvoiceDeliveryParams{PlacementID: row.ID, DueOn: &made.due, DeliveryEmail: &emailID, DeliveryCompany: &made.app.CompanyID, IssuedNumber: &number, DeliveryTo: made.contact.Email}); err != nil {
 		return err
 	}
+	if made.mailed { // sent by a person (never the system): the salary is shown to the client
+		if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.Placement, made.app.CandidateID); err != nil {
+			return err
+		}
+	}
 	// The number and recipient, never the amounts.
 	return audit.Record(ctx, tx, audit.Entry{Action: "placement.invoice_queued", EntityType: "placement", EntityID: row.ID, Changes: map[string]any{
 		"invoiceNumber": number, "to": *made.contact.Email, "automatic": auto, "dueOn": made.due.Format(time.DateOnly),
@@ -308,7 +316,10 @@ func (s *Service) File(ctx context.Context, p authz.Principal, id, format string
 				}
 				out.Data, err = s.inv.Mailer.InvoicePDF(ctx, tx, *inv.DeliveryEmail)
 			}
-			return err
+			if err != nil {
+				return err
+			}
+			return s.sentInvoiceOpened(ctx, tx, row)
 		}
 		if inv.SentAt != nil {
 			return notAllowed("The original invoice attachment is unavailable.")
@@ -336,7 +347,10 @@ func (s *Service) File(ctx context.Context, p authz.Principal, id, format string
 		if format == "docx" {
 			out.Data = made.docx
 		}
-		return nil
+		if !made.salary {
+			return nil
+		}
+		return salaryview.In(ctx, tx, s.salaryViews, salaryview.Placement, made.app.CandidateID)
 	})
 	return out, err
 }

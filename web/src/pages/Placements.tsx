@@ -5,6 +5,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey } from "../api/keys";
 import { downloadExport } from "../api/files";
 import { ExportButton } from "../components/ExportButton";
+import { useApplicationPlacement } from "../components/ApplicationPlacement";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { PlacementForm } from "../components/PlacementForm";
 import { PlacementInvoice } from "../components/PlacementInvoicing";
@@ -18,6 +19,19 @@ import { PLACEMENT_JOB_TYPE, PLACEMENT_STATUS, REPLACEMENT, formatDay, formatMon
 export function daysUntil(day: string, today = new Date()): number {
   const start = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   return Math.round((Date.parse(`${day}T00:00:00Z`) - start) / 86_400_000);
+}
+
+/**
+ * Editing a placement from the dashboard: the list has no salaries (it does
+ * not show them), so the form loads the placement with its salary first,
+ * never saving it over with none.
+ */
+function PlacementEditor({ p, permissions, onDone }: { p: Schemas["Placement"]; permissions: Permission[]; onDone: () => void }) {
+  const full = useApplicationPlacement(p.applicationId, true);
+  const placement = full.data?.find((x) => x.id === p.id);
+  if (full.error) return <ErrorMessage error={full.error} />;
+  if (!placement) return <p className="muted" role="status">{full.data ? "This placement is no longer there." : "Loading…"}</p>;
+  return <PlacementForm applicationId={p.applicationId} placement={placement} permissions={permissions} onDone={onDone} />;
 }
 
 const RANGES: [Range, string][] = [["this_year", "This year"], ["last_year", "Last year"], ["all", "All time"], ["custom", "Custom"]];
@@ -112,7 +126,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
                 <tbody>
                   {rows.slice(0, shown).map((p) => editing === p.id ? (
                     <tr key={p.id}><td colSpan={8}>
-                      <PlacementForm applicationId={p.applicationId} placement={p} permissions={permissions} onDone={() => { setEditing(null); }} />
+                      <PlacementEditor p={p} permissions={permissions} onDone={() => { setEditing(null); }} />
                     </td></tr>
                   ) : (
                     <PlacementRow key={p.id} p={p} permissions={permissions} today={today} seesFees={seesFees} onEdit={() => { setEditing(p.id); }} />

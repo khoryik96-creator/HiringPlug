@@ -13,6 +13,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Summary is a candidate as shown in lists.
@@ -114,6 +115,10 @@ type Filter struct {
 	// Similar: names like Query (typos), the closest first, one page only.
 	Similar bool
 	Order   Order
+	// IncludeSalary: return salaries (for roles that may see them), and
+	// count the page in the log of who was shown a salary (a page sorted by
+	// salary is counted either way).
+	IncludeSalary bool
 }
 
 // List returns up to limit candidates matching f, starting after cursor (the
@@ -145,7 +150,12 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		for i, r := range rows {
 			page.Items[i] = summaryOf(r, !canSeeSalary(p))
 		}
-		return attachCompensation(ctx, tx, p, page.Items)
+		if f.IncludeSalary {
+			if err := attachCompensation(ctx, tx, p, page.Items); err != nil {
+				return err
+			}
+		}
+		return salaryview.In(ctx, tx, s.salaryViews, salaryview.CandidateList, probedOrShown(page.Items, salarySort(sort))...)
 	})
 	return page, err
 }

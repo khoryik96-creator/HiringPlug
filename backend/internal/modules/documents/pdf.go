@@ -6,10 +6,8 @@ package documents
 
 import (
 	"context"
-	"errors"
 	"io"
 	"mime"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 
@@ -64,25 +62,31 @@ func (s *Service) savePdf(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 // Pdf opens a document's PDF.
 func (s *Service) Pdf(ctx context.Context, p authz.Principal, id string) (Document, io.ReadCloser, error) {
 	var row store.Document
+	var f io.ReadCloser
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		closeFile(&f) // a transaction tried again
 		var err error
 		row, err = store.New(tx).GetDocument(ctx, id)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("document")
 		}
+		if err != nil {
+			return err
+		}
+		if row.PdfKey == nil { // nothing to open: only refused to those who may not see it
+			if _, err := s.salaryCV(ctx, tx, row); err != nil {
+				return err
+			}
+			return apperr.NotFound("PDF of this document")
+		}
+		f, err = s.openFile(ctx, tx, row, *row.PdfKey, "PDF of this document")
 		return err
 	})
 	if err != nil {
+		closeFile(&f)
 		return Document{}, nil, err
 	}
-	if row.PdfKey == nil {
-		return Document{}, nil, apperr.NotFound("PDF of this document")
-	}
-	f, err := s.files.Open(*row.PdfKey)
-	if errors.Is(err, os.ErrNotExist) {
-		return Document{}, nil, apperr.NotFound("PDF of this document")
-	}
-	return fromRow(row), f, err
+	return fromRow(row), f, nil
 }
 
 // GetDocumentPdf handles GET /v1/documents/{documentId}/pdf.
@@ -108,6 +112,9 @@ func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Do
 			return apperr.NotFound("document")
 		}
 		if err != nil {
+			return err
+		}
+		if _, err := s.salaryCV(ctx, tx, row); err != nil {
 			return err
 		}
 		if filekind.Office(row.ContentType) && row.PdfStatus == nil { // a failed copy is not tried again on every view

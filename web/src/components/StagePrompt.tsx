@@ -32,7 +32,9 @@ export function StagePrompt({ app, stage, step, permissions, onMove, onClose }: 
   onClose: () => void;
 }) {
   const offers = useQuery({
-    queryKey: applicationOffersKey(app.id),
+    // Only whether one is open: no salary asked for (its own key, so the
+    // offer panel never reads this list for its salary).
+    queryKey: [...applicationOffersKey(app.id), "open"],
     queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { applicationId: app.id } } })).items,
     enabled: stage === "offer",
   });

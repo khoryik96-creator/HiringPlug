@@ -40,7 +40,7 @@ describe("candidate list columns", () => {
     renderWithClient(<CandidateList />);
     await screen.findByRole("columnheader", { name: /^Nationality/ });
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent.replace(/[↕▲▼]/g, ""))).toEqual(["Name", "Nationality", "Residence", "Work authorization"]);
-    const siti = screen.getByText("Siti Aisyah").closest("tr");
+    const siti = (await screen.findByText("Siti Aisyah")).closest("tr"); // the list waits for the person's columns
     expect(siti?.textContent).toContain("Singapore");
     expect(siti?.textContent).toContain("Malaysia");
     expect(siti?.textContent).toContain("Spouse visa");

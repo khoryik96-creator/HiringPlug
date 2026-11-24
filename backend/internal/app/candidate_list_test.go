@@ -25,9 +25,13 @@ func TestTheListShowsStatusNoticeAndSalaryToThoseWhoMaySeeIt(t *testing.T) {
 		"expectedSalary": map[string]any{"min": "10000", "max": "12000", "currency": "MYR", "period": "month"},
 	}).Status)
 
-	find := func(token string) api.CandidateSummary {
+	find := func(token string, query ...string) api.CandidateSummary {
 		var page api.CandidatePage
-		a.request(http.MethodGet, "/v1/candidates", token, nil).JSON(&page)
+		q := "?includeSalary=true"
+		if len(query) > 0 {
+			q = query[0]
+		}
+		a.request(http.MethodGet, "/v1/candidates"+q, token, nil).JSON(&page)
 		for _, s := range page.Items {
 			if s.Id == c.Id {
 				return s
@@ -47,6 +51,11 @@ func TestTheListShowsStatusNoticeAndSalaryToThoseWhoMaySeeIt(t *testing.T) {
 	assert.Equal(t, "MY", got.ResidenceCountry.MustGet())
 	assert.Equal(t, api.WorkAuthorizationBasisRpT, got.WorkAuthorizationBasis.MustGet(), "for the colour beside the name")
 	assert.Equal(t, "Banking", got.Industry.MustGet())
+	// A list that does not show salaries (a typeahead) does not get them.
+	plain := find(recruiter, "")
+	assert.True(t, plain.CurrentSalary.IsNull())
+	assert.True(t, plain.ExpectedSalary.IsNull())
+	assert.False(t, plain.SalaryRestricted, "they may see salaries; they did not ask")
 
 	hidden := find(sourcer)
 	assert.True(t, hidden.SalaryRestricted, "a sourcer may not see salaries")

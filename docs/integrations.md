@@ -37,6 +37,22 @@ key sees the candidates its role sees: for a role limited to its own (or its
 team's) candidates, none, so a key cannot be made for one. Nobody makes a key
 that can do more than they can.
 
+**Changed in 1.45.0: salaries only when asked for.** A program using a key
+that read salaries from these lists must now ask for them, as the app's own
+screens do: `GET /v1/candidates` and `POST /v1/candidates/search`
+(`includeSalary=true`: current and expected salaries), `GET /v1/offers`
+(the salary offered) and `GET /v1/placements` (the agreed salary; the fee is
+always there), and `POST /v1/email-previews` (the salary fields' values;
+`withheldFields` names those left out). Without it these salaries are null
+(or left out) where they used to be filled. A change to an offer or a
+placement sends it back without the salary unless the change set it. Every
+answer with salaries, and every page sorted or filtered by salary, is
+counted against the key in the log of who was shown a salary (Settings ›
+Audit log › Salary views), so ask only for what the program uses. Exports
+and a candidate's own page (`GET /v1/candidates/{id}`) are unchanged. To
+watch emails being sent, ask `GET /v1/emails` with `statusOnly=true`: how
+each is getting on, without subjects or messages, and not counted.
+
 **Webhooks.** Choose the events (candidate created or updated, application
 added or moved, careers applications, interviews scheduled or changed,
 feedback, offers approved, sent, accepted, declined or withdrawn, placements,

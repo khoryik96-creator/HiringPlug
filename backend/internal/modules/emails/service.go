@@ -17,6 +17,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Service holds the email use cases.
@@ -25,7 +26,8 @@ type Service struct {
 	pool        *pgxpool.Pool
 	deps        Deps
 	sender      mail.Sender
-	files       *blob.Store // banners and attachments
+	files       *blob.Store         // banners and attachments
+	salaryViews salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 const templateNameIndex = "email_template_name_idx"
@@ -223,6 +225,9 @@ func (s *Service) Draft(ctx context.Context, p authz.Principal, r DraftRequest) 
 		if to != nil && *to != "" {
 			out.To = append(out.To, *to)
 		}
+		if r.CandidateID != nil && salaryFilled(values, tpl.Subject, tpl.Body, deref(tpl.BodyHtml)) {
+			return salaryview.In(ctx, tx, s.salaryViews, salaryview.EmailFields, *r.CandidateID)
+		}
 		return nil
 	})
 	return out, err
@@ -304,7 +309,9 @@ type EmailView struct {
 }
 
 // List returns the emails about a candidate the user may see, newest first.
-func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, contactID *string) ([]EmailView, error) {
+// statusOnly: only how each is getting on (a list looked at again while
+// some are on their way), without their texts, and not counted as read.
+func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, contactID *string, statusOnly bool) ([]EmailView, error) {
 	if (candidateID == nil) == (contactID == nil) {
 		var errs apperr.FieldErrors
 		errs.Add("candidateId", "give candidateId or contactId")
@@ -329,6 +336,11 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, cont
 		}
 		files, err := q.EmailAttachments(ctx, ids)
 		if err != nil {
+			return err
+		}
+		if statusOnly {
+			withoutTexts(rows)
+		} else if err := s.salaryEmailsRead(ctx, tx, rows); err != nil {
 			return err
 		}
 		out = make([]EmailView, len(rows))

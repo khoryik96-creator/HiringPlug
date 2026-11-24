@@ -222,6 +222,27 @@ func InvoiceDoc(s InvoiceSettings, values map[string]string, billTo []string, ta
 	return doc
 }
 
+// InvoiceShowsSalary reports whether an invoice made from s with values
+// prints the annual salary (its fee basis, a share of the salary): in the
+// document itself (its preview or download), or with mail also in the email
+// it is sent with.
+func InvoiceShowsSalary(s InvoiceSettings, values map[string]string, mail bool) bool {
+	annual := values["salary.annual"]
+	if annual == "" {
+		return false
+	}
+	texts := []string{s.LineText, s.Footer}
+	if mail {
+		texts = append(texts, s.EmailSubject, s.EmailBody)
+	}
+	for _, text := range texts {
+		if strings.Contains(FillInvoice(text, values), annual) {
+			return true
+		}
+	}
+	return false
+}
+
 // trimZeros writes a percentage as people do: "8.00" is "8".
 func trimZeros(v string) string {
 	if strings.Contains(v, ".") {

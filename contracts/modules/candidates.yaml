@@ -138,6 +138,16 @@ paths:
           in: query
           description: With a sort other than newest, the `nextOffset` of the previous page.
           schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+        - name: includeSalary
+          in: query
+          description: >
+            Return current and expected salaries (only for roles that may see
+            them). Ask only when they are shown: each page with salaries is
+            counted in the log of who was shown a salary. Without it both are
+            null (sorting by salary still works, and a page sorted by salary is
+            counted too, with every candidate on it: the order tells about
+            their salaries).
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: OK
@@ -878,14 +888,14 @@ components:
           allOf: [{ $ref: '#/components/schemas/NoticePeriod' }]
           nullable: true
         currentSalary:
-          description: Needs candidates.compensation:read (see salaryRestricted).
+          description: Needs candidates.compensation:read (see salaryRestricted), and includeSalary.
           allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
           nullable: true
         expectedSalary:
-          description: Needs candidates.compensation:read (see salaryRestricted).
+          description: Needs candidates.compensation:read (see salaryRestricted), and includeSalary.
           allOf: [{ $ref: '#/components/schemas/SalaryRange' }]
           nullable: true
-        salaryRestricted: { type: boolean, description: "true: you may not see salaries, so both are left out." }
+        salaryRestricted: { type: boolean, description: "true: you may not see salaries, so both are left out (false says only that you may, not that they were asked for)." }
         id: { $ref: '#/components/schemas/CandidateId' }
         fullName: { type: string }
         email: { type: string, nullable: true }
@@ -947,6 +957,16 @@ components:
         cursor: { $ref: '#/components/schemas/CandidateId' }
         sort: { $ref: '#/components/schemas/CandidateSort' }
         offset: { type: integer, minimum: 0, maximum: 1000000, description: "With a sort other than newest, the nextOffset of the previous page." }
+        includeSalary:
+          type: boolean
+          description: >
+            Return current and expected salaries (only for roles that may see
+            them). Ask only when they are shown: each page with salaries is
+            counted in the log of who was shown a salary. Without it (false
+            unless given) both are null; expectedSalaryMax and sorting by
+            salary still work, and such a page is counted too, with every
+            candidate on it (being found, or the order, tells about their
+            salaries). An export always has them, for roles that may see them.
     SalaryCap:
       type: object
       additionalProperties: false

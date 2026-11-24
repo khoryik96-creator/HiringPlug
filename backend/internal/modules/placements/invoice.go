@@ -182,7 +182,7 @@ func (s *Service) PutInvoicing(ctx context.Context, p authz.Principal, id string
 		}}); err != nil {
 			return err
 		}
-		out, err = s.one(ctx, tx, p, row)
+		out, err = s.changed(ctx, tx, p, row, false)
 		return err
 	})
 	return out, err

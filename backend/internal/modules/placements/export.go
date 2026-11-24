@@ -19,6 +19,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/sheet"
 )
 
@@ -31,7 +32,7 @@ var (
 // When ids is not nil only those placements are kept (what the dashboard
 // shows after its search, filters and card).
 func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, ids []string, format string) (sheet.File, error) {
-	var views []View
+	var file sheet.File
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ExportPlacements(ctx, store.ExportPlacementsParams{
 			Ids: ids, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
@@ -42,7 +43,16 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, ids [
 		if len(rows) > sheet.MaxRows {
 			return apperr.ExportTooLarge(sheet.MaxRows)
 		}
-		if views, err = s.views(ctx, tx, p, rows); err != nil {
+		views, err := s.views(ctx, tx, p, rows)
+		if err != nil {
+			return err
+		}
+		// The file first: the salaries are counted as shown only once it is made.
+		fees := p.Can(api.PermissionPlacementsFeesRead)
+		if file, err = sheet.Write(format, sheet.Dated("Placements", time.Now(), s.inv.TimeZone), PlacementTable(views, fees)); err != nil {
+			return err
+		}
+		if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.Export, salaryOf(views)...); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{
@@ -53,7 +63,7 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, ids [
 	if err != nil {
 		return sheet.File{}, err
 	}
-	return sheet.Write(format, sheet.Dated("Placements", time.Now(), s.inv.TimeZone), PlacementTable(views, p.Can(api.PermissionPlacementsFeesRead)))
+	return file, nil
 }
 
 // PlacementTable is the export's sheet: the salary and fee columns only when shown.

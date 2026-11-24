@@ -70,6 +70,7 @@ type Application struct {
 type CVFile struct {
 	CandidateID, FileName, ContentType string
 	Data                               []byte
+	Salary                             bool // a formatted CV made with the salary
 }
 
 // Interview is what this module needs to know about an interview.

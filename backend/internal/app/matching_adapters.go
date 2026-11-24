@@ -69,7 +69,9 @@ func (a matchingCandidates) Briefs(ctx context.Context, tx pgx.Tx, ids []string)
 // Pool runs the user's advanced search for the AI candidate search: who to
 // consider, and what the AI may read of their profile (no name, contact or salary).
 func (a matchingCandidates) Pool(ctx context.Context, tx pgx.Tx, p authz.Principal, search api.CandidateSearch, limit int) ([]matching.PoolCandidate, error) {
-	page, err := a.candidates.SearchIn(ctx, tx, p, candidates.FilterOf(search, p), limit)
+	f := candidates.FilterOf(search, p)
+	f.IncludeSalary = false // the AI never reads a salary
+	page, err := a.candidates.SearchIn(ctx, tx, p, f, limit)
 	if err != nil {
 		return nil, err
 	}

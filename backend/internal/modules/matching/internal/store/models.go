@@ -842,6 +842,7 @@ type Email struct {
 	BouncedAt           *time.Time
 	DeliveryAttemptedAt *time.Time
 	CvCandidateIds      []string
+	ToCandidate         bool
 }
 
 type EmailAttachment struct {
@@ -1735,6 +1736,19 @@ type RoleSetting struct {
 	UpdatedBy        string
 	UpdatedAt        time.Time
 	KnownPermissions []string
+}
+
+type SalaryView struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	Kind         string
+	CandidateID  *string
+	CandidateIds []string
+	Day          pgtype.Date
+	Count        int32
+	FirstAt      time.Time
+	LastAt       time.Time
 }
 
 type Schedule struct {

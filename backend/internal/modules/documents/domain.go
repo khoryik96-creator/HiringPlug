@@ -51,6 +51,7 @@ type Document struct {
 	ReadOutdated  bool     // a candidate's CV read by older CV-reading rules than CVReader
 	ParsedProfile []byte   // JSON (api.ParsedProfile); only loaded for single-document reads
 	PdfStatus     *string  // formatted CVs made by the app: queued, ready, failed
+	Salary        bool     // a formatted CV made with the salary (CVFile only)
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }

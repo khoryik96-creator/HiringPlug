@@ -208,6 +208,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The company's audit log, newest first
+         * @description Entries about candidates and their jobs the user may not see are left out (row-level security). Salary values are never in the log, only that they changed.
+         */
+        get: operations["listAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit-log/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The audit log the filters find, as Excel or CSV (at most 10,000 entries) */
+        post: operations["exportAuditLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/salary-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who was shown a salary, newest day first
+         * @description One line per person, kind, candidate and day, with how often. A list, search or export is one line a day with the number of different candidates whose salary it showed. Lines about candidates the user may not see are left out (row-level security). No amounts.
+         */
+        get: operations["listSalaryViews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/salary-views/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The salary views the filters find, as Excel or CSV (at most 10,000 lines) */
+        post: operations["exportSalaryViews"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/automations": {
         parameters: {
             query?: never;
@@ -2656,7 +2730,7 @@ export interface paths {
         put?: never;
         /**
          * Fill an email's fields for a candidate (and a job or interview), to see before sending
-         * @description Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them).
+         * @description Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them). Salary fields' values come back in `fieldValues` only with includeSalary.
          */
         post: operations["previewEmail"];
         delete?: never;
@@ -4647,7 +4721,7 @@ export interface paths {
         head?: never;
         /**
          * Change an offer's terms (an offer waiting for approval or approved goes back to draft)
-         * @description Fields left out stay as they are. `salary` needs offers.salary:update.
+         * @description Fields left out stay as they are. `salary` needs offers.salary:update. The offer comes back with its salary only when this change set it (otherwise null: read it with GET /v1/offers and includeSalary).
          */
         patch: operations["updateOffer"];
         trace?: never;
@@ -4665,7 +4739,7 @@ export interface paths {
         put?: never;
         /**
          * Move an offer on (ask for approval, send, record the answer, withdraw)
-         * @description Sending without approval needs offers:approve.
+         * @description Sending without approval needs offers:approve. The offer comes back without its salary (null: read it with GET /v1/offers and includeSalary).
          */
         post: operations["stepOffer"];
         delete?: never;
@@ -4687,7 +4761,7 @@ export interface paths {
         put?: never;
         /**
          * Approve an offer waiting for approval, or send it back to draft
-         * @description You cannot decide on an offer you asked approval for.
+         * @description You cannot decide on an offer you asked approval for. The offer comes back without its salary (null: read it with GET /v1/offers and includeSalary).
          */
         post: operations["decideOffer"];
         delete?: never;
@@ -4999,7 +5073,7 @@ export interface paths {
         head?: never;
         /**
          * Change a placement (start, guarantee, status, invoice, money)
-         * @description Fields left out stay as they are. `money` needs placements.fees:update.
+         * @description Fields left out stay as they are. `money` needs placements.fees:update. The agreed salary comes back only when this change set `money` (otherwise null: read it with GET /v1/placements and includeSalary).
          */
         patch: operations["updatePlacement"];
         trace?: never;
@@ -5036,7 +5110,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date */
+        /**
+         * Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date
+         * @description The placement comes back without its agreed salary (`money.salary` null; the fee is there).
+         */
         put: operations["putPlacementInvoicing"];
         post?: never;
         delete?: never;
@@ -5058,7 +5135,7 @@ export interface paths {
         put?: never;
         /**
          * Email the invoice now (numbered from the template; the placement is then invoiced)
-         * @description Needs placements.fees:read too (the invoice shows the fee).
+         * @description Needs placements.fees:read too (the invoice shows the fee). The placement comes back without its agreed salary (`money.salary` null). Sent by a person, an invoice whose fee is a share of the salary counts as showing it (the log of who was shown a salary).
          */
         post: operations["sendPlacementInvoice"];
         delete?: never;
@@ -5765,7 +5842,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "aiusage:manage" | "aiusage:read" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
+        Permission: "aiproviders:manage" | "aiusage:manage" | "aiusage:read" | "assistant:use" | "auditlog.salary_views:read" | "auditlog:read" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -6229,6 +6306,100 @@ export interface components {
             model: string | null;
             inputTokens: number;
             outputTokens: number;
+        };
+        /** @description One action or kind of action, or several separated by commas (at most 20). */
+        AuditActionFilter: string;
+        /** @description Where a page ended (read it as an opaque value). */
+        AuditCursor: string;
+        /** @example aud_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        AuditEntryId: string;
+        /** @example sv_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        SalaryViewId: string;
+        /**
+         * @description user (a person), api_key (a program using an API key) or system (what happened automatically).
+         * @enum {string}
+         */
+        AuditActorKind: "user" | "api_key" | "system";
+        AuditEntry: {
+            id: components["schemas"]["AuditEntryId"];
+            /** Format: date-time */
+            at: string;
+            /** @description A user id, an API key id, or "system". */
+            actorId: string;
+            actorKind: components["schemas"]["AuditActorKind"];
+            /** @description The person's name; "Automatic" for the system; an API key's name, or "API key" when it cannot be found. */
+            actorName: string;
+            /** @example candidate.updated */
+            action: string;
+            /** @example candidate */
+            entityType: string;
+            entityId: string;
+            /** @description The record's name, when it can be looked up (null otherwise): a candidate's, job's, company's, contact's, user's or job lead's ("Accountant · Maju Bhd"); for a candidate on a job (application), "Candidate name · Job title". */
+            entityName: string | null;
+            /** @description For a candidate on a job (application), the candidate, whose page the record opens; null otherwise. */
+            candidateId: components["schemas"]["CandidateId"] | null;
+            /** @description What changed: field -> {"from", "to"}, or details of the action. Never a salary amount. */
+            changes: {
+                [key: string]: unknown;
+            };
+        };
+        AuditLogPage: {
+            items: components["schemas"]["AuditEntry"][];
+            nextCursor: components["schemas"]["AuditCursor"] | null;
+        };
+        AuditLogExport: {
+            format: components["schemas"]["ExportFormat"];
+            actor?: string;
+            action?: components["schemas"]["AuditActionFilter"];
+            entityType?: string;
+            entityId?: string;
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+        };
+        /**
+         * @description Where the salary was shown: candidate (their page), candidate_list (a list or search with salary), export (a file of candidates or placements with salary), email_fields (an email being written, filled with it), email_sent (an email sent with it), email_read (a sent email with it, read on a candidate's or contact's emails or in a copy of their data), cv (a formatted CV with it made, opened, downloaded or attached), screening (a screening call's salary), offer (an offer's salary), placement (a placement's salary).
+         * @enum {string}
+         */
+        SalaryViewKind: "candidate" | "candidate_list" | "export" | "email_fields" | "email_sent" | "email_read" | "cv" | "screening" | "offer" | "placement";
+        SalaryView: {
+            id: components["schemas"]["SalaryViewId"];
+            /**
+             * Format: date
+             * @description The day, in the agency's time zone.
+             */
+            day: string;
+            /** @description Who was shown it (a user id or an API key id). */
+            userId: string;
+            /** @description Their name; an API key's name, or "API key". */
+            userName: string;
+            kind: components["schemas"]["SalaryViewKind"];
+            /** @description Whose salary (null for a list, search or export). */
+            candidateId: components["schemas"]["CandidateId"] | null;
+            candidateName: string | null;
+            /** @description How many different candidates' salaries a list, search or export showed that day (1 for one candidate). */
+            candidates: number;
+            /** @description How often that day. */
+            count: number;
+            /** Format: date-time */
+            firstAt: string;
+            /** Format: date-time */
+            lastAt: string;
+        };
+        SalaryViewPage: {
+            items: components["schemas"]["SalaryView"][];
+            nextCursor: components["schemas"]["AuditCursor"] | null;
+        };
+        SalaryViewExport: {
+            format: components["schemas"]["ExportFormat"];
+            user?: string;
+            candidateId?: components["schemas"]["CandidateId"];
+            kind?: components["schemas"]["SalaryViewKind"];
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
         };
         AutomationId: string;
         AutomationRunId: string;
@@ -6756,11 +6927,11 @@ export interface components {
              */
             availabilitySince: string | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
-            /** @description Needs candidates.compensation:read (see salaryRestricted). */
+            /** @description Needs candidates.compensation:read (see salaryRestricted), and includeSalary. */
             currentSalary: components["schemas"]["SalaryAmount"] | null;
-            /** @description Needs candidates.compensation:read (see salaryRestricted). */
+            /** @description Needs candidates.compensation:read (see salaryRestricted), and includeSalary. */
             expectedSalary: components["schemas"]["SalaryRange"] | null;
-            /** @description true: you may not see salaries, so both are left out. */
+            /** @description true: you may not see salaries, so both are left out (false says only that you may, not that they were asked for). */
             salaryRestricted: boolean;
             id: components["schemas"]["CandidateId"];
             fullName: string;
@@ -6821,6 +6992,8 @@ export interface components {
             sort?: components["schemas"]["CandidateSort"];
             /** @description With a sort other than newest, the nextOffset of the previous page. */
             offset?: number;
+            /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work, and such a page is counted too, with every candidate on it (being found, or the order, tells about their salaries). An export always has them, for roles that may see them. */
+            includeSalary?: boolean;
         };
         SalaryCap: {
             /** @example 12000 */
@@ -8856,6 +9029,8 @@ export interface components {
             candidates?: components["schemas"]["EmailCandidate"][];
             /** @example Asia/Kuala_Lumpur */
             timeZone: string;
+            /** @description Put the salary fields' values in `fieldValues` (for roles that may see salaries; false unless given). Ask only when they are shown or put in the message (a salary field inserted, salary details for a shortlist): each answer with a salary is counted in the log of who was shown a salary. Without it they are left out and named in `withheldFields`. The subject and message are filled either way (and counted when a salary field in them is filled). */
+            includeSalary?: boolean;
         };
         EmailBatch: {
             recipients: components["schemas"]["EmailRecipient"][];
@@ -8901,10 +9076,12 @@ export interface components {
         EmailPreview: {
             candidateVersion?: number;
             compensationVersion?: number;
-            /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
+            /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries, and only with includeSalary). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
             fieldValues: {
                 [key: string]: string;
             };
+            /** @description Salary fields that have a value but were left out of fieldValues (includeSalary was not given), by token: ask again with includeSalary to put one in. */
+            withheldFields?: string[];
             /** @description The job's hiring contact, to send to (when an application is given and its job has one). */
             clientEmail: string | null;
             subject: string;
@@ -10867,7 +11044,7 @@ export interface components {
             jobTitle: string;
             companyName: string;
             status: components["schemas"]["OfferStatus"];
-            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set. */
+            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or that it was not asked for (GET /v1/offers without includeSalary; a change that did not set it). */
             salary?: components["schemas"]["SalaryAmount"] | null;
             /** Format: date */
             startDate: string | null;
@@ -11350,7 +11527,7 @@ export interface components {
         PlacementMoney: {
             /** @description The job's retainer when this is the first placement on a job with one. */
             retainer: components["schemas"]["PlacementRetainer"] | null;
-            /** @description The agreed salary. */
+            /** @description The agreed salary (in GET /v1/placements only with includeSalary; after a change only when it set `money`). */
             salary: components["schemas"]["SalaryAmount"] | null;
             /** @description e.g. "20" for 20% of the yearly salary. */
             feePercent: components["schemas"]["DecimalAmount"] | null;
@@ -12526,6 +12703,20 @@ export interface components {
     };
     parameters: {
         AiProviderPath: components["schemas"]["AiProviderName"];
+        /** @description The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since). */
+        AuditCursor: components["schemas"]["AuditCursor"];
+        /** @description Only what this actor did - a user id, an API key id, or "system" (what happened automatically). */
+        AuditActor: string;
+        /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). Several, separated by commas, find any of them ("settings,invoice_settings,tenant.renamed"). */
+        AuditAction: components["schemas"]["AuditActionFilter"];
+        /** @description Only entries about this kind of record (candidate, job, company, contact, email...). */
+        AuditEntityType: string;
+        /** @description Only entries about this record. */
+        AuditEntityId: string;
+        /** @description From this day on (in the agency's time zone). */
+        AuditFrom: string;
+        /** @description Up to and including this day (in the agency's time zone). */
+        AuditTo: string;
         AutomationIdPath: components["schemas"]["AutomationId"];
         AutomationRunIdPath: components["schemas"]["AutomationRunId"];
         CandidateIdPath: components["schemas"]["CandidateId"];
@@ -12947,6 +13138,157 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["AssistantOff"];
             429: components["responses"]["AssistantLimitReached"];
+        };
+    };
+    listAuditLog: {
+        parameters: {
+            query?: {
+                /** @description Only what this actor did - a user id, an API key id, or "system" (what happened automatically). */
+                actor?: components["parameters"]["AuditActor"];
+                /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). Several, separated by commas, find any of them ("settings,invoice_settings,tenant.renamed"). */
+                action?: components["parameters"]["AuditAction"];
+                /** @description Only entries about this kind of record (candidate, job, company, contact, email...). */
+                entityType?: components["parameters"]["AuditEntityType"];
+                /** @description Only entries about this record. */
+                entityId?: components["parameters"]["AuditEntityId"];
+                /** @description From this day on (in the agency's time zone). */
+                from?: components["parameters"]["AuditFrom"];
+                /** @description Up to and including this day (in the agency's time zone). */
+                to?: components["parameters"]["AuditTo"];
+                /** @description The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since). */
+                cursor?: components["parameters"]["AuditCursor"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    exportAuditLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditLogExport"];
+            };
+        };
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listSalaryViews: {
+        parameters: {
+            query?: {
+                /** @description Only what this person (a user id, or an API key id) was shown. */
+                user?: string;
+                /** @description Only this candidate's salary (lists and exports that showed it included). */
+                candidateId?: components["schemas"]["CandidateId"];
+                kind?: components["schemas"]["SalaryViewKind"];
+                /** @description From this day on (in the agency's time zone). */
+                from?: components["parameters"]["AuditFrom"];
+                /** @description Up to and including this day (in the agency's time zone). */
+                to?: components["parameters"]["AuditTo"];
+                /** @description The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since). */
+                cursor?: components["parameters"]["AuditCursor"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryViewPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    exportSalaryViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalaryViewExport"];
+            };
+        };
+        responses: {
+            /** @description The file (an Excel workbook or a CSV) */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description Too many rows (EXPORT_TOO_LARGE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listAutomations: {
@@ -13684,6 +14026,8 @@ export interface operations {
                 sort?: components["schemas"]["CandidateSort"];
                 /** @description With a sort other than newest, the `nextOffset` of the previous page. */
                 offset?: number;
+                /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it both are null (sorting by salary still works, and a page sorted by salary is counted too, with every candidate on it: the order tells about their salaries). */
+                includeSalary?: boolean;
             };
             header?: never;
             path?: never;
@@ -18171,6 +18515,8 @@ export interface operations {
             query?: {
                 candidateId?: components["schemas"]["CandidateId"];
                 contactId?: components["schemas"]["ContactId"];
+                /** @description Only how each email is getting on (to look again while some are on their way): the subject and message come back empty, and reading the list is not counted in the log of who was shown a salary (a list with an email that shows salary is counted otherwise). */
+                statusOnly?: boolean;
             };
             header?: never;
             path?: never;
@@ -21717,6 +22063,8 @@ export interface operations {
             query?: {
                 applicationId?: components["schemas"]["ApplicationId"];
                 status?: components["schemas"]["OfferStatus"];
+                /** @description Return the salaries offered (only with offers.salary:read). Ask only when they are shown: each list with salaries is counted in the log of who was shown a salary. Without it every salary is null. */
+                includeSalary?: boolean;
             };
             header?: never;
             path?: never;
@@ -22281,6 +22629,8 @@ export interface operations {
                 startFrom?: string;
                 /** @description Started on or before this day. */
                 startTo?: string;
+                /** @description Return the agreed salary in `money` (only with placements.fees:read). Ask only when it is shown: each list with salaries is counted in the log of who was shown a salary. Without it `money.salary` is null (the fee is still there). */
+                includeSalary?: boolean;
             };
             header?: never;
             path?: never;

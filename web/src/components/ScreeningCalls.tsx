@@ -9,11 +9,13 @@ import { CallQA } from "./callLines";
 import { ScreeningSalarySnapshot } from "./ScreeningSalarySnapshot";
 import { formatDay } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { callsShowSalary } from "../api/salaryShown";
 
 export function ScreeningCalls({ candidateId, permissions }: { candidateId: string; permissions: Permission[] }) {
   const calls = useQuery({
     queryKey: screeningCallsKey(candidateId),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/screening-calls", { params: { path: { candidateId } } })).items,
+    refetchOnWindowFocus: (q) => !callsShowSalary(q.state.data),
   });
   const notes = useQuery({
     queryKey: notesKey("candidate", candidateId),

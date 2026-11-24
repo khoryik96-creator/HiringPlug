@@ -17,6 +17,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // downloadLinkTTL is how long the AI worker's download link stays valid. It
@@ -34,7 +35,9 @@ type Service struct {
 	enrichIndustry func(context.Context, pgx.Tx, *api.ParsedProfile) error
 	industryLabels func(context.Context, pgx.Tx) ([]string, error)
 	recordBinned   func(context.Context, pgx.Tx, string, string, string, string) error
-	ai             AIAllowance // nil: the AI never fills in CV readings
+	ai             AIAllowance         // nil: the AI never fills in CV readings
+	salaryCVs      SalaryCVs           // formatted CVs made with the salary (CheckSalaryCVsWith)
+	salaryViews    salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 // AIAllowance says whether the AI may be used now (the company has one,
@@ -210,6 +213,9 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Docume
 			return apperr.NotFound("document")
 		}
 		if err != nil {
+			return err
+		}
+		if err := s.openCV(ctx, tx, row); err != nil { // its text holds the salary
 			return err
 		}
 		doc = fromRow(row)

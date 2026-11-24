@@ -22,6 +22,8 @@ class Permission(StrEnum):
     aiusage_manage = "aiusage:manage"
     aiusage_read = "aiusage:read"
     assistant_use = "assistant:use"
+    auditlog_salary_views_read = "auditlog.salary_views:read"
+    auditlog_read = "auditlog:read"
     automations_tasks_read = "automations.tasks:read"
     automations_tasks_update = "automations.tasks:update"
     automations_approve = "automations:approve"
@@ -852,6 +854,68 @@ class AssistantAnsweredJob(BaseModel):
     outputTokens: Annotated[int, Field(ge=0)]
 
 
+class AuditActionFilter(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="One action or kind of action, or several separated by commas (at most 20).",
+            max_length=400,
+            pattern="^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?(,[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?){0,19}$",
+        ),
+    ]
+
+
+class AuditCursor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(description="Where a page ended (read it as an opaque value).", max_length=100, min_length=1),
+    ]
+
+
+class AuditEntryId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["aud_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^aud_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class SalaryViewId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["sv_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^sv_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class AuditActorKind(StrEnum):
+    user = "user"
+    api_key = "api_key"
+    system = "system"
+
+
+class AuditLogExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    actor: Annotated[str | None, Field(max_length=40, min_length=1)] = None
+    action: AuditActionFilter | None = None
+    entityType: Annotated[str | None, Field(max_length=40, pattern="^[a-z][a-z0-9_]*$")] = None
+    entityId: Annotated[str | None, Field(max_length=60, min_length=1)] = None
+    from_: Annotated[date | None, Field(alias="from")] = None
+    to: date | None = None
+
+
+class SalaryViewKind(StrEnum):
+    candidate = "candidate"
+    candidate_list = "candidate_list"
+    export = "export"
+    email_fields = "email_fields"
+    email_sent = "email_sent"
+    email_read = "email_read"
+    cv = "cv"
+    screening = "screening"
+    offer = "offer"
+    placement = "placement"
+
+
 class AutomationId(RootModel[str]):
     root: Annotated[str, Field(pattern="^aut_[0-9a-hjkmnp-tv-z]{26}$")]
 
@@ -1395,13 +1459,18 @@ class CandidateSummary(BaseModel):
     availabilitySince: Annotated[AwareDatetime | None, Field(description="When the status was last set.")]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     currentSalary: Annotated[
-        SalaryAmount | None, Field(description="Needs candidates.compensation:read (see salaryRestricted).")
+        SalaryAmount | None,
+        Field(description="Needs candidates.compensation:read (see salaryRestricted), and includeSalary."),
     ]
     expectedSalary: Annotated[
-        SalaryRange | None, Field(description="Needs candidates.compensation:read (see salaryRestricted).")
+        SalaryRange | None,
+        Field(description="Needs candidates.compensation:read (see salaryRestricted), and includeSalary."),
     ]
     salaryRestricted: Annotated[
-        bool, Field(description="true: you may not see salaries, so both are left out.")
+        bool,
+        Field(
+            description="true: you may not see salaries, so both are left out (false says only that you may, not that they were asked for)."
+        ),
     ]
     id: CandidateId
     fullName: str
@@ -3570,9 +3639,15 @@ class EmailPreview(BaseModel):
     fieldValues: Annotated[
         dict[str, str],
         Field(
-            description='Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate\'s record is not changed.'
+            description='Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries, and only with includeSalary). The composer puts the value in the message, where it can be edited; the candidate\'s record is not changed.'
         ),
     ]
+    withheldFields: Annotated[
+        list[str] | None,
+        Field(
+            description="Salary fields that have a value but were left out of fieldValues (includeSalary was not given), by token: ask again with includeSalary to put one in."
+        ),
+    ] = None
     clientEmail: Annotated[
         str | None,
         Field(
@@ -7275,6 +7350,83 @@ class AiProviderEntry(BaseModel):
     check: Annotated[AiProviderCheck | None, Field(...)]
 
 
+class AuditEntry(BaseModel):
+    id: AuditEntryId
+    at: AwareDatetime
+    actorId: Annotated[str, Field(description='A user id, an API key id, or "system".')]
+    actorKind: AuditActorKind
+    actorName: Annotated[
+        str,
+        Field(
+            description='The person\'s name; "Automatic" for the system; an API key\'s name, or "API key" when it cannot be found.'
+        ),
+    ]
+    action: Annotated[str, Field(examples=["candidate.updated"])]
+    entityType: Annotated[str, Field(examples=["candidate"])]
+    entityId: str
+    entityName: Annotated[
+        str | None,
+        Field(
+            description="The record's name, when it can be looked up (null otherwise): a candidate's, job's, company's, contact's, user's or job lead's (\"Accountant · Maju Bhd\"); for a candidate on a job (application), \"Candidate name · Job title\".\n"
+        ),
+    ]
+    candidateId: Annotated[
+        CandidateId | None,
+        Field(
+            description="For a candidate on a job (application), the candidate, whose page the record opens; null otherwise."
+        ),
+    ]
+    changes: Annotated[
+        dict[str, Any],
+        Field(
+            description='What changed: field -> {"from", "to"}, or details of the action. Never a salary amount.'
+        ),
+    ]
+
+
+class AuditLogPage(BaseModel):
+    items: list[AuditEntry]
+    nextCursor: Annotated[AuditCursor | None, Field(...)]
+
+
+class SalaryView(BaseModel):
+    id: SalaryViewId
+    day: Annotated[date, Field(description="The day, in the agency's time zone.")]
+    userId: Annotated[str, Field(description="Who was shown it (a user id or an API key id).")]
+    userName: Annotated[str, Field(description='Their name; an API key\'s name, or "API key".')]
+    kind: SalaryViewKind
+    candidateId: Annotated[
+        CandidateId | None, Field(description="Whose salary (null for a list, search or export).")
+    ]
+    candidateName: Annotated[str | None, Field(...)]
+    candidates: Annotated[
+        int,
+        Field(
+            description="How many different candidates' salaries a list, search or export showed that day (1 for one candidate)."
+        ),
+    ]
+    count: Annotated[int, Field(description="How often that day.")]
+    firstAt: AwareDatetime
+    lastAt: AwareDatetime
+
+
+class SalaryViewPage(BaseModel):
+    items: list[SalaryView]
+    nextCursor: Annotated[AuditCursor | None, Field(...)]
+
+
+class SalaryViewExport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format: ExportFormat
+    user: Annotated[str | None, Field(max_length=40, min_length=1)] = None
+    candidateId: CandidateId | None = None
+    kind: SalaryViewKind | None = None
+    from_: Annotated[date | None, Field(alias="from")] = None
+    to: date | None = None
+
+
 class Automation(BaseModel):
     id: AutomationId
     version: int
@@ -7574,6 +7726,12 @@ class CandidateSearch(BaseModel):
             description="With a sort other than newest, the nextOffset of the previous page.",
             ge=0,
             le=1000000,
+        ),
+    ] = None
+    includeSalary: Annotated[
+        bool | None,
+        Field(
+            description="Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work, and such a page is counted too, with every candidate on it (being found, or the order, tells about their salaries). An export always has them, for roles that may see them.\n"
         ),
     ] = None
 
@@ -9009,7 +9167,7 @@ class Offer(BaseModel):
     salary: Annotated[
         SalaryAmount | None,
         Field(
-            description="Left out (and listed in restrictedFields) without offers.salary:read. null means none set."
+            description="Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or that it was not asked for (GET /v1/offers without includeSalary; a change that did not set it).\n"
         ),
     ] = None
     startDate: Annotated[date | None, Field(...)]
@@ -9161,7 +9319,12 @@ class PlacementMoney(BaseModel):
         PlacementRetainer | None,
         Field(description="The job's retainer when this is the first placement on a job with one."),
     ]
-    salary: Annotated[SalaryAmount | None, Field(description="The agreed salary.")]
+    salary: Annotated[
+        SalaryAmount | None,
+        Field(
+            description="The agreed salary (in GET /v1/placements only with includeSalary; after a change only when it set `money`).\n"
+        ),
+    ]
     feePercent: Annotated[DecimalAmount | None, Field(description='e.g. "20" for 20% of the yearly salary.')]
     feeAmount: Annotated[DecimalAmount | None, Field(...)]
     feeCurrency: Annotated[CurrencyCode | None, Field(...)]
@@ -9632,6 +9795,12 @@ class EmailPreviewRequest(BaseModel):
         ),
     ] = None
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
+    includeSalary: Annotated[
+        bool | None,
+        Field(
+            description="Put the salary fields' values in `fieldValues` (for roles that may see salaries; false unless given). Ask only when they are shown or put in the message (a salary field inserted, salary details for a shortlist): each answer with a salary is counted in the log of who was shown a salary. Without it they are left out and named in `withheldFields`. The subject and message are filled either way (and counted when a salary field in them is filled).\n"
+        ),
+    ] = None
 
 
 class Preferences(BaseModel):

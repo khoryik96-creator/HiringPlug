@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationPlacementKey } from "../api/keys";
@@ -11,16 +11,40 @@ import { billingTimeline, feeNote, invoiceBadge, monthsLong, todayISO, trimZeros
 
 type Placement = Schemas["Placement"];
 
+const queued = (list: Placement[] | undefined) => list?.some((p) => p.invoicing.deliveryStatus === "queued") ?? false;
+
+/**
+ * An application's placement with its agreed salary (asked for, so counted as shown: read when it is
+ * opened, not again when the window gets focus). While its invoice is queued for email, where it stands
+ * is read every 5 seconds without the salary, which is kept from the first read.
+ */
+export function useApplicationPlacement(applicationId: string, enabled: boolean) {
+  const full = useQuery({
+    queryKey: applicationPlacementKey(applicationId),
+    queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { applicationId, includeSalary: true } } })).items,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+  const status = useQuery({
+    queryKey: [...applicationPlacementKey(applicationId), "status"],
+    queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { applicationId } } })).items,
+    enabled: enabled && queued(full.data),
+    refetchInterval: (q) => (queued(q.state.data ?? full.data) ? 5000 : false),
+    refetchOnWindowFocus: false,
+  });
+  const data = useMemo(() => {
+    if (!full.data || !status.data || status.dataUpdatedAt < full.dataUpdatedAt) return full.data;
+    const salaries = new Map(full.data.map((p) => [p.id, p.money?.salary ?? null]));
+    return status.data.map((p) => (p.money ? { ...p, money: { ...p.money, salary: salaries.get(p.id) ?? null } } : p));
+  }, [full.data, full.dataUpdatedAt, status.data, status.dataUpdatedAt]);
+  return { ...full, data };
+}
+
 /** An application's placement, or recording one (offer and placed stages). */
 export function ApplicationPlacement({ applicationId, stage, permissions }: { applicationId: string; stage: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
   const canManage = permissions.includes("placements:manage");
-  const list = useQuery({
-    queryKey: applicationPlacementKey(applicationId),
-    queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { applicationId } } })).items,
-    refetchInterval: (q) => q.state.data?.some((p) => p.invoicing.deliveryStatus === "queued") ? 5000 : false,
-    enabled: stage === "offer" || stage === "placed",
-  });
+  const list = useApplicationPlacement(applicationId, stage === "offer" || stage === "placed");
   const placement = list.data?.[0];
   if (stage !== "offer" && stage !== "placed") return null;
   if (editing) {

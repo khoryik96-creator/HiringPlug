@@ -23,6 +23,7 @@ import { atCursor, fillTokens, plainToHtml, showBanners, valuesToTokens, without
 import { SaveAsTemplate } from "./SaveAsTemplate";
 import { type Shortlisted, ShortlistPanel, useShortlist } from "./Shortlist";
 import { useCandidatePackages } from "./useCandidatePackages";
+import { useFieldValues } from "./useFieldValues";
 import { useBanners } from "./useBanners";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -66,18 +67,18 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
     ? { candidates: packages.references(html) }
     : { candidateId, applicationId };
 
-  // The job's hiring contact, to send to, and the candidate's value for each field.
-  const context = useQuery({
-    queryKey: multi ? ["email-context", "shortlist", ...people.map((p) => p.applicationId ?? p.candidateId)] : ["email-context", applicationId ?? candidateId],
-    queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: "", bodyHtml: "", ...about, timeZone: timeZone() },
-    })),
+  // The job's hiring contact, to send to, and the candidate's value for each field (salary fields'
+  // once one is in the message or subject: asked for then, and counted as shown).
+  const context = useFieldValues({
+    key: multi ? ["email-context", "shortlist", ...people.map((p) => p.applicationId ?? p.candidateId)] : ["email-context", applicationId ?? candidateId],
+    body: { subject: "", bodyHtml: "", ...about, timeZone: timeZone() },
+    html, subject: form.subject,
   });
   const to = typedTo ?? context.data?.clientEmail ?? "";
   useEffect(() => { showBanners(previewBox.current, urls); }, [preview, urls]);
 
   const selected = templates.data?.items.find((t) => t.id === picked);
-  const values = context.data?.fieldValues;
+  const values = context.values;
   const fields = templates.data?.fields ?? [];
   // "Insert field" puts a field where the cursor last was: the subject or the message.
   const subjectBox = useRef<HTMLInputElement>(null);
@@ -185,7 +186,7 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
         names={{ them: values?.["[Client contact]"], others: [...people.map((p) => p.name), values?.["[Full name]"] ?? ""] }} />
       <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || !!preview?.missing.length} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
-        values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
+        values={values} withheld={context.withheld} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
         insertElsewhere={(f, value) => {
           if (!inSubject.current) return false;
           setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, subject, value ?? f.token) }));

@@ -33,6 +33,9 @@ type ClientCV struct {
 // recruiter ("includes the salary: ...").
 func (m *Module) ForClient(ctx context.Context, tx pgx.Tx, p authz.Principal, candidateID, documentID string) (ClientCV, string, error) {
 	const notMade = "is not a formatted CV made by HiringPlug: make a blind or formatted CV for them first"
+	if salary, err := m.IncludesSalary(ctx, tx, documentID); err != nil || salary { // said before its file is read (refused to some)
+		return ClientCV{}, "includes the salary: make one without it", err
+	}
 	f, err := m.svc.deps.Files.FormattedFile(ctx, tx, documentID)
 	if err != nil {
 		return ClientCV{}, "", err

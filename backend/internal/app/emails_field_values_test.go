@@ -27,9 +27,10 @@ func TestComposerFieldValues(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 
-	preview := func(token string) api.EmailPreview {
+	preview := func(token string) api.EmailPreview { // as the composer asks once a salary field is put in
 		var p api.EmailPreview
-		res := a.request(http.MethodPost, "/v1/email-previews", token, map[string]any{"subject": "", "bodyHtml": "", "candidateId": cand.Id, "timeZone": "Asia/Kuala_Lumpur"})
+		res := a.request(http.MethodPost, "/v1/email-previews", token, map[string]any{"subject": "", "bodyHtml": "", "candidateId": cand.Id,
+			"timeZone": "Asia/Kuala_Lumpur", "includeSalary": true})
 		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 		res.JSON(&p)
 		return p
@@ -40,6 +41,7 @@ func TestComposerFieldValues(t *testing.T) {
 		assert.Equal(t, "Siti Aisyah", values["[Full name]"])
 		assert.NotContains(t, values, "[Current salary]", "no value, not offered")
 		assert.NotContains(t, preview(sourcer).FieldValues, "[Expected salary]")
+		assert.Empty(t, *preview(sourcer).WithheldFields, "not even named to roles that may not see salaries")
 	})
 
 	t.Run("an edited value is sent as typed, counts as salary, and leaves the record alone", func(t *testing.T) {

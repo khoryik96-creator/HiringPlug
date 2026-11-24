@@ -92,3 +92,17 @@ func TestTheRateForASalary(t *testing.T) {
 	assert.Equal(t, "20", fee(flat, &Salary{Amount: "5000", Currency: "SGD", Period: "month"}))
 	assert.Equal(t, "none", fee(ClientTerms{}, nil))
 }
+
+func TestAnInvoiceShowsTheSalaryWhenItsTemplatePrintsIt(t *testing.T) {
+	s := DefaultInvoiceSettings("Hyppies")
+	values := map[string]string{"fee.basis": "20% of the annual salary of MYR 88,140.00", "salary.annual": "MYR 88,140.00"}
+	assert.True(t, InvoiceShowsSalary(s, values, false), "the default line prints the fee basis")
+	s.LineText = "Recruitment fee: {{candidate.name}}"
+	assert.False(t, InvoiceShowsSalary(s, values, true))
+	s.EmailBody = "The fee is {{fee.basis}}."
+	assert.True(t, InvoiceShowsSalary(s, values, true), "in the invoice's email")
+	assert.False(t, InvoiceShowsSalary(s, values, false), "the document itself does not print it")
+	s.Footer = "Based on {{salary.annual}}"
+	assert.True(t, InvoiceShowsSalary(s, values, false), "in the footer")
+	assert.False(t, InvoiceShowsSalary(s, map[string]string{"fee.basis": "", "salary.annual": ""}, true), "a fee typed in as an amount")
+}

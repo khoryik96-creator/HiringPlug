@@ -74,7 +74,8 @@ export function useCandidateColumns() {
     },
   });
   const fs = useFieldSettings();
-  return { columns: prefs.data?.candidateColumns ?? DEFAULT_COLUMNS, chosen: prefs.data?.candidateColumns != null, save, look: fs };
+  // ready: the person's own columns are known (or could not be read), so a list can tell whether it shows salaries.
+  return { columns: prefs.data?.candidateColumns ?? DEFAULT_COLUMNS, chosen: prefs.data?.candidateColumns != null, ready: !prefs.isPending, save, look: fs };
 }
 
 /** A name's initials: "Nurul Huda" -> "NH". */

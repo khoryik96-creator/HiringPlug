@@ -50,108 +50,6 @@ type SendRequest struct {
 	Candidates                 []Shortlisted // to the client about several candidates, instead of CandidateID
 }
 
-// Preview is a message with its fields filled, as it will be sent.
-type Preview struct {
-	CandidateVersion, CompensationVersion *int
-	Subject, BodyHTML                     string
-	Missing                               []string
-	Salary                                bool
-	ClientEmail                           *string // the job's hiring contact, for an application
-	// FieldValues: each field with a value, by token ("[Expected salary]"),
-	// for the composer to put in the message, where they can be edited.
-	FieldValues map[string]string
-}
-
-// fieldValues are the values by field token, for the composer.
-func fieldValues(values map[string]string) map[string]string {
-	out := map[string]string{}
-	for _, f := range Fields {
-		if v, ok := values[f.Key]; ok && v != "" {
-			out[f.Token()] = v
-		}
-	}
-	return out
-}
-
-// Preview fills a message's fields for a candidate (and an application or
-// interview) without sending anything.
-func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, list []Shortlisted, zone string, recipientCandidateID *string) (Preview, error) {
-	loc, err := location(zone)
-	if err != nil {
-		return Preview{}, err
-	}
-	var out Preview
-	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		var values map[string]string
-		var candidateVersion, compensationVersion *int
-		if recipientCandidateID != nil && len(list) == 0 {
-			return invalidRecipient()
-		}
-		if contactID != nil && recipientCandidateID != nil {
-			return invalidRecipient()
-		}
-		if len(list) > 0 {
-			if candidateID != nil || appID != nil || interviewID != nil {
-				return notBoth()
-			}
-			first, err := s.checkShortlist(ctx, tx, p, list)
-			if err != nil {
-				return err
-			}
-			candidateID, appID = &first.CandidateID, first.ApplicationID
-			values, err = s.shortlistValues(ctx, tx, p, first, loc)
-			if err != nil {
-				return err
-			}
-		} else if candidateID != nil && contactID == nil {
-			dc, err := s.context(ctx, tx, p, *candidateID, appID, interviewID)
-			if err != nil {
-				return err
-			}
-			dc.Location = loc
-			values = Values(dc)
-			v := dc.Candidate.Version
-			if v > 0 {
-				candidateVersion = &v
-			}
-			if p.Can(api.PermissionCandidatesCompensationRead) {
-				v := dc.Candidate.CompensationVersion
-				compensationVersion = &v
-			}
-		} else {
-			var err error
-			if values, err = s.values(ctx, tx, p, candidateID, appID, interviewID, contactID, loc); err != nil {
-				return err
-			}
-		}
-		if len(list) > 0 {
-			if err := s.recipientValues(ctx, tx, p, values, contactID, recipientCandidateID, loc); err != nil {
-				return err
-			}
-		}
-		sub := FillFields(strings.Join(strings.Fields(subject), " "), values, false)
-		clean := SanitizeHTML(bodyHTML)
-		body := FillFields(clean, values, true)
-		out = Preview{
-			Subject: sub.Text, BodyHTML: WithoutFieldMarks(body.Text), Missing: union(sub.Missing, body.Missing),
-			Salary: sub.Salary || body.Salary || ShowsSalaryField(clean), FieldValues: fieldValues(values), CandidateVersion: candidateVersion, CompensationVersion: compensationVersion,
-		}
-		// Said at preview, not only on send: another candidate's salary never goes to a candidate.
-		if err := salaryOnlyTheirOwn(recipientCandidateID, bodyHTML, out.Salary); err != nil {
-			return err
-		}
-		if appID != nil {
-			app, err := s.application(ctx, tx, *appID, nil)
-			if err != nil {
-				return err
-			}
-			out.ClientEmail = app.ClientEmail
-		}
-		return nil
-	})
-	return out, err
-}
-
 // values are the field values for an email: the candidate's (as p may see
 // them), the application's and the interview's, the sender's and the agency's;
 // or, for an email to a client's contact, the contact's and their company's.
@@ -265,6 +163,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 				return err
 			}
 		}
+		valuesOf := whoseFields(candidateID, r.RecipientCandidateID)
 		if r.RecipientCandidateID != nil {
 			if err := s.contactable(ctx, tx, *r.RecipientCandidateID); err != nil {
 				return err
@@ -324,7 +223,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		row, err := q.InsertEmail(ctx, store.InsertEmailParams{
 			CandidateID: candidateID, ApplicationID: appID, ContactID: r.ContactID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
 			Subject: filled.Subject, Body: filled.Body, BodyHtml: orNil(filled.BodyHTML), Salary: filled.salary, SalaryRestricted: restricted,
-			SenderName: p.Name, ReplyTo: p.Email,
+			SenderName: p.Name, ReplyTo: p.Email, ToCandidate: r.RecipientCandidateID != nil,
 		})
 		if err != nil {
 			return err
@@ -375,6 +274,9 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			return err
 		}
 		out = EmailView{Email: row, Attachments: files}
+		if err := s.salarySent(ctx, tx, filled.salary, valuesOf, o.BodyHTML, cvs...); err != nil {
+			return err
+		}
 		// The text stays in the email record; never the salary in the audit log.
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "email.queued", EntityType: "email", EntityID: row.ID,

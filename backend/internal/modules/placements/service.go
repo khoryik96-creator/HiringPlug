@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Service holds the placement use cases.
@@ -22,7 +23,8 @@ type Service struct {
 	applications Applications
 	users        Users
 	inv          Invoicing
-	now          func() time.Time // tests may fix "today"
+	now          func() time.Time    // tests may fix "today"
+	salaryViews  salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 // View is a placement as a user may see it.
@@ -212,62 +214,10 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "placement.updated", EntityType: "placement", EntityID: id, Changes: changes}); err != nil {
 			return err
 		}
-		out, err = s.one(ctx, tx, p, updated)
+		out, err = s.changed(ctx, tx, p, updated, money.Set)
 		return err
 	})
 	return out, err
-}
-
-// Filter narrows the list of placements.
-type Filter struct {
-	ApplicationID, Status, InvoiceStatus *string
-	StartFrom, StartTo                   *time.Time
-}
-
-// List returns placements, newest start first (at most 500), and (with
-// placements.fees:read) the fee totals of every matching one that stands.
-// Listed is a page of the list: the placements (at most 500), how many match
-// in all, and with placements.fees:read their fee totals.
-type Listed struct {
-	Items  []View
-	Total  int
-	Totals []FeeTotal
-}
-
-func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) (Listed, error) {
-	var out []View
-	var totals []FeeTotal
-	var total int64
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		q := store.New(tx)
-		rows, err := q.ListPlacements(ctx, store.ListPlacementsParams{
-			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
-		})
-		if err != nil {
-			return err
-		}
-		if total, err = q.CountPlacements(ctx, store.CountPlacementsParams{
-			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
-		}); err != nil {
-			return err
-		}
-		if out, err = s.views(ctx, tx, p, rows); err != nil || !p.Can(api.PermissionPlacementsFeesRead) {
-			return err
-		}
-		sums, err := q.PlacementFeeTotals(ctx, store.PlacementFeeTotalsParams{
-			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
-		})
-		if err != nil {
-			return err
-		}
-		moved, err := s.retainerLines(ctx, tx, func(r store.Placement) bool {
-			return (f.ApplicationID == nil || r.ApplicationID == *f.ApplicationID) && (f.Status == nil || r.Status == *f.Status) &&
-				(f.InvoiceStatus == nil || r.InvoiceStatus == *f.InvoiceStatus) && inPeriod(r.StartDate, f.StartFrom, f.StartTo)
-		})
-		totals = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total }, moved...)
-		return err
-	})
-	return Listed{Items: out, Total: int(total), Totals: totals}, err
 }
 
 // Today is today's date in the agency's time zone (what counts as started,
@@ -398,6 +348,19 @@ func (s *Service) one(ctx context.Context, tx pgx.Tx, p authz.Principal, row sto
 		return View{}, err
 	}
 	return views[0], nil
+}
+
+// changed is a placement as a change sends it back: without its agreed
+// salary unless keepSalary (the change set it: what was just typed in); a
+// screen that shows it reads it again, asking for it (and counted).
+func (s *Service) changed(ctx context.Context, tx pgx.Tx, p authz.Principal, row store.Placement, keepSalary bool) (View, error) {
+	v, err := s.one(ctx, tx, p, row)
+	if err == nil && !keepSalary {
+		views := []View{v}
+		withoutSalaries(views)
+		v = views[0]
+	}
+	return v, err
 }
 
 // views adds the application, the recruiter's name and (when the user may

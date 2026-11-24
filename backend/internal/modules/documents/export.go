@@ -7,26 +7,56 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Exported is a document as it goes into a copy of a candidate's data: what
 // it is and the text read from it (the file itself stays in the app).
+// SalaryWithheld: a formatted CV made with the salary, whose text is left
+// out for a user who may not see salaries.
 type Exported struct {
 	FileName, Source, Status string
 	Text                     *string
+	SalaryWithheld           bool
 	UploadedAt               time.Time
 }
 
 // ForExport returns a candidate's documents with their text, newest first,
-// in the caller's transaction.
+// in the caller's transaction. The text of a formatted CV made with the
+// salary goes only to a user who may see salaries, and is then counted as
+// a salary shown.
 func (m *Module) ForExport(ctx context.Context, tx pgx.Tx, candidateID string) ([]Exported, error) {
 	rows, err := store.New(tx).ListDocumentTexts(ctx, candidateID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]Exported, len(rows))
+	var may *bool // whether the user may see salaries, asked once
+	shown := false
 	for i, r := range rows {
 		out[i] = Exported{FileName: r.FileName, Source: r.Source, Status: r.Status, Text: r.ExtractedText, UploadedAt: r.CreatedAt}
+		salary, err := m.service.includesSalary(ctx, tx, r.ID, r.Source)
+		if err != nil {
+			return nil, err
+		}
+		if !salary || r.ExtractedText == nil {
+			continue
+		}
+		if may == nil {
+			v, err := store.New(tx).MaySeeSalary(ctx)
+			if err != nil {
+				return nil, err
+			}
+			may = &v
+		}
+		if *may {
+			shown = true
+		} else {
+			out[i].Text, out[i].SalaryWithheld = nil, true
+		}
+	}
+	if shown {
+		return out, salaryview.In(ctx, tx, m.service.salaryViews, salaryview.CV, candidateID)
 	}
 	return out, nil
 }

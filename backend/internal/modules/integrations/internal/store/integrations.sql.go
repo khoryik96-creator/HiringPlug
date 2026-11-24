@@ -36,6 +36,36 @@ func (q *Queries) ApiKeyByHash(ctx context.Context, keyHash string) (ApiKeyByHas
 	return i, err
 }
 
+const apiKeyNames = `-- name: ApiKeyNames :many
+SELECT id, name FROM api_key WHERE id = ANY ($1::text[])
+`
+
+type ApiKeyNamesRow struct {
+	ID   string
+	Name string
+}
+
+// API keys' names (revoked ones too), for the audit log's "who".
+func (q *Queries) ApiKeyNames(ctx context.Context, ids []string) ([]ApiKeyNamesRow, error) {
+	rows, err := q.db.Query(ctx, apiKeyNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApiKeyNamesRow
+	for rows.Next() {
+		var i ApiKeyNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteWebhook = `-- name: DeleteWebhook :execrows
 DELETE FROM webhook WHERE id = $1
 `

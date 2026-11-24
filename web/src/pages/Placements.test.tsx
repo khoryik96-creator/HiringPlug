@@ -58,6 +58,28 @@ describe("placements", () => {
     expect(await screen.findByRole("form", { name: "Change placement" })).toBeTruthy();
   });
 
+  it("does not ask for salaries on the dashboard; changing one loads it with its salary first", async () => {
+    const shown = placement();
+    const fees = { feePercent: "20.00", feeAmount: "20400.00", feeCurrency: "MYR", retainer: null };
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string, init: { params?: { query?: { applicationId?: string } } }) => {
+      if (path === "/v1/users") return Promise.resolve(ok({ items: [] }));
+      if (path === "/v1/placements" && init.params?.query?.applicationId) return Promise.resolve(ok({ items: [shown], total: 1, today: "2026-12-10" }));
+      if (path === "/v1/placements") {
+        return Promise.resolve(ok({ items: [placement({ money: { ...fees, salary: null } })], total: 1, today: "2026-12-10", feeTotals: [] }));
+      }
+      return Promise.resolve(ok({}));
+    }) as never);
+    renderWithClient(<Placements permissions={["placements:read", "placements:manage", "placements.fees:read", "placements.fees:update"]} />);
+    await screen.findByRole("row", { name: /Siti Aisyah/ });
+    fireEvent.click(screen.getByText("⋯"));
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    await screen.findByRole("form", { name: "Change placement" });
+    expect(screen.getByLabelText<HTMLInputElement>("Agreed salary").value, "never saved over with none").toBe("8500.00");
+    const queries = get.mock.calls.map((c) => c as unknown[]).filter((c) => c[0] === "/v1/placements").map((c) => c[1]);
+    expect(queries[0]).toEqual({ params: { query: { startFrom: expect.any(String) as string, startTo: expect.any(String) as string } } });
+    expect(queries).toContainEqual({ params: { query: { applicationId: "appl_1", includeSalary: true } } });
+  });
+
   it("records a placement with its fee, from an offer", async () => {
     reads({ items: [], total: 0, today: "2026-12-10" });
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(placement()));

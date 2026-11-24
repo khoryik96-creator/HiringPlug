@@ -20,7 +20,7 @@ func TestEmailSalaryPreferenceCleansWordingWithoutChangingStoredNotes(t *testing
 	r := a.request("PUT", "/v1/candidates/"+c.Id+"/compensation", token, map[string]any{"expectedVersion": 0, "currentSalary": map[string]any{"amount": "16400", "currency": "MYR", "period": "month", "description": raw}, "expectedSalary": nil, "salaryNotes": "perf bonus is variable"})
 	require.Equal(t, 200, r.Status)
 	preview := func(auth string) api.EmailPreview {
-		r := a.request("POST", "/v1/email-previews", auth, map[string]any{"candidateId": c.Id, "subject": "", "bodyHtml": "", "timeZone": "Asia/Kuala_Lumpur"})
+		r := a.request("POST", "/v1/email-previews", auth, map[string]any{"candidateId": c.Id, "subject": "", "bodyHtml": "", "timeZone": "Asia/Kuala_Lumpur", "includeSalary": true})
 		require.Equal(t, 200, r.Status, "%s", r.Body)
 		var out api.EmailPreview
 		r.JSON(&out)

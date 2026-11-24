@@ -16,13 +16,15 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Service holds the formatted CV use cases.
 type Service struct {
-	pool  *pgxpool.Pool
-	deps  Deps
-	files *blob.Store
+	pool        *pgxpool.Pool
+	deps        Deps
+	files       *blob.Store
+	salaryViews salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 // TemplateView is a template as listed.
@@ -235,10 +237,18 @@ func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID str
 		if err != nil {
 			return err
 		}
+		// Kept as a CV with the salary (opened only by those who may see
+		// salaries, counted each time) only when a salary is really in it.
+		withSalary := o.IncludeSalary && (cand.CurrentSalary != nil || cand.ExpectedSalary != nil)
 		if err := store.New(tx).RecordFormattedCv(ctx, store.RecordFormattedCvParams{
-			DocumentID: docID, CandidateID: candidateID, Blind: o.Blind, IncludeSalary: o.IncludeSalary,
+			DocumentID: docID, CandidateID: candidateID, Blind: o.Blind, IncludeSalary: withSalary,
 		}); err != nil {
 			return err
+		}
+		if withSalary {
+			if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.CV, candidateID); err != nil {
+				return err
+			}
 		}
 		// What was chosen, never the values (salary stays out of the log).
 		return audit.Record(ctx, tx, audit.Entry{Action: "cv.formatted", EntityType: "candidate", EntityID: candidateID, Changes: map[string]any{

@@ -43,6 +43,13 @@ paths:
       parameters:
         - { name: applicationId, in: query, required: false, schema: { $ref: '#/components/schemas/ApplicationId' } }
         - { name: status, in: query, required: false, schema: { $ref: '#/components/schemas/OfferStatus' } }
+        - name: includeSalary
+          in: query
+          description: >
+            Return the salaries offered (only with offers.salary:read). Ask
+            only when they are shown: each list with salaries is counted in the
+            log of who was shown a salary. Without it every salary is null.
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: OK
@@ -86,7 +93,10 @@ paths:
       operationId: updateOffer
       tags: [offers]
       summary: Change an offer's terms (an offer waiting for approval or approved goes back to draft)
-      description: "Fields left out stay as they are. `salary` needs offers.salary:update."
+      description: >
+        Fields left out stay as they are. `salary` needs offers.salary:update.
+        The offer comes back with its salary only when this change set it
+        (otherwise null: read it with GET /v1/offers and includeSalary).
       x-permission: offers:manage
       requestBody:
         required: true
@@ -113,7 +123,9 @@ paths:
       operationId: stepOffer
       tags: [offers]
       summary: Move an offer on (ask for approval, send, record the answer, withdraw)
-      description: Sending without approval needs offers:approve.
+      description: >
+        Sending without approval needs offers:approve. The offer comes back
+        without its salary (null: read it with GET /v1/offers and includeSalary).
       x-permission: offers:manage
       requestBody:
         required: true
@@ -140,7 +152,9 @@ paths:
       operationId: decideOffer
       tags: [offers]
       summary: Approve an offer waiting for approval, or send it back to draft
-      description: You cannot decide on an offer you asked approval for.
+      description: >
+        You cannot decide on an offer you asked approval for. The offer comes
+        back without its salary (null: read it with GET /v1/offers and includeSalary).
       x-permission: offers:approve
       requestBody:
         required: true
@@ -206,7 +220,10 @@ components:
         companyName: { type: string }
         status: { $ref: '#/components/schemas/OfferStatus' }
         salary:
-          description: Left out (and listed in restrictedFields) without offers.salary:read. null means none set.
+          description: >
+            Left out (and listed in restrictedFields) without offers.salary:read.
+            null means none set, or that it was not asked for (GET /v1/offers
+            without includeSalary; a change that did not set it).
           allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
           nullable: true
         startDate: { type: string, format: date, nullable: true }

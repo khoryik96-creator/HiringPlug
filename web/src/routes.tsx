@@ -23,6 +23,7 @@ const EmailConnection = page(() => import("./pages/EmailConnection"), "EmailConn
 const Access = page(() => import("./pages/Access"), "Access");
 const AiProvider = page(() => import("./pages/AiProvider"), "AiProvider");
 const AiUsage = page(() => import("./pages/AiUsage"), "AiUsage");
+const AuditLog = page(() => import("./pages/AuditLog"), "AuditLog");
 const BookingHours = page(() => import("./components/BookingHours"), "BookingHours");
 const TeamBookings = page(() => import("./components/TeamBookings"), "TeamBookings");
 const Bin = page(() => import("./pages/Bin"), "Bin");
@@ -174,6 +175,8 @@ export const ROUTES: Route[] = [
     render: () => <Access /> },
   { section: "privacy", path: /^#\/privacy/, permission: "privacy:manage", menu: { in: "settings", label: "Data protection", href: "#/privacy" },
     render: () => <Privacy /> },
+  { section: "audit-log", path: /^#\/settings\/audit-log/, permission: "auditlog:read", menu: { in: "settings", label: "Audit log", href: "#/settings/audit-log" },
+    render: (c) => <AuditLog canSeeSalaryViews={can(c, "auditlog.salary_views:read")} /> },
   { section: "integrations", path: /^#\/integrations/, permission: "integrations:manage", menu: { in: "settings", label: "Integrations", href: "#/integrations" },
     render: () => <Integrations /> },
   { section: "cv-templates", path: /^#\/cv-templates/, permission: "cvformats:create", menu: { in: "settings", label: "CV templates", href: "#/cv-templates" },

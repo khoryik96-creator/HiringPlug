@@ -13,7 +13,8 @@ export function fieldName(field: string): string {
   return named[field] ?? field.replace(/([A-Z])/g, " $1").toLowerCase();
 }
 
-function show(value: unknown): string {
+/** A changed value in words: "—" for nothing, a notice period as "1 month". */
+export function show(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
   if (Array.isArray(value)) return value.length > 0 ? value.map(show).join(", ") : "—";
   if (typeof value === "object") {
@@ -33,7 +34,7 @@ export function actorOf(entry: ActivityEntry): string {
 }
 
 /** What happened, in words; null for entries the timeline shows another way (notes). */
-export function describe(entry: ActivityEntry): string | null {
+export function describe(entry: Pick<ActivityEntry, "action" | "changes">): string | null {
   const [, verb] = entry.action.split(".");
   switch (entry.action) {
     case "candidate.screened": {

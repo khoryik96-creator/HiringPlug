@@ -246,3 +246,8 @@ FROM document
 WHERE candidate_id = ANY(@candidate_ids::text[]) AND source <> 'formatted' AND binned_at IS NULL
   AND extracted_text IS NOT NULL AND extracted_text <> '' AND source IN ('original', 'linkedin', 'jobstreet')
 ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC;
+
+-- Whether the transaction's user may see salaries (a formatted CV made with
+-- the salary is only theirs to open).
+-- name: MaySeeSalary :one
+SELECT app_has_permission('candidates.compensation:read')::boolean AS may;
