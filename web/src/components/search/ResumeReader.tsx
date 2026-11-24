@@ -1,6 +1,7 @@
 // Search results read as resumes: the results down the left, the chosen
-// candidate's full CV on the right (with the search's words marked). Next and
-// Prev (or the ← → keys) move through the results without leaving the page.
+// candidate's full CV on the right (with the search's words marked, or, found
+// by meaning, why). Next and Prev (or the ← → keys) move through the results
+// without leaving the page.
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { Schemas } from "../../api/client";
@@ -12,6 +13,7 @@ import { StatusDisc, workAuth } from "../candidateColumns";
 import { rangeText, salaryText, waColumnLabel } from "../candidateLook";
 import { ErrorMessage } from "../ErrorMessage";
 import { type Picked, SearchPicker } from "../SearchPicker";
+import { WhyLine, WhyStrength } from "./MeaningSearch";
 
 type Hit = Schemas["CandidateSearchHit"];
 type Summary = Schemas["CandidateSummary"];
@@ -20,10 +22,12 @@ type Summary = Schemas["CandidateSummary"];
  * Reads the results as resumes. Give it a new `key` for each new search, so it
  * starts again at the first result (and, on a phone, at the list).
  */
-export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, chooseToEmail = true, canAddToJob, more, onMore }: {
+export function ResumeReader({ hits, highlight, showLevel = false, seen, onSeen, chosen, onChoose, chooseToEmail = true, canAddToJob, more, onMore }: {
   hits: Hit[];
   /** The boolean search whose words are marked in the CV (and on the profile it opens; "" for none). */
   highlight: string;
+  /** Searching by meaning for a level: why a candidate was found names their level. */
+  showLevel?: boolean;
   /** Candidates already looked at in this search. */
   seen: ReadonlySet<string>;
   onSeen: (id: string) => void;
@@ -94,7 +98,7 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
           if (e.key === "ArrowDown") { e.preventDefault(); if (last) next(); else open(at + 1, true); }
           if (e.key === "ArrowUp") { e.preventDefault(); open(at - 1, true); }
         }}>
-          {hits.map(({ candidate: c, matchedIn }) => (
+          {hits.map(({ candidate: c, matchedIn, why }) => (
             <li key={c.id}>
               <button type="button" id={hitId(c.id)} className={`reader-hit${c.id === currentId ? " on" : ""}`}
                 aria-current={c.id === currentId ? "true" : undefined}
@@ -113,6 +117,7 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
                 </span>
                 <span className="tags">
                   {matchedIn.length > 0 && <span className="found-in">{matchedIn.includes("cv") ? "in CV" : "in profile"}</span>}
+                  {why && <WhyStrength why={why} />}
                   {chosen?.has(c.id) && <span className="chosen-mark">{chooseToEmail ? "✉ " : "✓ "}chosen</span>}
                   {seen.has(c.id) && c.id !== currentId && <span className="seen">✓ read</span>}
                 </span>
@@ -128,6 +133,7 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
           requestAnimationFrame(() => { const el = document.getElementById(hitId(current.candidate.id)); if (el) reveal(el, "center"); });
         }}>‹ Back to results</button>
         <PaneHead c={current.candidate} />
+        {current.why && <div className="pane-why"><WhyLine why={current.why} showLevel={showLevel} /></div>}
         <div className="pane-bar">
           <button type="button" className="pill-btn" disabled={at === 0} onClick={() => { open(at - 1); }}>‹ Prev</button>
           <span role="status">{String(at + 1)} of {String(hits.length)}</span>

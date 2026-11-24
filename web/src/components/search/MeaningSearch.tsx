@@ -1,16 +1,24 @@
 // Search by meaning on the candidates page: the switch beside the search box,
 // how the search was read (and how far the reading of the company's CVs has
-// got), and why each candidate was found. The server reads the words in a
-// moment; meanwhile the list asks again (useMeaningPolling).
-import { useEffect, useState } from "react";
+// got), why each candidate was found, and the offer to search words that
+// found no one by meaning. The server reads the words in a moment; meanwhile
+// the list asks again (readingInterval).
+import { useQuery } from "@tanstack/react-query";
+import { Fragment, useEffect, useState } from "react";
 
-import type { Schemas } from "../../api/client";
+import { api, type Schemas, unwrap } from "../../api/client";
 
 const KEY = "hiringplug.candidates.meaning";
 
-/** Whether the search box searches by meaning (kept on this device: a convenience). */
-export function useMeaningMode(): [boolean, (on: boolean) => void] {
+/**
+ * Whether the search box searches by meaning (kept on this device: a
+ * convenience). byWords: the page opened with a search of its own in the
+ * address (a name, email or phone from the dashboard), so this visit searches
+ * by words until the switch is used; what is kept stays as it was.
+ */
+export function useMeaningMode(byWords = false): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(() => {
+    if (byWords) return false;
     try { return window.localStorage.getItem(KEY) === "1"; } catch { return false; }
   });
   const set = (v: boolean) => {
@@ -100,6 +108,11 @@ export function MeaningBanner({ outcome, text, tooLong, onWords }: {
 
 const STRENGTH: Record<Schemas["MeaningWhy"]["strength"], string> = { strong: "Strong match", good: "Good match", possible: "Possible match" };
 
+/** How strong a match by meaning is, as a small label ("Strong match"). */
+export function WhyStrength({ why }: { why: Schemas["MeaningWhy"] }) {
+  return <span className={`why-strength ${why.strength}`}>{STRENGTH[why.strength]}</span>;
+}
+
 /** The matched title's field, and its level when the search asked for one ("accounting · level: executive"). */
 function WhyField({ why, showLevel, lead }: { why: Schemas["MeaningWhy"]; showLevel: boolean; lead: string }) {
   const parts = [why.family, showLevel && why.level ? `level: ${why.level.toLowerCase()}` : null].filter(Boolean);
@@ -109,15 +122,15 @@ function WhyField({ why, showLevel, lead }: { why: Schemas["MeaningWhy"]; showLe
 
 /** Why a candidate was found by meaning: the title of theirs that matched (its
  * field, and its level when the search asked for one), where their CV says it,
- * and the search's own words in it (unless shown otherwise). inCell stacks it
- * in a list's Match column, the CV's words cut to three lines (all of them on
- * hover). */
+ * and the search's own words in it (unless shown otherwise; each word whole,
+ * the line breaking after a comma). inCell stacks it in a list's Match column,
+ * the CV's words cut to three lines (all of them on hover). */
 export function WhyLine({ why, showLevel = false, showWords = true, inCell = false }: {
   why: Schemas["MeaningWhy"]; showLevel?: boolean; showWords?: boolean; inCell?: boolean;
 }) {
   return (
     <span className={`why-line${inCell ? " in-cell" : ""}`}>
-      <span className={`why-strength ${why.strength}`}>{STRENGTH[why.strength]}</span>
+      <WhyStrength why={why} />
       {why.title && (
         <span className="why-title">
           as <strong>{why.title}</strong> ({why.titleWhen === "now" || !why.titleWhen ? "now" : why.titleWhen})
@@ -126,13 +139,49 @@ export function WhyLine({ why, showLevel = false, showWords = true, inCell = fal
       )}
       {why.title && inCell && <WhyField why={why} showLevel={showLevel} lead="" />}
       {why.passage && <q className="why-passage" title={inCell ? why.passage : undefined}>{why.passage}</q>}
-      {showWords && why.words.length > 0 && <span className="muted small why-words">CV says: {why.words.join(", ")}</span>}
+      {showWords && why.words.length > 0 && (
+        <span className="muted small why-words">
+          CV says: {why.words.map((w, i) => <Fragment key={i}>{i > 0 && ", "}<span className="why-word">{w}</span></Fragment>)}
+        </span>
+      )}
     </span>
   );
 }
 
-/** Whether a typed search reads as a role or the work (worth searching by meaning), not a name, email or phone. */
+/**
+ * Whether a typed search could be a role or the work: not an email or a phone,
+ * nor too short to mean anything. A name passes (names and roles cannot be
+ * told apart), so the offer to search by meaning waits for words that found no one.
+ */
 export function looksLikeWork(text: string): boolean {
   const t = text.trim();
   return t.length >= 3 && !/[@\d]/.test(t) && /[a-z]{3,}/i.test(t);
+}
+
+/** Whether this server can search by meaning changes only with the AI worker's model: asked again after an hour. */
+const STATUS_FRESH_MS = 60 * 60_000;
+
+/**
+ * Whether to offer searching a word search's text by meaning: the words found
+ * no one, could be a role or the work, and this server has the meaning model
+ * (asked once, and only when the offer could show).
+ */
+export function useMeaningOffer(text: string, nobodyFound: boolean): boolean {
+  const ask = nobodyFound && looksLikeWork(text);
+  const status = useQuery({
+    queryKey: ["meaning", "status"],
+    queryFn: async () => unwrap(await api.GET("/v1/meaning/status")),
+    enabled: ask,
+    staleTime: STATUS_FRESH_MS,
+  });
+  return ask && status.data?.available === true;
+}
+
+/** Under the search box while searching by meaning, when the words look like a boolean: its rules are not read. */
+export function MeaningRulesHint({ id }: { id: string }) {
+  return (
+    <p id={id} className="meaning-hint muted small" role="status">
+      Search by meaning reads your words as a recruiter would; AND, OR, NOT and quotes work in the word search.
+    </p>
+  );
 }

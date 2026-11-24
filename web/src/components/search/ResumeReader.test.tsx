@@ -69,6 +69,23 @@ describe("reading search results as resumes", () => {
     expect(first.getAttribute("aria-current")).toBe("true");
     expect(first.textContent).toContain("RM 8,000 → RM 9,500 · 1 month");
     expect(first.textContent).toContain("in CV");
+    expect(pane.querySelector(".pane-why"), "found by words: no why").toBeNull();
+  });
+
+  it("says why each was found by meaning: how strong in the results, and why over the resume", async () => {
+    serveCvs();
+    const why = (strength: "strong" | "good", title: string) => ({
+      score: 0.8, strength, title, titleWhen: "now", family: "accounting", level: "Executive", passage: "Full set of accounts and bank reconciliations", words: ["accounts"],
+    });
+    reader({ hits: [{ ...hit(nurul, []), why: why("strong", "Account Executive") }, { ...hit(wei, []), why: why("good", "Finance Executive") }] as never, showLevel: true });
+    const pane = screen.getByRole("region", { name: "Resume of Nurul Aisyah" });
+    expect(pane.querySelector(".pane-why")?.textContent)
+      .toBe("Strong matchas Account Executive (now) · accounting · level: executiveFull set of accounts and bank reconciliationsCV says: accounts");
+    expect(screen.getByRole("button", { name: /Nurul Aisyah/ }).textContent).toContain("Strong match");
+    expect(screen.getByRole("button", { name: /Wei Tan/ }).textContent).toContain("Good match");
+    fireEvent.click(screen.getByRole("button", { name: "Next ›" }));
+    expect(screen.getByRole("region", { name: "Resume of Wei Tan" }).querySelector(".pane-why")?.textContent).toContain("Good matchas Finance Executive (now)");
+    expect(await screen.findByText("the CV of cand_2")).toBeTruthy();
   });
 
   it("moves with Next, Prev, the arrow keys and a click, and marks those read", async () => {
