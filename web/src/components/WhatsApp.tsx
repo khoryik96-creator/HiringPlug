@@ -97,7 +97,8 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
   const send = () => {
     if (!chosen?.chatNumber) return;
     window.open(chatLink(chosen.chatNumber, text), "_blank", "noopener,noreferrer"); // before anything async: not a blocked pop-up
-    log.mutate(`WhatsApp to ${chosen.number}:\n${text}`);
+    // A blank message opens the chat to type in WhatsApp itself.
+    log.mutate(text.trim() ? `WhatsApp to ${chosen.number}:\n${text}` : `WhatsApp chat opened with ${chosen.number} (no message typed).`);
   };
 
   return (
@@ -126,7 +127,7 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
         )}
         {numbers.length === 1 && chosen && <p className="field muted small">To {chosen.label.toLowerCase()} {chosen.number}</p>}
         <label className="field full">Message
-          <textarea rows={7} required value={text} disabled={draft.isPending} onChange={(e) => { setEdited(e.target.value); }} />
+          <textarea rows={7} value={text} disabled={draft.isPending} onChange={(e) => { setEdited(e.target.value); }} />
         </label>
         {(draft.data?.missing.length ?? 0) > 0 && (
           <p className="full warning small" role="status">Not filled in: {draft.data?.missing.map((m) => `[${m}]`).join(", ")}. Change them before sending.</p>
@@ -134,7 +135,7 @@ export function WhatsAppDialog({ subject, onClose }: { subject: Subject; onClose
         {draft.data && !chosen?.chatNumber && <p className="full warning small" role="status">No valid phone number: save it with its country code (e.g. +60 12 345 6789).</p>}
         <ErrorMessage error={templates.error ?? draft.error ?? log.error} />
         <div className="row full">
-          <button type="submit" className="whatsapp-send" disabled={!chosen?.chatNumber || !text.trim() || log.isPending}>Open in WhatsApp</button>
+          <button type="submit" className="whatsapp-send" disabled={!chosen?.chatNumber || draft.isPending || log.isPending}>Open in WhatsApp</button>
           <span className="muted small">Kept as a WhatsApp note.</span>
         </div>
       </form>
