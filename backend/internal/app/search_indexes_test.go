@@ -62,6 +62,7 @@ func TestSearchesCanUseTheirIndexes(t *testing.T) {
 		{"contact_linkedin_url_idx", "contact", `linkedin_url = ANY(ARRAY['https://www.linkedin.com/in/x'])`},
 		{"contact_linkedin_key_idx", "contact", `lower(rtrim(linkedin_url, '/')) = 'https://www.linkedin.com/in/x'`},
 		{"company_linkedin_key_idx", "company", `lower(rtrim(linkedin_url, '/')) = 'https://www.linkedin.com/company/x'`},
+		{"company_name_core_trgm_idx", "company", `name_core % 'synthetic compny 7'`},
 	}
 	ctx := context.Background()
 	explain := func(q pgx.Tx, query string, args ...any) string {

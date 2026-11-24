@@ -90,6 +90,44 @@ func (s *Service) Similar(ctx context.Context, p authz.Principal, id string) ([]
 	return out, err
 }
 
+// NamedLike is a company whose name is the same as or much like a name
+// looked for; SameName when only the legal form or case differs.
+type NamedLike struct {
+	ID, Name                             string
+	City, Website, LinkedinURL, Industry *string
+	SameName                             bool
+}
+
+// NamedLike returns up to 5 companies named like name (a lead's company):
+// the same name once its legal form is set aside first, then the most
+// similar. A blank name, or one with control characters, is refused.
+func (s *Service) NamedLike(ctx context.Context, p authz.Principal, name string) ([]NamedLike, error) {
+	name, ok := nameText(name)
+	var errs apperr.FieldErrors
+	switch {
+	case !ok:
+		errs.Add("name", "must be text (UTF-8)")
+	case name == "":
+		errs.Add("name", "is required")
+	}
+	if err := errs.Err(); err != nil {
+		return nil, err
+	}
+	out := []NamedLike{}
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		if err := q.SetNamedLikeThreshold(ctx); err != nil {
+			return err
+		}
+		rows, err := q.CompaniesNamedLike(ctx, name)
+		for _, r := range rows {
+			out = append(out, NamedLike{ID: r.ID, Name: r.Name, City: r.City, Website: r.Website, LinkedinURL: r.LinkedinUrl, Industry: r.Industry, SameName: r.SameName})
+		}
+		return err
+	})
+	return out, err
+}
+
 // DuplicateGroup is companies that look like one, and why.
 type DuplicateGroup struct {
 	Reasons   []api.CompanyDuplicateReason

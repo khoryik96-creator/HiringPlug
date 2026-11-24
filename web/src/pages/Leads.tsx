@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { LeadFindHR } from "../components/LeadFindHR";
 import { LeadSources } from "../components/LeadSources";
 import { SaveError } from "../components/SaveError";
 import { formatDay, keysOf, LEAD_STATUS } from "../labels";
@@ -13,6 +14,7 @@ type Filters = { status: Schemas["LeadStatus"] | ""; open: "" | "true" | "false"
 /** Companies that are hiring: leads from sources and ads saved by hand. */
 export function Leads({ permissions }: { permissions: Permission[] }) {
   const canManage = permissions.includes("leads:manage");
+  const canFindHR = permissions.includes("companies:read") && permissions.includes("contacts:read");
   const [filters, setFilters] = useState<Filters>({ status: "", open: "true", q: "" });
   const list = useQuery({
     queryKey: ["job-leads", filters],
@@ -22,11 +24,26 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
   });
   const [adding, setAdding] = useState(false);
   const [sources, setSources] = useState(false);
+  // Find HR for one lead, in a panel beside the list: the newest copy of it read or saved here, so a link
+  // from the panel sends its current version even once a filter hides it (its status changed, say).
+  const [finding, setFinding] = useState<Lead | null>(null);
+  const inList = finding ? list.data?.find((l) => l.id === finding.id) : undefined;
+  if (finding && inList && inList !== finding && inList.version >= finding.version) setFinding(inList);
+  const shown = inList && finding && inList.version >= finding.version ? inList : finding;
+  const savedLead = useCallback((saved: Lead) => { setFinding((f) => (f?.id === saved.id && saved.version >= f.version ? saved : f)); }, []);
+  const findingId = finding?.id;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const closeFinding = useCallback(() => {
+    setFinding(null);
+    // Back to the lead's Find HR button, where the panel was opened from; to the list's title once a filter hides its row.
+    const from = findingId ? document.getElementById(findHrButtonId(findingId)) : null;
+    (from ?? heading.current)?.focus();
+  }, [findingId]);
   return (
     <main className="list-page">
       {/* Like the other lists: the filters and the buttons beside the title. */}
       <div className="row spread">
-        <h2>Leads</h2>
+        <h2 ref={heading} tabIndex={-1}>Leads</h2>
         <div className="row">
           <input aria-label="Search leads" placeholder="Search" value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} />
           <select aria-label="Status" value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}>
@@ -42,30 +59,41 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
       </div>
       {canManage && adding && <SaveAd onDone={() => { setAdding(false); }} />}
       {sources && <LeadSources canManage={canManage} />}
-      <section className="panel" aria-label="Hiring leads">
-        <ErrorMessage error={list.error} />
-        {list.data?.length === 0 && <p className="muted">No leads here yet.{canManage && " Save an ad you found, or add a source that brings them in."}</p>}
-        {list.data && list.data.length > 0 && (
-          <table>
-            <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th></tr></thead>
-            <tbody>{list.data.map((l) => <LeadRow key={l.id} lead={l} canManage={canManage} />)}</tbody>
-          </table>
-        )}
-      </section>
+      <div className={shown ? "leads-layout with-hr" : "leads-layout"}>
+        <section className="panel" aria-label="Hiring leads">
+          <ErrorMessage error={list.error} />
+          {list.data?.length === 0 && <p className="muted">No leads here yet.{canManage && " Save an ad you found, or add a source that brings them in."}</p>}
+          {list.data && list.data.length > 0 && (
+            <table>
+              <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th>{canFindHR && <th><span className="visually-hidden">Find HR</span></th>}</tr></thead>
+              <tbody>{list.data.map((l) => (
+                <LeadRow key={l.id} lead={l} canManage={canManage} open={shown?.id === l.id} onSaved={savedLead}
+                  onFindHR={canFindHR ? () => { setFinding(shown?.id === l.id ? null : l); } : undefined} />
+              ))}</tbody>
+            </table>
+          )}
+        </section>
+        {shown && <LeadFindHR key={shown.id} lead={shown} permissions={permissions} onClose={closeFinding} onSaved={savedLead} />}
+      </div>
     </main>
   );
 }
 
-function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
+const findHrButtonId = (leadId: string) => `find-hr-${leadId}`;
+
+function LeadRow({ lead: l, canManage, open, onSaved, onFindHR }: {
+  lead: Lead; canManage: boolean; open: boolean; onSaved: (saved: Lead) => void; onFindHR: (() => void) | undefined;
+}) {
   const queryClient = useQueryClient();
   const setStatus = useMutation({
     mutationFn: async (status: Schemas["LeadStatus"]) =>
       unwrap(await api.PATCH("/v1/job-leads/{jobLeadId}", { params: { path: { jobLeadId: l.id } }, body: { version: l.version, status } })),
+    onSuccess: onSaved,
     onSettled: async () => { await queryClient.invalidateQueries({ queryKey: ["job-leads"] }); },
   });
   return (
-    <tr>
-      <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : l.companyName}</td>
+    <tr className={open ? "lead-open" : undefined}>
+      <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : <><strong>{l.companyName}</strong><div className="muted small">not in HiringPlug yet</div></>}</td>
       <td>{l.url && /^https?:\/\//i.test(l.url) ? <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a> : l.title}{l.notes && <div className="muted">{l.notes}</div>}</td>
       <td>{l.location}</td>
       <td className="muted">{formatDay((l.postedAt ?? l.firstSeenAt).slice(0, 10))}{l.closedAt && <> · closed</>}</td>
@@ -78,6 +106,9 @@ function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
         ) : LEAD_STATUS[l.status]}
         <ErrorMessage error={setStatus.error} />
       </td>
+      {onFindHR && <td className="lead-find-hr">
+        <button type="button" id={findHrButtonId(l.id)} className="doc-btn" aria-pressed={open} aria-label={`Find HR for ${l.companyName}`} onClick={onFindHR}>Find HR</button>
+      </td>}
     </tr>
   );
 }

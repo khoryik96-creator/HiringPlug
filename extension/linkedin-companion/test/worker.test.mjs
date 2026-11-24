@@ -266,3 +266,54 @@ test('passes on the company names, and says when the role matched by name only',
   const linked = await browser({page: (tab, args) => (args.length === 4 ? {joined: '2019-04', left: '', current: true} : true), fast: true}).send(check);
   assert.equal(linked.result.matched_by_name, undefined);
 });
+
+test("finds a company's LinkedIn page from its name: up to five companies, each with its own page", async () => {
+  let opened = '', given;
+  const shown = [
+    {url: 'https://www.linkedin.com/company/contoh-logistik/?trk=search', name: ' Contoh  Logistik Sdn Bhd ', subtitle: ' Truck Transportation •  Shah Alam '},
+    {url: 'https://www.linkedin.com/company/Contoh-Logistik/life/', name: 'Contoh Logistik Sdn Bhd', subtitle: 'shown twice'},
+    {url: 'https://www.linkedin.com/school/universiti-contoh/', name: 'Universiti Contoh', subtitle: 'a school, not a company'},
+    {url: 'https://evil.test/company/contoh/', name: 'Contoh', subtitle: ''},
+    {url: 'https://www.linkedin.com/company/contoh-freight/', name: '', subtitle: 'no name'},
+    ...['a', 'b', 'c', 'd', 'e'].map(s => ({url: `https://www.linkedin.com/company/contoh-${s}`, name: `Contoh ${s.toUpperCase()}`, subtitle: 'x'.repeat(400)})),
+  ];
+  const b = browser({page: (tab, args) => { opened = tab.url; given = [...args]; return {companies: shown, empty: false}; }});
+  const reply = await b.send({action: 'companySearch', args: {operation_id: op, name: '  Contoh   Logistik '}});
+  const {companies} = JSON.parse(JSON.stringify(reply.result));
+  assert.equal(companies.length, 5, 'at most five');
+  assert.deepEqual(companies[0], {url: 'https://www.linkedin.com/company/contoh-logistik/', name: 'Contoh Logistik Sdn Bhd', subtitle: 'Truck Transportation • Shah Alam'});
+  assert.deepEqual(companies.map(c => c.url), ['contoh-logistik', 'contoh-a', 'contoh-b', 'contoh-c', 'contoh-d'].map(s => `https://www.linkedin.com/company/${s}/`),
+    'normalised, once each, only company pages with a name');
+  assert.equal(companies[1].subtitle.length, 300, 'clipped');
+  assert.deepEqual(given, ['Contoh Logistik']);
+  const url = new URL(opened);
+  assert.equal(url.origin + url.pathname, 'https://www.linkedin.com/search/results/companies/');
+  assert.equal(url.searchParams.get('keywords'), 'Contoh Logistik');
+  assert.equal(url.searchParams.get('origin'), 'SWITCH_SEARCH_VERTICAL');
+  assert.equal(b.tabs.size, 1, 'its tab is closed');
+
+  const odd = browser({page: () => ({companies: [], empty: true})});
+  assert.deepEqual(JSON.parse(JSON.stringify((await odd.send({action: 'companySearch', args: {operation_id: op, name: 'Kedai Kopi & Co?'}})).result)), {companies: []},
+    'no company found is an answer, and a name with & or ? stays one search word');
+});
+
+test('a companies search needs a name from HiringPlug, and stops at a sign-in page', async () => {
+  for (const name of [undefined, '', '   ', 7, 'x'.repeat(201), ['Contoh']]) {
+    const b = browser();
+    assert.match((await b.send({action: 'companySearch', args: {operation_id: op, name}})).error, /Start the search from HiringPlug/, String(name));
+    assert.equal(b.tabs.size, 1, 'no tab opened');
+  }
+  const signIn = browser({page: () => ({failed: true})});
+  assert.match((await signIn.send({action: 'companySearch', args: {operation_id: op, name: 'Contoh Logistik'}})).error, /sign in/);
+  assert.equal(signIn.tabs.size, 1, 'its tab is closed');
+  const blocked = browser({page: () => ({blocked: 'LinkedIn needs a verification check. Nothing was read.'})});
+  assert.match((await blocked.send({action: 'companySearch', args: {operation_id: op, name: 'Contoh Logistik'}})).error, /verification check/);
+  const none = browser({page: () => ({loading: true, cards: 2}), fast: true});
+  assert.match((await none.send({action: 'companySearch', args: {operation_id: op, name: 'Contoh Logistik'}})).error, /no company page for this name/);
+});
+
+test('an action the companion does not know is refused', async () => {
+  const b = browser();
+  assert.match((await b.send({action: 'companyWipe', args: {operation_id: op, name: 'Contoh Logistik'}})).error, /does not know this action/);
+  assert.equal(b.tabs.size, 1);
+});

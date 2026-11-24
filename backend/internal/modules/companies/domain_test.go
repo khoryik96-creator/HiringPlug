@@ -150,3 +150,16 @@ func TestTermsRates(t *testing.T) {
 	assert.Equal(t, []string{"tiers.0.feePercent", "tiers.0.guaranteeDays", "tiers.0.paymentTermsDays"},
 		[]string{errs[0].Field, errs[1].Field, errs[2].Field}, "always in the same order")
 }
+
+func TestNameTextReadsControlCharactersAsSpaces(t *testing.T) {
+	for in, want := range map[string]string{
+		"Maju Foods\tBhd": "Maju Foods Bhd", "Maju\nFoods": "Maju Foods", "Maju\x00Foods": "Maju Foods",
+		"  Maju\x1f\x7fFoods ": "Maju Foods", "Syarikat Ümran": "Syarikat Ümran",
+	} {
+		got, ok := nameText(in)
+		assert.True(t, ok, "%q", in)
+		assert.Equal(t, want, got, "%q", in)
+	}
+	_, ok := nameText("Maju\xffFoods")
+	assert.False(t, ok, "not UTF-8")
+}

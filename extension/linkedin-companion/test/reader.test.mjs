@@ -62,3 +62,85 @@ test('a role still drawing its dates is waited for, by name too', () => {
   const reader = page([role('HR Manager', 'Payments Network Malaysia · Full-time', '')]);
   assert.equal(reader.readHRJoined(profile, 'https://www.linkedin.com/company/paynet/', '555', ['Payments Network Malaysia']).wait, 'dates');
 });
+
+// HiringPlug's company reader (company.js) on a LinkedIn companies search, laid
+// out as LinkedIn draws its result cards (invented companies).
+const companySource = readFileSync(new URL('../company.js', import.meta.url), 'utf8');
+const searchURL = name => 'https://www.linkedin.com/search/results/companies/?keywords=' + encodeURIComponent(name) + '&origin=SWITCH_SEARCH_VERTICAL';
+
+const companyCard = (link, name, subtitle) => `
+  <div role="listitem"><a href="${link}"><img alt=""></a>
+    <div><p><a href="${link}">${name}</a></p><p>${subtitle}</p><p>1K followers</p></div></div>`;
+
+const results = cards => `<div componentkey="SearchResults_Companies"><div role="list">${cards.join('')}</div></div>`;
+
+function companies(cards, url = searchURL('Contoh Logistik')) {
+  return searchPage(`<div aria-label="Primary content">${results(cards)}</div>`, url);
+}
+
+function searchPage(inMain, url = searchURL('Contoh Logistik')) {
+  const dom = new JSDOM(`<main>${inMain}</main>`, {url, runScripts: 'outside-only'});
+  const {window} = dom;
+  window.Element.prototype.getClientRects = function () { return [{}]; };
+  Object.defineProperty(window.HTMLElement.prototype, 'innerText', {get() { return this.textContent; }});
+  window.eval(companySource);
+  return window.HiringplugCompany;
+}
+
+test('a companies search is read into its companies, each once, with its own LinkedIn page', () => {
+  const reader = companies([
+    companyCard('https://www.linkedin.com/company/contoh-logistik/?trk=search_result', 'Contoh  Logistik Sdn Bhd', 'Truck Transportation •\n Shah Alam, Selangor'),
+    companyCard('https://www.linkedin.com/school/universiti-contoh/', 'Universiti Contoh', 'Higher Education • Kuala Lumpur'),
+    companyCard('https://www.linkedin.com/company/Contoh-Logistik/life/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation'),
+    companyCard('https://www.linkedin.com/company/contoh-freight-services/', 'Contoh Freight Services', 'Freight and Package Transportation • Klang'),
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(reader.readSearch('Contoh Logistik'))), {companies: [
+    {url: 'https://www.linkedin.com/company/contoh-logistik/', name: 'Contoh Logistik Sdn Bhd', subtitle: 'Truck Transportation • Shah Alam, Selangor'},
+    {url: 'https://www.linkedin.com/company/contoh-freight-services/', name: 'Contoh Freight Services', subtitle: 'Freight and Package Transportation • Klang'},
+  ], empty: false});
+});
+
+test('a companies search with no results, still drawing, for another name, or at a sign-in page', () => {
+  const none = companies([]);
+  assert.deepEqual({...none.readSearch('Contoh Logistik')}, {loading: true, cards: 0}, 'still drawing');
+  const empty = new JSDOM(`<main><h2>No results found</h2></main>`, {url: searchURL('Kedai Kopi Contoh'), runScripts: 'outside-only'});
+  empty.window.Element.prototype.getClientRects = function () { return [{}]; };
+  Object.defineProperty(empty.window.HTMLElement.prototype, 'innerText', {get() { return this.textContent; }});
+  empty.window.eval(companySource);
+  assert.deepEqual(JSON.parse(JSON.stringify(empty.window.HiringplugCompany.readSearch('Kedai Kopi Contoh'))), {companies: [], empty: true});
+  const card = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation');
+  assert.deepEqual({...companies([card]).readSearch('Contoh Freight')}, {failed: true}, 'a search for another name is not this one');
+  assert.deepEqual({...companies([card], 'https://www.linkedin.com/search/results/people/?keywords=Contoh%20Logistik').readSearch('Contoh Logistik')}, {failed: true});
+  assert.match(companies([], 'https://www.linkedin.com/checkpoint/challenge/').readSearch('Contoh Logistik').blocked, /sign in or complete a check/);
+});
+
+test("another list on the page (the side rail's suggestions) is never read as a result", () => {
+  const suggestion = companyCard('https://www.linkedin.com/company/syarikat-lain/', 'Syarikat Lain Bhd', 'Retail • Penang');
+  const rail = `<aside><h2>Pages people also viewed</h2><div role="list">${suggestion}</div></aside>`;
+  const found = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation');
+  assert.deepEqual(JSON.parse(JSON.stringify(searchPage(results([found]) + rail).readSearch('Contoh Logistik'))), {companies: [
+    {url: 'https://www.linkedin.com/company/contoh-logistik/', name: 'Contoh Logistik Sdn Bhd', subtitle: 'Truck Transportation'},
+  ], empty: false}, 'no Primary content region: only the results');
+  assert.deepEqual({...searchPage(rail).readSearch('Contoh Logistik')}, {loading: true, cards: 0}, 'results not drawn yet: the rail is no answer');
+});
+
+test('results drawn as a plain list in the results region are read, the side rail beside them never', () => {
+  const found = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation');
+  const suggestion = companyCard('https://www.linkedin.com/company/syarikat-lain/', 'Syarikat Lain Bhd', 'Retail • Penang');
+  const reader = searchPage(`<div aria-label="Primary content"><div role="list">${found}</div></div><aside><div role="list">${suggestion}</div></aside>`);
+  assert.deepEqual(JSON.parse(JSON.stringify(reader.readSearch('Contoh Logistik'))), {companies: [
+    {url: 'https://www.linkedin.com/company/contoh-logistik/', name: 'Contoh Logistik Sdn Bhd', subtitle: 'Truck Transportation'},
+  ], empty: false}, 'no SearchResults_ container: the results region still counts');
+});
+
+test('a page of results for another spelling, or saying it found none, is no company of this name', () => {
+  const card = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation');
+  const url = searchURL('Contoh Logistk');
+  const corrected = '<p>No results found for Contoh Logistk.</p><p>Showing results for <a href="#">Contoh Logistik</a></p>';
+  assert.deepEqual(JSON.parse(JSON.stringify(searchPage(`<div aria-label="Primary content">${corrected}${results([card])}</div>`, url).readSearch('Contoh Logistk'))),
+    {companies: [], empty: true});
+  assert.deepEqual(JSON.parse(JSON.stringify(searchPage(`<p>Showing results for <b>Contoh Logistik</b></p>${results([card])}`, url).readSearch('Contoh Logistk'))),
+    {companies: [], empty: true}, 'the notice alone');
+  const says = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Never no results for your freight');
+  assert.equal(companies([says]).readSearch('Contoh Logistik').companies.length, 1, "a card's own words are not LinkedIn's notice");
+});

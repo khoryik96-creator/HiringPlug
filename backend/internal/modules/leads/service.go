@@ -205,6 +205,20 @@ func (s *Service) Leads(ctx context.Context, p authz.Principal, f LeadFilter) ([
 	return out, err
 }
 
+// Lead returns one lead as it is now.
+func (s *Service) Lead(ctx context.Context, p authz.Principal, id string) (store.JobLead, error) {
+	var out store.JobLead
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		out, err = store.New(tx).GetLead(ctx, id)
+		if database.IsNoRows(err) {
+			return apperr.NotFound("lead")
+		}
+		return err
+	})
+	return out, err
+}
+
 // ManualLead is a job ad saved by hand.
 type ManualLead struct {
 	CompanyName, Title   string

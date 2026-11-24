@@ -27,7 +27,8 @@ const newer = (v: string | null) => companionAtLeast(v, NEEDS);
 
 export const hrScanKey = (companyId: string) => ["hr-scan", companyId] as const;
 
-export function FindHR({ company, canCreate, canUseApollo }: { company: Company; canCreate: boolean; canUseApollo: boolean }) {
+/** `compact` lays it out for a narrow side panel (a lead's Find HR); it works the same. */
+export function FindHR({ company, canCreate, canUseApollo, compact = false }: { company: Company; canCreate: boolean; canUseApollo: boolean; compact?: boolean }) {
   const queryClient = useQueryClient();
   const companion = useCompanion();
   const key = hrScanKey(company.id);
@@ -130,9 +131,11 @@ export function FindHR({ company, canCreate, canUseApollo }: { company: Company;
   const settings = !s || editing;
   const seconds = running ? Math.max(0, Math.round((now - running.started) / 1000)) : 0;
   return (
-    <section className="panel find-hr" aria-label="Find HR">
+    <section className={`panel find-hr${compact ? " compact" : ""}`} aria-label="Find HR">
       <div className="row spread">
-        <h3>Find HR <a className="muted small" href={page} target="_blank" rel="noreferrer">on LinkedIn ↗</a></h3>
+        {/* In a side panel its own title says it already: only the link to the page. */}
+        {compact ? <a className="muted small" href={page} target="_blank" rel="noreferrer">{company.name} on LinkedIn ↗</a>
+          : <h3>Find HR <a className="muted small" href={page} target="_blank" rel="noreferrer">on LinkedIn ↗</a></h3>}
         <div className="row">
           {s && !settings && !running && canCreate && <button type="button" className="link" onClick={() => { setEditing(true); }}>New search</button>}
           {canUseApollo && <button type="button" className="doc-btn" onClick={() => { setShowApollo(true); }}>Apollo</button>}

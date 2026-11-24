@@ -119,7 +119,7 @@ queue. Every module's API is a contract in `contracts/modules/*.yaml`.
 2. Search by meaning (9): done in 1.40.0 (docs/ai-worker.md, "Search by meaning").
 3. Housekeeping (10): help, checklist and this handover are done; **tidying
    old branches (the Leads workspace merged or closed) is left to the owner**.
-4. Then: batch CV formatting, Find HR for unlinked leads, Gmail replies and
+4. Then (batch CV formatting ✅ 1.38.0, Find HR for unlinked leads ✅ 1.41.0): Gmail replies and
    bounces, AI usage and cost per month, an audit-log page and "who viewed
    salary", single sign-on, cloud readiness (files in object storage, sign-in
    limits in PostgreSQL, key rotation, alerts). Waiting on the owner: Google

@@ -1238,6 +1238,53 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .hr-tier.tA { color: var(--accent); }
 .hr-tier.tC { color: var(--muted); }
 .hr-chip { display: inline-block; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.78rem; font-weight: 650; white-space: nowrap; text-decoration: none; }
+/* Find HR laid out for a narrow side panel (a lead's): the form stacked, the list tighter. */
+.find-hr.compact { border: 0; box-shadow: none; padding: 0; margin: 0; background: transparent; }
+.find-hr.compact .hr-settings { flex-direction: column; align-items: stretch; gap: 0.55rem; }
+.find-hr.compact .hr-settings .grow { flex: none; }
+.find-hr.compact table.hr-people { font-size: 0.85rem; }
+.find-hr.compact table.hr-people :is(th, td) { padding: 0.45rem 0.5rem; }
+.find-hr.compact table.hr-people th { font-size: 0.68rem; letter-spacing: 0.04em; }
+.find-hr.compact .choose-row { flex-wrap: wrap; }
+
+/* Leads › Find HR (option A): the panel beside the list; under the toolbar on a narrow screen. */
+.leads-layout.with-hr { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 1rem; align-items: start; margin: 1rem 0; }
+.leads-layout.with-hr > .panel { margin: 0; min-width: 0; }
+.leads-layout.with-hr > section.panel { overflow-x: auto; }
+.lead-hr { position: sticky; top: var(--lead-hr-top, 68px); max-height: calc(100vh - var(--lead-hr-top, 68px) - 12px); overflow-y: auto; padding: 1rem 1.1rem 1.25rem; display: grid; gap: 0.75rem; align-content: start; }
+.lead-hr h4 { margin: 0 0 0.2rem; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.lead-hr-new h4 { text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--ink); }
+.lead-hr p { margin: 0; }
+.lead-hr .warning code { overflow-wrap: anywhere; }
+.lead-hr-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--line); }
+.lead-hr-head h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.lead-hr-head h3:focus { outline: none; }
+.list-page h2[tabindex="-1"]:focus { outline: none; }
+.lead-hr-step { display: grid; gap: 0.5rem; }
+.lead-hr-matches { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.lead-hr-matches li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); }
+.lead-hr-matches li > div { min-width: 0; overflow-wrap: anywhere; }
+.lead-hr-matches li > .error { flex-basis: 100%; margin: 0; }
+.lead-hr-new { display: grid; gap: 0.6rem; padding-top: 0.75rem; border-top: 1px dashed var(--line-strong); }
+.lead-hr-company { color: var(--text); }
+.linkedin-finder { display: grid; gap: 0.35rem; }
+.finder-label { font-size: 0.85rem; font-weight: 600; }
+.linkedin-finder .row { flex-wrap: nowrap; }
+.linkedin-finder input.grow { flex: 1; min-width: 0; }
+.linkedin-found { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.linkedin-found li { display: flex; align-items: center; gap: 0.4rem; }
+.linkedin-found button { flex: 1; min-width: 0; display: grid; justify-items: start; gap: 0.05rem; text-align: left; padding: 0.4rem 0.65rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; box-shadow: none; font-weight: 400; }
+.linkedin-found button:hover { border-color: var(--accent); }
+.linkedin-found button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.linkedin-found-name { font-weight: 650; color: var(--ink); }
+table tr.lead-open td { background: var(--accent-soft); }
+table tr.lead-open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+td.lead-find-hr { text-align: right; white-space: nowrap; }
+td.lead-find-hr .doc-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (width <= 900px) {
+  .leads-layout.with-hr { grid-template-columns: minmax(0, 1fr); }
+  .lead-hr { order: -1; position: static; max-height: none; }
+}
 .hr-chip.new { background: #e8f6ee; color: #15803d; }
 .hr-chip.dup { background: #fdf3e2; color: #b45309; }
 .hr-chip.have { background: var(--soft); color: var(--muted); }

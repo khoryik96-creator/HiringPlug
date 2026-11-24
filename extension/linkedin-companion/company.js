@@ -3,6 +3,8 @@
  * of the company: its name, industry, company size, website and
  * headquarters, and its overview. Read in a background tab the companion
  * opened at that exact company page, for a new company in HiringPlug.
+ * On a LinkedIn companies search (readSearch), the companies it shows, each
+ * with its own LinkedIn page, for a lead whose company is not yet linked.
  * Written in the style of CV Studio's reader: only the page asked for, only
  * what is shown, nothing guessed. Runs in the extension's isolated world; no
  * network.
@@ -95,5 +97,61 @@
     };
   }
 
-  globalThis.HiringplugCompany = {readAbout};
+  // The visible text of root outside the given cards.
+  function pageWords(root, cards) {
+    if (!root) return '';
+    const parts = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (visible(node.parentElement) && !cards.some(card => card.contains(node))) parts.push(node.nodeValue);
+    }
+    return compact(parts.join(' '));
+  }
+
+  // A companies search (Find HR for a lead): the result cards, each with the
+  // company's own page, its name and the line under it (industry, place).
+  // Links to anything but a company page (a school, a showcase, a person)
+  // are left out, and a company shown twice is listed once. Only cards in the
+  // search results themselves count, never another list on the page (the
+  // side rail's suggestions).
+  function readSearch(expectedName) {
+    if (location.origin !== 'https://www.linkedin.com') return {failed: true};
+    const main = document.querySelector('main');
+    const primary = main?.querySelector('[aria-label="Primary content"]');
+    const scope = primary || main;
+    // Any list counts only inside the results region (the side rail is outside it), as the people search reads.
+    const selector = '[componentkey^="SearchResults_"] [role="listitem"], li.reusable-search__result-container, .entity-result' +
+      (primary ? ', [role="list"] > [role="listitem"], [role="list"] > * > [role="listitem"]' : '');
+    const cards = scope ? [...scope.querySelectorAll(selector)].filter(n => visible(n) && !n.parentElement?.closest(selector)) : [];
+    const problem = issue(!cards.length);
+    if (problem) return {blocked: problem};
+    const keywords = new URLSearchParams(location.search).get('keywords');
+    if (!/^\/search\/results\/companies\/?$/.test(location.pathname) || compact(keywords).toLowerCase() !== compact(expectedName).toLowerCase()) {
+      return {failed: true};
+    }
+    if (!scope) return {loading: true};
+    const companies = [], seen = new Set();
+    for (const card of cards) {
+      const legacy = card.querySelector('.entity-result__title-text a[href]');
+      const paragraphs = [...card.querySelectorAll('p')].filter(visible);
+      const link = legacy || paragraphs[0]?.querySelector('a[href]') || paragraphs[0]?.closest('a[href]');
+      const url = companyURL(link?.href || '');
+      const name = compact(legacy ? text(legacy) : text(paragraphs[0])).slice(0, 200);
+      const subtitle = compact(legacy ? text(card.querySelector('.entity-result__primary-subtitle')) : text(paragraphs[1])).slice(0, 300);
+      if (!url || !name || seen.has(url.toLowerCase())) continue;
+      seen.add(url.toLowerCase());
+      companies.push({url, name, subtitle});
+      if (companies.length >= 10) break;
+    }
+    // LinkedIn saying it found nothing for this name, or that it shows
+    // results for another (a spelling it corrected), means no company of this
+    // name, whatever cards it shows instead. Only the page's own words count,
+    // not what a card says of its company.
+    if (/\b(?:no results found|no results|0 results|showing results for)\b/i.test(pageWords(main, cards))) return {companies: [], empty: true};
+    // Cards that show no company yet may still be drawing: wait (the worker
+    // says, if it stays so, that LinkedIn showed no company page).
+    if (!companies.length) return {loading: true, cards: cards.length};
+    return {companies, empty: false};
+  }
+
+  globalThis.HiringplugCompany = {readAbout, readSearch};
 })();

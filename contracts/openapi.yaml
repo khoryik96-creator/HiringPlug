@@ -2155,6 +2155,30 @@ paths:
               schema: {$ref: '#/components/schemas/CompanyDuplicateGroups'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/companies/named-like:
+    get:
+      operationId: listCompaniesNamedLike
+      tags: [companies]
+      summary: Companies whose name is the same as or much like a name (a lead's company, before linking it)
+      description: >
+        Up to 5 companies: those with the same name once its legal form and case are set aside ("MAJU FOODS BERHAD" and "Maju Foods Bhd") first, then the most similar names. None for a name that is only a legal form ("Sdn Bhd").
+
+      x-permission: companies:read
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: The company name to look for.
+          schema: {type: string, minLength: 1, maxLength: 200}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompaniesNamedLike'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/companies/{companyId}/similar:
     parameters:
       - $ref: '#/components/parameters/CompanyIdPath'
@@ -7013,6 +7037,20 @@ paths:
   /v1/job-leads/{jobLeadId}:
     parameters:
       - $ref: '#/components/parameters/JobLeadIdPath'
+    get:
+      operationId: getJobLead
+      tags: [leads]
+      summary: One lead as it is now (whatever the list's filter shows)
+      x-permission: leads:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobLead'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
     patch:
       operationId: updateJobLead
       tags: [leads]
@@ -11525,6 +11563,27 @@ components:
       required: [items]
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/CompanyLookalike'}}
+    CompanyNamedLike:
+      type: object
+      required: [id, name, city, website, linkedinUrl, industry, sameName]
+      properties:
+        id: {$ref: '#/components/schemas/CompanyId'}
+        name: {type: string}
+        city: {type: string, nullable: true}
+        website: {type: string, nullable: true}
+        linkedinUrl: {type: string, nullable: true}
+        industry: {type: string, nullable: true}
+        sameName:
+          type: boolean
+          description: The same name once its legal form ("Sdn Bhd", "Berhad"...), case and accents are set aside.
+    CompaniesNamedLike:
+      type: object
+      required: [items]
+      properties:
+        items:
+          description: Same names first, then the most similar; at most 5.
+          type: array
+          items: {$ref: '#/components/schemas/CompanyNamedLike'}
     CompanyDuplicateGroup:
       type: object
       required: [reasons, companies]

@@ -45,6 +45,11 @@ Adding a company with its LinkedIn page, **Fill in from LinkedIn** reads that
 page's About tab: the name, industry, company size, website, headquarters and
 overview (what is already typed stays; the AI later picks the closest of the
 agency's industries).
+On the Leads page, **Find HR** for a lead whose company is not in HiringPlug
+yet (from 1.6.0) runs a LinkedIn companies search for the company's name and
+lists up to five companies it shows, each with its own LinkedIn page
+(`linkedin.com/company/…`), its name and the line under it; links to anything
+else (a school, a showcase page, a person) are left out.
 
 ## What it does, and does not
 
@@ -73,13 +78,14 @@ agency's industries).
 - `roles.js`: HiringPlug's own small reader (in the same style): when a
   contact's time at the company ended, the roles shown as current at other
   companies, with each company's LinkedIn page: where they work now.
-- `company.js`: HiringPlug's reader of a company's About page (same style),
-  with CV Studio's access rules.
+- `company.js`: HiringPlug's reader of a company's About page and of a
+  companies search (same style), with CV Studio's access rules.
 - `worker.js`: the background worker: who may ask (connected HiringPlug pages
   only), the tabs it opens and closes, and the checks on what it returns.
 - `bridge.js`: runs on the connected HiringPlug page and passes messages.
 - `popup.html`, `popup.js`: connect or disconnect a HiringPlug address; check for an update.
 - `update.html`, `update.js`, `updater.js`: the self-update (see Update).
-- `test/worker.test.mjs`: the worker with a fake browser, and
-  `test/updater.test.mjs`: the update with a fake folder (both with
-  `node --test`, part of `task test:web`).
+- `test/worker.test.mjs`: the worker with a fake browser,
+  `test/updater.test.mjs`: the update with a fake folder, and
+  `test/reader.test.mjs`: the readers on pages laid out as LinkedIn draws
+  them (all with `node --test`, part of `task test:web`).

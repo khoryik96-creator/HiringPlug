@@ -17,6 +17,20 @@ func (h *HTTP) ListSimilarCompanies(ctx context.Context, req api.ListSimilarComp
 	return api.ListSimilarCompanies200JSONResponse{Items: lookalikesToAPI(found)}, nil
 }
 
+// ListCompaniesNamedLike handles GET /v1/companies/named-like.
+func (h *HTTP) ListCompaniesNamedLike(ctx context.Context, req api.ListCompaniesNamedLikeRequestObject) (api.ListCompaniesNamedLikeResponseObject, error) {
+	found, err := h.svc.NamedLike(ctx, authz.MustFromContext(ctx), req.Params.Name)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListCompaniesNamedLike200JSONResponse{Items: make([]api.CompanyNamedLike, len(found))}
+	for i, n := range found {
+		out.Items[i] = api.CompanyNamedLike{Id: n.ID, Name: n.Name, City: c.OrNull(n.City), Website: c.OrNull(n.Website),
+			LinkedinUrl: c.OrNull(n.LinkedinURL), Industry: c.OrNull(n.Industry), SameName: n.SameName}
+	}
+	return out, nil
+}
+
 // ListCompanyDuplicates handles GET /v1/companies/duplicates.
 func (h *HTTP) ListCompanyDuplicates(ctx context.Context, _ api.ListCompanyDuplicatesRequestObject) (api.ListCompanyDuplicatesResponseObject, error) {
 	groups, err := h.svc.Duplicates(ctx, authz.MustFromContext(ctx))

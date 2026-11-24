@@ -905,8 +905,22 @@ date; one listed again is updated, and one no longer listed is marked closed
 was last checked and why a check failed. Leads are filtered by status (new,
 contacted, became a client, ignored), still listed or closed, and words, and
 can be linked to a company record. Fetches never reach the server's own or
-private networks. Next: licensed job-data providers, and contacts found for a
-lead's company (with the built-in email check).
+private networks. Next: licensed job-data providers.
+
+**Find HR for a lead** ✅ (1.41.0): each lead has a **Find HR** button
+(for those who may read companies and contacts) that opens a panel beside the
+list, so you can work down the leads without leaving the page. A lead not yet
+linked asks first which company it is: those in HiringPlug with the same name
+(legal form, case and accents aside: "MAJU FOODS BERHAD" is "Maju Foods Bhd")
+or a much alike one are offered, up to five; **This one** links the lead.
+Otherwise **Add it as a new company**: its name, and its LinkedIn page, which
+**Find on LinkedIn** looks up by the name in your own browser (the LinkedIn
+companion 1.6.0 or later; or paste the page). A page already on another
+company is not added twice: the panel offers to link that company instead.
+Adding needs permission to add companies, linking to manage leads. Then the
+company's own **Find HR** runs in the panel (a linked company without a
+LinkedIn page asks for it first). Closing the panel stops a scan still
+running.
 
 ## 4, 5. Jobs, pipeline, interviews, matching
 
@@ -1978,7 +1992,8 @@ there is none; 1.39.0), opens a message: blank, or from a **WhatsApp template** 
 WhatsApp templates; three to start with) filled with their name, the job
 chosen and yours. Salary fields are never filled. "Open in WhatsApp" opens the
 recruiter's own WhatsApp (app or web, a wa.me chat link) with the message
-typed in, and keeps it on their timeline as a **WhatsApp** note. Numbers saved
+typed in (a blank message just opens the chat, 1.41.0), and keeps it on their
+timeline as a **WhatsApp** note. Numbers saved
 without a country code are read as `HP_DEFAULT_PHONE_REGION`'s. Nothing is
 sent by HiringPlug itself, so no WhatsApp Business account is needed.
 

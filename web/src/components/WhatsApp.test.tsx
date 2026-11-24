@@ -70,6 +70,39 @@ describe("WhatsApp", () => {
     expect(button.title).toContain("Add their phone number");
   });
 
+  it("opens the chat with no message when the message is left blank", async () => {
+    mockGets();
+    const opened = vi.spyOn(window, "open").mockReturnValue(null);
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/notes" ? { id: "note_1" } : { text: "", missing: [], numbers: [{ label: "Phone", number: "+60123456789", chatNumber: "60123456789" }] },
+    ))) as never);
+    const onClose = vi.fn();
+    renderWithClient(<WhatsAppDialog subject={{ kind: "candidate", id: "cand_1", name: "Siti Aminah" }} onClose={onClose} />);
+    expect(await screen.findByText("To phone +60123456789")).toBeTruthy();
+    const send = screen.getByRole<HTMLButtonElement>("button", { name: "Open in WhatsApp" });
+    await waitFor(() => { expect(send.disabled).toBe(false); });
+    fireEvent.click(send);
+    expect(opened).toHaveBeenCalledWith("https://wa.me/60123456789", "_blank", "noopener,noreferrer");
+    await waitFor(() => { expect(onClose).toHaveBeenCalled(); });
+    expect(sentBody(post, post.mock.calls.length - 1)).toMatchObject({ kind: "whatsapp", body: "WhatsApp chat opened with +60123456789 (no message typed)." });
+  });
+
+  it("opens the chat with nothing typed in when the message is only spaces, as the note says", async () => {
+    mockGets();
+    const opened = vi.spyOn(window, "open").mockReturnValue(null);
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/notes" ? { id: "note_1" } : { text: "", missing: [], numbers: [{ label: "Phone", number: "+60123456789", chatNumber: "60123456789" }] },
+    ))) as never);
+    const onClose = vi.fn();
+    renderWithClient(<WhatsAppDialog subject={{ kind: "contact", id: "cont_1", name: "Aisyah Contoh" }} onClose={onClose} />);
+    expect(await screen.findByText("To phone +60123456789")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "  \n\t " } });
+    fireEvent.click(screen.getByRole("button", { name: "Open in WhatsApp" }));
+    expect(opened).toHaveBeenCalledWith("https://wa.me/60123456789", "_blank", "noopener,noreferrer");
+    await waitFor(() => { expect(onClose).toHaveBeenCalled(); });
+    expect(sentBody(post, post.mock.calls.length - 1)).toMatchObject({ kind: "whatsapp", body: "WhatsApp chat opened with +60123456789 (no message typed)." });
+  });
+
   it("cannot send without a valid number", async () => {
     mockGets();
     vi.spyOn(api, "POST").mockResolvedValue(ok({ text: "", missing: [], numbers: [{ label: "Mobile", number: "12" }] }));

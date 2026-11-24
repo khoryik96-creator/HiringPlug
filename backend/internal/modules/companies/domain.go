@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
@@ -187,4 +188,20 @@ func squeezedOrNil(s *string) *string {
 		return nil
 	}
 	return &t
+}
+
+// nameText is a name as the database can compare it: control characters
+// (a line break in a job feed's company name, a stray NUL) read as spaces and
+// runs of spaces squeezed; false when it is not text at all (invalid UTF-8).
+func nameText(s string) (string, bool) {
+	if !utf8.ValidString(s) {
+		return "", false
+	}
+	spaced := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(spaced), " "), true
 }
