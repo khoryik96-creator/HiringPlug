@@ -106,8 +106,10 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, t
 }
 
 // change loads an offer, checks its version, applies fn and saves it with an
-// audit entry, in one transaction.
-func (s *Service) change(ctx context.Context, p authz.Principal, id string, version int, action string,
+// audit entry, in one transaction. The offer comes back without its salary
+// unless keepSalary (the change set it: what was just typed in): a screen
+// that shows it reads it again, asking for it (and counted).
+func (s *Service) change(ctx context.Context, p authz.Principal, id string, version int, action string, keepSalary bool,
 	fn func(tx pgx.Tx, q *store.Queries, o Offer) (Offer, map[string]any, error),
 ) (View, error) {
 	var out View
@@ -146,7 +148,9 @@ func (s *Service) change(ctx context.Context, p authz.Principal, id string, vers
 		if err := audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "offer", EntityID: id, Changes: changes}); err != nil {
 			return err
 		}
-		out, err = s.one(ctx, tx, p, updated)
+		if out, err = s.one(ctx, tx, p, updated); err == nil && !keepSalary {
+			out.Salary = nil
+		}
 		return err
 	})
 	return out, err
@@ -159,7 +163,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 			return View{}, err
 		}
 	}
-	return s.change(ctx, p, id, version, "offer.changed", func(_ pgx.Tx, q *store.Queries, o Offer) (Offer, map[string]any, error) {
+	return s.change(ctx, p, id, version, "offer.changed", salary.Set, func(_ pgx.Tx, q *store.Queries, o Offer) (Offer, map[string]any, error) {
 		after, problem := Edit(o, terms)
 		if problem != "" {
 			return o, nil, notAllowed(problem)
@@ -186,7 +190,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 
 // Step moves an offer on (ask for approval, send, record the answer, withdraw).
 func (s *Service) Step(ctx context.Context, p authz.Principal, id string, version int, step string) (View, error) {
-	return s.change(ctx, p, id, version, "offer."+stepAction[step], func(_ pgx.Tx, q *store.Queries, o Offer) (Offer, map[string]any, error) {
+	return s.change(ctx, p, id, version, "offer."+stepAction[step], false, func(_ pgx.Tx, q *store.Queries, o Offer) (Offer, map[string]any, error) {
 		salaries, err := q.OfferSalaries(ctx, []string{id})
 		if err != nil {
 			return o, nil, err
@@ -209,7 +213,7 @@ func (s *Service) Decide(ctx context.Context, p authz.Principal, id string, vers
 	if approve {
 		action = "offer.approved"
 	}
-	return s.change(ctx, p, id, version, action, func(_ pgx.Tx, _ *store.Queries, o Offer) (Offer, map[string]any, error) {
+	return s.change(ctx, p, id, version, action, false, func(_ pgx.Tx, _ *store.Queries, o Offer) (Offer, map[string]any, error) {
 		after, problem := Decide(o, approve, note, p.UserID, time.Now())
 		if problem != "" {
 			return o, nil, notAllowed(problem)

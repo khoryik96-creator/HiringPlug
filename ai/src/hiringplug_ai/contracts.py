@@ -9161,7 +9161,7 @@ class Offer(BaseModel):
     salary: Annotated[
         SalaryAmount | None,
         Field(
-            description="Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or (in GET /v1/offers) that includeSalary was not given.\n"
+            description="Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or that it was not asked for (GET /v1/offers without includeSalary; a change that did not set it).\n"
         ),
     ] = None
     startDate: Annotated[date | None, Field(...)]
@@ -9315,7 +9315,9 @@ class PlacementMoney(BaseModel):
     ]
     salary: Annotated[
         SalaryAmount | None,
-        Field(description="The agreed salary (in GET /v1/placements only with includeSalary)."),
+        Field(
+            description="The agreed salary (in GET /v1/placements only with includeSalary; after a change only when it set `money`).\n"
+        ),
     ]
     feePercent: Annotated[DecimalAmount | None, Field(description='e.g. "20" for 20% of the yearly salary.')]
     feeAmount: Annotated[DecimalAmount | None, Field(...)]

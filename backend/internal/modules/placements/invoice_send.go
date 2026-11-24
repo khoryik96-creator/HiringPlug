@@ -64,7 +64,7 @@ func (s *Service) SendNow(ctx context.Context, p authz.Principal, id string) (Vi
 		if err != nil {
 			return err
 		}
-		out, err = s.one(ctx, tx, p, row)
+		out, err = s.changed(ctx, tx, p, row, false)
 		return err
 	})
 	return out, err

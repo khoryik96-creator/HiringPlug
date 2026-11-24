@@ -214,7 +214,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "placement.updated", EntityType: "placement", EntityID: id, Changes: changes}); err != nil {
 			return err
 		}
-		out, err = s.one(ctx, tx, p, updated)
+		out, err = s.changed(ctx, tx, p, updated, money.Set)
 		return err
 	})
 	return out, err
@@ -348,6 +348,19 @@ func (s *Service) one(ctx context.Context, tx pgx.Tx, p authz.Principal, row sto
 		return View{}, err
 	}
 	return views[0], nil
+}
+
+// changed is a placement as a change sends it back: without its agreed
+// salary unless keepSalary (the change set it: what was just typed in); a
+// screen that shows it reads it again, asking for it (and counted).
+func (s *Service) changed(ctx context.Context, tx pgx.Tx, p authz.Principal, row store.Placement, keepSalary bool) (View, error) {
+	v, err := s.one(ctx, tx, p, row)
+	if err == nil && !keepSalary {
+		views := []View{v}
+		withoutSalaries(views)
+		v = views[0]
+	}
+	return v, err
 }
 
 // views adds the application, the recruiter's name and (when the user may

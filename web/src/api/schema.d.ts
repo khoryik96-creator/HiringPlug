@@ -4721,7 +4721,7 @@ export interface paths {
         head?: never;
         /**
          * Change an offer's terms (an offer waiting for approval or approved goes back to draft)
-         * @description Fields left out stay as they are. `salary` needs offers.salary:update.
+         * @description Fields left out stay as they are. `salary` needs offers.salary:update. The offer comes back with its salary only when this change set it (otherwise null: read it with GET /v1/offers and includeSalary).
          */
         patch: operations["updateOffer"];
         trace?: never;
@@ -4739,7 +4739,7 @@ export interface paths {
         put?: never;
         /**
          * Move an offer on (ask for approval, send, record the answer, withdraw)
-         * @description Sending without approval needs offers:approve.
+         * @description Sending without approval needs offers:approve. The offer comes back without its salary (null: read it with GET /v1/offers and includeSalary).
          */
         post: operations["stepOffer"];
         delete?: never;
@@ -4761,7 +4761,7 @@ export interface paths {
         put?: never;
         /**
          * Approve an offer waiting for approval, or send it back to draft
-         * @description You cannot decide on an offer you asked approval for.
+         * @description You cannot decide on an offer you asked approval for. The offer comes back without its salary (null: read it with GET /v1/offers and includeSalary).
          */
         post: operations["decideOffer"];
         delete?: never;
@@ -5073,7 +5073,7 @@ export interface paths {
         head?: never;
         /**
          * Change a placement (start, guarantee, status, invoice, money)
-         * @description Fields left out stay as they are. `money` needs placements.fees:update.
+         * @description Fields left out stay as they are. `money` needs placements.fees:update. The agreed salary comes back only when this change set `money` (otherwise null: read it with GET /v1/placements and includeSalary).
          */
         patch: operations["updatePlacement"];
         trace?: never;
@@ -5110,7 +5110,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date */
+        /**
+         * Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date
+         * @description The placement comes back without its agreed salary (`money.salary` null; the fee is there).
+         */
         put: operations["putPlacementInvoicing"];
         post?: never;
         delete?: never;
@@ -5132,7 +5135,7 @@ export interface paths {
         put?: never;
         /**
          * Email the invoice now (numbered from the template; the placement is then invoiced)
-         * @description Needs placements.fees:read too (the invoice shows the fee).
+         * @description Needs placements.fees:read too (the invoice shows the fee). The placement comes back without its agreed salary (`money.salary` null). Sent by a person, an invoice whose fee is a share of the salary counts as showing it (the log of who was shown a salary).
          */
         post: operations["sendPlacementInvoice"];
         delete?: never;
@@ -11037,7 +11040,7 @@ export interface components {
             jobTitle: string;
             companyName: string;
             status: components["schemas"]["OfferStatus"];
-            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or (in GET /v1/offers) that includeSalary was not given. */
+            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or that it was not asked for (GET /v1/offers without includeSalary; a change that did not set it). */
             salary?: components["schemas"]["SalaryAmount"] | null;
             /** Format: date */
             startDate: string | null;
@@ -11520,7 +11523,7 @@ export interface components {
         PlacementMoney: {
             /** @description The job's retainer when this is the first placement on a job with one. */
             retainer: components["schemas"]["PlacementRetainer"] | null;
-            /** @description The agreed salary (in GET /v1/placements only with includeSalary). */
+            /** @description The agreed salary (in GET /v1/placements only with includeSalary; after a change only when it set `money`). */
             salary: components["schemas"]["SalaryAmount"] | null;
             /** @description e.g. "20" for 20% of the yearly salary. */
             feePercent: components["schemas"]["DecimalAmount"] | null;
