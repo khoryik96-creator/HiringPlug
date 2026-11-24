@@ -75,7 +75,8 @@ func TestOnlyThoseWhoMaySeeSalariesOpenAFormattedCVWithIt(t *testing.T) {
 // A copy of a candidate's data (an access request) holds the text of a
 // formatted CV made with the salary only for someone who may see salaries,
 // and then counts it as a salary shown; for anyone else it says the text
-// was left out.
+// was left out. The salary section and an email with the salary in the
+// copy count too.
 func TestACopyOfTheirDataHoldsASalaryCVsTextOnlyForThoseWhoMaySeeSalaries(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
@@ -90,6 +91,9 @@ func TestACopyOfTheirDataHoldsASalaryCVsTextOnlyForThoseWhoMaySeeSalaries(t *tes
 	_, err := testutil.Current.Admin.Exec(context.Background(),
 		`UPDATE document SET extracted_text = 'Siti Aisyah. Expected salary: MYR 10,913 a month' WHERE id = $1`, cv.DocumentId)
 	require.NoError(t, err)
+	res = a.request(http.MethodPost, "/v1/emails", owner.Token, map[string]any{"candidateId": c.Id, "to": []string{"hr@client.example"},
+		"subject": "Siti", "bodyHtml": "<p>Expecting [Expected salary]</p>", "timeZone": "Asia/Kuala_Lumpur"})
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
 	a.setRole(owner.Token, "sourcer", map[string]any{"version": 0, "permissions": append(authz.PermissionsForRole(api.RoleSourcer), api.PermissionPrivacyManage),
 		"candidateScope": "all", "jobCandidates": true}, http.StatusOK)
 
@@ -105,12 +109,15 @@ func TestACopyOfTheirDataHoldsASalaryCVsTextOnlyForThoseWhoMaySeeSalaries(t *tes
 	assert.NotContains(t, body, "10,913", "no salary in the CV's text")
 	assert.Contains(t, body, `"formatted"`, "the CV is still listed")
 	assert.Contains(t, left, "The text of 1 formatted CV(s) made with the salary: you may not see it.")
-	assert.NotContains(t, a.seen(owner.Token, sourcer.ID), "cv:"+c.Id)
+	assert.Empty(t, a.seen(owner.Token, sourcer.ID), "no salary in the copy: nothing counted")
 
 	body, left = export(owner.Token)
 	assert.Contains(t, body, "MYR 10,913", "the owner may see salaries")
 	for _, l := range left {
 		assert.NotContains(t, l, "formatted CV")
 	}
-	assert.Equal(t, 2, a.seen(owner.Token, owner.ID)["cv:"+c.Id].Count, "made, then in the copy")
+	seen := a.seen(owner.Token, owner.ID)
+	assert.Equal(t, 2, seen["cv:"+c.Id].Count, "made, then in the copy")
+	assert.Equal(t, 1, seen["candidate:"+c.Id].Count, "the salary section")
+	assert.Equal(t, 1, seen["email_read:"+c.Id].Count, "the email with the salary")
 }

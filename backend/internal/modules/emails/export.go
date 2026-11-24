@@ -18,10 +18,13 @@ type Exported struct {
 }
 
 // ForExport returns the emails about a candidate, newest first, in the
-// caller's transaction.
+// caller's transaction; those with a salary are counted as read.
 func (m *Module) ForExport(ctx context.Context, tx pgx.Tx, candidateID string) ([]Exported, error) {
 	rows, err := store.New(tx).ListCandidateEmails(ctx, &candidateID)
 	if err != nil {
+		return nil, err
+	}
+	if err := m.service.salaryEmailsRead(ctx, tx, rows); err != nil {
 		return nil, err
 	}
 	out := make([]Exported, len(rows))

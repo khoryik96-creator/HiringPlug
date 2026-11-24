@@ -16,6 +16,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/privacy"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 type privacyCandidates struct{ candidates *candidates.Module }
@@ -34,7 +35,10 @@ func (a privacyCandidates) Count(ctx context.Context, tx pgx.Tx) (int, error) {
 }
 
 // privacyData gathers a candidate's data from each module. It looks the
-// modules up when called: some are built after the privacy module.
+// modules up when called: some are built after the privacy module. A
+// salary in the copy is counted as shown (the salary section as the
+// candidate's page, emails with one as read, a formatted CV with one as a
+// CV).
 type privacyData struct{ m *Modules }
 
 func (a privacyData) About(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (privacy.Held, error) {
@@ -49,6 +53,9 @@ func (a privacyData) About(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 		held.NotIncluded = append(held.NotIncluded, "Salary (current and expected): you may not see it.")
 	} else if s, ok := salarySection(v.Compensation); ok {
 		held.Sections = append(held.Sections, s)
+		if err := salaryview.In(ctx, tx, a.m.AuditLog, salaryview.Candidate, id); err != nil { // shown in the copy
+			return privacy.Held{}, err
+		}
 	}
 	type part struct {
 		perm   api.Permission
