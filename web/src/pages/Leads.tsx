@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { LeadFindHR } from "../components/LeadFindHR";
 import { LeadSources } from "../components/LeadSources";
 import { SaveError } from "../components/SaveError";
 import { formatDay, keysOf, LEAD_STATUS } from "../labels";
@@ -13,6 +14,7 @@ type Filters = { status: Schemas["LeadStatus"] | ""; open: "" | "true" | "false"
 /** Companies that are hiring: leads from sources and ads saved by hand. */
 export function Leads({ permissions }: { permissions: Permission[] }) {
   const canManage = permissions.includes("leads:manage");
+  const canFindHR = permissions.includes("companies:read") && permissions.includes("contacts:read");
   const [filters, setFilters] = useState<Filters>({ status: "", open: "true", q: "" });
   const list = useQuery({
     queryKey: ["job-leads", filters],
@@ -22,6 +24,10 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
   });
   const [adding, setAdding] = useState(false);
   const [sources, setSources] = useState(false);
+  // Find HR for one lead, in a panel beside the list (the list as read now, else as it was when opened).
+  const [finding, setFinding] = useState<Lead | null>(null);
+  const shown = finding ? (list.data?.find((l) => l.id === finding.id) ?? finding) : null;
+  const closeFinding = useCallback(() => { setFinding(null); }, []);
   return (
     <main className="list-page">
       {/* Like the other lists: the filters and the buttons beside the title. */}
@@ -42,21 +48,27 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
       </div>
       {canManage && adding && <SaveAd onDone={() => { setAdding(false); }} />}
       {sources && <LeadSources canManage={canManage} />}
-      <section className="panel" aria-label="Hiring leads">
-        <ErrorMessage error={list.error} />
-        {list.data?.length === 0 && <p className="muted">No leads here yet.{canManage && " Save an ad you found, or add a source that brings them in."}</p>}
-        {list.data && list.data.length > 0 && (
-          <table>
-            <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th></tr></thead>
-            <tbody>{list.data.map((l) => <LeadRow key={l.id} lead={l} canManage={canManage} />)}</tbody>
-          </table>
-        )}
-      </section>
+      <div className={shown ? "leads-layout with-hr" : "leads-layout"}>
+        <section className="panel" aria-label="Hiring leads">
+          <ErrorMessage error={list.error} />
+          {list.data?.length === 0 && <p className="muted">No leads here yet.{canManage && " Save an ad you found, or add a source that brings them in."}</p>}
+          {list.data && list.data.length > 0 && (
+            <table>
+              <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th>{canFindHR && <th><span className="visually-hidden">Find HR</span></th>}</tr></thead>
+              <tbody>{list.data.map((l) => (
+                <LeadRow key={l.id} lead={l} canManage={canManage} open={shown?.id === l.id}
+                  onFindHR={canFindHR ? () => { setFinding(shown?.id === l.id ? null : l); } : undefined} />
+              ))}</tbody>
+            </table>
+          )}
+        </section>
+        {shown && <LeadFindHR key={shown.id} lead={shown} permissions={permissions} onClose={closeFinding} />}
+      </div>
     </main>
   );
 }
 
-function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
+function LeadRow({ lead: l, canManage, open, onFindHR }: { lead: Lead; canManage: boolean; open: boolean; onFindHR: (() => void) | undefined }) {
   const queryClient = useQueryClient();
   const setStatus = useMutation({
     mutationFn: async (status: Schemas["LeadStatus"]) =>
@@ -64,7 +76,7 @@ function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
     onSettled: async () => { await queryClient.invalidateQueries({ queryKey: ["job-leads"] }); },
   });
   return (
-    <tr>
+    <tr className={open ? "lead-open" : undefined}>
       <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : l.companyName}</td>
       <td>{l.url && /^https?:\/\//i.test(l.url) ? <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a> : l.title}{l.notes && <div className="muted">{l.notes}</div>}</td>
       <td>{l.location}</td>
@@ -78,6 +90,9 @@ function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
         ) : LEAD_STATUS[l.status]}
         <ErrorMessage error={setStatus.error} />
       </td>
+      {onFindHR && <td className="lead-find-hr">
+        <button type="button" className="doc-btn" aria-pressed={open} aria-label={`Find HR for ${l.companyName}`} onClick={onFindHR}>Find HR</button>
+      </td>}
     </tr>
   );
 }
