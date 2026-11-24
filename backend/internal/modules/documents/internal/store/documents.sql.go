@@ -551,6 +551,19 @@ func (q *Queries) LockCandidateCVs(ctx context.Context, candidateID string) erro
 	return err
 }
 
+const maySeeSalary = `-- name: MaySeeSalary :one
+SELECT app_has_permission('candidates.compensation:read')::boolean AS may
+`
+
+// Whether the transaction's user may see salaries (a formatted CV made with
+// the salary is only theirs to open).
+func (q *Queries) MaySeeSalary(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, maySeeSalary)
+	var may bool
+	err := row.Scan(&may)
+	return may, err
+}
+
 const moveDocumentsToCandidate = `-- name: MoveDocumentsToCandidate :execrows
 UPDATE document SET candidate_id = $1 WHERE candidate_id = $2
 `
