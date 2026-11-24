@@ -1680,8 +1680,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   every action of a kind (`candidate`), the kind of record, one record, and a
   range of days in the agency's time zone; cursor pages. Entries about
   candidates (and their jobs) the user may not see are left out, as
-  everywhere. A new company, contact or job now records what it was made
-  with, not an empty change. `POST /v1/audit-log/export` downloads what the
+  everywhere. A new company, contact or job records no fields (`{}`: webhooks
+  copy an entry's changes, so a new record's details stay out of them).
+  `POST /v1/audit-log/export` downloads what the
   filters find as Excel or CSV (at most 10,000 entries); the download is
   itself audited (`auditlog.exported`).
 - **Who was shown a salary** (`GET /v1/salary-views`,
@@ -1706,7 +1707,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   a salary, an offer or a placement), lists that do not show it (offers sent
   on the dashboard and pipeline, the placements dashboard), reading back a
   sent email that shows a salary, invoices (their fee basis may name the
-  salary), the market map and a candidate's data copy (already audited).
+  salary), the market map and the salary section of a candidate's data copy
+  (already audited; the text of a formatted CV with the salary in that copy
+  is counted as `cv`).
 - **Lists ask for salaries.** `GET /v1/candidates` and
   `POST /v1/candidates/search` return salaries only with `includeSalary`
   (for roles that may see them); the candidate list asks only while a salary
@@ -1714,7 +1717,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   search or a pick-a-candidate box gets none. Exports always have them.
 - **Formatted CVs made with the salary** open, download, turn into a PDF,
   show their text or go with an email only for roles that may see salaries;
-  others see them listed but get "includes the candidate's salary".
+  others see them listed but get "includes the candidate's salary". A copy
+  of a candidate's data (an access request) leaves such a CV's text out for
+  them and says so.
 
 ## Import
 

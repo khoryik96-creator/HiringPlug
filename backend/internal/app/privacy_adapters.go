@@ -56,7 +56,13 @@ func (a privacyData) About(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 		gather func() (privacy.Section, error)
 	}
 	for _, x := range []part{
-		{api.PermissionDocumentsRead, "CVs and documents", func() (privacy.Section, error) { return a.documents(ctx, tx, id) }},
+		{api.PermissionDocumentsRead, "CVs and documents", func() (privacy.Section, error) {
+			s, withheld, err := a.documents(ctx, tx, id)
+			if withheld > 0 {
+				held.NotIncluded = append(held.NotIncluded, fmt.Sprintf("The text of %d formatted CV(s) made with the salary: you may not see it.", withheld))
+			}
+			return s, err
+		}},
 		{api.PermissionPipelineRead, "Jobs they were put forward for", func() (privacy.Section, error) { return a.applications(ctx, tx, id) }},
 		{api.PermissionNotesRead, "Notes", func() (privacy.Section, error) {
 			s, hidden, err := a.notes(ctx, tx, id)
@@ -185,17 +191,23 @@ func salarySection(c *candidates.Compensation) (privacy.Section, bool) {
 	return privacy.Section{Title: "Salary", Items: []privacy.Item{item}}, true
 }
 
-func (a privacyData) documents(ctx context.Context, tx pgx.Tx, id string) (privacy.Section, error) {
+// documents lists the candidate's documents with their text; withheld is
+// how many formatted CVs made with the salary had their text left out (the
+// user may not see salaries).
+func (a privacyData) documents(ctx context.Context, tx pgx.Tx, id string) (s privacy.Section, withheld int, err error) {
 	docs, err := a.m.Documents.ForExport(ctx, tx, id)
-	s := privacy.Section{Title: "CVs and documents", Items: []privacy.Item{}}
+	s = privacy.Section{Title: "CVs and documents", Items: []privacy.Item{}}
 	for _, d := range docs {
 		item := privacy.Item{{Label: "File", Value: d.FileName}, {Label: "Kind", Value: d.Source}, {Label: "Uploaded", Value: d.UploadedAt.Format(time.DateOnly)}}
 		if d.Text != nil {
 			item = append(item, privacy.Field{Label: "Text read from it", Value: *d.Text})
 		}
+		if d.SalaryWithheld {
+			withheld++
+		}
 		s.Items = append(s.Items, item)
 	}
-	return s, err
+	return s, withheld, err
 }
 
 func (a privacyData) applications(ctx context.Context, tx pgx.Tx, id string) (privacy.Section, error) {

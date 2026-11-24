@@ -34,10 +34,7 @@ func (m *Module) RecordSalaryViewsWith(r salaryview.Recorder) { m.service.salary
 // salaryCV reports whether row is a formatted CV made with the salary, and
 // refuses it to a transaction whose user may not see salaries.
 func (s *Service) salaryCV(ctx context.Context, tx pgx.Tx, row store.Document) (bool, error) {
-	if row.Source != "formatted" || s.salaryCVs == nil {
-		return false, nil
-	}
-	salary, err := s.salaryCVs.IncludesSalary(ctx, tx, row.ID)
+	salary, err := s.includesSalary(ctx, tx, row.ID, row.Source)
 	if err != nil || !salary {
 		return false, err
 	}
@@ -49,6 +46,15 @@ func (s *Service) salaryCV(ctx context.Context, tx pgx.Tx, row store.Document) (
 		return false, apperr.New(api.ErrorCodeFORBIDDEN, "This formatted CV includes the candidate's salary, which your role may not see.")
 	}
 	return true, nil
+}
+
+// includesSalary reports whether a document is a formatted CV made with
+// the salary.
+func (s *Service) includesSalary(ctx context.Context, tx pgx.Tx, id, source string) (bool, error) {
+	if source != "formatted" || s.salaryCVs == nil {
+		return false, nil
+	}
+	return s.salaryCVs.IncludesSalary(ctx, tx, id)
 }
 
 // openCV is salaryCV for a CV whose content goes to the user: a salary CV

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -69,4 +70,46 @@ func TestOnlyThoseWhoMaySeeSalariesOpenAFormattedCVWithIt(t *testing.T) {
 	send["cvs"] = []map[string]any{{"documentId": noPay.DocumentId}}
 	res = a.request(http.MethodPost, "/v1/emails", tenant.Users[api.RoleSourcer].Token, send)
 	assert.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+}
+
+// A copy of a candidate's data (an access request) holds the text of a
+// formatted CV made with the salary only for someone who may see salaries,
+// and then counts it as a salary shown; for anyone else it says the text
+// was left out.
+func TestACopyOfTheirDataHoldsASalaryCVsTextOnlyForThoseWhoMaySeeSalaries(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleSourcer)
+	owner, sourcer := tenant.Users[api.RoleOwner], tenant.Users[api.RoleSourcer]
+	c := a.withSalary(owner.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah", "email": "siti@example.com"})
+	var cv api.FormattedCv
+	res := a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/formatted-cvs", owner.Token, map[string]any{"includeSalary": true})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	res.JSON(&cv)
+	_, err := testutil.Current.Admin.Exec(context.Background(),
+		`UPDATE document SET extracted_text = 'Siti Aisyah. Expected salary: MYR 10,913 a month' WHERE id = $1`, cv.DocumentId)
+	require.NoError(t, err)
+	a.setRole(owner.Token, "sourcer", map[string]any{"version": 0, "permissions": append(authz.PermissionsForRole(api.RoleSourcer), api.PermissionPrivacyManage),
+		"candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+
+	export := func(token string) (string, []string) {
+		t.Helper()
+		res := a.request(http.MethodGet, "/v1/candidates/"+c.Id+"/data-export", token, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var e api.CandidateDataExport
+		res.JSON(&e)
+		return string(res.Body), e.NotIncluded
+	}
+	body, left := export(sourcer.Token)
+	assert.NotContains(t, body, "10,913", "no salary in the CV's text")
+	assert.Contains(t, body, `"formatted"`, "the CV is still listed")
+	assert.Contains(t, left, "The text of 1 formatted CV(s) made with the salary: you may not see it.")
+	assert.NotContains(t, a.seen(owner.Token, sourcer.ID), "cv:"+c.Id)
+
+	body, left = export(owner.Token)
+	assert.Contains(t, body, "MYR 10,913", "the owner may see salaries")
+	for _, l := range left {
+		assert.NotContains(t, l, "formatted CV")
+	}
+	assert.Equal(t, 2, a.seen(owner.Token, owner.ID)["cv:"+c.Id].Count, "made, then in the copy")
 }
