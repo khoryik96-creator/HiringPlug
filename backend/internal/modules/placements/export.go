@@ -19,6 +19,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/sheet"
 )
 
@@ -43,6 +44,9 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f Filter, ids [
 			return apperr.ExportTooLarge(sheet.MaxRows)
 		}
 		if views, err = s.views(ctx, tx, p, rows); err != nil {
+			return err
+		}
+		if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.Export, salaryOf(views)...); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{

@@ -62,17 +62,6 @@ type Preview struct {
 	FieldValues map[string]string
 }
 
-// fieldValues are the values by field token, for the composer.
-func fieldValues(values map[string]string) map[string]string {
-	out := map[string]string{}
-	for _, f := range Fields {
-		if v, ok := values[f.Key]; ok && v != "" {
-			out[f.Token()] = v
-		}
-	}
-	return out
-}
-
 // Preview fills a message's fields for a candidate (and an application or
 // interview) without sending anything.
 func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, list []Shortlisted, zone string, recipientCandidateID *string) (Preview, error) {
@@ -138,6 +127,9 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 		}
 		// Said at preview, not only on send: another candidate's salary never goes to a candidate.
 		if err := salaryOnlyTheirOwn(recipientCandidateID, bodyHTML, out.Salary); err != nil {
+			return err
+		}
+		if err := s.salaryFieldsShown(ctx, tx, out.FieldValues, candidateID); err != nil {
 			return err
 		}
 		if appID != nil {
@@ -265,6 +257,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 				return err
 			}
 		}
+		valuesOf := candidateID // whose details fill the message's own fields
 		if r.RecipientCandidateID != nil {
 			if err := s.contactable(ctx, tx, *r.RecipientCandidateID); err != nil {
 				return err
@@ -375,6 +368,9 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			return err
 		}
 		out = EmailView{Email: row, Attachments: files}
+		if err := s.salarySent(ctx, tx, filled.salary, valuesOf, o.BodyHTML, cvs...); err != nil {
+			return err
+		}
 		// The text stays in the email record; never the salary in the audit log.
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "email.queued", EntityType: "email", EntityID: row.ID,

@@ -28,7 +28,10 @@ func (s *Service) File(ctx context.Context, p authz.Principal, id string) (Docum
 		if database.IsNoRows(err) {
 			return apperr.NotFound("document")
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		return s.openCV(ctx, tx, row)
 	})
 	if err != nil {
 		return Document{}, nil, 0, err
@@ -70,6 +73,9 @@ func (m *Module) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (
 	}
 	key := row.StorageKey
 	doc := fromRow(row)
+	if doc.Salary, err = m.service.salaryCV(ctx, tx, row); err != nil { // the caller counts it where it goes
+		return Document{}, nil, err
+	}
 	if asPDF {
 		if row.PdfKey == nil {
 			return Document{}, nil, apperr.NotFound("PDF of this CV (make it first)")

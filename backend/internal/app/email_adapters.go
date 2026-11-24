@@ -135,7 +135,7 @@ func (a emailDocuments) MaxUploadBytes() int64 { return a.documents.MaxUploadByt
 
 func (a emailDocuments) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (emails.CVFile, error) {
 	doc, data, err := a.documents.CVFile(ctx, tx, id, asPDF)
-	return emails.CVFile{CandidateID: doc.CandidateID, FileName: doc.FileName, ContentType: doc.ContentType, Data: data}, err
+	return emails.CVFile{CandidateID: doc.CandidateID, FileName: doc.FileName, ContentType: doc.ContentType, Data: data, Salary: doc.Salary}, err
 }
 
 func (a emailCandidates) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]emails.Candidate, error) {

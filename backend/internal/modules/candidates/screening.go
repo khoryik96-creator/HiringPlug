@@ -18,6 +18,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Notes is what screening calls need from the notes module.
@@ -233,7 +234,15 @@ func (s *Service) ScreeningCalls(ctx context.Context, p authz.Principal, id stri
 			}
 			out[i] = callFromRow(r, name)
 		}
-		return loadCallSalaries(ctx, tx, out)
+		if err := loadCallSalaries(ctx, tx, out); err != nil {
+			return err
+		}
+		for _, c := range out {
+			if c.SalarySnapshot != nil { // a salary is shown: counted once for the list
+				return salaryview.In(ctx, tx, s.salaryViews, salaryview.Screening, id)
+			}
+		}
+		return nil
 	})
 	return out, err
 }

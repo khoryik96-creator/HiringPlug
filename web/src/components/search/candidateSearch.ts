@@ -79,6 +79,18 @@ export function sortOf(current: CandidateSort, column: string): "ascending" | "d
   return !c ? undefined : current === c.asc ? "ascending" : current === c.desc ? "descending" : undefined;
 }
 
+/**
+ * Whether the list asks the server for salaries: only for those who may see them, and only when they
+ * are shown or used (a salary column, a salary sort, or the expected salary filter). Every page that
+ * comes with salaries is counted in the log of who was shown a salary.
+ */
+export function wantsSalary(canSeeSalary: boolean, columns: readonly string[], sort: CandidateSort | null, s: SearchState): boolean {
+  if (!canSeeSalary) return false;
+  const salaryColumn = columns.some((c) => SORTABLE[c]?.salary === true);
+  const salarySort = sort !== null && Object.values(SORTABLE).some((x) => x.salary === true && (x.asc === sort || x.desc === sort));
+  return salaryColumn || salarySort || s.salaryMax.trim() !== "";
+}
+
 /** The request for a page of the search (q and "mine" come from the page's own boxes). */
 export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, sort: CandidateSort = "newest", folderId?: string): Schemas["CandidateSearch"] {
   const body: Schemas["CandidateSearch"] = { limit: 25, skillsMatch: s.skillsMatch };

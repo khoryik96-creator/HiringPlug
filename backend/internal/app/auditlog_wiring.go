@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/auditlog"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // newAuditLog builds the auditlog module once the modules it names records
@@ -48,7 +49,13 @@ func newAuditLog(d Deps, m *Modules) *auditlog.Module {
 	}, auditlog.Config{TimeZone: d.Config.TimeZone})
 }
 
-// recordSalaryViews has every module that shows a salary count it.
+// recordSalaryViews has every module that shows a salary count it, and
+// keeps formatted CVs made with the salary from those who may not see it.
 func recordSalaryViews(m *Modules) {
-	_ = m.AuditLog
+	for _, module := range []interface {
+		RecordSalaryViewsWith(r salaryview.Recorder)
+	}{m.Candidates, m.Emails, m.Cvformats, m.Documents, m.Offers, m.Placements} {
+		module.RecordSalaryViewsWith(m.AuditLog)
+	}
+	m.Documents.CheckSalaryCVsWith(m.Cvformats)
 }

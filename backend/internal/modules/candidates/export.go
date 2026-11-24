@@ -19,6 +19,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/sheet"
 )
 
@@ -35,7 +36,7 @@ const exportPage = 1000
 
 // Export returns everyone the search finds as a file.
 func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter, format string) (sheet.File, error) {
-	f.NoSnippets = true
+	f.NoSnippets, f.IncludeSalary = true, true
 	var found []Summary
 	var labels map[string]map[string]string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -71,6 +72,9 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter,
 			if page.NextOffset != nil {
 				f.Order.Offset = *page.NextOffset
 			}
+		}
+		if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.Export, salariesShown(found)...); err != nil {
+			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "candidate.exported", EntityType: "user", EntityID: p.UserID,

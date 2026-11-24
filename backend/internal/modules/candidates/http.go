@@ -35,7 +35,8 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 	if req.Params.Sort != nil {
 		order.Sort = string(*req.Params.Sort)
 	}
-	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner, Folder: req.Params.Folder, Similar: req.Params.Similar != nil && *req.Params.Similar, Order: order}, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner, Folder: req.Params.Folder, Similar: req.Params.Similar != nil && *req.Params.Similar, Order: order,
+		IncludeSalary: req.Params.IncludeSalary != nil && *req.Params.IncludeSalary}, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}

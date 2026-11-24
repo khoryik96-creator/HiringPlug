@@ -105,8 +105,8 @@ func TestRequestIDsAndUnknownRoutes(t *testing.T) {
 func TestRowLevelSecurityCoversEveryCommand(t *testing.T) {
 	t.Parallel()
 	exempt := map[string]string{ // "table:COMMAND": why it needs no policy
-		"ai_use:UPDATE": "the AI use ledger is append-only: a use, once recorded, never changes",
-		"ai_use:DELETE": "the AI use ledger is append-only: spent tokens stay spent when their record is deleted",
+		"ai_use:UPDATE":      "the AI use ledger is append-only: a use, once recorded, never changes",
+		"ai_use:DELETE":      "the AI use ledger is append-only: spent tokens stay spent when their record is deleted",
 		"salary_view:INSERT": "who was shown a salary is counted only through app_record_salary_view, never written by the app itself",
 		"salary_view:UPDATE": "who was shown a salary is counted only through app_record_salary_view, never changed by the app itself",
 		"salary_view:DELETE": "who was shown a salary is never deleted",

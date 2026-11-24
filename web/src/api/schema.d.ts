@@ -6918,11 +6918,11 @@ export interface components {
              */
             availabilitySince: string | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
-            /** @description Needs candidates.compensation:read (see salaryRestricted). */
+            /** @description Needs candidates.compensation:read (see salaryRestricted), and includeSalary. */
             currentSalary: components["schemas"]["SalaryAmount"] | null;
-            /** @description Needs candidates.compensation:read (see salaryRestricted). */
+            /** @description Needs candidates.compensation:read (see salaryRestricted), and includeSalary. */
             expectedSalary: components["schemas"]["SalaryRange"] | null;
-            /** @description true: you may not see salaries, so both are left out. */
+            /** @description true: you may not see salaries, so both are left out (false says only that you may, not that they were asked for). */
             salaryRestricted: boolean;
             id: components["schemas"]["CandidateId"];
             fullName: string;
@@ -6983,6 +6983,8 @@ export interface components {
             sort?: components["schemas"]["CandidateSort"];
             /** @description With a sort other than newest, the nextOffset of the previous page. */
             offset?: number;
+            /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work. An export always has them, for roles that may see them. */
+            includeSalary?: boolean;
         };
         SalaryCap: {
             /** @example 12000 */
@@ -14009,6 +14011,8 @@ export interface operations {
                 sort?: components["schemas"]["CandidateSort"];
                 /** @description With a sort other than newest, the `nextOffset` of the previous page. */
                 offset?: number;
+                /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it both are null (sorting by salary still works). */
+                includeSalary?: boolean;
             };
             header?: never;
             path?: never;

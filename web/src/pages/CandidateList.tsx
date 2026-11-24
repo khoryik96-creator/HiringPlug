@@ -16,7 +16,7 @@ import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
 import { ResumeReader } from "../components/search/ResumeReader";
 import { MeaningBanner, MeaningRulesHint, MeaningSwitch, readingInterval, useMeaningMode, useMeaningOffer, useReadingTooLong, WhyLine } from "../components/search/MeaningSearch";
-import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
+import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody, wantsSalary } from "../components/search/candidateSearch";
 import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
 import { useRowPicking } from "../components/useRowPicking";
 import { useDebounced } from "../components/useDebounced";
@@ -82,12 +82,15 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
   // A search by meaning is best match first: no order applies (the kept one is back with the words).
   const order = meaningText ? null : sortBy;
+  // Salaries only when a salary column, sort or filter uses them (each page with them is logged).
+  const includeSalary = wantsSalary(canSeeSalary, cols.columns, order, effective);
   const list = useInfiniteQuery({
-    queryKey: [...candidatesKey, plainQ, mine, sortBy, folder],
+    queryKey: [...candidatesKey, plainQ, mine, sortBy, folder, includeSalary],
     enabled: !advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => {
-      const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number; folder?: string } = {};
+      const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number; folder?: string; includeSalary?: boolean } = {};
+      if (includeSalary) query.includeSalary = true;
       if (plainQ.trim()) query.q = plainQ.trim();
       if (folder) query.folder = folder;
       if (mine) query.owner = "me";
@@ -98,11 +101,14 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     },
     getNextPageParam: nextPage,
   });
-  const searchBody = (page?: PageAt) => (meaningText
-    ? { ...toBody(effective, "", mine, undefined, "newest", folder), meaning: meaningText, limit: 100 }
-    : toBody(effective, plainQ, mine, page, sortBy, folder));
+  const searchBody = (page?: PageAt) => ({
+    ...(meaningText
+      ? { ...toBody(effective, "", mine, undefined, "newest", folder), meaning: meaningText, limit: 100 }
+      : toBody(effective, plainQ, mine, page, sortBy, folder)),
+    ...(includeSalary ? { includeSalary: true } : {}),
+  });
   const found = useInfiniteQuery({
-    queryKey: [...candidatesKey, "search", plainQ, mine, effective, order, folder, meaningText],
+    queryKey: [...candidatesKey, "search", plainQ, mine, effective, order, folder, meaningText, includeSalary],
     enabled: advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: searchBody(pageParam) })),

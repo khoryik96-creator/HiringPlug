@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Service holds the offer use cases.
@@ -21,6 +22,7 @@ type Service struct {
 	pool         *pgxpool.Pool
 	applications Applications
 	users        Users
+	salaryViews  salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 // Salary is the salary offered.
@@ -224,8 +226,10 @@ func (s *Service) List(ctx context.Context, p authz.Principal, appID, status *st
 		if err != nil {
 			return err
 		}
-		out, err = s.views(ctx, tx, p, rows)
-		return err
+		if out, err = s.views(ctx, tx, p, rows); err != nil || !showsSalary(appID, status) {
+			return err
+		}
+		return salaryview.In(ctx, tx, s.salaryViews, salaryview.Offer, offeredTo(out)...)
 	})
 	return out, err
 }

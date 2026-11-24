@@ -1475,13 +1475,18 @@ class CandidateSummary(BaseModel):
     availabilitySince: Annotated[AwareDatetime | None, Field(description="When the status was last set.")]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     currentSalary: Annotated[
-        SalaryAmount | None, Field(description="Needs candidates.compensation:read (see salaryRestricted).")
+        SalaryAmount | None,
+        Field(description="Needs candidates.compensation:read (see salaryRestricted), and includeSalary."),
     ]
     expectedSalary: Annotated[
-        SalaryRange | None, Field(description="Needs candidates.compensation:read (see salaryRestricted).")
+        SalaryRange | None,
+        Field(description="Needs candidates.compensation:read (see salaryRestricted), and includeSalary."),
     ]
     salaryRestricted: Annotated[
-        bool, Field(description="true: you may not see salaries, so both are left out.")
+        bool,
+        Field(
+            description="true: you may not see salaries, so both are left out (false says only that you may, not that they were asked for)."
+        ),
     ]
     id: CandidateId
     fullName: str
@@ -7692,6 +7697,12 @@ class CandidateSearch(BaseModel):
             description="With a sort other than newest, the nextOffset of the previous page.",
             ge=0,
             le=1000000,
+        ),
+    ] = None
+    includeSalary: Annotated[
+        bool | None,
+        Field(
+            description="Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work. An export always has them, for roles that may see them.\n"
         ),
     ] = None
 

@@ -70,7 +70,14 @@ func (s *Service) Pdf(ctx context.Context, p authz.Principal, id string) (Docume
 		if database.IsNoRows(err) {
 			return apperr.NotFound("document")
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		if row.PdfKey == nil { // nothing to open: only refused to those who may not see it
+			_, err := s.salaryCV(ctx, tx, row)
+			return err
+		}
+		return s.openCV(ctx, tx, row)
 	})
 	if err != nil {
 		return Document{}, nil, err
@@ -108,6 +115,9 @@ func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Do
 			return apperr.NotFound("document")
 		}
 		if err != nil {
+			return err
+		}
+		if _, err := s.salaryCV(ctx, tx, row); err != nil {
 			return err
 		}
 		if filekind.Office(row.ContentType) && row.PdfStatus == nil { // a failed copy is not tried again on every view

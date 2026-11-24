@@ -168,6 +168,9 @@ func (s *Service) SendSeparately(ctx context.Context, p authz.Principal, r Batch
 			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID, ConsentCandidateId: rec.CandidateID}); err != nil {
 				return err
 			}
+			if err := s.salarySent(ctx, tx, filled.salary, rec.CandidateID, base.BodyHTML); err != nil {
+				return err
+			}
 			if err := audit.Record(ctx, tx, audit.Entry{
 				Action: "email.queued", EntityType: "email", EntityID: row.ID,
 				Changes: map[string]any{"candidateId": rec.CandidateID, "contactId": rec.ContactID, "to": filled.To,

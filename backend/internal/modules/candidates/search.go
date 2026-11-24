@@ -15,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/boolsearch"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // CVs is what search needs from the documents module: the candidates whose
@@ -41,6 +42,9 @@ type SearchFilter struct {
 	Folder                                          *string // only the candidates in this folder
 	Order                                           Order
 	NoSnippets                                      bool // an export: no CV snippets (they are not shown)
+	// IncludeSalary: return salaries (for roles that may see them; a search
+	// counts the page in the log of who was shown a salary).
+	IncludeSalary bool
 }
 
 // SearchHit is a candidate found, with where the boolean matched.
@@ -65,8 +69,14 @@ func (s *Service) Search(ctx context.Context, p authz.Principal, f SearchFilter,
 	var page SearchPage
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		page, err = s.searchTx(ctx, tx, p, f, cursor, limit)
-		return err
+		if page, err = s.searchTx(ctx, tx, p, f, cursor, limit); err != nil || !f.IncludeSalary {
+			return err
+		}
+		shown := make([]Summary, len(page.Items))
+		for i, h := range page.Items {
+			shown[i] = h.Summary
+		}
+		return salaryview.In(ctx, tx, s.salaryViews, salaryview.CandidateList, salariesShown(shown)...)
 	})
 	return page, err
 }
@@ -171,8 +181,10 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 			matched = append(matched, r.ID)
 		}
 	}
-	if err := attachCompensation(ctx, tx, p, summaries); err != nil {
-		return page, err
+	if f.IncludeSalary {
+		if err := attachCompensation(ctx, tx, p, summaries); err != nil {
+			return page, err
+		}
 	}
 	snippets := map[string]string{}
 	// CV text only to those who may read CVs (the boolean still finds by it).

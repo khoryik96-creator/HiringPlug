@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // Service holds the placement use cases.
@@ -22,7 +23,8 @@ type Service struct {
 	applications Applications
 	users        Users
 	inv          Invoicing
-	now          func() time.Time // tests may fix "today"
+	now          func() time.Time    // tests may fix "today"
+	salaryViews  salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 // View is a placement as a user may see it.

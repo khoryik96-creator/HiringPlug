@@ -18,6 +18,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 const emailUniqueIndex = "candidate_tenant_email_uq"
@@ -32,12 +33,13 @@ type Service struct {
 	rules       FieldRules // the company's mandatory fields and sources
 	salaryRules SalaryRules
 	movers      []RecordMover
-	notes       Notes              // screening calls' notes
-	cvs         CVs                // CV text, for advanced search
-	used        usedCache          // the suggestions of values already used
-	zone        *time.Location     // the agency's time zone: what day it is (UseTimeZone)
-	folderItems folderfilter.Items // a folder's candidates (UseFolders)
-	meaning     Meaning            // search by meaning (SearchByMeaningWith)
+	notes       Notes               // screening calls' notes
+	cvs         CVs                 // CV text, for advanced search
+	used        usedCache           // the suggestions of values already used
+	zone        *time.Location      // the agency's time zone: what day it is (UseTimeZone)
+	folderItems folderfilter.Items  // a folder's candidates (UseFolders)
+	meaning     Meaning             // search by meaning (SearchByMeaningWith)
+	salaryViews salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
 }
 
 // Create adds a candidate.
@@ -115,8 +117,10 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 		if err != nil {
 			return err
 		}
-		view, err = s.loadView(ctx, tx, s.users, p, fromRow(row))
-		return err
+		if view, err = s.loadView(ctx, tx, s.users, p, fromRow(row)); err != nil || view.Compensation == nil {
+			return err
+		}
+		return salaryview.In(ctx, tx, s.salaryViews, salaryview.Candidate, id)
 	})
 	return view, err
 }

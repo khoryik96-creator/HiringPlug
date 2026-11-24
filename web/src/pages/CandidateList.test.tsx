@@ -158,7 +158,7 @@ describe("candidate list", () => {
     post.mock.calls.splice(0, post.mock.calls.findIndex((c) => JSON.stringify(c).includes("internship")));
     expect(sentBody(post)).toEqual({
       limit: 25, skillsMatch: "all", boolean: "SAP AND (BW OR BPC) NOT internship", skills: ["SAP"], availability: ["looking"],
-      expectedSalaryMax: { amount: "12000", currency: "MYR" },
+      expectedSalaryMax: { amount: "12000", currency: "MYR" }, includeSalary: true,
     });
     const link = await screen.findByRole("link", { name: "Aina" });
     expect(link.getAttribute("href")).toBe("#/candidates/cand_01jbz6w0m0k8q9x2r3s4t5v6w7?hl=" + encodeURIComponent("SAP AND (BW OR BPC) NOT internship"));
@@ -181,15 +181,15 @@ describe("candidate list", () => {
     await screen.findByText("Siti Aisyah");
     // Click a header to sort by it, like a spreadsheet; click again to flip.
     fireEvent.click(screen.getByRole("button", { name: /^Expected salary/ }));
-    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_asc" } } }); });
+    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_asc", includeSalary: true } } }); });
     fireEvent.click(screen.getByRole("button", { name: /^Expected salary/ }));
-    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc" } } }); });
+    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc", includeSalary: true } } }); });
     expect(screen.getByRole("columnheader", { name: /Expected salary/ }).getAttribute("aria-sort")).toBe("descending");
     fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
     expect(await screen.findByText("Zara")).toBeTruthy();
-    expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc", offset: 25 } } });
+    expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc", offset: 25, includeSalary: true } } });
     fireEvent.click(screen.getByRole("button", { name: /^Name/ }));
-    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "name" } } }); });
+    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "name", includeSalary: true } } }); });
     fireEvent.click(screen.getByRole("button", { name: "Back to newest first" }));
     await waitFor(() => { expect(screen.getByRole("columnheader", { name: /^Name/ }).getAttribute("aria-sort")).toBe("none"); });
     cleanup();

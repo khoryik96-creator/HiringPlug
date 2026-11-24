@@ -81,6 +81,7 @@ func FilterOf(b api.CandidateSearch, p authz.Principal) SearchFilter {
 		Specializations: strs(b.Specialization), Certifications: strs(b.Certifications),
 		AllSkills: b.SkillsMatch == nil || *b.SkillsMatch == "all", NoticeMaxDays: b.NoticeMaxDays, UpdatedWithinDays: b.UpdatedWithinDays,
 		Owner: blankNil(b.Owner), Folder: b.FolderId, Order: Order{Offset: deref(b.Offset)},
+		IncludeSalary: b.IncludeSalary != nil && *b.IncludeSalary,
 	}
 	if f.Owner != nil && *f.Owner == "me" {
 		f.Owner = &p.UserID
