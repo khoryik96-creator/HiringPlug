@@ -842,6 +842,7 @@ type Email struct {
 	BouncedAt           *time.Time
 	DeliveryAttemptedAt *time.Time
 	CvCandidateIds      []string
+	ToCandidate         bool
 }
 
 type EmailAttachment struct {

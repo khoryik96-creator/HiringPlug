@@ -30,10 +30,10 @@ RETURNING *;
 
 -- name: InsertEmail :one
 INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
-                   body_html, salary, salary_restricted, fees_restricted, sent_by, sender_name, reply_to)
+                   body_html, salary, salary_restricted, fees_restricted, sent_by, sender_name, reply_to, to_candidate)
 VALUES (app_current_tenant(), sqlc.narg(candidate_id), sqlc.narg(application_id), sqlc.narg(contact_id), @to_addresses::text[],
         @cc_addresses::text[], @bcc_addresses::text[], @subject, @body, sqlc.narg(body_html), @salary, @salary_restricted,
-        @fees_restricted, coalesce(sqlc.narg(sent_by)::text, app_current_user()), @sender_name, @reply_to)
+        @fees_restricted, coalesce(sqlc.narg(sent_by)::text, app_current_user()), @sender_name, @reply_to, @to_candidate)
 RETURNING *;
 
 -- name: SetEmailCalendar :exec

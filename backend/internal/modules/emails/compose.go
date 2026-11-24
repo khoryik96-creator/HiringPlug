@@ -223,7 +223,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		row, err := q.InsertEmail(ctx, store.InsertEmailParams{
 			CandidateID: candidateID, ApplicationID: appID, ContactID: r.ContactID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
 			Subject: filled.Subject, Body: filled.Body, BodyHtml: orNil(filled.BodyHTML), Salary: filled.salary, SalaryRestricted: restricted,
-			SenderName: p.Name, ReplyTo: p.Email,
+			SenderName: p.Name, ReplyTo: p.Email, ToCandidate: r.RecipientCandidateID != nil,
 		})
 		if err != nil {
 			return err

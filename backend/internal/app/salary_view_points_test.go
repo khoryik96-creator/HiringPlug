@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -410,4 +411,27 @@ func TestReadingASentEmailWithASalaryCountsIt(t *testing.T) {
 	read("candidateId=" + recipient.Id)
 	assert.Equal(t, 2, a.seen(owner, admin.ID)["email_read:"+recipient.Id].Count)
 	assert.Equal(t, 1, a.seen(owner, admin.ID)["email_read:"+c.Id].Count)
+
+	// To a candidate who is on the list themselves (first, as a client's
+	// email's own candidate is): still only theirs.
+	wei := a.withSalary(rt, map[string]any{"firstName": "Wei", "email": "wei@example.com"})
+	lina := a.withSalary(rt, map[string]any{"firstName": "Lina"})
+	block := `<div data-candidate-summary="true"><p data-candidate-id="%s">Expected salary: <span data-field="candidate.expectedSalary">RM 11,000 per month</span></p></div>`
+	notice := `<div data-candidate-summary="true"><p data-candidate-id="%s">Notice: 1 month</p></div>`
+	send(map[string]any{"recipientCandidateId": wei.Id, "candidates": []map[string]any{{"candidateId": wei.Id}, {"candidateId": lina.Id}},
+		"to": []string{"wei@example.com"}, "bodyHtml": fmt.Sprintf(block, wei.Id) + fmt.Sprintf(notice, lina.Id)})
+	read("candidateId=" + lina.Id)
+	seen = a.seen(owner, admin.ID)
+	assert.Equal(t, 1, seen["email_read:"+wei.Id].Count, "the email to Wei shows only his salary")
+	assert.NotContains(t, seen, "email_read:"+lina.Id, "though Lina is on its list")
+
+	// A client's email about several, written without a contact (from a
+	// job): any of theirs, the first's and the others'.
+	first, second := a.withSalary(rt, map[string]any{"firstName": "Aziz"}), a.withSalary(rt, map[string]any{"firstName": "Bella"})
+	send(map[string]any{"candidates": []map[string]any{{"candidateId": first.Id}, {"candidateId": second.Id}},
+		"to": []string{"hr@client.example"}, "bodyHtml": fmt.Sprintf(notice, first.Id) + fmt.Sprintf(block, second.Id)})
+	read("candidateId=" + first.Id)
+	seen = a.seen(owner, admin.ID)
+	assert.Equal(t, 1, seen["email_read:"+first.Id].Count)
+	assert.Equal(t, 1, seen["email_read:"+second.Id].Count, "Bella's salary is in it")
 }

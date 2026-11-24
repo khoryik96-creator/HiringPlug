@@ -10,7 +10,6 @@ package emails
 
 import (
 	"context"
-	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -124,10 +123,11 @@ func (s *Service) salarySent(ctx context.Context, tx pgx.Tx, salary bool, values
 
 // salaryReaders are the candidates whose salary sent emails with one may
 // show, by email: the shortlisted candidates of an email about several (a
-// salary in it may be any of theirs); only the recipient, for one to a
-// candidate about others (it never shows another candidate's salary,
-// salaryOnlyTheirOwn); otherwise the candidate it is about. The stored
-// message no longer marks whose each salary is.
+// salary in it may be any of theirs); only the recipient, for one written
+// to a candidate (it never shows another candidate's salary,
+// salaryOnlyTheirOwn), even when they are on its list; otherwise the
+// candidate it is about. The stored message no longer marks whose each
+// salary is.
 func salaryReaders(emails []store.Email, shortlisted []store.EmailCandidateIDsRow) []string {
 	listed := map[string][]string{}
 	for _, r := range shortlisted {
@@ -139,9 +139,8 @@ func salaryReaders(emails []store.Email, shortlisted []store.EmailCandidateIDsRo
 			continue
 		}
 		list := listed[e.ID]
-		toCandidate := e.CandidateID != nil && len(list) > 0 && !slices.Contains(list, *e.CandidateID)
 		switch {
-		case toCandidate || len(list) == 0:
+		case e.ToCandidate || len(list) == 0:
 			if e.CandidateID != nil {
 				out = append(out, *e.CandidateID)
 			}

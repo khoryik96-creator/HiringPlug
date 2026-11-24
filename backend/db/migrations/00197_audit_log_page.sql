@@ -5,6 +5,9 @@
 --   kind, candidate and day (the agency's time zone), with how often. Never
 --   an amount. Written only through app_record_salary_view (no policy lets
 --   the app add, change or delete a line itself), never deleted.
+-- email.to_candidate (the emails module's): an email about several
+--   candidates written to a candidate (it may show only their salary), so
+--   reading it again counts only theirs, even when they are on its list.
 -- Committed migrations are never edited (CI enforces this): add a new file.
 
 -- +goose Up
@@ -101,6 +104,17 @@ $$;
 REVOKE ALL ON FUNCTION app_move_salary_views(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app_move_salary_views(text, text) TO hiringplug_app;
 
+-- An email about several candidates (a shortlist) written to one of them
+-- rather than to the client: whose salary it may show is the recipient's
+-- only. Emails sent before: those whose candidate (the recipient) is not
+-- on their list; one to a candidate on their own list cannot be told from
+-- the client's and stays counted as the client's.
+ALTER TABLE email ADD COLUMN to_candidate boolean NOT NULL DEFAULT false;
+UPDATE email e SET to_candidate = true
+WHERE e.candidate_id IS NOT NULL AND e.contact_id IS NULL
+  AND EXISTS (SELECT 1 FROM email_candidate c WHERE c.email_id = e.id)
+  AND NOT EXISTS (SELECT 1 FROM email_candidate c WHERE c.email_id = e.id AND c.candidate_id = e.candidate_id);
+
 -- Admin roles a company has customised get the new permissions, as they would by default.
 UPDATE role_setting SET permissions = array_append(permissions, 'auditlog:read')
 WHERE role = 'admin' AND NOT ('auditlog:read' = ANY (permissions));
@@ -108,6 +122,7 @@ UPDATE role_setting SET permissions = array_append(permissions, 'auditlog.salary
 WHERE role = 'admin' AND NOT ('auditlog.salary_views:read' = ANY (permissions));
 
 -- +goose Down
+ALTER TABLE email DROP COLUMN IF EXISTS to_candidate;
 UPDATE role_setting SET permissions = array_remove(array_remove(permissions, 'auditlog:read'), 'auditlog.salary_views:read');
 DROP FUNCTION IF EXISTS app_move_salary_views(text, text);
 DROP FUNCTION IF EXISTS app_record_salary_view(text, text, text[], date, timestamptz);
