@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	rereadAfter = 2 * time.Minute // a search still being read after this is queued again (its job died)
+	rereadAfter = 2 * time.Minute // a search still being read after this is queued again (its job died), twice as late each time
 	byWords     = 100             // candidates found by the search's own words in their CVs
 	passageMax  = 300             // characters of a passage shown
 )
@@ -163,7 +163,7 @@ func (s *Service) readQuery(ctx context.Context, tx pgx.Tx, tenantID, model stri
 	if row.Status == "ready" {
 		return row, true, q.TouchQuery(ctx, row.ID)
 	}
-	if row.CreatedAt.Before(s.now().Add(-rereadAfter)) { // its job died, or it failed: once more
+	if row.CreatedAt.Before(s.now().Add(-rereadAfter << min(row.Rereads, 5))) { // its job died, or it failed: once more, later each time
 		if err := q.RereadQuery(ctx, row.ID); err != nil {
 			return row, false, err
 		}

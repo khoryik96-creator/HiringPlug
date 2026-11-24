@@ -47,7 +47,11 @@ class MeaningModel:
         self._tokenizer.enable_truncation(MAX_TOKENS)
         self._tokenizer.enable_padding()
         options = ort.SessionOptions()
-        options.intra_op_num_threads = max(1, min(4, os.cpu_count() or 1))
+        # Half the cores at most: the background read-through must leave room
+        # for reading CVs and for the database; no spinning while idle.
+        options.intra_op_num_threads = max(1, min(4, (os.cpu_count() or 2) // 2))
+        options.inter_op_num_threads = 1
+        options.add_session_config_entry("session.intra_op.allow_spinning", "0")
         self._session = ort.InferenceSession(
             str(folder / "model.onnx"), options, providers=["CPUExecutionProvider"]
         )
@@ -58,10 +62,14 @@ class MeaningModel:
         """One unit-length row of 384 numbers per text (mean of the tokens)."""
         if not texts:
             return np.zeros((0, DIMENSIONS), dtype=np.float32)
+        # Read in batches of texts of about the same length (a batch is padded
+        # to its longest), then put back in the order asked for.
+        order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
+        ordered = [texts[i] for i in order]
         out = []
-        for start in range(0, len(texts), BATCH):
+        for start in range(0, len(ordered), BATCH):
             with self._lock:
-                encoded = self._tokenizer.encode_batch([t or " " for t in texts[start : start + BATCH]])
+                encoded = self._tokenizer.encode_batch([t or " " for t in ordered[start : start + BATCH]])
             ids = np.array([e.ids for e in encoded], dtype=np.int64)
             mask = np.array([e.attention_mask for e in encoded], dtype=np.int64)
             feed = {"input_ids": ids, "attention_mask": mask}
@@ -72,7 +80,10 @@ class MeaningModel:
             mean = (hidden * weights).sum(axis=1) / np.maximum(weights.sum(axis=1), 1e-9)
             norms = np.linalg.norm(mean, axis=1, keepdims=True)
             out.append(mean / np.maximum(norms, 1e-9))
-        return np.vstack(out).astype(np.float32)
+        rows = np.vstack(out).astype(np.float32)
+        result = np.empty_like(rows)
+        result[order] = rows
+        return result
 
 
 _loaded: dict[Path, MeaningModel] = {}

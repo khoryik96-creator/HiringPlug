@@ -601,7 +601,7 @@ func (q *Queries) ProfileScores(ctx context.Context, arg ProfileScoresParams) ([
 }
 
 const queryByHash = `-- name: QueryByHash :one
-SELECT id, status, level, describes, exact, understood, created_at, read_at, (role IS NOT NULL)::boolean AS has_role,
+SELECT id, status, level, describes, exact, understood, created_at, read_at, rereads, (role IS NOT NULL)::boolean AS has_role,
        (context IS NOT NULL)::boolean AS has_context,
        (SELECT count(*) FROM meaning_query_need n WHERE n.query_id = q.id)::int AS needs
 FROM meaning_query q WHERE text_hash = $1
@@ -616,6 +616,7 @@ type QueryByHashRow struct {
 	Understood []byte
 	CreatedAt  time.Time
 	ReadAt     *time.Time
+	Rereads    int16
 	HasRole    bool
 	HasContext bool
 	Needs      int32
@@ -634,6 +635,7 @@ func (q *Queries) QueryByHash(ctx context.Context, textHash string) (QueryByHash
 		&i.Understood,
 		&i.CreatedAt,
 		&i.ReadAt,
+		&i.Rereads,
 		&i.HasRole,
 		&i.HasContext,
 		&i.Needs,
@@ -689,7 +691,7 @@ func (q *Queries) ReadOf(ctx context.Context, candidateIds []string) ([]ReadOfRo
 }
 
 const rereadQuery = `-- name: RereadQuery :exec
-UPDATE meaning_query SET status = 'reading', created_at = now(), read_at = NULL WHERE id = $1
+UPDATE meaning_query SET status = 'reading', created_at = now(), read_at = NULL, rereads = least(rereads + 1, 100) WHERE id = $1
 `
 
 func (q *Queries) RereadQuery(ctx context.Context, id string) error {

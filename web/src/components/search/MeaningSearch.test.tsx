@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Schemas } from "../../api/client";
-import { looksLikeWork, MeaningBanner, MeaningSwitch, readingInterval, WhyLine } from "./MeaningSearch";
+import { looksLikeWork, MeaningBanner, MeaningSwitch, READING_POLLS, readingInterval, WhyLine } from "./MeaningSearch";
 
 afterEach(() => {
   cleanup();
@@ -105,5 +105,6 @@ describe("search by meaning", () => {
     expect(readingInterval(false, 0)).toBe(false);
     expect(readingInterval(true, 0)).toBe(700);
     expect(readingInterval(true, 21)).toBe(5000);
+    expect(readingInterval(true, READING_POLLS + 1)).toBe(false); // minutes on: the AI worker is likely down, stop asking
   });
 });

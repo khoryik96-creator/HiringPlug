@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { applicationsKey, jobSuggestionsKey } from "../api/keys";
 import { IconButton, PlusIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
-import { readingInterval, WhyLine } from "./search/MeaningSearch";
+import { READING_POLLS, readingInterval, WhyLine } from "./search/MeaningSearch";
 
 /** A snippet with the job's words, sent marked [[like this]], highlighted. */
 export function Highlighted({ text }: { text: string }) {
@@ -53,13 +53,15 @@ export function tidySnippet(snippet: string): string {
  */
 export function PossibleCandidates({ jobId, permissions }: { jobId: string; permissions: Permission[] }) {
   const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
   const allowed = ["matching:read", "candidates:read", "documents:read", "pipeline:read"].every((p) => permissions.includes(p as Permission));
   const list = useQuery({
     queryKey: jobSuggestionsKey(jobId),
     queryFn: async () => unwrap(await api.GET("/v1/matches/suggestions", { params: { query: { jobId } } })),
     enabled: allowed,
-    // While the job is being read by meaning (a moment), ask again.
-    refetchInterval: (query) => readingInterval(query.state.data?.meaning?.status === "reading", query.state.dataUpdateCount),
+    // While the job is being read by meaning (a moment), ask again: only
+    // while the list is open, and not for ever (the AI worker may be down).
+    refetchInterval: (query) => open && readingInterval(query.state.data?.meaning?.status === "reading", query.state.dataUpdateCount),
   });
   const add = useMutation({
     mutationFn: async (candidateId: string) =>
@@ -75,7 +77,11 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
   const meaning = list.data?.meaning;
   const showLevel = Boolean(meaning?.understood?.levelName);
   return (
-    <details className="fold" aria-label="Possible candidates">
+    <details className="fold" aria-label="Possible candidates" onToggle={(e) => {
+      const nowOpen = e.currentTarget.open;
+      setOpen(nowOpen);
+      if (nowOpen && list.data?.meaning?.status === "reading") void list.refetch();
+    }}>
       <summary>
         <span className="fold-title">Possible candidates</span>
         {found && !noText && <span className="count-chip">{String(found.length)}</span>}
@@ -84,6 +90,8 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
       {meaning?.status === "reading" && (
         <p className="meaning-banner" role="status">
           <span className="spinner" aria-hidden="true" /> Reading the job the way a recruiter would… meanwhile, CVs with its words.
+          {(queryClient.getQueryState(jobSuggestionsKey(jobId))?.dataUpdateCount ?? 0) > READING_POLLS && <> This is taking longer than usual: is the AI worker running?{" "}
+            <button type="button" className="link" onClick={() => { void list.refetch(); }}>Check again</button></>}
         </p>
       )}
       {meaning?.status === "unavailable" && <p className="muted small">Matching by meaning is not set up on this server: CVs with the job’s words only.</p>}

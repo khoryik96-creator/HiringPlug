@@ -97,6 +97,51 @@ describe("CVs and documents", () => {
     expect(within(again).queryByText("Noelle Khoo")).toBeNull();
   });
 
+  it("reads a CV read by older rules again when its details are reviewed, then opens the review", async () => {
+    let parseStatus: Document["parseStatus"] = "parsed";
+    let outdated = true;
+    let name = "Tyco Valves";
+    const cv = () => doc({ id: "doc_cv", fileName: "Leong CV.txt", contentType: "text/plain", extractedText: "CV text", parseStatus,
+      readOutdated: outdated, updatedAt: new Date().toISOString(),
+      parsedProfile: { parser: "rules@1", fullName: { value: name, quote: name.toUpperCase() }, skills: [], experience: [], education: [], dropped: 0 } as never });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
+    ))) as never);
+    const post = vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("CV text");
+    fireEvent.click(screen.getByRole("button", { name: "Review details" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
+    expect(post.mock.calls[0]?.[0]).toBe("/v1/documents/{documentId}/parse");
+    expect(screen.queryByRole("region", { name: "Details from this CV" })).toBeNull();
+    name = "Leong Wei Ming"; // read the new way
+    outdated = false;
+    parseStatus = "parsed";
+    const review = await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 });
+    expect(await within(review).findByText("Leong Wei Ming")).toBeTruthy();
+  });
+
+  it("opens the review of a CV still read the old way after reading it once again", async () => {
+    let parseStatus: Document["parseStatus"] = "parsed";
+    const cv = () => doc({ id: "doc_cv", fileName: "Old CV.txt", contentType: "text/plain", extractedText: "CV text", parseStatus,
+      readOutdated: true, updatedAt: new Date().toISOString(),
+      parsedProfile: { parser: "rules@1", fullName: { value: "Ali", quote: "ALI" }, skills: [], experience: [], education: [], dropped: 0 } as never });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
+    ))) as never);
+    const post = vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("CV text");
+    fireEvent.click(screen.getByRole("button", { name: "Review details" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
+    parseStatus = "parsed"; // the AI worker still reads the old way: still out of date
+    await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 });
+    fireEvent.click(screen.getByRole("button", { name: "Close review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review details" }));
+    expect(await screen.findByRole("region", { name: "Details from this CV" })).toBeTruthy();
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
   it("reads a CV never read with the same button, then shows it ready", async () => {
     let parseStatus: Document["parseStatus"] = null;
     const cv = () => doc({ id: "doc_old", fileName: "Old CV.txt", contentType: "text/plain", extractedText: "Old text", parseStatus,

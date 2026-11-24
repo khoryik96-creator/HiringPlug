@@ -1473,6 +1473,7 @@ type MeaningQuery struct {
 	CreatedAt  time.Time
 	ReadAt     *time.Time
 	UsedAt     time.Time
+	Rereads    int16
 }
 
 type MeaningQueryNeed struct {

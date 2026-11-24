@@ -102,7 +102,7 @@ SELECT count(*) FROM meaning_candidate WHERE model = @model;
 
 -- A search or a job, as read.
 -- name: QueryByHash :one
-SELECT id, status, level, describes, exact, understood, created_at, read_at, (role IS NOT NULL)::boolean AS has_role,
+SELECT id, status, level, describes, exact, understood, created_at, read_at, rereads, (role IS NOT NULL)::boolean AS has_role,
        (context IS NOT NULL)::boolean AS has_context,
        (SELECT count(*) FROM meaning_query_need n WHERE n.query_id = q.id)::int AS needs
 FROM meaning_query q WHERE text_hash = @text_hash;
@@ -114,7 +114,7 @@ ON CONFLICT (tenant_id, text_hash) DO UPDATE SET used_at = now()
 RETURNING id, status, created_at;
 
 -- name: RereadQuery :exec
-UPDATE meaning_query SET status = 'reading', created_at = now(), read_at = NULL WHERE id = @id;
+UPDATE meaning_query SET status = 'reading', created_at = now(), read_at = NULL, rereads = least(rereads + 1, 100) WHERE id = @id;
 
 -- name: TouchQuery :exec
 UPDATE meaning_query SET used_at = now() WHERE id = @id AND used_at < now() - interval '1 hour';

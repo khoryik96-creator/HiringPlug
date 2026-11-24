@@ -45,9 +45,12 @@ export const READING_TOO_LONG_MS = 15000;
 /** How often to ask again while the words are read: soon at first, then
  * seldom (after a while the AI worker is likely down, and the page may stay open). */
 export function readingInterval(reading: boolean, asked: number): number | false {
-  if (!reading) return false;
+  if (!reading || asked > READING_POLLS) return false; // a few minutes: the AI worker is likely down
   return asked > 20 ? 5000 : 700;
 }
+
+/** How often a search being read is asked about before the page stops asking (about 3½ minutes). */
+export const READING_POLLS = 60;
 
 /** True once the search has been reading for longer than usual. */
 export function useReadingTooLong(reading: boolean, text: string): boolean {
@@ -61,11 +64,12 @@ export function useReadingTooLong(reading: boolean, text: string): boolean {
 }
 
 /** What the search by meaning is doing, in a line above the list. */
-export function MeaningBanner({ outcome, text, tooLong, onWords }: {
+export function MeaningBanner({ outcome, text, tooLong, onWords, onAgain }: {
   outcome: Schemas["MeaningOutcome"] | null | undefined;
   text: string;
   tooLong: boolean;
   onWords: () => void;
+  onAgain?: () => void; // ask again, once the page has stopped asking
 }) {
   if (!outcome) return null;
   if (outcome.status === "unavailable") {
@@ -80,7 +84,9 @@ export function MeaningBanner({ outcome, text, tooLong, onWords }: {
     return (
       <p className="meaning-banner" role="status">
         <span className="spinner" aria-hidden="true" /> Reading “{text}” the way a recruiter would…
-        {tooLong && <> This is taking longer than usual: is the AI worker running? <button type="button" className="link" onClick={onWords}>Search by words instead</button></>}
+        {tooLong && <> This is taking longer than usual: is the AI worker running?{" "}
+          {onAgain && <><button type="button" className="link" onClick={onAgain}>Check again</button> · </>}
+          <button type="button" className="link" onClick={onWords}>Search by words instead</button></>}
       </p>
     );
   }

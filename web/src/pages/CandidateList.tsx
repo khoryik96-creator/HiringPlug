@@ -173,7 +173,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         {canImport && !dropped && <DropHint accept={CV_TYPES} label="Drop CVs anywhere to upload" onPick={drop.take} skipped={drop.skipped} />}
       </div>
       {rulesTyped && <MeaningRulesHint id={rulesHint} />}
-      {meaningText && <MeaningBanner outcome={meaning} text={meaningText} tooLong={tooLong} onWords={() => { setByMeaning(false); }} />}
+      {meaningText && <MeaningBanner outcome={meaning} text={meaningText} tooLong={tooLong} onWords={() => { setByMeaning(false); }}
+        onAgain={() => { void found.refetch(); }} />}
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} mine={{ on: mine, set: setMine }} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && filtersOn > 0 && (
         <div className="active-filters" aria-label="Search filters">

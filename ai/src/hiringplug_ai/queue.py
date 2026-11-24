@@ -105,6 +105,21 @@ class Queue:
             return None
         return ClaimedJob(*row)
 
+    def claim_except(self, lease_seconds: int, kinds: list[str], queue: str = AI_QUEUE) -> ClaimedJob | None:
+        """Claim the next job of any kind but these (the meaning slot's are left to it)."""
+        row = (
+            self._connection()
+            .execute(
+                "SELECT id, tenant_id, kind, payload, attempts, max_attempts, request_id, priority"
+                " FROM job_claim_except_kinds(%s, %s, %s, %s)",
+                (queue, self.worker_id, lease_seconds, kinds),
+            )
+            .fetchone()
+        )
+        if row is None:
+            return None
+        return ClaimedJob(*row)
+
     def enqueue(self, job: ClaimedJob, f: FollowUp) -> None:
         """Queue one job for the same company as `job`, on its own (not tied to
         the job completing): a word to the app that must not wait for retries."""
