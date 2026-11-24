@@ -1,10 +1,25 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Schemas } from "../../api/client";
 import { looksLikeWork, MeaningBanner, MeaningSwitch, readingInterval, WhyLine } from "./MeaningSearch";
 
-afterEach(() => { cleanup(); });
+afterEach(() => {
+  cleanup();
+  for (const style of document.head.querySelectorAll("style")) style.remove();
+});
+
+/** The page's stylesheet for search by meaning, in force in the document. */
+function meaningCss(): CSSStyleSheet {
+  const style = document.createElement("style");
+  style.textContent = readFileSync(join(process.cwd(), "src", "meaning.css"), "utf8");
+  document.head.append(style);
+  if (!style.sheet) throw new Error("meaning.css was not read");
+  return style.sheet;
+}
 
 const why: Schemas["MeaningWhy"] = {
   score: 0.88, strength: "strong", title: "Account Executive", titleWhen: "now", family: "accounting", level: "Executive",
@@ -51,6 +66,23 @@ describe("search by meaning", () => {
     expect(container.textContent).toBe("Possible matchas Recruitment Consultant (until 2013)");
   });
 
+  it("lets the CV's words break after a comma, never inside a word, so a phone's card is not widened", () => {
+    const sheet = meaningCss();
+    const many = ["accounts", "bank reconciliations", "ledger", "payroll", "audit"];
+    const { container } = render(<WhyLine why={{ ...why, words: many }} inCell />);
+    const line = container.querySelector<HTMLElement>(".why-words");
+    expect(line?.textContent).toBe("CV says: accounts, bank reconciliations, ledger, payroll, audit");
+    expect(getComputedStyle(line as HTMLElement).whiteSpace, "the line wraps").not.toBe("nowrap");
+    const words = [...container.querySelectorAll<HTMLElement>(".why-word")];
+    expect(words.map((w) => w.textContent)).toEqual(many);
+    for (const w of words) expect(getComputedStyle(w).whiteSpace, `${w.textContent} stays whole`).toBe("nowrap");
+    // On a phone the Match cell is a line of the candidate's card: as wide as the card, never wider.
+    const phone = [...sheet.cssRules].find((r): r is CSSMediaRule => r instanceof CSSMediaRule && r.conditionText === "(max-width: 700px)");
+    const cell = [...(phone?.cssRules ?? [])].find((r): r is CSSStyleRule => r instanceof CSSStyleRule && r.selectorText === "table.pick-table td.col-match");
+    expect(cell?.style.flexBasis).toBe("100%");
+    expect(cell?.style.minWidth, "not the wide screen's 16rem").toBe("0px");
+  });
+
   it("switches on and off from the search box", () => {
     const onChange = vi.fn();
     const { rerender } = render(<MeaningSwitch on={false} onChange={onChange} />);
@@ -62,7 +94,7 @@ describe("search by meaning", () => {
     expect(screen.getByRole("button", { name: /Meaning/ }).getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("offers itself for words that read as a role or work, not a name, email or phone", () => {
+  it("offers itself for words that could be a role or work, not an email or phone", () => {
     expect(looksLikeWork("talent acquisition")).toBe(true);
     expect(looksLikeWork("aina@example.com")).toBe(false);
     expect(looksLikeWork("012 345 6789")).toBe(false);
