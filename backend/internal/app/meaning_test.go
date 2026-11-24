@@ -188,7 +188,7 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 	a.addToJob(token, job.Id, cara.Id)
 	dina := a.createCandidate(token, map[string]any{"firstName": "Dina", "currentTitle": "Procurement Manager"})
 	withCV(t, a, aiConn, token, dina.Id, "Interviews and offers with suppliers; tenders and contracts.") // the job's words, not its work
-	fiona := a.createCandidate(token, map[string]any{"firstName": "Fiona"}) // no title: meaning cannot say her field
+	fiona := a.createCandidate(token, map[string]any{"firstName": "Fiona"})                              // no title: meaning cannot say her field
 	withCV(t, a, aiConn, token, fiona.Id, "Interviews and offers for our engineering teams.")
 	a.request(http.MethodGet, "/v1/meaning/status", token, nil)
 	readByMeaning(t, a, aiConn, tenant.ID)
