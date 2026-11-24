@@ -6304,6 +6304,8 @@ export interface components {
             inputTokens: number;
             outputTokens: number;
         };
+        /** @description Where a page ended (read it as an opaque value). */
+        AuditCursor: string;
         /** @example aud_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         AuditEntryId: string;
         /** @example sv_01jbz6w0m0k8q9x2r3s4t5v6w7 */
@@ -6338,7 +6340,7 @@ export interface components {
         };
         AuditLogPage: {
             items: components["schemas"]["AuditEntry"][];
-            nextCursor: components["schemas"]["AuditEntryId"] | null;
+            nextCursor: components["schemas"]["AuditCursor"] | null;
         };
         AuditLogExport: {
             format: components["schemas"]["ExportFormat"];
@@ -6382,7 +6384,7 @@ export interface components {
         };
         SalaryViewPage: {
             items: components["schemas"]["SalaryView"][];
-            nextCursor: components["schemas"]["SalaryViewId"] | null;
+            nextCursor: components["schemas"]["AuditCursor"] | null;
         };
         SalaryViewExport: {
             format: components["schemas"]["ExportFormat"];
@@ -12692,6 +12694,8 @@ export interface components {
     };
     parameters: {
         AiProviderPath: components["schemas"]["AiProviderName"];
+        /** @description The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since). */
+        AuditCursor: components["schemas"]["AuditCursor"];
         /** @description Only what this actor did - a user id, an API key id, or "system" (what happened automatically). */
         AuditActor: string;
         /** @description Only this action ("candidate.updated"), or with no dot every action of that kind ("candidate" finds candidate.created, candidate.updated...). */
@@ -13142,8 +13146,8 @@ export interface operations {
                 from?: components["parameters"]["AuditFrom"];
                 /** @description Up to and including this day (in the agency's time zone). */
                 to?: components["parameters"]["AuditTo"];
-                /** @description The `nextCursor` of the previous page. */
-                cursor?: components["schemas"]["AuditEntryId"];
+                /** @description The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since). */
+                cursor?: components["parameters"]["AuditCursor"];
                 limit?: number;
             };
             header?: never;
@@ -13216,8 +13220,8 @@ export interface operations {
                 from?: components["parameters"]["AuditFrom"];
                 /** @description Up to and including this day (in the agency's time zone). */
                 to?: components["parameters"]["AuditTo"];
-                /** @description The `nextCursor` of the previous page. */
-                cursor?: components["schemas"]["SalaryViewId"];
+                /** @description The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since). */
+                cursor?: components["parameters"]["AuditCursor"];
                 limit?: number;
             };
             header?: never;

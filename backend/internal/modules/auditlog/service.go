@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/auditlog/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
@@ -87,8 +88,21 @@ func (s *Service) Log(ctx context.Context, p authz.Principal, f LogFilter, curso
 	return out, err
 }
 
+// badCursor: a cursor that is not one a page gave.
+func badCursor() error {
+	return apperr.Validation(apperr.FieldErrors{{Field: "cursor", Message: "is not the nextCursor of a page"}})
+}
+
 func (s *Service) logPage(ctx context.Context, tx pgx.Tx, f audit.Filter, cursor *string, limit int) (LogPage, error) {
-	logged, more, err := audit.Page(ctx, tx, f, cursor, limit)
+	var after *audit.After
+	if cursor != nil {
+		at, id, ok := ReadLogCursor(*cursor)
+		if !ok {
+			return LogPage{}, badCursor()
+		}
+		after = &audit.After{At: at, ID: id}
+	}
+	logged, more, err := audit.Page(ctx, tx, f, after, limit)
 	if err != nil {
 		return LogPage{}, err
 	}
@@ -135,8 +149,9 @@ func (s *Service) logPage(ctx context.Context, tx pgx.Tx, f audit.Filter, cursor
 		out.Items[i] = e
 	}
 	if more && len(logged) > 0 {
-		last := logged[len(logged)-1].ID
-		out.NextCursor = &last
+		last := logged[len(logged)-1]
+		next := LogCursor(last.CreatedAt, last.ID)
+		out.NextCursor = &next
 	}
 	return out, nil
 }
@@ -213,8 +228,17 @@ func (s *Service) SalaryViews(ctx context.Context, p authz.Principal, f ViewFilt
 }
 
 func (s *Service) viewPage(ctx context.Context, tx pgx.Tx, f ViewFilter, cursor *string, limit int) (ViewPage, error) {
+	var afterDay pgtype.Date
+	var afterID string
+	if cursor != nil {
+		day, id, ok := ReadViewCursor(*cursor)
+		if !ok {
+			return ViewPage{}, badCursor()
+		}
+		afterDay, afterID = date(&day), id
+	}
 	rows, err := store.New(tx).ListSalaryViews(ctx, store.ListSalaryViewsParams{
-		UserID: f.User, Kind: f.Kind, CandidateID: f.CandidateID, FromDay: date(f.From), ToDay: date(f.To), Cursor: cursor,
+		UserID: f.User, Kind: f.Kind, CandidateID: f.CandidateID, FromDay: date(f.From), ToDay: date(f.To), AfterDay: afterDay, AfterID: afterID,
 		RowLimit: int32(limit + 1), //nolint:gosec // 1..200 per the contract
 	})
 	if err != nil {
@@ -223,8 +247,9 @@ func (s *Service) viewPage(ctx context.Context, tx pgx.Tx, f ViewFilter, cursor 
 	var out ViewPage
 	if len(rows) > limit {
 		rows = rows[:limit]
-		last := rows[len(rows)-1].ID
-		out.NextCursor = &last
+		last := rows[len(rows)-1]
+		next := ViewCursor(last.Day.Time, last.ID)
+		out.NextCursor = &next
 	}
 	who, candidates := make([]string, len(rows)), []string{}
 	for i, r := range rows {

@@ -12,7 +12,8 @@ SELECT app_record_salary_view(@kind::text, sqlc.narg(candidate_id)::text, @candi
 SELECT app_move_salary_views(@from_id::text, @to_id::text);
 
 -- Salary views, newest day first (and the newest line first within a day),
--- after the cursor's line. A list or export line counts, and is found by,
+-- after where the previous page ended (its last line's day and id, which a
+-- merge may since have taken away). A list or export line counts, and is found by,
 -- only the candidates the reader sees (row-level security hides a line
 -- with none of them).
 -- name: ListSalaryViews :many
@@ -28,7 +29,7 @@ WHERE (sqlc.narg(user_id)::text IS NULL OR user_id = sqlc.narg(user_id))
        OR (sqlc.narg(candidate_id) = ANY (candidate_ids) AND app_sees_candidate(sqlc.narg(candidate_id))))
   AND (sqlc.narg(from_day)::date IS NULL OR day >= sqlc.narg(from_day))
   AND (sqlc.narg(to_day)::date IS NULL OR day <= sqlc.narg(to_day))
-  AND (sqlc.narg(cursor)::text IS NULL OR (day, id) < (SELECT c.day, c.id FROM salary_view c WHERE c.id = sqlc.narg(cursor)))
+  AND (sqlc.narg(after_day)::date IS NULL OR (day, id) < (sqlc.narg(after_day), @after_id::text))
 ORDER BY day DESC, id DESC
 LIMIT @row_limit;
 

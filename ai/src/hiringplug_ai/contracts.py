@@ -854,6 +854,13 @@ class AssistantAnsweredJob(BaseModel):
     outputTokens: Annotated[int, Field(ge=0)]
 
 
+class AuditCursor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(description="Where a page ended (read it as an opaque value).", max_length=100, min_length=1),
+    ]
+
+
 class AuditEntryId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["aud_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^aud_[0-9a-hjkmnp-tv-z]{26}$")
@@ -7363,7 +7370,7 @@ class AuditEntry(BaseModel):
 
 class AuditLogPage(BaseModel):
     items: list[AuditEntry]
-    nextCursor: Annotated[AuditEntryId | None, Field(...)]
+    nextCursor: Annotated[AuditCursor | None, Field(...)]
 
 
 class SalaryView(BaseModel):
@@ -7389,7 +7396,7 @@ class SalaryView(BaseModel):
 
 class SalaryViewPage(BaseModel):
     items: list[SalaryView]
-    nextCursor: Annotated[SalaryViewId | None, Field(...)]
+    nextCursor: Annotated[AuditCursor | None, Field(...)]
 
 
 class SalaryViewExport(BaseModel):

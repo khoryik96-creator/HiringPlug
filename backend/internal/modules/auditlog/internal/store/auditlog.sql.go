@@ -25,9 +25,9 @@ WHERE ($1::text IS NULL OR user_id = $1)
        OR ($3 = ANY (candidate_ids) AND app_sees_candidate($3)))
   AND ($4::date IS NULL OR day >= $4)
   AND ($5::date IS NULL OR day <= $5)
-  AND ($6::text IS NULL OR (day, id) < (SELECT c.day, c.id FROM salary_view c WHERE c.id = $6))
+  AND ($6::date IS NULL OR (day, id) < ($6, $7::text))
 ORDER BY day DESC, id DESC
-LIMIT $7
+LIMIT $8
 `
 
 type ListSalaryViewsParams struct {
@@ -36,7 +36,8 @@ type ListSalaryViewsParams struct {
 	CandidateID *string
 	FromDay     pgtype.Date
 	ToDay       pgtype.Date
-	Cursor      *string
+	AfterDay    pgtype.Date
+	AfterID     string
 	RowLimit    int32
 }
 
@@ -53,7 +54,8 @@ type ListSalaryViewsRow struct {
 }
 
 // Salary views, newest day first (and the newest line first within a day),
-// after the cursor's line. A list or export line counts, and is found by,
+// after where the previous page ended (its last line's day and id, which a
+// merge may since have taken away). A list or export line counts, and is found by,
 // only the candidates the reader sees (row-level security hides a line
 // with none of them).
 func (q *Queries) ListSalaryViews(ctx context.Context, arg ListSalaryViewsParams) ([]ListSalaryViewsRow, error) {
@@ -63,7 +65,8 @@ func (q *Queries) ListSalaryViews(ctx context.Context, arg ListSalaryViewsParams
 		arg.CandidateID,
 		arg.FromDay,
 		arg.ToDay,
-		arg.Cursor,
+		arg.AfterDay,
+		arg.AfterID,
 		arg.RowLimit,
 	)
 	if err != nil {

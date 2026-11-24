@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -321,4 +322,36 @@ func TestSalaryViewsDownload(t *testing.T) {
 	require.Len(t, exp.Items, 2)
 	assert.Equal(t, map[string]any{"list": "salary_views", "count": float64(1), "format": "csv"}, exp.Items[1].Changes)
 	assert.Equal(t, map[string]any{"list": "salary_views", "count": float64(2), "format": "xlsx"}, exp.Items[0].Changes)
+}
+
+// "Load more" follows on from where the page ended, even when its last
+// line has gone since: a merge folds a duplicate's line into the kept
+// candidate's.
+func TestSalaryViewPagesFollowOnAfterAMerge(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.sameSalaryDay()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	keep := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
+	dup := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Duplicate"})
+	other := a.withSalary(recruiter.Token, map[string]any{"firstName": "Ali"})
+	for _, id := range []string{other.Id, keep.Id, dup.Id} { // the duplicate's line is the newest
+		require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+id, recruiter.Token, nil).Status)
+	}
+	first := a.salaryViews(owner, "?limit=1&user="+recruiter.ID)
+	require.Len(t, first.Items, 1)
+	require.Equal(t, dup.Id, orEmpty(first.Items[0].CandidateId))
+
+	res := a.request(http.MethodPost, "/v1/candidates/"+keep.Id+"/merge", owner, map[string]any{"duplicateId": dup.Id, "version": keep.Version})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	rest := a.salaryViews(owner, "?user="+recruiter.ID+"&cursor="+url.QueryEscape(first.NextCursor.MustGet()))
+	ids := []string{}
+	for _, v := range rest.Items {
+		ids = append(ids, orEmpty(v.CandidateId))
+	}
+	assert.Equal(t, []string{keep.Id, other.Id}, ids, "the lines after the merged one")
+	bad := a.request(http.MethodGet, "/v1/salary-views?cursor=sv_nope", owner, nil)
+	assert.Equal(t, http.StatusBadRequest, bad.Status, "%s", bad.Body)
 }

@@ -87,3 +87,24 @@ func TestALongChangeFitsInAnExcelCell(t *testing.T) {
 	assert.NotEmpty(t, file.Data)
 	assert.Equal(t, "short", FitCell("short"))
 }
+
+// A cursor holds where the page ended, so it reads back without the line.
+func TestCursorsSayWhereAPageEnded(t *testing.T) {
+	at := time.Date(2026, 3, 10, 4, 5, 6, 789000, time.UTC)
+	gotAt, id, ok := ReadLogCursor(LogCursor(at.In(time.FixedZone("MYT", 8*3600)), "aud_1"))
+	assert.True(t, ok)
+	assert.True(t, at.Equal(gotAt))
+	assert.Equal(t, "aud_1", id)
+	day, id, ok := ReadViewCursor(ViewCursor(time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC), "sv_1"))
+	assert.True(t, ok)
+	assert.Equal(t, "2026-03-10", day.Format(time.DateOnly))
+	assert.Equal(t, "sv_1", id)
+	for _, bad := range []string{"", "aud_1", "yesterday~aud_1", LogCursor(at, "sv_1")} {
+		_, _, ok := ReadLogCursor(bad)
+		assert.False(t, ok, bad)
+	}
+	for _, bad := range []string{"sv_1", "2026-13-01~sv_1", ViewCursor(at, "aud_1")} {
+		_, _, ok := ReadViewCursor(bad)
+		assert.False(t, ok, bad)
+	}
+}

@@ -656,10 +656,7 @@ paths:
         - $ref: '#/components/parameters/AuditEntityId'
         - $ref: '#/components/parameters/AuditFrom'
         - $ref: '#/components/parameters/AuditTo'
-        - name: cursor
-          in: query
-          description: The `nextCursor` of the previous page.
-          schema: {$ref: '#/components/schemas/AuditEntryId'}
+        - $ref: '#/components/parameters/AuditCursor'
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 200, default: 50}
@@ -724,10 +721,7 @@ paths:
           schema: {$ref: '#/components/schemas/SalaryViewKind'}
         - $ref: '#/components/parameters/AuditFrom'
         - $ref: '#/components/parameters/AuditTo'
-        - name: cursor
-          in: query
-          description: The `nextCursor` of the previous page.
-          schema: {$ref: '#/components/schemas/SalaryViewId'}
+        - $ref: '#/components/parameters/AuditCursor'
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 200, default: 50}
@@ -10068,6 +10062,11 @@ components:
         model: {type: string, nullable: true}
         inputTokens: {type: integer, minimum: 0}
         outputTokens: {type: integer, minimum: 0}
+    AuditCursor:
+      type: string
+      description: Where a page ended (read it as an opaque value).
+      minLength: 1
+      maxLength: 100
     AuditEntryId:
       type: string
       pattern: '^aud_[0-9a-hjkmnp-tv-z]{26}$'
@@ -10114,7 +10113,7 @@ components:
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
         nextCursor:
-          allOf: [{$ref: '#/components/schemas/AuditEntryId'}]
+          allOf: [{$ref: '#/components/schemas/AuditCursor'}]
           nullable: true
     AuditLogExport:
       type: object
@@ -10158,7 +10157,7 @@ components:
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/SalaryView'}}
         nextCursor:
-          allOf: [{$ref: '#/components/schemas/SalaryViewId'}]
+          allOf: [{$ref: '#/components/schemas/AuditCursor'}]
           nullable: true
     SalaryViewExport:
       type: object
@@ -18490,6 +18489,13 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/AiProviderName'}
+    AuditCursor:
+      name: cursor
+      in: query
+      description: >
+        The `nextCursor` of the previous page (it says where that page ended, so the next one follows on even if lines were merged away since).
+
+      schema: {$ref: '#/components/schemas/AuditCursor'}
     AuditActor:
       name: actor
       in: query

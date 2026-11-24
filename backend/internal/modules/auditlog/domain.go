@@ -92,6 +92,42 @@ func DayRange(from, to *time.Time, loc *time.Location) (start, end *time.Time) {
 	return start, end
 }
 
+// A cursor says where a page ended: its last line's time (an entry) or day
+// (a salary view), "~", and its id. The next page follows on from there,
+// even when that line is gone (a merge folds a duplicate's line into the
+// kept candidate's).
+const cursorSep = "~"
+
+// LogCursor is the cursor after an audit log entry.
+func LogCursor(at time.Time, id string) string {
+	return at.UTC().Format(time.RFC3339Nano) + cursorSep + id
+}
+
+// ViewCursor is the cursor after a salary view line.
+func ViewCursor(day time.Time, id string) string {
+	return day.Format(time.DateOnly) + cursorSep + id
+}
+
+// ReadLogCursor reads LogCursor; ok is false for anything else.
+func ReadLogCursor(c string) (at time.Time, id string, ok bool) {
+	when, id, found := strings.Cut(c, cursorSep)
+	if !found || !strings.HasPrefix(id, "aud_") {
+		return time.Time{}, "", false
+	}
+	at, err := time.Parse(time.RFC3339Nano, when)
+	return at, id, err == nil
+}
+
+// ReadViewCursor reads ViewCursor; ok is false for anything else.
+func ReadViewCursor(c string) (day time.Time, id string, ok bool) {
+	when, id, found := strings.Cut(c, cursorSep)
+	if !found || !strings.HasPrefix(id, "sv_") {
+		return time.Time{}, "", false
+	}
+	day, err := time.Parse(time.DateOnly, when)
+	return day, id, err == nil
+}
+
 // IsKind reports whether kind is a salary view kind (salaryview.Kinds).
 func IsKind(kind string) bool { _, ok := KindLabels[kind]; return ok }
 
