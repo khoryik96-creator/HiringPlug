@@ -19,3 +19,11 @@ How to write an entry (newest at the top, one per task):
 ```
 
 ## In progress
+
+### Single sign-on with Microsoft
+- Who: Claude (account A), session "Hiring Plug"
+- Branch: claude/relaxed-hopper-ex7y3v
+- Touches: identity module (sign-in, sessions, two-step), the sign-in page, Settings (Microsoft app registration and who may sign in), config HP_* for Microsoft sign-in
+- Started: 25 Nov 2026    Last update: 25 Nov 2026
+- State: in progress
+- Next: map sign-in and the existing Microsoft app settings; mockup for the owner; build, review, verify, merge as 1.46.0
