@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { SectionTabs } from "../components/SectionTabs";
 import { ChangesTable } from "./auditLog/ChangesTable";
 import { FilterBar } from "./auditLog/FilterBar";
-import { type Filters, readView, type Tab, viewHash } from "./auditLog/filters";
+import { type Filters, filtersFor, readView, type Tab, viewHash } from "./auditLog/filters";
 import { SalaryViewsTable } from "./auditLog/SalaryViewsTable";
 import "./auditLog/auditLog.css";
 
@@ -19,7 +19,7 @@ export function AuditLog({ canSeeSalaryViews }: { canSeeSalaryViews: boolean }) 
     if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
   }, [view]);
   const setFilters = (filters: Filters) => { setView((v) => ({ ...v, filters })); };
-  const setTab = (tab: Tab) => { setView((v) => ({ tab, filters: { ...v.filters, what: "" } })); }; // "What" means another thing on each tab
+  const setTab = (tab: Tab) => { setView((v) => ({ tab, filters: filtersFor(tab, v.filters) })); };
 
   const changes = (
     <div className="audit-panel">

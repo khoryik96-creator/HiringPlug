@@ -69,6 +69,8 @@ describe("audit log filters", () => {
     expect(view).toEqual({ tab: "salary", filters: { who: "usr_1", what: "export", from: "2026-11-01", to: "" } });
     expect(readView(viewHash(view.tab, view.filters), true, now)).toEqual(view);
     expect(readView("#/settings/audit-log?tab=salary&what=export", false, now).tab).toBe("changes");
+    expect(readView("#/settings/audit-log?tab=salary&who=system", true, now).filters.who).toBe("");
+    expect(readView("#/settings/audit-log?who=system", true, now).filters.who).toBe("system");
     expect(readView("#/settings/audit-log?what=export&from=nonsense", true, now).filters).toEqual({ ...defaultFilters(now), what: "" });
   });
 

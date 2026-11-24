@@ -152,6 +152,21 @@ describe("Settings › Audit log", () => {
     await waitFor(() => { expect(calls(get, "/v1/salary-views").at(-1)).toMatchObject({ kind: "email_sent" }); });
   });
 
+  it("leaves Automatic out of Who on Salary views (nobody is shown a salary automatically)", async () => {
+    const get = serve(() => ({ items: [entry({ actorId: "system", actorKind: "system", actorName: "Automatic" })], nextCursor: null }),
+      () => ({ items: [view({})], nextCursor: null }));
+    renderWithClient(<AuditLog canSeeSalaryViews />);
+    await screen.findByRole("option", { name: "Automatic" });
+    fireEvent.change(screen.getByLabelText("Who"), { target: { value: "system" } });
+    await waitFor(() => { expect(calls(get, "/v1/audit-log").at(-1)).toMatchObject({ actor: "system" }); });
+    fireEvent.click(screen.getByRole("tab", { name: "Salary views" }));
+    await screen.findByRole("table", { name: "Salary views" });
+    expect(calls(get, "/v1/salary-views").at(-1)).not.toHaveProperty("user");
+    const who = screen.getAllByLabelText<HTMLSelectElement>("Who").find((s) => s.closest("[role=tabpanel]:not([hidden])"));
+    expect(who?.value).toBe("");
+    expect(window.location.hash).not.toContain("who=");
+  });
+
   it("says when nothing was found", async () => {
     serve(() => ({ items: [], nextCursor: null }));
     renderWithClient(<AuditLog canSeeSalaryViews={false} />);

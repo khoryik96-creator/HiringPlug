@@ -67,6 +67,14 @@ export function defaultFilters(now = new Date()): Filters {
   return { who: "", what: "", from: localDay(from), to: localDay(now) };
 }
 
+/**
+ * The filters on switching to a tab: "What" means another thing on each, and nobody is shown a salary
+ * automatically (Salary views has no "Automatic" in Who).
+ */
+export function filtersFor(tab: Tab, f: Filters): Filters {
+  return { ...f, what: "", who: tab === "salary" && f.who === AUTOMATIC ? "" : f.who };
+}
+
 /** The tab and filters an address names; anything missing or not understood takes its default. */
 export function readView(hash: string, canSalary: boolean, now = new Date()): { tab: Tab; filters: Filters } {
   const at = hash.indexOf("?");
@@ -79,7 +87,8 @@ export function readView(hash: string, canSalary: boolean, now = new Date()): { 
     const v = q.get(name);
     return v === null ? d[name] : v === "" || isDay(v) ? v : d[name]; // "from=" is "any day"
   };
-  return { tab, filters: { who: q.get("who") ?? "", what: known ? what : "", from: day("from"), to: day("to") } };
+  const who = q.get("who") ?? "";
+  return { tab, filters: { who: tab === "salary" && who === AUTOMATIC ? "" : who, what: known ? what : "", from: day("from"), to: day("to") } };
 }
 
 /** The address of a view (dates always written, so a link shows the same days later). */
