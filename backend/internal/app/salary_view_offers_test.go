@@ -26,7 +26,9 @@ func TestChangesSendOffersAndPlacementsBackWithoutTheirSalary(t *testing.T) {
 	company := a.createCompany(rt, map[string]any{"name": "Contoh Berhad"})
 	billing := a.createContact(rt, map[string]any{"companyId": company.Id, "firstName": "Ken", "email": "ken." + tenant.ID + "@contoh.test"})
 	app := a.addToJob(rt, a.createJob(rt, map[string]any{"companyId": company.Id, "title": "Accountant"}).Id, c.Id)
-	salary := func(amount string) map[string]any { return map[string]any{"amount": amount, "currency": "MYR", "period": "month"} }
+	salary := func(amount string) map[string]any {
+		return map[string]any{"amount": amount, "currency": "MYR", "period": "month"}
+	}
 
 	o := a.offer(http.MethodPost, "/v1/applications/"+app.Id+"/offers", rt, map[string]any{"salary": salary("9123")}, http.StatusCreated)
 	require.True(t, o.Salary.IsSpecified() && !o.Salary.IsNull(), "what was just typed in")
