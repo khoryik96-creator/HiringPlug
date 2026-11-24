@@ -3,6 +3,7 @@ package auditlog
 // The rules, as pure functions on plain values.
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -104,6 +105,15 @@ func Distinct(ids []string) []string {
 			out = append(out, id)
 		}
 	}
+	return out
+}
+
+// InLockOrder is ids without blanks or repeats, sorted: the order a
+// showing counts its candidates' lines in, the same in every transaction, so
+// two counted at once never wait on each other in a circle.
+func InLockOrder(ids []string) []string {
+	out := Distinct(ids)
+	sort.Strings(out)
 	return out
 }
 

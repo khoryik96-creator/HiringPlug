@@ -68,6 +68,10 @@ func TestDistinctDropsBlanksAndRepeats(t *testing.T) {
 	assert.Equal(t, []string{"b", "a"}, Distinct([]string{"b", "", "a", "b"}))
 }
 
+func TestLinesAreCountedInIDOrder(t *testing.T) {
+	assert.Equal(t, []string{"cand_a", "cand_b"}, InLockOrder([]string{"cand_b", "", "cand_a", "cand_b"}))
+}
+
 // An entry whose changes are longer than an Excel cell holds is cut short,
 // saying so, and the workbook is still written.
 func TestALongChangeFitsInAnExcelCell(t *testing.T) {

@@ -29,7 +29,7 @@ func (s *Service) record(ctx context.Context, tx pgx.Tx, kind string, candidateI
 	if !IsKind(kind) {
 		return fmt.Errorf("auditlog: unknown salary view kind %q", kind)
 	}
-	ids := Distinct(candidateIDs)
+	ids := InLockOrder(candidateIDs)
 	if len(ids) == 0 {
 		return nil
 	}
