@@ -113,7 +113,7 @@ func (q *Queries) BusyFor(ctx context.Context, arg BusyForParams) ([]BusyForRow,
 }
 
 const calendarMeetings = `-- name: CalendarMeetings :many
-SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview WHERE $1::text=ANY(interviewer_ids) AND starts_at< $2::timestamptz AND ends_at> $3::timestamptz
+SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at FROM interview WHERE $1::text=ANY(interviewer_ids) AND starts_at< $2::timestamptz AND ends_at> $3::timestamptz
 `
 
 type CalendarMeetingsParams struct {
@@ -150,6 +150,7 @@ func (q *Queries) CalendarMeetings(ctx context.Context, arg CalendarMeetingsPara
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RemindedFor,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -216,7 +217,7 @@ func (q *Queries) Clashes(ctx context.Context, arg ClashesParams) ([]ClashesRow,
 }
 
 const feedbackDue = `-- name: FeedbackDue :many
-SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview i
+SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at FROM interview i
 WHERE $1::text = ANY(i.interviewer_ids) AND i.status IN ('scheduled', 'completed') AND i.ends_at < now()
   AND NOT EXISTS (SELECT 1 FROM interview_feedback f WHERE f.interview_id = i.id AND f.user_id = $1::text)
 ORDER BY i.starts_at DESC LIMIT 100
@@ -250,6 +251,7 @@ func (q *Queries) FeedbackDue(ctx context.Context, userID string) ([]Interview, 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RemindedFor,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -262,7 +264,7 @@ func (q *Queries) FeedbackDue(ctx context.Context, userID string) ([]Interview, 
 }
 
 const getInterview = `-- name: GetInterview :one
-SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview WHERE id = $1
+SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at FROM interview WHERE id = $1
 `
 
 func (q *Queries) GetInterview(ctx context.Context, id string) (Interview, error) {
@@ -286,6 +288,7 @@ func (q *Queries) GetInterview(ctx context.Context, id string) (Interview, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RemindedFor,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -295,7 +298,7 @@ INSERT INTO interview (tenant_id, application_id, title, starts_at, duration_min
                        instructions, interviewer_ids, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, $7,
         $8, $9::text[], app_current_user())
-RETURNING id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for
+RETURNING id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at
 `
 
 type InsertInterviewParams struct {
@@ -341,6 +344,7 @@ func (q *Queries) InsertInterview(ctx context.Context, arg InsertInterviewParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RemindedFor,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -371,7 +375,7 @@ func (q *Queries) InterviewIDsOnApplications(ctx context.Context, applicationIds
 }
 
 const listApplicationInterviews = `-- name: ListApplicationInterviews :many
-SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview WHERE application_id = $1 ORDER BY starts_at LIMIT 100
+SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at FROM interview WHERE application_id = $1 ORDER BY starts_at LIMIT 100
 `
 
 func (q *Queries) ListApplicationInterviews(ctx context.Context, applicationID string) ([]Interview, error) {
@@ -401,6 +405,7 @@ func (q *Queries) ListApplicationInterviews(ctx context.Context, applicationID s
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RemindedFor,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -444,7 +449,7 @@ func (q *Queries) ListFeedback(ctx context.Context, interviewIds []string) ([]In
 }
 
 const listInterviews = `-- name: ListInterviews :many
-SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview
+SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at FROM interview
 WHERE ($1::timestamptz IS NULL OR ends_at >= $1)
   AND ($2::timestamptz IS NULL OR starts_at < $2)
   AND ($3::text IS NULL OR $3::text = ANY(interviewer_ids))
@@ -485,6 +490,7 @@ func (q *Queries) ListInterviews(ctx context.Context, arg ListInterviewsParams) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RemindedFor,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -592,7 +598,7 @@ UPDATE interview SET
   location = $6, instructions = $7, interviewer_ids = $8::text[],
   status = $9, version = version + 1, updated_at = now()
 WHERE id = $10 AND version = $11
-RETURNING id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for
+RETURNING id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at
 `
 
 type UpdateInterviewParams struct {
@@ -643,6 +649,63 @@ func (q *Queries) UpdateInterview(ctx context.Context, arg UpdateInterviewParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RemindedFor,
+		&i.OutlookChangedAt,
+	)
+	return i, err
+}
+
+const updateInterviewFromOutlook = `-- name: UpdateInterviewFromOutlook :one
+UPDATE interview SET
+  title = $1, starts_at = $2, duration_minutes = $3, ends_at = $4,
+  location = $5, instructions = $6,
+  outlook_changed_at = now(), version = version + 1, updated_at = now()
+WHERE id = $7 AND version = $8 AND status = 'scheduled'
+RETURNING id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for, outlook_changed_at
+`
+
+type UpdateInterviewFromOutlookParams struct {
+	Title           string
+	StartsAt        time.Time
+	DurationMinutes int32
+	EndsAt          time.Time
+	Location        *string
+	Instructions    *string
+	ID              string
+	ExpectedVersion int32
+}
+
+// What the organizer changed in Outlook to the interview's invitation.
+func (q *Queries) UpdateInterviewFromOutlook(ctx context.Context, arg UpdateInterviewFromOutlookParams) (Interview, error) {
+	row := q.db.QueryRow(ctx, updateInterviewFromOutlook,
+		arg.Title,
+		arg.StartsAt,
+		arg.DurationMinutes,
+		arg.EndsAt,
+		arg.Location,
+		arg.Instructions,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	var i Interview
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ApplicationID,
+		&i.Version,
+		&i.Title,
+		&i.StartsAt,
+		&i.DurationMinutes,
+		&i.EndsAt,
+		&i.Mode,
+		&i.Location,
+		&i.Instructions,
+		&i.Status,
+		&i.InterviewerIds,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RemindedFor,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }

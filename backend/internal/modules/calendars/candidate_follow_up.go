@@ -22,7 +22,13 @@ import (
 const candidateReminderLead = 24 * time.Hour
 const candidateReminderCutoff = time.Hour
 
+// candidateAttendee is the invitation's candidate: the address it was sent to
+// (pinned, so people added in Outlook are never taken for them), or, for an
+// invitation sent before addresses were pinned, its one required attendee.
 func candidateAttendee(row store.CalendarEvent) (string, error) {
+	if row.CandidateEmail != nil && *row.CandidateEmail != "" {
+		return *row.CandidateEmail, nil
+	}
 	var people []api.CalendarAttendee
 	if err := json.Unmarshal(row.Attendees, &people); err != nil {
 		return "", err

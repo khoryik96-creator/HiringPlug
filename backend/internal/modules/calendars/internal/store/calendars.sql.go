@@ -32,6 +32,45 @@ func (q *Queries) AcceptInvitationResponseReceipt(ctx context.Context, arg Accep
 	return err
 }
 
+const acceptOutlookHoldChange = `-- name: AcceptOutlookHoldChange :execrows
+UPDATE calendar_event SET title= $1,notes= $2,location= $3,
+ remote_key=$4,remote_snapshot= $5,web_url=coalesce($6,web_url),
+ outlook_changed_at=now(),version=version+1,sent_version=version+1,updated_at=now()
+WHERE id= $7 AND version= $8 AND version=sent_version AND sync_status='synced' AND source IN ('interview','booking')
+`
+
+type AcceptOutlookHoldChangeParams struct {
+	Title           string
+	Notes           string
+	Location        string
+	RemoteKey       *string
+	RemoteSnapshot  []byte
+	WebUrl          *string
+	ID              string
+	ExpectedVersion int32
+}
+
+// A change made in Outlook to a private interview or booking hold other than
+// its time (a rename, a place, notes): kept on the hold, not pushed back.
+// People added in Outlook stay only in its receipt: a hold made again (in
+// another account, after a reconnect) never invites them.
+func (q *Queries) AcceptOutlookHoldChange(ctx context.Context, arg AcceptOutlookHoldChangeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, acceptOutlookHoldChange,
+		arg.Title,
+		arg.Notes,
+		arg.Location,
+		arg.RemoteKey,
+		arg.RemoteSnapshot,
+		arg.WebUrl,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const activeSourceHolds = `-- name: ActiveSourceHolds :many
 SELECT source,source_id FROM calendar_event WHERE user_id= $1 AND source IN ('interview','booking','interview_invitation') AND status='active' AND ends_at> $2::timestamptz AND source_id IS NOT NULL
 `
@@ -90,7 +129,7 @@ func (q *Queries) AdoptCalendarRemote(ctx context.Context, arg AdoptCalendarRemo
 
 const advanceInterviewInvitationSource = `-- name: AdvanceInterviewInvitationSource :one
 UPDATE calendar_event SET source_version= $1
-WHERE id= $2 AND source_version< $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+WHERE id= $2 AND source_version< $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type AdvanceInterviewInvitationSourceParams struct {
@@ -141,6 +180,115 @@ func (q *Queries) AdvanceInterviewInvitationSource(ctx context.Context, arg Adva
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
+	)
+	return i, err
+}
+
+const applyOutlookInvitationChange = `-- name: ApplyOutlookInvitationChange :one
+UPDATE calendar_event SET title= $1,notes= $2,
+ -- Its message rewritten in Outlook (not taken as the instructions): kept as Outlook has it.
+ notes_html=CASE WHEN $3::boolean THEN NULL ELSE notes_html END,
+ outlook_body=outlook_body OR $3::boolean,
+ location= $4,starts_at= $5,ends_at= $6,attendees= $7,
+ -- The online meeting as Outlook has it: removed there, its link goes too,
+ -- and a later HiringPlug change no longer asks for a Teams meeting.
+ join_url=CASE WHEN $8::boolean THEN coalesce($9,join_url) END,
+ teams=teams AND NOT $10::boolean,web_url=coalesce($11,web_url),
+ remote_key=$12,remote_snapshot= $13,
+ source_version=GREATEST(source_version,$14::integer),outlook_changed_at=now(),
+ version=version+1,sent_version=version+1,sync_status='synced',sync_error=NULL,body_dirty=false,updated_at=now()
+WHERE id= $15 AND source='interview_invitation' AND version= $16 AND version=sent_version
+RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
+`
+
+type ApplyOutlookInvitationChangeParams struct {
+	Title           string
+	Notes           string
+	OutlookBody     bool
+	Location        string
+	StartsAt        time.Time
+	EndsAt          time.Time
+	Attendees       []byte
+	Online          bool
+	JoinUrl         *string
+	TeamsOff        bool
+	WebUrl          *string
+	RemoteKey       *string
+	RemoteSnapshot  []byte
+	SourceVersion   int32
+	ID              string
+	ExpectedVersion int32
+}
+
+// A change the organizer made in Outlook to an interview invitation, taken in
+// as Outlook has it: sent_version moves with version (from the old version),
+// so nothing is pushed back to Outlook.
+func (q *Queries) ApplyOutlookInvitationChange(ctx context.Context, arg ApplyOutlookInvitationChangeParams) (CalendarEvent, error) {
+	row := q.db.QueryRow(ctx, applyOutlookInvitationChange,
+		arg.Title,
+		arg.Notes,
+		arg.OutlookBody,
+		arg.Location,
+		arg.StartsAt,
+		arg.EndsAt,
+		arg.Attendees,
+		arg.Online,
+		arg.JoinUrl,
+		arg.TeamsOff,
+		arg.WebUrl,
+		arg.RemoteKey,
+		arg.RemoteSnapshot,
+		arg.SourceVersion,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	var i CalendarEvent
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Version,
+		&i.Title,
+		&i.Notes,
+		&i.Location,
+		&i.StartsAt,
+		&i.EndsAt,
+		&i.TimeZone,
+		&i.AllDay,
+		&i.Teams,
+		&i.Attendees,
+		&i.Source,
+		&i.SourceID,
+		&i.SourceVersion,
+		&i.Status,
+		&i.SyncStatus,
+		&i.SyncError,
+		&i.RemoteGeneration,
+		&i.RemoteID,
+		&i.RemoteKey,
+		&i.RemoteConnection,
+		&i.SentVersion,
+		&i.WebUrl,
+		&i.JoinUrl,
+		&i.RemoteSnapshot,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.InvitationCalendar,
+		&i.InvitationSubject,
+		&i.ReminderMinutes,
+		&i.CandidateResponse,
+		&i.CandidateReminder,
+		&i.CandidateReminderVersion,
+		&i.CandidateReminderQueuedFor,
+		&i.CandidateReminderSentFor,
+		&i.NotesHtml,
+		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -296,7 +444,7 @@ func (q *Queries) CalendarConnectionByID(ctx context.Context, id string) (Calend
 }
 
 const calendarEvent = `-- name: CalendarEvent :one
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE id= $1
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE id= $1
 `
 
 func (q *Queries) CalendarEvent(ctx context.Context, id string) (CalendarEvent, error) {
@@ -342,6 +490,9 @@ func (q *Queries) CalendarEvent(ctx context.Context, id string) (CalendarEvent, 
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -362,7 +513,7 @@ func (q *Queries) CalendarPushFailed(ctx context.Context, arg CalendarPushFailed
 }
 
 const cancelCalendarEvent = `-- name: CancelCalendarEvent :one
-UPDATE calendar_event SET status='cancelled',version=version+1,sync_status= $1,sync_error=NULL,updated_at=now() WHERE id= $2 AND version= $3 AND source='local' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+UPDATE calendar_event SET status='cancelled',version=version+1,sync_status= $1,sync_error=NULL,updated_at=now() WHERE id= $2 AND version= $3 AND source='local' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type CancelCalendarEventParams struct {
@@ -414,12 +565,15 @@ func (q *Queries) CancelCalendarEvent(ctx context.Context, arg CancelCalendarEve
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
 
 const cancelCalendarHold = `-- name: CancelCalendarHold :one
-UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,$1),version=version+1,sync_status=CASE WHEN remote_id IS NULL THEN 'local' ELSE 'pending' END,updated_at=now() WHERE id= $2 AND status<>'cancelled' AND source_version<= $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,$1),version=version+1,sync_status=CASE WHEN remote_id IS NULL THEN 'local' ELSE 'pending' END,updated_at=now() WHERE id= $2 AND status<>'cancelled' AND source_version<= $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type CancelCalendarHoldParams struct {
@@ -472,6 +626,9 @@ func (q *Queries) CancelCalendarHold(ctx context.Context, arg CancelCalendarHold
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -689,7 +846,7 @@ func (q *Queries) ImportOutlookEvent(ctx context.Context, arg ImportOutlookEvent
 
 const insertCalendarEvent = `-- name: InsertCalendarEvent :one
 INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,time_zone,all_day,teams,attendees,source,sync_status)
-VALUES(app_current_tenant(),app_current_user(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'local',$11) RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+VALUES(app_current_tenant(),app_current_user(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'local',$11) RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type InsertCalendarEventParams struct {
@@ -761,14 +918,17 @@ func (q *Queries) InsertCalendarEvent(ctx context.Context, arg InsertCalendarEve
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
 
 const insertInterviewInvitation = `-- name: InsertInterviewInvitation :one
-INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder)
-VALUES(app_current_tenant(),app_current_user(),$1,$2,$3,$4,$5,$6,'interview_invitation',$7,$8,'active','pending',$9,$10,$11,$12,$13,$14)
-RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder,candidate_email)
+VALUES(app_current_tenant(),app_current_user(),$1,$2,$3,$4,$5,$6,'interview_invitation',$7,$8,'active','pending',$9,$10,$11,$12,$13,$14,$15)
+RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type InsertInterviewInvitationParams struct {
@@ -786,6 +946,7 @@ type InsertInterviewInvitationParams struct {
 	InvitationSubject  *string
 	ReminderMinutes    int32
 	CandidateReminder  bool
+	CandidateEmail     *string
 }
 
 func (q *Queries) InsertInterviewInvitation(ctx context.Context, arg InsertInterviewInvitationParams) (CalendarEvent, error) {
@@ -804,6 +965,7 @@ func (q *Queries) InsertInterviewInvitation(ctx context.Context, arg InsertInter
 		arg.InvitationSubject,
 		arg.ReminderMinutes,
 		arg.CandidateReminder,
+		arg.CandidateEmail,
 	)
 	var i CalendarEvent
 	err := row.Scan(
@@ -846,6 +1008,9 @@ func (q *Queries) InsertInterviewInvitation(ctx context.Context, arg InsertInter
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -874,7 +1039,7 @@ func (q *Queries) InsertOutlookBusy(ctx context.Context, arg InsertOutlookBusyPa
 }
 
 const interviewInvitation = `-- name: InterviewInvitation :one
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE source='interview_invitation' AND source_id= $1
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE source='interview_invitation' AND source_id= $1
 `
 
 func (q *Queries) InterviewInvitation(ctx context.Context, interviewID *string) (CalendarEvent, error) {
@@ -920,12 +1085,15 @@ func (q *Queries) InterviewInvitation(ctx context.Context, interviewID *string) 
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
 
 const listCalendarEvents = `-- name: ListCalendarEvents :many
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE user_id=app_current_user() AND (status='active' OR sync_status IN ('pending','failed','conflict')) AND starts_at< $1::timestamptz AND ends_at> $2::timestamptz ORDER BY starts_at,id LIMIT 1001
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE user_id=app_current_user() AND (status='active' OR sync_status IN ('pending','failed','conflict')) AND starts_at< $1::timestamptz AND ends_at> $2::timestamptz ORDER BY starts_at,id LIMIT 1001
 `
 
 type ListCalendarEventsParams struct {
@@ -982,6 +1150,9 @@ func (q *Queries) ListCalendarEvents(ctx context.Context, arg ListCalendarEvents
 			&i.CandidateReminderSentFor,
 			&i.NotesHtml,
 			&i.BodyDirty,
+			&i.CandidateEmail,
+			&i.OutlookBody,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1195,7 +1366,7 @@ func (q *Queries) PreviousCalendarConnection(ctx context.Context, userID string)
 }
 
 const pushedSourceHolds = `-- name: PushedSourceHolds :many
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id IS NOT NULL AND source IN ('interview','booking')
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id IS NOT NULL AND source IN ('interview','booking')
 `
 
 type PushedSourceHoldsParams struct {
@@ -1253,6 +1424,9 @@ func (q *Queries) PushedSourceHolds(ctx context.Context, arg PushedSourceHoldsPa
 			&i.CandidateReminderSentFor,
 			&i.NotesHtml,
 			&i.BodyDirty,
+			&i.CandidateEmail,
+			&i.OutlookBody,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1327,7 +1501,7 @@ func (q *Queries) ReleaseImportedRemote(ctx context.Context, arg ReleaseImported
 }
 
 const remoteCalendarEvent = `-- name: RemoteCalendarEvent :one
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id= $3
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id= $3
 `
 
 type RemoteCalendarEventParams struct {
@@ -1379,12 +1553,15 @@ func (q *Queries) RemoteCalendarEvent(ctx context.Context, arg RemoteCalendarEve
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
 
 const remoteEventsInWindow = `-- name: RemoteEventsInWindow :many
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id IS NOT NULL AND starts_at< $3::timestamptz AND ends_at> $4::timestamptz
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id IS NOT NULL AND starts_at< $3::timestamptz AND ends_at> $4::timestamptz
 `
 
 type RemoteEventsInWindowParams struct {
@@ -1448,6 +1625,9 @@ func (q *Queries) RemoteEventsInWindow(ctx context.Context, arg RemoteEventsInWi
 			&i.CandidateReminderSentFor,
 			&i.NotesHtml,
 			&i.BodyDirty,
+			&i.CandidateEmail,
+			&i.OutlookBody,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1497,7 +1677,7 @@ func (q *Queries) ResetCalendarTargets(ctx context.Context) error {
 }
 
 const retryCalendarEvent = `-- name: RetryCalendarEvent :one
-UPDATE calendar_event SET sync_status='pending',sync_error=NULL,version=version+1,updated_at=now(),remote_generation=remote_generation+CASE WHEN remote_snapshot->>'deleted'='true' THEN 1 ELSE 0 END,remote_id=CASE WHEN remote_snapshot->>'deleted'='true' THEN NULL ELSE remote_id END,remote_key=CASE WHEN remote_snapshot->>'deleted'='true' THEN NULL ELSE remote_key END,remote_snapshot=CASE WHEN remote_snapshot->>'deleted'='true' THEN NULL ELSE remote_snapshot END WHERE id= $1 AND version= $2 AND source<>'outlook' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+UPDATE calendar_event SET sync_status='pending',sync_error=NULL,version=version+1,updated_at=now(),remote_generation=remote_generation+CASE WHEN remote_snapshot->>'deleted'='true' THEN 1 ELSE 0 END,remote_id=CASE WHEN remote_snapshot->>'deleted'='true' THEN NULL ELSE remote_id END,remote_key=CASE WHEN remote_snapshot->>'deleted'='true' THEN NULL ELSE remote_key END,remote_snapshot=CASE WHEN remote_snapshot->>'deleted'='true' THEN NULL ELSE remote_snapshot END WHERE id= $1 AND version= $2 AND source<>'outlook' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type RetryCalendarEventParams struct {
@@ -1548,6 +1728,9 @@ func (q *Queries) RetryCalendarEvent(ctx context.Context, arg RetryCalendarEvent
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -1739,7 +1922,7 @@ func (q *Queries) SaveOutlookAvailability(ctx context.Context, arg SaveOutlookAv
 const setCandidateReminder = `-- name: SetCandidateReminder :one
 UPDATE calendar_event SET candidate_reminder= $1, candidate_reminder_version=candidate_reminder_version+1,
  candidate_reminder_queued_for=NULL
-WHERE id= $2 AND source='interview_invitation' AND candidate_reminder IS DISTINCT FROM $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+WHERE id= $2 AND source='interview_invitation' AND candidate_reminder IS DISTINCT FROM $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type SetCandidateReminderParams struct {
@@ -1790,12 +1973,15 @@ func (q *Queries) SetCandidateReminder(ctx context.Context, arg SetCandidateRemi
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
 
 const sourceCalendarEvents = `-- name: SourceCalendarEvents :many
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE source= $1 AND source_id= $2
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE source= $1 AND source_id= $2
 `
 
 type SourceCalendarEventsParams struct {
@@ -1852,6 +2038,9 @@ func (q *Queries) SourceCalendarEvents(ctx context.Context, arg SourceCalendarEv
 			&i.CandidateReminderSentFor,
 			&i.NotesHtml,
 			&i.BodyDirty,
+			&i.CandidateEmail,
+			&i.OutlookBody,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1872,7 +2061,7 @@ UPDATE calendar_event SET source_version= $1,title= $2,notes= $3,
  starts_at= $6,ends_at= $7,status= $8,version=version+1,updated_at=now(),
  sync_status=CASE WHEN sync_status IN ('failed','conflict') THEN sync_status ELSE 'pending' END
 WHERE id= $9 AND source_version< $1
-RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type SyncInterviewInvitationParams struct {
@@ -1940,8 +2129,29 @@ func (q *Queries) SyncInterviewInvitation(ctx context.Context, arg SyncInterview
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
+}
+
+const tryLockCalendarSource = `-- name: TryLockCalendarSource :one
+SELECT pg_try_advisory_xact_lock(hashtextextended(app_current_tenant() || ':calendar-source:' || $1::text || ':' || $2::text,0))
+`
+
+type TryLockCalendarSourceParams struct {
+	Kind     string
+	SourceID string
+}
+
+// The same lock, taken only when it is free (a refresh never waits for it: a
+// source job holding it may be waiting for a row the refresh already wrote).
+func (q *Queries) TryLockCalendarSource(ctx context.Context, arg TryLockCalendarSourceParams) (bool, error) {
+	row := q.db.QueryRow(ctx, tryLockCalendarSource, arg.Kind, arg.SourceID)
+	var pg_try_advisory_xact_lock bool
+	err := row.Scan(&pg_try_advisory_xact_lock)
+	return pg_try_advisory_xact_lock, err
 }
 
 const tryLockInterviewInvitation = `-- name: TryLockInterviewInvitation :one
@@ -1989,7 +2199,7 @@ func (q *Queries) UnlockInterviewInvitation(ctx context.Context, arg UnlockInter
 }
 
 const unreceiptedCalendarEvents = `-- name: UnreceiptedCalendarEvents :many
-SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty FROM calendar_event WHERE user_id= $1 AND source<>'outlook' AND (remote_id IS NULL OR remote_connection IS DISTINCT FROM $2::text) AND updated_at> now()-interval '120 days'
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at FROM calendar_event WHERE user_id= $1 AND source<>'outlook' AND (remote_id IS NULL OR remote_connection IS DISTINCT FROM $2::text) AND updated_at> now()-interval '120 days'
 `
 
 type UnreceiptedCalendarEventsParams struct {
@@ -2048,6 +2258,9 @@ func (q *Queries) UnreceiptedCalendarEvents(ctx context.Context, arg Unreceipted
 			&i.CandidateReminderSentFor,
 			&i.NotesHtml,
 			&i.BodyDirty,
+			&i.CandidateEmail,
+			&i.OutlookBody,
+			&i.OutlookChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -2065,7 +2278,7 @@ UPDATE calendar_event SET title= $1,notes= $2,
  notes_html=CASE WHEN $3::boolean THEN notes_html ELSE $4 END,
  body_dirty=body_dirty OR notes <> $2 OR (NOT $3::boolean AND notes_html IS DISTINCT FROM $4),
  location= $5,starts_at= $6,ends_at= $7,time_zone= $8,all_day= $9,teams= $10,attendees= $11,version=version+1,sync_status= $12,sync_error=NULL,updated_at=now()
-WHERE id= $13 AND version= $14 AND source='local' AND status='active' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+WHERE id= $13 AND version= $14 AND source='local' AND status='active' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type UpdateCalendarEventParams struct {
@@ -2143,6 +2356,9 @@ func (q *Queries) UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEve
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }
@@ -2192,7 +2408,7 @@ const upsertCalendarHold = `-- name: UpsertCalendarHold :one
 INSERT INTO calendar_event(tenant_id,user_id,title,location,starts_at,ends_at,time_zone,source,source_id,source_version,status,sync_status)
 VALUES(app_current_tenant(),$1,$2,$3,$4,$5,'UTC',$6,$7,$8,$9,$10)
 ON CONFLICT(tenant_id,user_id,source,source_id) DO UPDATE SET title=excluded.title,location=excluded.location,starts_at=excluded.starts_at,ends_at=excluded.ends_at,source_version=excluded.source_version,status=excluded.status,version=calendar_event.version+1,sync_status=excluded.sync_status,sync_error=NULL,updated_at=now()
-WHERE calendar_event.source_version<excluded.source_version OR (calendar_event.source_version=excluded.source_version AND calendar_event.status<>excluded.status) RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty
+WHERE calendar_event.source_version<excluded.source_version OR (calendar_event.source_version=excluded.source_version AND calendar_event.status<>excluded.status) RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at, invitation_calendar, invitation_subject, reminder_minutes, candidate_response, candidate_reminder, candidate_reminder_version, candidate_reminder_queued_for, candidate_reminder_sent_for, notes_html, body_dirty, candidate_email, outlook_body, outlook_changed_at
 `
 
 type UpsertCalendarHoldParams struct {
@@ -2262,6 +2478,9 @@ func (q *Queries) UpsertCalendarHold(ctx context.Context, arg UpsertCalendarHold
 		&i.CandidateReminderSentFor,
 		&i.NotesHtml,
 		&i.BodyDirty,
+		&i.CandidateEmail,
+		&i.OutlookBody,
+		&i.OutlookChangedAt,
 	)
 	return i, err
 }

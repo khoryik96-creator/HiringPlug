@@ -321,6 +321,9 @@ type CalendarEvent struct {
 	CandidateReminderSentFor   *time.Time
 	NotesHtml                  *string
 	BodyDirty                  bool
+	CandidateEmail             *string
+	OutlookBody                bool
+	OutlookChangedAt           *time.Time
 }
 
 type CalendarOauthState struct {
@@ -1116,23 +1119,24 @@ type IndustryCatalogue struct {
 }
 
 type Interview struct {
-	ID              string
-	TenantID        string
-	ApplicationID   string
-	Version         int32
-	Title           string
-	StartsAt        time.Time
-	DurationMinutes int32
-	EndsAt          time.Time
-	Mode            string
-	Location        *string
-	Instructions    *string
-	Status          string
-	InterviewerIds  []string
-	CreatedBy       string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	RemindedFor     *time.Time
+	ID               string
+	TenantID         string
+	ApplicationID    string
+	Version          int32
+	Title            string
+	StartsAt         time.Time
+	DurationMinutes  int32
+	EndsAt           time.Time
+	Mode             string
+	Location         *string
+	Instructions     *string
+	Status           string
+	InterviewerIds   []string
+	CreatedBy        string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	RemindedFor      *time.Time
+	OutlookChangedAt *time.Time
 }
 
 type InterviewFeedback struct {

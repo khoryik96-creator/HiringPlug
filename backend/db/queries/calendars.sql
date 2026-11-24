@@ -64,6 +64,10 @@ UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_vers
 -- Source jobs for one interview or booking run one at a time.
 -- name: LockCalendarSource :exec
 SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':calendar-source:' || @kind::text || ':' || @source_id::text,0));
+-- The same lock, taken only when it is free (a refresh never waits for it: a
+-- source job holding it may be waiting for a row the refresh already wrote).
+-- name: TryLockCalendarSource :one
+SELECT pg_try_advisory_xact_lock(hashtextextended(app_current_tenant() || ':calendar-source:' || @kind::text || ':' || @source_id::text,0));
 -- name: TryLockInterviewInvitation :one
 SELECT pg_try_advisory_lock(hashtextextended(@tenant_id::text || ':calendar-source:interview:' || @source_id::text,0));
 -- name: UnlockInterviewInvitation :exec
@@ -71,8 +75,8 @@ SELECT pg_advisory_unlock(hashtextextended(@tenant_id::text || ':calendar-source
 -- name: InterviewInvitation :one
 SELECT * FROM calendar_event WHERE source='interview_invitation' AND source_id= @interview_id;
 -- name: InsertInterviewInvitation :one
-INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder)
-VALUES(app_current_tenant(),app_current_user(),@title,@notes,sqlc.narg(notes_html),@location,@starts_at,@ends_at,'interview_invitation',@interview_id,@source_version,'active','pending',@teams,@attendees,@invitation_calendar,@invitation_subject,@reminder_minutes,@candidate_reminder)
+INSERT INTO calendar_event(tenant_id,user_id,title,notes,notes_html,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder,candidate_email)
+VALUES(app_current_tenant(),app_current_user(),@title,@notes,sqlc.narg(notes_html),@location,@starts_at,@ends_at,'interview_invitation',@interview_id,@source_version,'active','pending',@teams,@attendees,@invitation_calendar,@invitation_subject,@reminder_minutes,@candidate_reminder,@candidate_email)
 RETURNING *;
 -- name: SaveCandidateResponse :exec
 UPDATE calendar_event SET candidate_response = sqlc.narg(response)
@@ -201,3 +205,31 @@ UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,
 -- Live interview and booking holds (checked against their sources at each sync).
 -- name: ActiveSourceHolds :many
 SELECT source,source_id FROM calendar_event WHERE user_id= @user_id AND source IN ('interview','booking','interview_invitation') AND status='active' AND ends_at> @from_time::timestamptz AND source_id IS NOT NULL;
+
+-- A change the organizer made in Outlook to an interview invitation, taken in
+-- as Outlook has it: sent_version moves with version (from the old version),
+-- so nothing is pushed back to Outlook.
+-- name: ApplyOutlookInvitationChange :one
+UPDATE calendar_event SET title= @title,notes= @notes,
+ -- Its message rewritten in Outlook (not taken as the instructions): kept as Outlook has it.
+ notes_html=CASE WHEN @outlook_body::boolean THEN NULL ELSE notes_html END,
+ outlook_body=outlook_body OR @outlook_body::boolean,
+ location= @location,starts_at= @starts_at,ends_at= @ends_at,attendees= @attendees,
+ -- The online meeting as Outlook has it: removed there, its link goes too,
+ -- and a later HiringPlug change no longer asks for a Teams meeting.
+ join_url=CASE WHEN @online::boolean THEN coalesce(sqlc.narg(join_url),join_url) END,
+ teams=teams AND NOT @teams_off::boolean,web_url=coalesce(sqlc.narg(web_url),web_url),
+ remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot,
+ source_version=GREATEST(source_version,@source_version::integer),outlook_changed_at=now(),
+ version=version+1,sent_version=version+1,sync_status='synced',sync_error=NULL,body_dirty=false,updated_at=now()
+WHERE id= @id AND source='interview_invitation' AND version= @expected_version AND version=sent_version
+RETURNING *;
+-- A change made in Outlook to a private interview or booking hold other than
+-- its time (a rename, a place, notes): kept on the hold, not pushed back.
+-- People added in Outlook stay only in its receipt: a hold made again (in
+-- another account, after a reconnect) never invites them.
+-- name: AcceptOutlookHoldChange :execrows
+UPDATE calendar_event SET title= @title,notes= @notes,location= @location,
+ remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot,web_url=coalesce(sqlc.narg(web_url),web_url),
+ outlook_changed_at=now(),version=version+1,sent_version=version+1,updated_at=now()
+WHERE id= @id AND version= @expected_version AND version=sent_version AND sync_status='synced' AND source IN ('interview','booking');

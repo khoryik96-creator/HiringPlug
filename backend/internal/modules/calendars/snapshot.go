@@ -55,7 +55,7 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 			if row.SourceID != nil {
 				sourceID = *row.SourceID
 			}
-			if err := s.mergeRemote(ctx, tx, row, e); err != nil {
+			if err := s.mergeRemote(ctx, tx, c, row, e); err != nil {
 				return err
 			}
 			if row.Source == "local" {
@@ -152,7 +152,7 @@ func (s *Service) adopt(ctx context.Context, tx pgx.Tx, c store.CalendarConnecti
 	return q.CalendarEvent(ctx, row.ID)
 }
 
-func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.CalendarEvent, e graphEvent) error {
+func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, c store.CalendarConnection, row store.CalendarEvent, e graphEvent) error {
 	q := store.New(tx)
 	missingAttendee, err := saveCandidateResponse(ctx, q, row, e)
 	if err != nil {
@@ -170,21 +170,13 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 	if (sameRemote && (!changedInvitation || row.SyncStatus == "conflict")) || row.Version != row.SentVersion {
 		return nil // nothing new in Outlook (or its change is already marked), or ours is on its way
 	}
+	if row.Source != "local" {
+		return s.mergeManaged(ctx, tx, c.TenantID, row, e, missingAttendee)
+	}
 	snapshot, _ := json.Marshal(e)
 	start, end, err := e.times()
 	if err != nil {
 		return err
-	}
-	if row.Source != "local" {
-		if missingAttendee || e.IsCancelled || !start.Equal(row.StartsAt) || !end.Equal(row.EndsAt) {
-			return q.MarkCalendarConflict(ctx, store.MarkCalendarConflictParams{ID: row.ID, RemoteKey: e.key(), RemoteSnapshot: snapshot})
-		}
-		if row.Source == invitationSource && responseOnly(row, e) {
-			return q.AcceptInvitationResponseReceipt(ctx, store.AcceptInvitationResponseReceiptParams{
-				ID: row.ID, ExpectedVersion: row.Version, RemoteKey: e.key(), RemoteSnapshot: snapshot,
-			})
-		}
-		return nil
 	}
 	// Outlook answers with the body as text. Only a body changed in Outlook since
 	// the last receipt replaces the notes (and their formatting): a reply or

@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -41,7 +42,9 @@ type outlookFixture struct {
 	lastPatch                   map[string]any // what the last change sent
 	deleteStatus                int            // answer to deletes when not 0 (a broken or busy Outlook)
 	trialJoinURL                string
-	onWrite                     func() // runs as Outlook takes a create or change, before it answers
+	onWrite                     func()          // runs as Outlook takes a create or change, before it answers
+	strictMatch                 bool            // a change or delete whose If-Match is not the event's changeKey is refused (412)
+	outsideWindow               map[string]bool // events moved outside the sync's window: read one by one, not listed
 	config                      calendars.Config
 }
 
@@ -65,7 +68,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(r.URL.Path, "/calendarView"):
 		items := []map[string]any{}
 		for _, e := range f.events {
-			if accountOf(e) == f.signedIn() { // each account sees its own calendar
+			if accountOf(e) == f.signedIn() && !f.outsideWindow[fmt.Sprint(e["id"])] { // each account sees its own calendar
 				items = append(items, answered(r, e))
 			}
 		}
@@ -114,6 +117,10 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(404)
 			return
 		}
+		if f.strictMatch && r.Method != "GET" && r.Header.Get("If-Match") != `W/"`+fmt.Sprint(e["changeKey"])+`"` {
+			w.WriteHeader(http.StatusPreconditionFailed) // changed in Outlook since that version
+			return
+		}
 		switch r.Method {
 		case "DELETE":
 			if f.deleteStatus != 0 {
@@ -138,7 +145,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			for key, v := range patch {
 				e[key] = v
 			}
-			e["changeKey"] = "v2"
+			e["changeKey"] = fmt.Sprintf("v%d", f.patches+1)
 		}
 		_ = json.NewEncoder(w).Encode(answered(r, e))
 	default:

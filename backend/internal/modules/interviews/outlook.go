@@ -8,7 +8,10 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 // Calendar shares only scheduling facts, never feedback or candidate salaries.
@@ -68,4 +71,68 @@ func (m *Module) StandingIDs(ctx context.Context, tx pgx.Tx, ids []string) (map[
 		out[id] = true
 	}
 	return out, err
+}
+
+// ChangeFromOutlook takes into a scheduled interview what its organizer
+// changed in Outlook to its invitation (title, place, instructions, time), in
+// the calendar refresh's transaction, which holds the interview's calendar
+// lock. Nothing is sent back to Outlook and no calendar job is queued here:
+// the calendars module, which called, does both as needed. The audit entry is
+// an ordinary update (webhooks and automations follow it) marked via Outlook
+// and by the organizer who changed it there (the refresh itself runs as the
+// system).
+func (m *Module) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id, organizer string, version int, c OutlookChange) (CalendarMeeting, error) {
+	s := m.service
+	q := store.New(tx)
+	row, err := getRow(ctx, q, id)
+	if err != nil {
+		return CalendarMeeting{}, err
+	}
+	if int(row.Version) != version {
+		return calendarMeeting(row), apperr.StaleVersion("interview")
+	}
+	if row.Status != "scheduled" {
+		return calendarMeeting(row), apperr.New(api.ErrorCodeINTERVIEWNOTALLOWED, "The interview is no longer scheduled.")
+	}
+	before := detailsOf(row)
+	after, errs := ApplyOutlookChange(before, c)
+	if err := errs.Err(); err != nil {
+		return calendarMeeting(row), err
+	}
+	changes := audit.Diff(fields(before), fields(after))
+	if _, ok := changes["instructionsLength"]; !ok && text(before.Instructions) != text(after.Instructions) {
+		changes["instructionsLength"] = map[string]any{"from": len(text(before.Instructions)), "to": len(text(after.Instructions)), "changed": true}
+	}
+	if len(changes) == 0 {
+		return calendarMeeting(row), nil
+	}
+	updated, err := q.UpdateInterviewFromOutlook(ctx, store.UpdateInterviewFromOutlookParams{
+		ID: id, ExpectedVersion: row.Version, Title: after.Title, StartsAt: after.StartsAt, EndsAt: after.Ends(),
+		DurationMinutes: int32(after.Duration), //nolint:gosec // 5..480, checked above
+		Location:        after.Location, Instructions: after.Instructions,
+	})
+	if database.IsNoRows(err) {
+		return calendarMeeting(row), apperr.StaleVersion("interview")
+	}
+	if err != nil {
+		return calendarMeeting(row), err
+	}
+	changes["via"], changes["by"] = "outlook", organizer
+	if err := audit.Record(ctx, tx, audit.Entry{Action: "interview.updated", EntityType: "interview", EntityID: id, Changes: changes}); err != nil {
+		return calendarMeeting(row), err
+	}
+	if !after.StartsAt.Equal(before.StartsAt) {
+		// Moved: remind of the new time (the old reminder sees the change and does nothing).
+		if err := s.queueReminder(ctx, tx, tenant, id, after); err != nil {
+			return calendarMeeting(row), err
+		}
+	}
+	return calendarMeeting(updated), nil
+}
+
+func text(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

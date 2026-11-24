@@ -42,6 +42,8 @@ type View struct {
 	MyFeedbackDue  bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	// OutlookChangedAt is when a change its organizer made in Outlook was last taken in.
+	OutlookChangedAt *time.Time
 }
 
 // Schedule adds an interview to an application, and moves the application to
@@ -384,7 +386,7 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 		out[i] = View{
 			ID: r.ID, Version: int(r.Version), App: apps[r.ApplicationID], Details: d, Interviewers: people,
 			Feedback: visible, Names: names, FeedbackHidden: hidden, MyFeedbackDue: FeedbackDue(p.UserID, d, all, now),
-			CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+			CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, OutlookChangedAt: r.OutlookChangedAt,
 		}
 	}
 	return out, nil

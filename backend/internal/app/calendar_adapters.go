@@ -148,3 +148,21 @@ func (a calendarRecipients) InterviewRecipient(ctx context.Context, tx pgx.Tx, a
 	optedOut, err := a.privacy.DoNotContact(ctx, tx, application.CandidateID)
 	return *person.Email, optedOut, err
 }
+
+// calendarInterviews takes into an interview what its organizer changed in
+// Outlook to its invitation.
+type calendarInterviews struct{ m *interviews.Module }
+
+func (a calendarInterviews) ChangeFromOutlook(ctx context.Context, tx pgx.Tx, tenant, id, organizer string, version int, c calendars.MeetingChange) (calendars.Meeting, error) {
+	change := interviews.OutlookChange{Title: c.Title, Location: c.Location, Instructions: c.Instructions, StartsAt: c.Start}
+	if c.Start != nil && c.End != nil {
+		length := c.End.Sub(*c.Start)
+		if length%time.Minute != 0 {
+			return calendars.Meeting{}, apperr.Validation(apperr.FieldErrors{{Field: "durationMinutes", Message: "an interview lasts whole minutes"}})
+		}
+		minutes := int(length / time.Minute)
+		change.Duration = &minutes
+	}
+	m, err := a.m.ChangeFromOutlook(ctx, tx, tenant, id, organizer, version, change)
+	return interviewMeeting(m), err
+}

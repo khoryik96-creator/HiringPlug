@@ -229,7 +229,7 @@ func NewModules(d Deps) *Modules {
 	m.Calendars.ConnectOutlookWith(calendars.Deps{
 		Apps: calendarApps{m.Emails}, Sources: calendarSources{m.Interviews, m.Scheduling}, Users: calendarUsers{m.Identity},
 		Recipients:   calendarRecipients{m.Pipeline, m.Candidates, m.Privacy},
-		ReminderMail: calendarReminderMail{m},
+		ReminderMail: calendarReminderMail{m}, Interviews: calendarInterviews{m.Interviews},
 	}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL, TimeZone: d.Config.TimeZone})
 	m.Interviews.UseCalendar(m.Calendars)
 	m.Scheduling.UseCalendar(m.Calendars)

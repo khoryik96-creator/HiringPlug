@@ -64,7 +64,7 @@ it("shows hourly appointments, opens an exact early slot, and advances one day",
     id: "cev_1", version: 1, title: "Morning interview", startsAt: slot(9).toISOString(), endsAt: slot(10).toISOString(),
     notes: "", location: "", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, allDay: false,
     teams: false, attendees: [], source: "local", sourceId: null, status: "active", syncStatus: "local",
-    syncError: null, webUrl: null, joinUrl: null, editable: true,
+    syncError: null, webUrl: null, joinUrl: null, editable: true, outlookChangedAt: null,
   };
   const read = vi.spyOn(api, "GET").mockResolvedValue(ok({
     items: [event, { ...event, id: "cev_2", title: "Team offsite", allDay: true, startsAt: today.toISOString(), endsAt: addDays(today, 1).toISOString() },
@@ -161,7 +161,7 @@ it("asks for the Teams link when Outlook cannot make the meeting", async () => {
 it("shows three meetings a month day and opens the day for the rest", async () => {
   const today = startDay(new Date());
   const at = (h: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), h).toISOString();
-  const base = { version: 1, notes: "", location: "", timeZone: "UTC", allDay: false, teams: false, attendees: [], source: "local", sourceId: null, status: "active", syncStatus: "local", syncError: null, webUrl: null, joinUrl: null, editable: true };
+  const base = { version: 1, notes: "", location: "", timeZone: "UTC", allDay: false, teams: false, attendees: [], source: "local", sourceId: null, status: "active", syncStatus: "local", syncError: null, webUrl: null, joinUrl: null, editable: true, outlookChangedAt: null };
   const items = [8, 9, 10, 11, 12].map((h) => ({ ...base, id: `cev_${String(h)}`, title: `Meeting at ${String(h)}`, startsAt: at(h), endsAt: at(h + 1) }));
   vi.spyOn(api, "GET").mockResolvedValue(ok({ items, connection: disconnected }));
   renderWithClient(<Calendar />);
