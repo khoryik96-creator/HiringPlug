@@ -208,7 +208,8 @@ who, which candidate, where and which day, never the amount, never for the
 system. Lines are written only by the database function
 `app_record_salary_view` (the app cannot add, change or delete one itself)
 and read with `auditlog.salary_views:read`, within the reader's candidate
-scope. Candidate lists return salaries only when asked (`includeSalary`), so
+scope: a list or export line (many candidates) is visible only when the
+reader sees one of its candidates, and counts and matches only those. Candidate lists return salaries only when asked (`includeSalary`), so
 screens that do not show them never receive them.
 
 The **audit log** page reads `audit_log` with `auditlog:read`. Row-level

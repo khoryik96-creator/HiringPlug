@@ -14,11 +14,15 @@ import (
 
 const listSalaryViews = `-- name: ListSalaryViews :many
 SELECT id, user_id, kind, candidate_id,
-       (CASE WHEN candidate_id IS NULL THEN cardinality(candidate_ids) ELSE 1 END)::integer AS candidates, day, count, first_at, last_at
+       (CASE WHEN candidate_id IS NOT NULL THEN 1
+             WHEN app_scope_all() THEN cardinality(candidate_ids)
+             ELSE (SELECT count(*) FROM unnest(candidate_ids) AS c (id) WHERE app_sees_candidate(c.id)) END)::integer AS candidates,
+       day, count, first_at, last_at
 FROM salary_view
 WHERE ($1::text IS NULL OR user_id = $1)
   AND ($2::text IS NULL OR kind = $2)
-  AND ($3::text IS NULL OR candidate_id = $3 OR $3 = ANY (candidate_ids))
+  AND ($3::text IS NULL OR candidate_id = $3
+       OR ($3 = ANY (candidate_ids) AND app_sees_candidate($3)))
   AND ($4::date IS NULL OR day >= $4)
   AND ($5::date IS NULL OR day <= $5)
   AND ($6::text IS NULL OR (day, id) < (SELECT c.day, c.id FROM salary_view c WHERE c.id = $6))
@@ -49,7 +53,9 @@ type ListSalaryViewsRow struct {
 }
 
 // Salary views, newest day first (and the newest line first within a day),
-// after the cursor's line.
+// after the cursor's line. A list or export line counts, and is found by,
+// only the candidates the reader sees (row-level security hides a line
+// with none of them).
 func (q *Queries) ListSalaryViews(ctx context.Context, arg ListSalaryViewsParams) ([]ListSalaryViewsRow, error) {
 	rows, err := q.db.Query(ctx, listSalaryViews,
 		arg.UserID,

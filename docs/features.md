@@ -1701,7 +1701,8 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   number of different candidates it showed. Never an amount. Filters: who,
   candidate (lists and exports that showed them too), kind, days; Excel or
   CSV download (audited). Lines about candidates the user may not see are
-  left out. Nothing in either log is deleted automatically.
+  left out; a list or export line shows (and is found by) only the
+  candidates they see, and is left out when they see none of them. Nothing in either log is deleted automatically.
 - **Not counted**: what the app reads for its own work (the AI never gets a
   salary; automatic emails; the system), what a person just typed in (saving
   a salary, an offer or a placement), lists that do not show it (offers sent

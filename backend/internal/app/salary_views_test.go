@@ -239,24 +239,39 @@ func TestSalaryViewsStayInTheirCompanyAndScope(t *testing.T) {
 		require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+c.Id, recruiter.Token, nil).Status)
 	}
 	require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates?includeSalary=true", recruiter.Token, nil).Status)
+	// The owner's search showed only the sourcer's candidate.
+	res = a.request(http.MethodPost, "/v1/candidates/search", owner, map[string]any{"q": "Theirs", "includeSalary": true})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	// Another company's views are never shown.
 	other := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	elsewhere := a.withSalary(other.Users[api.RoleRecruiter].Token, map[string]any{"firstName": "Elsewhere"})
 	require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+elsewhere.Id, other.Users[api.RoleRecruiter].Token, nil).Status)
 	assert.Len(t, a.salaryViews(other.Users[api.RoleOwner].Token, "").Items, 1)
-	assert.Len(t, a.salaryViews(owner, "").Items, 3)
+	assert.Len(t, a.salaryViews(owner, "").Items, 4)
 	assert.Empty(t, a.salaryViews(owner, "?candidateId="+elsewhere.Id).Items)
 	assert.Empty(t, a.salaryViews(owner, "?user="+other.Users[api.RoleRecruiter].ID).Items)
 
-	// A user who sees only their own candidates sees only lines about them
-	// (and the lists, which name no candidate).
+	assert.Len(t, a.salaryViews(owner, "?candidateId="+theirs.Id).Items, 3, "their page, the recruiter's list, the owner's search")
+
+	// A user who sees only their own candidates sees only lines about them,
+	// and the lists that showed one of them, counting only those: never that
+	// a list showed someone else's candidate.
 	a.setRole(owner, "recruiter", map[string]any{"version": 0, "permissions": append(authz.PermissionsForRole(api.RoleRecruiter), api.PermissionAuditlogSalaryViewsRead),
 		"candidateScope": "own", "jobCandidates": false}, http.StatusOK)
+	scoped := a.salaryViews(recruiter.Token, "").Items
+	require.Len(t, scoped, 2)
 	var about []string
-	for _, v := range a.salaryViews(recruiter.Token, "").Items {
+	for _, v := range scoped {
 		about = append(about, orEmpty(v.CandidateId))
+		assert.Equal(t, recruiter.ID, v.UserId, "not the owner's search of someone else's candidate")
+		assert.Equal(t, 1, v.Candidates, "their own candidate only")
 	}
 	assert.ElementsMatch(t, []string{mine.Id, ""}, about)
+	assert.Empty(t, a.salaryViews(recruiter.Token, "?candidateId="+theirs.Id).Items, "not even through the list")
+	assert.Len(t, a.salaryViews(recruiter.Token, "?candidateId="+mine.Id).Items, 2)
+	file := a.request(http.MethodPost, "/v1/salary-views/export", recruiter.Token, map[string]any{"format": "csv"})
+	require.Equal(t, http.StatusOK, file.Status, "%s", file.Body)
+	assert.NotContains(t, string(file.Body), "Test owner", "nor in the download")
 }
 
 func TestSalaryViewsDownload(t *testing.T) {

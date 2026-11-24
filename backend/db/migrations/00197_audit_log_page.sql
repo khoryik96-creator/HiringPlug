@@ -32,11 +32,14 @@ CREATE INDEX salary_view_day_idx ON salary_view (tenant_id, day DESC, id DESC);
 CREATE INDEX salary_view_candidate_idx ON salary_view (tenant_id, candidate_id) WHERE candidate_id IS NOT NULL;
 
 ALTER TABLE salary_view ENABLE ROW LEVEL SECURITY;
--- Read only, by those who may see it, and only lines about candidates they see.
+-- Read only, by those who may see it, and only lines about candidates they
+-- see: a list or export line (no candidate_id) when they see at least one of
+-- its candidates (the auditlog queries count only those).
 CREATE POLICY tenant_read ON salary_view FOR SELECT
   USING (tenant_id = app_current_tenant() AND app_has_permission('auditlog.salary_views:read'));
 CREATE POLICY candidate_scope ON salary_view AS RESTRICTIVE FOR SELECT
-  USING (candidate_id IS NULL OR app_sees_candidate(candidate_id));
+  USING (CASE WHEN candidate_id IS NOT NULL THEN app_sees_candidate(candidate_id)
+              ELSE app_scope_all() OR EXISTS (SELECT 1 FROM unnest(candidate_ids) AS c (id) WHERE app_sees_candidate(c.id)) END);
 
 -- Counts one showing of a salary to the transaction's user, in their
 -- company: the day's line for (user, kind, candidate) is added or counted
