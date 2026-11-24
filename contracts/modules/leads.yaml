@@ -156,6 +156,20 @@ paths:
   /v1/job-leads/{jobLeadId}:
     parameters:
       - $ref: '#/components/parameters/JobLeadIdPath'
+    get:
+      operationId: getJobLead
+      tags: [leads]
+      summary: One lead as it is now (whatever the list's filter shows)
+      x-permission: leads:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobLead' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     patch:
       operationId: updateJobLead
       tags: [leads]

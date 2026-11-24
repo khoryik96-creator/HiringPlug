@@ -4257,7 +4257,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /** One lead as it is now (whatever the list's filter shows) */
+        get: operations["getJobLead"];
         put?: never;
         post?: never;
         delete?: never;
@@ -20849,6 +20850,31 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getJobLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobLeadId: components["parameters"]["JobLeadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLead"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     updateJobLead: {

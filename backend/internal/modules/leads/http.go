@@ -94,6 +94,15 @@ func (h *HTTP) CreateJobLead(ctx context.Context, req api.CreateJobLeadRequestOb
 	return api.CreateJobLead201JSONResponse(leadToAPI(row)), nil
 }
 
+// GetJobLead handles GET /v1/job-leads/{jobLeadId}.
+func (h *HTTP) GetJobLead(ctx context.Context, req api.GetJobLeadRequestObject) (api.GetJobLeadResponseObject, error) {
+	row, err := h.svc.Lead(ctx, authz.MustFromContext(ctx), req.JobLeadId)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetJobLead200JSONResponse(leadToAPI(row)), nil
+}
+
 // UpdateJobLead handles PATCH /v1/job-leads/{jobLeadId}.
 func (h *HTTP) UpdateJobLead(ctx context.Context, req api.UpdateJobLeadRequestObject) (api.UpdateJobLeadResponseObject, error) {
 	b := req.Body
