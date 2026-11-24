@@ -51,6 +51,17 @@ func salaryFilled(values map[string]string, texts ...string) bool {
 	return false
 }
 
+// whoseFields is the candidate whose details fill a message's own fields:
+// the recipient, when the email goes to a candidate (shortlistValues leaves
+// out the first shortlisted candidate's details, recipientValues puts in the
+// recipient's); otherwise the candidate it is about.
+func whoseFields(about, recipient *string) *string {
+	if recipient != nil {
+		return recipient
+	}
+	return about
+}
+
 // salaryFieldsShown counts the composer's field values when they hold the
 // candidate's salary.
 func (s *Service) salaryFieldsShown(ctx context.Context, tx pgx.Tx, byToken map[string]string, candidateID *string) error {

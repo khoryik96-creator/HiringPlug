@@ -129,7 +129,8 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 		if err := salaryOnlyTheirOwn(recipientCandidateID, bodyHTML, out.Salary); err != nil {
 			return err
 		}
-		if err := s.salaryFieldsShown(ctx, tx, out.FieldValues, candidateID); err != nil {
+		// The message's own fields are the recipient's when the email goes to a candidate.
+		if err := s.salaryFieldsShown(ctx, tx, out.FieldValues, whoseFields(candidateID, recipientCandidateID)); err != nil {
 			return err
 		}
 		if appID != nil {
@@ -257,7 +258,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 				return err
 			}
 		}
-		valuesOf := candidateID // whose details fill the message's own fields
+		valuesOf := whoseFields(candidateID, r.RecipientCandidateID)
 		if r.RecipientCandidateID != nil {
 			if err := s.contactable(ctx, tx, *r.RecipientCandidateID); err != nil {
 				return err

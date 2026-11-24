@@ -152,3 +152,57 @@ func with(body map[string]any, key string, value any) map[string]any {
 	out[key] = value
 	return out
 }
+
+// An email to a candidate about shortlisted candidates fills its own fields
+// with the recipient's details: their salary is the one counted, and a
+// shortlisted candidate's salary never fills them (not even when the
+// recipient has none).
+func TestAShortlistEmailToACandidateCountsTheRecipientsOwnSalary(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	rt := recruiter.Token
+	shortlisted := a.withSalary(rt, map[string]any{"firstName": "Siti", "email": "siti@example.com"})
+	recipient := a.createCandidate(rt, map[string]any{"firstName": "Ravi", "email": "ravi@example.com"})
+	res := a.request(http.MethodPut, "/v1/candidates/"+recipient.Id+"/compensation", rt, map[string]any{
+		"expectedVersion": 0, "currentSalary": nil, "expectedSalary": map[string]any{"min": "12345", "currency": "MYR", "period": "month"},
+	})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	noSalary := a.createCandidate(rt, map[string]any{"firstName": "Mei", "email": "mei@example.com"})
+	email := func(path string, to api.Candidate) *response {
+		body := map[string]any{
+			"recipientCandidateId": to.Id, "candidates": []map[string]any{{"candidateId": shortlisted.Id}},
+			"subject": "Roles for you", "bodyHtml": "<p>Your expected salary: [Expected salary]</p>", "timeZone": "Asia/Kuala_Lumpur",
+		}
+		if path == "/v1/emails" {
+			body["to"] = []string{string(to.Email.MustGet())}
+		}
+		return a.request(http.MethodPost, path, rt, body)
+	}
+
+	res = email("/v1/email-previews", recipient)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	var preview api.EmailPreview
+	res.JSON(&preview)
+	assert.Contains(t, preview.BodyHtml, "12,345")
+	res = email("/v1/emails", recipient)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	seen := a.seen(owner, recruiter.ID)
+	assert.Equal(t, 1, seen["email_fields:"+recipient.Id].Count, "the composer showed the recipient's salary")
+	assert.Equal(t, 1, seen["email_sent:"+recipient.Id].Count, "the recipient's salary went to them")
+	assert.NotContains(t, seen, "email_fields:"+shortlisted.Id)
+	assert.NotContains(t, seen, "email_sent:"+shortlisted.Id)
+
+	// A recipient with no salary: the field stays empty, never the shortlisted candidate's.
+	res = email("/v1/email-previews", noSalary)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res.JSON(&preview)
+	assert.Contains(t, preview.Missing, "[Expected salary]")
+	assert.NotContains(t, preview.BodyHtml, "10,913")
+	for _, v := range preview.FieldValues {
+		assert.NotContains(t, v, "10,913")
+	}
+	assert.Equal(t, http.StatusBadRequest, email("/v1/emails", noSalary).Status, "no value for the recipient")
+	assert.NotContains(t, a.seen(owner, recruiter.ID), "email_fields:"+shortlisted.Id)
+}
