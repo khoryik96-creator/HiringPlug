@@ -19,11 +19,3 @@ How to write an entry (newest at the top, one per task):
 ```
 
 ## In progress
-
-### AI usage and cost per month, with a limit
-- Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v
-- Touches: a new AI usage page in Settings; the AI allowance check (assistant, matching, app ai_adapters); each AI-using module gains a per-month usage query (assistant, matching, jobs, companies, cvformats, interviewprep, documents, talent search); config HP_AI_MONTHLY_TOKENS becomes the default limit
-- Started: 24 Nov 2026    Last update: 24 Nov 2026
-- State: in progress
-- Next: usage per month and per feature with its cost from the owner's prices; the owner sets the monthly limit in Settings; warning near the limit
