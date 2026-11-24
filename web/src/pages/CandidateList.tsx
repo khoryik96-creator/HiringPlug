@@ -82,11 +82,13 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
   // A search by meaning is best match first: no order applies (the kept one is back with the words).
   const order = meaningText ? null : sortBy;
-  // Salaries only when a salary column, sort or filter uses them (each page with them is logged).
-  const includeSalary = wantsSalary(canSeeSalary, cols.columns, order, effective);
+  // Salaries only when shown: a salary column, or the resume reader (each page with them is logged,
+  // so such a list is not fetched again just because the window got focus).
+  const includeSalary = wantsSalary(canSeeSalary, cols.columns, openAs === "resume");
   const list = useInfiniteQuery({
     queryKey: [...candidatesKey, plainQ, mine, sortBy, folder, includeSalary],
-    enabled: !advanced && folders.ready,
+    enabled: !advanced && folders.ready && cols.ready, // the columns say whether salaries are shown
+    refetchOnWindowFocus: !includeSalary,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => {
       const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number; folder?: string; includeSalary?: boolean } = {};
@@ -109,7 +111,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   });
   const found = useInfiniteQuery({
     queryKey: [...candidatesKey, "search", plainQ, mine, effective, order, folder, meaningText, includeSalary],
-    enabled: advanced && folders.ready,
+    enabled: advanced && folders.ready && cols.ready,
+    refetchOnWindowFocus: !includeSalary,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: searchBody(pageParam) })),
     getNextPageParam: nextPage,

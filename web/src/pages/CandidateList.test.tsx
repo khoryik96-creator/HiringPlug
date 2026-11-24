@@ -285,6 +285,26 @@ describe("candidate list", () => {
     expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
   });
 
+  it("asks for salaries only while it shows them: a salary column, or the full-resume reader", async () => {
+    const paid = { ...summary, currentSalary: { amount: "8517.00", currency: "MYR", period: "month" } };
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: { includeSalary?: boolean } } }) => {
+      if (path === "/v1/candidates") {
+        return Promise.resolve(ok({ items: [init?.params?.query?.includeSalary ? paid : summary], nextCursor: null }));
+      }
+      return (answer([summary], ["currentRole", "status", "email"]) as (p: string) => unknown)(path);
+    }) as never);
+    const asked = () => get.mock.calls.map((c) => c as unknown[]).filter((c) => c[0] === "/v1/candidates")
+      .map((c) => (c[1] as { params: { query: { includeSalary?: boolean } } }).params.query.includeSalary === true);
+    renderWithClient(<CandidateList canSeeSalary />);
+    await screen.findByRole("link", { name: "Siti Aisyah" });
+    expect(asked(), "no salary column: no salaries").toEqual([false]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Full resume" }));
+    const pane = await screen.findByRole("region", { name: "Resume of Siti Aisyah" });
+    await waitFor(() => { expect(pane.textContent).toContain("8,517"); });
+    expect(asked().at(-1), "the reader shows each candidate's pay").toBe(true);
+  });
+
   it("by default leaves out a Work authorization column: it shows in colour under each name", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canSeeSalary />);

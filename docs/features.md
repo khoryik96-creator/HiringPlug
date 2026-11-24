@@ -1723,9 +1723,12 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   is counted as `cv`).
 - **Lists ask for salaries.** `GET /v1/candidates` and
   `POST /v1/candidates/search` return salaries only with `includeSalary`
-  (for roles that may see them); the candidate list asks only while a salary
-  column, a salary sort or the expected salary filter is used, so a name
-  search or a pick-a-candidate box gets none. Exports always have them.
+  (for roles that may see them); the candidate list asks only while it shows
+  them (a salary column, or the full-resume reader, which shows each
+  candidate's pay), once the person's columns are known, and does not fetch
+  such a list again just because the window got focus. Sorting by salary or
+  the expected salary filter work without them, and a name search or a
+  pick-a-candidate box gets none. Exports always have them.
   `GET /v1/offers` and `GET /v1/placements` do the same (`includeSalary`;
   without it an offer's salary and a placement's agreed salary are null, the
   fee stays).
