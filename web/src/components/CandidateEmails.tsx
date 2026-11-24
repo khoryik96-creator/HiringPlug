@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Permission, type Schemas, unwrap } from "../api/client";
+import { type Permission, type Schemas } from "../api/client";
 import { loadApplications } from "../api/applications";
 import { candidateApplicationsKey, candidateEmailsKey } from "../api/keys";
 import { EMAIL_STATUS, formatWhen } from "../labels";
@@ -10,6 +10,7 @@ import { CandidateBookings } from "./CandidateBookings";
 import { EmailComposer } from "./EmailComposer";
 import { OutlookProfileMail } from "./outlook/OutlookProfileMail";
 import { ErrorMessage } from "./ErrorMessage";
+import { useSentEmails } from "./useSentEmails";
 
 /** Emails sent about a candidate, newest first, and writing a new one. */
 export function CandidateEmails({ candidateId, email, permissions, writing: controlledWriting, onWritingChange }: { candidateId: string; email?:string|null;permissions: Permission[]; writing?: boolean; onWritingChange?: (writing: boolean) => void }) {
@@ -17,12 +18,7 @@ export function CandidateEmails({ candidateId, email, permissions, writing: cont
   const writing = controlledWriting ?? ownWriting;
   const setWriting = onWritingChange ?? setOwnWriting;
   const canSend = permissions.includes("emails:send");
-  const list = useQuery({
-    queryKey: candidateEmailsKey(candidateId),
-    queryFn: async () => unwrap(await api.GET("/v1/emails", { params: { query: { candidateId } } })).items,
-    // Sending happens in the background: look again while any is on its way.
-    refetchInterval: (q) => (q.state.data?.some((e) => e.status === "queued") ? 3000 : false),
-  });
+  const list = useSentEmails(candidateEmailsKey(candidateId), { candidateId });
   const apps = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
     queryFn: ({ signal }) => loadApplications("candidate", candidateId, signal),

@@ -1549,6 +1549,14 @@ paths:
       parameters:
         - { name: candidateId, in: query, required: false, schema: { $ref: '#/components/schemas/CandidateId' } }
         - { name: contactId, in: query, required: false, schema: { $ref: '#/components/schemas/ContactId' } }
+        - name: statusOnly
+          in: query
+          description: >
+            Only how each email is getting on (to look again while some are on
+            their way): the subject and message come back empty, and reading
+            the list is not counted in the log of who was shown a salary (a
+            list with an email that shows salary is counted otherwise).
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: OK

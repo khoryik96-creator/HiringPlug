@@ -68,7 +68,8 @@ func (h *HTTP) DraftEmail(ctx context.Context, req api.DraftEmailRequestObject) 
 
 // ListEmails handles GET /v1/emails.
 func (h *HTTP) ListEmails(ctx context.Context, req api.ListEmailsRequestObject) (api.ListEmailsResponseObject, error) {
-	rows, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.CandidateId, req.Params.ContactId)
+	rows, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.CandidateId, req.Params.ContactId,
+		req.Params.StatusOnly != nil && *req.Params.StatusOnly)
 	if err != nil {
 		return nil, err
 	}

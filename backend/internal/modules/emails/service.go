@@ -309,7 +309,9 @@ type EmailView struct {
 }
 
 // List returns the emails about a candidate the user may see, newest first.
-func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, contactID *string) ([]EmailView, error) {
+// statusOnly: only how each is getting on (a list looked at again while
+// some are on their way), without their texts, and not counted as read.
+func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, contactID *string, statusOnly bool) ([]EmailView, error) {
 	if (candidateID == nil) == (contactID == nil) {
 		var errs apperr.FieldErrors
 		errs.Add("candidateId", "give candidateId or contactId")
@@ -336,7 +338,9 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, cont
 		if err != nil {
 			return err
 		}
-		if err := s.salaryEmailsRead(ctx, tx, rows); err != nil {
+		if statusOnly {
+			withoutTexts(rows)
+		} else if err := s.salaryEmailsRead(ctx, tx, rows); err != nil {
 			return err
 		}
 		out = make([]EmailView, len(rows))

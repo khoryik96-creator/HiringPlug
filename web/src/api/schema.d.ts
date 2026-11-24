@@ -18515,6 +18515,8 @@ export interface operations {
             query?: {
                 candidateId?: components["schemas"]["CandidateId"];
                 contactId?: components["schemas"]["ContactId"];
+                /** @description Only how each email is getting on (to look again while some are on their way): the subject and message come back empty, and reading the list is not counted in the log of who was shown a salary (a list with an email that shows salary is counted otherwise). */
+                statusOnly?: boolean;
             };
             header?: never;
             path?: never;

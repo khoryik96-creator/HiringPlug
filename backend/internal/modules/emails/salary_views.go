@@ -170,3 +170,11 @@ func (s *Service) salaryEmailsRead(ctx context.Context, tx pgx.Tx, emails []stor
 	}
 	return salaryview.In(ctx, tx, s.salaryViews, salaryview.EmailRead, salaryReaders(emails, shortlisted)...)
 }
+
+// withoutTexts leaves out the emails' subjects and messages (a list asked
+// for only how they are getting on: nothing in it is read).
+func withoutTexts(emails []store.Email) {
+	for i := range emails {
+		emails[i].Subject, emails[i].Body, emails[i].BodyHtml = "", "", nil
+	}
+}
