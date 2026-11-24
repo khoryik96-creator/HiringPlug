@@ -10,6 +10,7 @@ import { companyKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
 import { FindHR } from "./FindHR";
 import { activeRuns, stopRun } from "./findHrRun";
+import { nameTab, openTab } from "./openRecords";
 import { LeadCompanyChoice } from "./LeadCompanyChoice";
 import { CompanyLinkedin } from "./LeadCompanyLinkedin";
 import { companyPage } from "./linkedinCompany";
@@ -78,10 +79,14 @@ function LinkedCompany({ id, permissions }: { id: string; permissions: Permissio
     queryKey: companyKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId: id } } })),
   });
-  // A scan started here has no Stop once the panel is gone (closed, or another lead's opened): it stops with it.
-  useEffect(() => () => {
-    const run = activeRuns.get(id);
-    if (run) stopRun(run);
+  // A scan started here has no Stop once the panel is gone (closed, or another lead's opened): it stops with
+  // it. One already running when the panel opened (from the company's own page) goes on.
+  useEffect(() => {
+    const before = activeRuns.get(id);
+    return () => {
+      const run = activeRuns.get(id);
+      if (run && run !== before) stopRun(run);
+    };
   }, [id]);
   const c = company.data;
   if (!c) return company.error ? <ErrorMessage error={company.error} /> : <p className="muted small">Loading…</p>;
@@ -90,7 +95,8 @@ function LinkedCompany({ id, permissions }: { id: string; permissions: Permissio
     <>
       <p className="lead-hr-company small">
         <span className="muted">Company: </span>
-        <a href={`#/companies/${c.id}`} target="_blank" rel="noreferrer">{c.name} ↗</a>
+        <a href={`#/companies/${c.id}`} title="Opens as a tab here; the panel stays"
+          onClick={(e) => { e.preventDefault(); openTab(`#/companies/${c.id}`, "company"); nameTab(`#/companies/${c.id}`, c.name); }}>{c.name}</a>
         {c.city && <span className="muted"> · {c.city}</span>}
       </p>
       {!hasPage && <CompanyLinkedin company={c} canUpdate={permissions.includes("companies:update")} />}

@@ -124,6 +124,15 @@ test("another list on the page (the side rail's suggestions) is never read as a 
   assert.deepEqual({...searchPage(rail).readSearch('Contoh Logistik')}, {loading: true, cards: 0}, 'results not drawn yet: the rail is no answer');
 });
 
+test('results drawn as a plain list in the results region are read, the side rail beside them never', () => {
+  const found = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation');
+  const suggestion = companyCard('https://www.linkedin.com/company/syarikat-lain/', 'Syarikat Lain Bhd', 'Retail • Penang');
+  const reader = searchPage(`<div aria-label="Primary content"><div role="list">${found}</div></div><aside><div role="list">${suggestion}</div></aside>`);
+  assert.deepEqual(JSON.parse(JSON.stringify(reader.readSearch('Contoh Logistik'))), {companies: [
+    {url: 'https://www.linkedin.com/company/contoh-logistik/', name: 'Contoh Logistik Sdn Bhd', subtitle: 'Truck Transportation'},
+  ], empty: false}, 'no SearchResults_ container: the results region still counts');
+});
+
 test('a page of results for another spelling, or saying it found none, is no company of this name', () => {
   const card = companyCard('https://www.linkedin.com/company/contoh-logistik/', 'Contoh Logistik Sdn Bhd', 'Truck Transportation');
   const url = searchURL('Contoh Logistk');

@@ -59,11 +59,15 @@ func TestCompaniesNamedLikeALeadsCompany(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, res.Status, "blank %q: %s", blank, res.Body)
 	}
 	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/companies/named-like", owner, nil).Status, "no name")
-	for _, bad := range []string{"Maju%00Foods", "Maju%0AFoods", "Maju%FFFoods"} {
-		res := a.request(http.MethodGet, "/v1/companies/named-like?name="+bad, owner, nil)
-		require.Equal(t, http.StatusBadRequest, res.Status, "%q: %s", bad, res.Body)
-		assert.Equal(t, []string{"name"}, fieldNames(t, res.Error()), "%q", bad)
+	// A job feed's company name may hold a line break (or a stray NUL): read as a space.
+	for _, odd := range []string{"Maju\x00Foods Berhad", "MAJU\nFOODS\nBERHAD"} {
+		found := a.namedLike(owner, odd)
+		require.NotEmpty(t, found, "%q", odd)
+		assert.Equal(t, same.Id, found[0].Id, "%q", odd)
 	}
+	res = a.request(http.MethodGet, "/v1/companies/named-like?name=Maju%FFFoods", owner, nil)
+	require.Equal(t, http.StatusBadRequest, res.Status, "not UTF-8: %s", res.Body)
+	assert.Equal(t, []string{"name"}, fieldNames(t, res.Error()))
 }
 
 func TestCompaniesNamedLikeNeedsCompaniesRead(t *testing.T) {

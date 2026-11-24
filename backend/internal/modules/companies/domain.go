@@ -190,16 +190,18 @@ func squeezedOrNil(s *string) *string {
 	return &t
 }
 
-// plainText reports whether s is valid UTF-8 without control characters
-// (a tab is allowed), which the database could not compare or store.
-func plainText(s string) bool {
+// nameText is a name as the database can compare it: control characters
+// (a line break in a job feed's company name, a stray NUL) read as spaces and
+// runs of spaces squeezed; false when it is not text at all (invalid UTF-8).
+func nameText(s string) (string, bool) {
 	if !utf8.ValidString(s) {
-		return false
+		return "", false
 	}
-	for _, r := range s {
-		if (r < 0x20 && r != '\t') || r == 0x7f {
-			return false
+	spaced := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
 		}
-	}
-	return true
+		return r
+	}, s)
+	return strings.Join(strings.Fields(spaced), " "), true
 }

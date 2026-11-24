@@ -151,10 +151,15 @@ func TestTermsRates(t *testing.T) {
 		[]string{errs[0].Field, errs[1].Field, errs[2].Field}, "always in the same order")
 }
 
-func TestPlainTextRefusesControlCharacters(t *testing.T) {
-	assert.True(t, plainText("Maju Foods\tBhd"), "a tab is allowed")
-	assert.True(t, plainText("Syarikat Ümran"))
-	for _, bad := range []string{"Maju\x00Foods", "Maju\nFoods", "Maju\x1fFoods", "Maju\x7fFoods", "Maju\xffFoods"} {
-		assert.False(t, plainText(bad), "%q", bad)
+func TestNameTextReadsControlCharactersAsSpaces(t *testing.T) {
+	for in, want := range map[string]string{
+		"Maju Foods\tBhd": "Maju Foods Bhd", "Maju\nFoods": "Maju Foods", "Maju\x00Foods": "Maju Foods",
+		"  Maju\x1f\x7fFoods ": "Maju Foods", "Syarikat Ümran": "Syarikat Ümran",
+	} {
+		got, ok := nameText(in)
+		assert.True(t, ok, "%q", in)
+		assert.Equal(t, want, got, "%q", in)
 	}
+	_, ok := nameText("Maju\xffFoods")
+	assert.False(t, ok, "not UTF-8")
 }

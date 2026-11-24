@@ -89,6 +89,18 @@ describe("a lead's Find HR panel", () => {
     expect(sentBody(patch)).toEqual({ version: 4, companyId: "comp_1" });
   });
 
+  it("keeps 'Link the lead to that one' beside its error when that link fails, to try again", async () => {
+    serve({ matches: [] });
+    vi.spyOn(api, "POST").mockResolvedValue(failure("COMPANY_DUPLICATE_NAME", "A company with this name exists.", { existingCompanyId: "comp_1" }, 409));
+    const patch = vi.spyOn(api, "PATCH").mockResolvedValue(failure("CONFLICT_STALE_VERSION", "Changed by someone else.", {}, 409));
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Add and link" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Link the lead to that one" }));
+    expect(await screen.findByText("Changed by someone else.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Link the lead to that one" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
+  });
+
   it("finds the company's LinkedIn page from its name with the companion", async () => {
     serve({ matches: [] });
     const call = vi.spyOn(companion, "companionCall").mockResolvedValue({ companies: [
@@ -122,7 +134,13 @@ describe("a lead's Find HR panel", () => {
     const get = serve();
     show({ companyId: "comp_1" });
     expect(await screen.findByRole("region", { name: "Find HR" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Contoh Logistik Sdn Bhd ↗" }).getAttribute("target")).toBe("_blank");
+    // The company opens as a tab here, never a browser tab, and the panel stays.
+    const name = screen.getByRole("link", { name: "Contoh Logistik Sdn Bhd" });
+    expect(name.getAttribute("target")).toBeNull();
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    name.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(screen.getByRole("region", { name: "Find HR" })).toBeTruthy();
     expect(get.mock.calls.some((c) => c[0] === "/v1/companies/named-like")).toBe(false);
   });
 
@@ -202,14 +220,29 @@ describe("a lead's Find HR panel", () => {
     }
   });
 
-  it("stops a scan running in the panel when the panel closes", async () => {
+  it("keeps a scan started on the company's own page going when the panel closes", async () => {
     serve();
-    const call = vi.spyOn(companion, "companionCall").mockResolvedValue({});
+    vi.spyOn(companion, "companionCall").mockResolvedValue({});
     const run = newRun(vi.fn());
     activeRuns.set("comp_1", run);
     try {
       show({ companyId: "comp_1" });
       expect(await screen.findByRole("region", { name: "Find HR" })).toBeTruthy();
+      cleanup();
+      expect(run.stopped).toBe(false);
+    } finally {
+      activeRuns.delete("comp_1");
+    }
+  });
+
+  it("stops a scan started in the panel when the panel closes", async () => {
+    serve();
+    const call = vi.spyOn(companion, "companionCall").mockResolvedValue({});
+    const run = newRun(vi.fn());
+    try {
+      show({ companyId: "comp_1" });
+      expect(await screen.findByRole("region", { name: "Find HR" })).toBeTruthy();
+      activeRuns.set("comp_1", run); // started from the panel
       expect(run.stopped).toBe(false);
       cleanup();
       expect(run.stopped).toBe(true);

@@ -78,7 +78,9 @@ export function LeadCompanyChoice({ lead, permissions, onLinked, onSaved }: {
   // Once added, the form stays (with why the link failed) even though the company now has the same name.
   // The lookup failed: adding stays possible (a company with the name is still refused by the server).
   const showAdd = created !== null || addAnyway || (!matches.isPending && !items.some((m) => m.sameName));
-  const existing = add.error instanceof ApiError && add.error.code === "COMPANY_DUPLICATE_NAME" ? add.error.details.existingCompanyId : undefined;
+  const duplicateOf = add.error instanceof ApiError && add.error.code === "COMPANY_DUPLICATE_NAME" ? add.error.details.existingCompanyId : undefined;
+  // Kept once linking to it fails, so "Link the lead to that one" stays to try again beside its error.
+  const existing = typeof duplicateOf === "string" ? duplicateOf : link.variables?.from === "existing" && link.isError ? link.variables.companyId : undefined;
   const pageWrong = linkedin.trim() !== "" && companyPage(linkedin) === "";
   const samePage = pageOwner && pageOwner.page === companyPage(linkedin) ? pageOwner : null;
 
@@ -124,10 +126,13 @@ export function LeadCompanyChoice({ lead, permissions, onLinked, onSaved }: {
               {linkError("page")}
             </div>
           )}
-          <ErrorMessage error={add.error}>
-            {typeof existing === "string" && <button type="button" className="doc-btn" disabled={busy} onClick={() => { add.reset(); link.mutate({ companyId: existing, from: "existing" }); }}>Link the lead to that one</button>}
-          </ErrorMessage>
-          {linkError("existing")}
+          <ErrorMessage error={add.error} />
+          {existing !== undefined && (
+            <>
+              <button type="button" className="doc-btn" disabled={busy} onClick={() => { add.reset(); link.mutate({ companyId: existing, from: "existing" }); }}>Link the lead to that one</button>
+              {linkError("existing")}
+            </>
+          )}
           <div className="row">
             <button type="submit" className="primary" disabled={busy || !name.trim() || pageWrong || samePage !== null}>
               {add.isPending ? (created ? "Linking…" : "Adding…") : created ? `Link to ${created.name}` : "Add and link"}

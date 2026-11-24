@@ -116,8 +116,11 @@
   function readSearch(expectedName) {
     if (location.origin !== 'https://www.linkedin.com') return {failed: true};
     const main = document.querySelector('main');
-    const scope = main?.querySelector('[aria-label="Primary content"]') || main;
-    const selector = '[componentkey^="SearchResults_"] [role="listitem"], li.reusable-search__result-container, .entity-result';
+    const primary = main?.querySelector('[aria-label="Primary content"]');
+    const scope = primary || main;
+    // Any list counts only inside the results region (the side rail is outside it), as the people search reads.
+    const selector = '[componentkey^="SearchResults_"] [role="listitem"], li.reusable-search__result-container, .entity-result' +
+      (primary ? ', [role="list"] > [role="listitem"], [role="list"] > * > [role="listitem"]' : '');
     const cards = scope ? [...scope.querySelectorAll(selector)].filter(n => visible(n) && !n.parentElement?.closest(selector)) : [];
     const problem = issue(!cards.length);
     if (problem) return {blocked: problem};

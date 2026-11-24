@@ -71,7 +71,7 @@ SELECT c.id, c.name, c.city, c.website, c.linkedin_url, c.industry,
        (c.name_core = me.core)::boolean AS same_name
 FROM company c, (SELECT app_company_name_core($1::text) AS core) me
 WHERE me.core <> ''
-  AND (c.name_core = me.core OR (c.name_core % me.core AND similarity(c.name_core, me.core) >= 0.6))
+  AND (c.name_core = me.core OR c.name_core % me.core)
 ORDER BY (c.name_core = me.core) DESC, similarity(c.name_core, me.core) DESC, c.id DESC
 LIMIT 5
 `
@@ -89,8 +89,9 @@ type CompaniesNamedLikeRow struct {
 // Companies whose name is the same as a name (a lead's company) once its
 // legal form is set aside, or much like it, as SimilarCompanies decides.
 // The same names first, then the most similar. None when only a legal form
-// is left. % (at SetNamedLikeThreshold's 0.6) lets the trigram index on
-// name_core find the similar names; similarity() keeps the exact rule.
+// is left. % at SetNamedLikeThreshold's 0.6 is SimilarCompanies' rule
+// (similarity >= 0.6) and, unlike similarity() in the WHERE, lets the trigram
+// index on name_core be used under row-level security; similarity() only orders.
 func (q *Queries) CompaniesNamedLike(ctx context.Context, name string) ([]CompaniesNamedLikeRow, error) {
 	rows, err := q.db.Query(ctx, companiesNamedLike, name)
 	if err != nil {

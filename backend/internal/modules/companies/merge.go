@@ -7,7 +7,6 @@ package companies
 import (
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -103,13 +102,13 @@ type NamedLike struct {
 // the same name once its legal form is set aside first, then the most
 // similar. A blank name, or one with control characters, is refused.
 func (s *Service) NamedLike(ctx context.Context, p authz.Principal, name string) ([]NamedLike, error) {
-	name = strings.TrimSpace(name)
+	name, ok := nameText(name)
 	var errs apperr.FieldErrors
 	switch {
+	case !ok:
+		errs.Add("name", "must be text (UTF-8)")
 	case name == "":
 		errs.Add("name", "is required")
-	case !plainText(name):
-		errs.Add("name", "must be plain text, without control characters")
 	}
 	if err := errs.Err(); err != nil {
 		return nil, err
