@@ -201,16 +201,24 @@ open, download, turn into a PDF, show the text of or attach it for anyone
 without `candidates.compensation:read`.
 
 **Who was shown a salary.** Each time a salary reaches a person (a page, a
-list or search that asked for salaries, an export, an email's fields or an
-email sent, a formatted CV, a screening call, an offer, a placement) it is
-counted in `salary_view` (see [features.md](features.md#audit-log-and-who-was-shown-a-salary--1450-the-api-the-page-follows)):
+list or search that asked for salaries or was sorted or filtered by salary,
+an export, an email's fields or an email sent or read again, a copy of a
+candidate's data, a formatted CV, a screening call, an offer, a placement
+or an invoice that prints it) it is counted in `salary_view` (see [features.md](features.md#audit-log-and-who-was-shown-a-salary--1450-the-api-the-page-follows)):
 who, which candidate, where and which day, never the amount, never for the
 system. Lines are written only by the database function
 `app_record_salary_view` (the app cannot add, change or delete one itself)
 and read with `auditlog.salary_views:read`, within the reader's candidate
 scope: a list or export line (many candidates) is visible only when the
 reader sees one of its candidates, and counts and matches only those. Candidate lists return salaries only when asked (`includeSalary`), so
-screens that do not show them never receive them.
+screens that do not show them never receive them; the same goes for offers,
+placements and an email's field values. A merge moves the duplicate's lines
+to the kept candidate (`app_move_salary_views`).
+
+Known gaps, not counted: the placements dashboard shows each placement's
+fee and fee percentage, from which the salary can be worked out (fee × 100
+÷ percentage); and the market map. Give `placements.fees:read` only to
+roles that may know salaries.
 
 The **audit log** page reads `audit_log` with `auditlog:read`. Row-level
 security still applies: entries about candidates and applications outside

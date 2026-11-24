@@ -1684,9 +1684,13 @@ scrolled sideways.
   contacts, people and job leads are named, and a candidate on a job as
   "Siti Aisyah · Accountant", opening the candidate; others by kind and id)
   and what changed
-  (salaries only as "changed", never amounts). Filters: who, one action or
-  every action of a kind (`candidate`), the kind of record, one record, and a
-  range of days in the agency's time zone; cursor pages. Entries about
+  (salaries only as "changed", never amounts). Filters: who, actions or
+  kinds of action (`candidate`; several separated by commas, as "What"
+  sends them: Settings is `settings`, `invoice_settings`, `tenant.renamed`...,
+  Documents and CVs includes formatted CVs, `cv`), the kind of record, one
+  record, and a range of days in the agency's time zone; cursor pages (the
+  cursor holds where the page ended, so Load more follows on even after a
+  merge took a line away). Entries about
   candidates (and their jobs) the user may not see are left out, as
   everywhere. A new company, contact or job records no fields (`{}`: webhooks
   copy an entry's changes, so a new record's details stay out of them).
@@ -1700,14 +1704,25 @@ scrolled sideways.
   their history, a merge, a screening call that did not set the salary:
   `candidate`), their screening calls' salaries (`screening`), a
   candidate list or search that asked for salaries (`candidate_list`), an
-  export of candidates or placements with them (`export`), an email being
-  written whose fields came back with it, or a draft from a template that
-  fills a salary field (`email_fields`), an email sent with it
-  (`email_sent`), a formatted CV with it made, opened, downloaded or attached
-  to an email (`cv`), a list of offers that asked for their salaries (an
-  application's offers, the offers waiting for approval: `offer`), a list of
-  placements that asked for theirs (an application's placement, one being
-  changed on the dashboard: `placement`). One line per
+  export of candidates or placements with them (`export`), a candidate list
+  or search sorted by salary or filtered by the expected salary, salaries or
+  not (`candidate_list`, with every candidate on the page: the order, or
+  being found, tells about each one's salary), an email being written that
+  came back with it: the composer's salary field values, asked for only once
+  a salary field is in the message or subject (inserted, typed or from a
+  template), a shortlist's salary details when they are put in, or a preview
+  or draft that fills a salary field (`email_fields`), an email sent with it
+  (`email_sent`), a sent email with it read again on a candidate's or
+  contact's emails or in a copy of their data (`email_read`: once for the
+  list, for the candidates whose salary it may show; for an email to a
+  candidate, only theirs), the salary section of a copy of a candidate's
+  data (`candidate`), a formatted CV with it made, opened, downloaded or
+  attached to an email (`cv`), a list of offers that asked for their salaries
+  (an application's offers, the offers waiting for approval: `offer`), a list
+  of placements that asked for theirs (an application's placement, one being
+  changed on the dashboard), or an invoice whose fee is a share of the
+  salary (it prints the annual salary) opened or sent by a person
+  (`placement`). One line per
   person, kind, candidate and day (the agency's day), with how often and the
   first and last time; a list, search or export is one line a day with the
   number of different candidates it showed. A salary is a current or
@@ -1720,31 +1735,39 @@ scrolled sideways.
   a duplicate candidate moves its lines to the kept candidate (a line for
   the same person, kind and day is added to theirs). Nothing in either log is deleted automatically.
 - **Not counted**: what the app reads for its own work (the AI never gets a
-  salary; automatic emails; the system), what a person just typed in (saving
-  a salary, an offer or a placement, and the offer or placement sent back
-  after a change), lists that do not ask for it (offers sent on the dashboard
-  and pipeline, checking whether an offer is open, the placements
-  dashboard: they get no salary), reading back a
-  sent email that shows a salary, invoices (their fee basis may name the
-  salary), the market map and the salary section of a candidate's data copy
-  (already audited; the text of a formatted CV with the salary in that copy
-  is counted as `cv`).
+  salary; automatic emails and invoices; the system), what a person just
+  typed in (saving a salary, creating an offer or a placement, or a change
+  that set its salary), what never carries the salary: lists that do not ask
+  for it (offers sent on the dashboard and pipeline, checking whether an
+  offer is open, the placements dashboard), an offer or placement sent back
+  after a change that did not set its salary (moving it on, approving it,
+  choosing who is invoiced, sending the invoice), opening the email composer
+  or choosing a shortlist's candidates, and an invoice's status read while
+  it is queued (the screen keeps the salary it read first, and does not read
+  offers or a placement again when the window gets focus). Known gaps: the
+  placements dashboard's fee and fee percentage (the salary can be worked
+  out from them) and the market map.
 - **Lists ask for salaries.** `GET /v1/candidates` and
   `POST /v1/candidates/search` return salaries only with `includeSalary`
   (for roles that may see them); the candidate list asks only while it shows
   them (a salary column, or the full-resume reader, which shows each
   candidate's pay), once the person's columns are known, and does not fetch
   such a list again just because the window got focus. Sorting by salary or
-  the expected salary filter work without them, and a name search or a
-  pick-a-candidate box gets none. Exports always have them.
+  the expected salary filter work without them (and are counted), and a name
+  search or a pick-a-candidate box gets none. Exports always have them.
   `GET /v1/offers` and `GET /v1/placements` do the same (`includeSalary`;
   without it an offer's salary and a placement's agreed salary are null, the
-  fee stays).
+  fee stays); a change to an offer or placement sends it back without the
+  salary unless the change set it. `POST /v1/email-previews` returns the
+  salary fields' values only with `includeSalary`, naming the others in
+  `withheldFields` (the subject and message are filled either way).
 - **Formatted CVs made with the salary** open, download, turn into a PDF,
   show their text or go with an email only for roles that may see salaries;
   others see them listed but get "includes the candidate's salary". A copy
   of a candidate's data (an access request) leaves such a CV's text out for
-  them and says so.
+  them and says so. A CV made "with the salary" for a candidate who has no
+  current or expected salary has none in it, so it is kept as a CV without
+  the salary (open to anyone who may see the CV, and not counted).
 
 ## Import
 

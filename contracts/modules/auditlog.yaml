@@ -7,10 +7,12 @@ x-module:
     keeps the log of who was shown a salary: one line per person, kind,
     candidate and day (in the agency's time zone, HP_TIME_ZONE), counted. A
     salary is counted when it is really returned to a person: a candidate's
-    page, a list or search with salary columns, an export, an email's fields
-    or an email sent with it, a formatted CV with it, a screening call's
-    salary, an offer or a placement. Neither log ever holds an amount, and
-    nothing in either is deleted automatically.
+    page, a list or search with salary columns or sorted or filtered by
+    salary, an export, an email's fields, an email sent with it or read
+    again, a copy of a candidate's data, a formatted CV with it, a screening
+    call's salary, an offer, a placement or an invoice that prints it.
+    Neither log ever holds an amount, and nothing in either is deleted
+    automatically (a candidate merge moves the duplicate's lines).
   permissions:
     auditlog:read:
       description: See the company's audit log (who changed what, and when).
