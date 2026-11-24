@@ -7725,7 +7725,7 @@ class CandidateSearch(BaseModel):
     includeSalary: Annotated[
         bool | None,
         Field(
-            description="Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work. An export always has them, for roles that may see them.\n"
+            description="Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work, and such a page is counted too, with every candidate on it (being found, or the order, tells about their salaries). An export always has them, for roles that may see them.\n"
         ),
     ] = None
 

@@ -355,3 +355,39 @@ func TestSalaryViewPagesFollowOnAfterAMerge(t *testing.T) {
 	bad := a.request(http.MethodGet, "/v1/salary-views?cursor=sv_nope", owner, nil)
 	assert.Equal(t, http.StatusBadRequest, bad.Status, "%s", bad.Body)
 }
+
+// A page found by the expected salary, or sorted by salary, tells about the
+// salary of everyone on it even without the salaries: it is counted, with
+// every candidate on it. Other pages without salaries are not.
+func TestASalaryFilterOrSortIsCountedWithoutSalaries(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.sameSalaryDay()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti"})
+	bare := a.createCandidate(recruiter.Token, map[string]any{"firstName": "Bare"})
+	list := func() api.SalaryView { return a.seen(owner, recruiter.ID)["candidate_list:"] }
+	ok := func(method, path string, body any) {
+		t.Helper()
+		res := a.request(method, path, recruiter.Token, body)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		assert.NotContains(t, string(res.Body), "8517", "no salary in the page")
+	}
+
+	ok(http.MethodGet, "/v1/candidates?sort=name", nil)
+	ok(http.MethodPost, "/v1/candidates/search", map[string]any{"q": "Siti"})
+	assert.Zero(t, list().Count, "nothing about salaries")
+
+	ok(http.MethodGet, "/v1/candidates?sort=expected_salary_desc", nil)
+	assert.Equal(t, 1, list().Count, "sorted by salary")
+	assert.Equal(t, 2, list().Candidates, "everyone on the page")
+	ok(http.MethodPost, "/v1/candidates/search", map[string]any{"expectedSalaryMax": map[string]any{"amount": "20000", "currency": "MYR"}})
+	assert.Equal(t, 2, list().Count, "found by the expected salary")
+	ok(http.MethodPost, "/v1/candidates/search", map[string]any{"q": "Bare", "sort": "current_salary_asc"})
+	assert.Equal(t, 3, list().Count, "a search sorted by salary")
+	about := a.salaryViews(owner, "?candidateId="+bare.Id)
+	require.Len(t, about.Items, 1)
+	assert.Equal(t, api.SalaryViewKindCandidateList, about.Items[0].Kind)
+	assert.Len(t, a.salaryViews(owner, "?candidateId="+c.Id).Items, 1)
+}

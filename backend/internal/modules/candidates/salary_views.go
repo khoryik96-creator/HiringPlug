@@ -9,6 +9,7 @@ package candidates
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -30,6 +31,24 @@ func salariesShown(items []Summary) []string {
 	var out []string
 	for _, s := range items {
 		if HasSalary(s.Compensation) {
+			out = append(out, s.ID)
+		}
+	}
+	return out
+}
+
+// salarySort: a sort by current or expected salary (CandidateSort).
+func salarySort(sort string) bool { return strings.Contains(sort, "salary") }
+
+// probedOrShown are the candidates of a page whose salary it tells about:
+// every one on it when salaries chose or ordered them (probed: the expected
+// salary filter, a salary sort; even without salaries in the page, who is
+// found and in which order says something about each), and those whose
+// salary is in it.
+func probedOrShown(items []Summary, probed bool) []string {
+	out := salariesShown(items)
+	if probed {
+		for _, s := range items {
 			out = append(out, s.ID)
 		}
 	}

@@ -83,8 +83,9 @@ export function sortOf(current: CandidateSort, column: string): "ascending" | "d
  * Whether the list asks the server for salaries: only for those who may see them, and only when they
  * are shown: a salary column in the table, or the full-resume reader (its rows and heading show pay).
  * A salary sort or the expected salary filter alone does not ask: the server sorts and filters
- * without returning them. Every page that comes with salaries is counted in the log of who was shown
- * a salary.
+ * without returning them (and counts such a page in the log of who was shown a salary anyway: the
+ * order, or being found, tells about each one's salary). Every page that comes with salaries is
+ * counted too.
  */
 export function wantsSalary(canSeeSalary: boolean, columns: readonly string[], reader: boolean): boolean {
   if (!canSeeSalary) return false;

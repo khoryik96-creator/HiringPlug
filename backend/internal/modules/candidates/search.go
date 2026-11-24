@@ -69,14 +69,17 @@ func (s *Service) Search(ctx context.Context, p authz.Principal, f SearchFilter,
 	var page SearchPage
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		if page, err = s.searchTx(ctx, tx, p, f, cursor, limit); err != nil || !f.IncludeSalary {
+		if page, err = s.searchTx(ctx, tx, p, f, cursor, limit); err != nil {
 			return err
 		}
 		shown := make([]Summary, len(page.Items))
 		for i, h := range page.Items {
 			shown[i] = h.Summary
 		}
-		return salaryview.In(ctx, tx, s.salaryViews, salaryview.CandidateList, salariesShown(shown)...)
+		// Found by the expected salary, or ordered by salary (a search by
+		// meaning keeps its own order): it tells about each one found.
+		probed := canSeeSalary(p) && (f.SalaryMax != nil || (salarySort(f.Order.Sort) && f.Meaning == nil))
+		return salaryview.In(ctx, tx, s.salaryViews, salaryview.CandidateList, probedOrShown(shown, probed)...)
 	})
 	return page, err
 }

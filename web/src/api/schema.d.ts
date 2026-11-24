@@ -6992,7 +6992,7 @@ export interface components {
             sort?: components["schemas"]["CandidateSort"];
             /** @description With a sort other than newest, the nextOffset of the previous page. */
             offset?: number;
-            /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work. An export always has them, for roles that may see them. */
+            /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it (false unless given) both are null; expectedSalaryMax and sorting by salary still work, and such a page is counted too, with every candidate on it (being found, or the order, tells about their salaries). An export always has them, for roles that may see them. */
             includeSalary?: boolean;
         };
         SalaryCap: {
@@ -14022,7 +14022,7 @@ export interface operations {
                 sort?: components["schemas"]["CandidateSort"];
                 /** @description With a sort other than newest, the `nextOffset` of the previous page. */
                 offset?: number;
-                /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it both are null (sorting by salary still works). */
+                /** @description Return current and expected salaries (only for roles that may see them). Ask only when they are shown: each page with salaries is counted in the log of who was shown a salary. Without it both are null (sorting by salary still works, and a page sorted by salary is counted too, with every candidate on it: the order tells about their salaries). */
                 includeSalary?: boolean;
             };
             header?: never;
