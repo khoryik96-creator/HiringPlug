@@ -5,9 +5,13 @@ package calendars
 // instructions, time) through the interviews module; nothing is sent back to
 // Outlook, which already sent the update. A deleted invitation, or one whose
 // candidate was taken off, still waits for review (that would cancel the
-// interview). A private interview or booking hold keeps a rename, a place,
-// notes or people, but a hold moved in Outlook waits for review: it is one
-// person's copy, and moving it must not move the meeting for the others.
+// interview). A change is taken only while the organizer may still schedule
+// interviews and sees the candidate, and only for an interview still
+// scheduled; otherwise a move waits for review, as before. A private
+// interview or booking hold keeps a rename, a place or notes (people added
+// there stay in Outlook only, so a hold made again never invites them), but a
+// hold moved in Outlook waits for review: it is one person's copy, and moving
+// it must not move the meeting for the others.
 
 import (
 	"context"

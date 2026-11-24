@@ -147,7 +147,9 @@ func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 		}
 		if errors.As(writeErr, &provider) && provider.Status == 412 && same {
 			latest, readErr := s.oneRemote(ctx, current, *row.RemoteID, token)
-			if readErr != nil {
+			// Changed in Outlook as well, and too big to sync (over the attendee
+			// limit): still both sides changed, so it is flagged for review.
+			if readErr != nil && !errors.Is(readErr, errEventLimit) {
 				return s.pushFailure(ctx, conn, p, row, current, readErr)
 			}
 			snapshot, _ := json.Marshal(latest)

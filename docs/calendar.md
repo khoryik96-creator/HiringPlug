@@ -150,9 +150,12 @@ shared/delegated calendars are not included.
   in Outlook are on the invitation, not the interview's panel. Deleting the
   invitation in Outlook, removing the candidate from it, or a change made at
   the same time in HiringPlug is still flagged for review and never cancels
-  the interview. A booking or panel hold keeps a rename, place, notes or
-  people changed in Outlook; a hold moved or deleted there is flagged (it is
-  one person's copy). **Keep HiringPlug details & sync** explicitly resolves a
+  the interview. A change is taken only while the organizer may still
+  schedule interviews and sees the candidate, and only for an interview still
+  scheduled (a completed one moved in Outlook is flagged). A booking or panel
+  hold keeps a rename, place or notes changed in Outlook (people added there
+  stay in Outlook, so a hold made again never invites them); a hold moved or
+  deleted there is flagged (it is one person's copy). **Keep HiringPlug details & sync** explicitly resolves a
   conflict. Concurrent edits use versions and Outlook conditional writes.
 - Booking pages and interview clash checks use Outlook busy intervals. While a
   sync is late, failing or needs reconnecting, the last known busy times still

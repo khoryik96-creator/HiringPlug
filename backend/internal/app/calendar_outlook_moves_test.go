@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -124,6 +125,31 @@ func TestOutlookAndHiringPlugChangedTogetherIsAConflict(t *testing.T) {
 	c.a.interview(http.MethodPatch, c.path, c.user, map[string]any{"version": c.iv.Version, "startsAt": ours}, http.StatusOK)
 	c.editInOutlook(moveInOutlook(c.iv.StartsAt.Add(3*time.Hour), c.iv.StartsAt.Add(3*time.Hour+45*time.Minute)))
 	assert.EqualValues(t, "conflict", c.invitation().Status, "both sides changed: flagged for review")
+	assert.True(t, ours.Equal(c.interview().StartsAt), "HiringPlug's time is kept")
+}
+
+// Changed in Outlook to more people than a sync takes, then moved in
+// HiringPlug: Outlook refuses the stale change, and the invitation is flagged
+// for review (both sides changed), not failed with the sync's limit message.
+func TestOutlookAndHiringPlugChangedTogetherBeyondTheAttendeeLimitIsAConflict(t *testing.T) {
+	t.Parallel()
+	c := startOutlookInvitation(t, outlookInvite{})
+	c.f.mu.Lock()
+	c.f.strictMatch = true
+	for id, e := range c.f.events {
+		people := e["attendees"].([]any)
+		for i := range 101 {
+			people = append(people, outlookAttendee(fmt.Sprintf("guest%03d@example.test", i), "optional"))
+		}
+		e["attendees"] = people
+		e["changeKey"] = "outlook-" + id + "-crowded"
+	}
+	c.f.mu.Unlock()
+	ours := c.iv.StartsAt.Add(2 * time.Hour)
+	c.a.interview(http.MethodPatch, c.path, c.user, map[string]any{"version": c.iv.Version, "startsAt": ours}, http.StatusOK)
+	refreshOutlook(t, c.a, c.user, c.tenant) // runs the queued push too
+	inv := c.invitation()
+	assert.EqualValues(t, "conflict", inv.Status, "both sides changed: flagged for review")
 	assert.True(t, ours.Equal(c.interview().StartsAt), "HiringPlug's time is kept")
 }
 
