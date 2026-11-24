@@ -104,7 +104,10 @@ func TestRequestIDsAndUnknownRoutes(t *testing.T) {
 // candidates. Every command must be covered, or the gap listed here with why.
 func TestRowLevelSecurityCoversEveryCommand(t *testing.T) {
 	t.Parallel()
-	exempt := map[string]string{} // "table:COMMAND": why it needs no policy
+	exempt := map[string]string{ // "table:COMMAND": why it needs no policy
+		"ai_use:UPDATE": "the AI use ledger is append-only: a use, once recorded, never changes",
+		"ai_use:DELETE": "the AI use ledger is append-only: spent tokens stay spent when their record is deleted",
+	}
 	rows, err := testutil.Current.Admin.Query(context.Background(), `
 		SELECT c.relname, cmd
 		FROM pg_class c

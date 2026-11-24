@@ -17,6 +17,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiusage"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/automations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/bin"
@@ -82,6 +83,7 @@ type Modules struct {
 	Intake        *intake.Module
 	Market        *market.Module
 	AIProviders   *aiproviders.Module
+	AIUsage       *aiusage.Module
 	Scheduling    *scheduling.Module
 	Industries    *industries.Module
 	Automations   *automations.Module
@@ -106,6 +108,9 @@ func NewModules(d Deps) *Modules {
 	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant})
 	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
+	// The AI use ledger and each company's monthly AI limit (the server's as default).
+	m.AIUsage = aiusage.New(d.Pool, aiusage.Deps{Users: m.Identity},
+		aiusage.Config{DefaultTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
@@ -303,6 +308,7 @@ type (
 	intakeHTTP        = intake.HTTP
 	marketHTTP        = market.HTTP
 	aiprovidersHTTP   = aiproviders.HTTP
+	aiusageHTTP       = aiusage.HTTP
 	schedulingHTTP    = scheduling.HTTP
 	industriesHTTP    = industries.HTTP
 	automationsHTTP   = automations.HTTP
@@ -345,6 +351,7 @@ type Server struct {
 	*intakeHTTP
 	*marketHTTP
 	*aiprovidersHTTP
+	*aiusageHTTP
 	*schedulingHTTP
 	*industriesHTTP
 	*automationsHTTP
@@ -388,6 +395,7 @@ func (m *Modules) Server() *Server {
 		intakeHTTP:        m.Intake.HTTP,
 		marketHTTP:        m.Market.HTTP,
 		aiprovidersHTTP:   m.AIProviders.HTTP,
+		aiusageHTTP:       m.AIUsage.HTTP,
 		schedulingHTTP:    m.Scheduling.HTTP,
 		industriesHTTP:    m.Industries.HTTP,
 		automationsHTTP:   m.Automations.HTTP,

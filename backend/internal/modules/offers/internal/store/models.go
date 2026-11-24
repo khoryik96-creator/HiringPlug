@@ -52,6 +52,39 @@ type AiProviderStatus struct {
 	Error        *string
 }
 
+type AiUsageAlert struct {
+	TenantID  string
+	Month     time.Time
+	Level     int16
+	ReachedAt time.Time
+}
+
+type AiUsageSetting struct {
+	TenantID              string
+	LimitKind             string
+	LimitTokens           *int64
+	LimitMoney            pgtype.Numeric
+	Currency              string
+	PriceInputPerMillion  pgtype.Numeric
+	PriceOutputPerMillion pgtype.Numeric
+	WarnPercent           int16
+	Version               int32
+	UpdatedBy             *string
+	UpdatedAt             time.Time
+}
+
+type AiUse struct {
+	ID           string
+	TenantID     string
+	Feature      string
+	UserID       *string
+	SourceID     string
+	RunKey       string
+	InputTokens  int64
+	OutputTokens int64
+	UsedAt       time.Time
+}
+
 type ApiKey struct {
 	ID         string
 	TenantID   string

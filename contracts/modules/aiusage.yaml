@@ -1,0 +1,261 @@
+# Module contract: aiusage (what the AI is used for, what it costs, and each
+# company's monthly limit).
+# See contracts/README.md for the format.
+x-module:
+  name: aiusage
+  description: >
+    One ledger of every AI use: which feature used the AI, for whom and how
+    many tokens (input and output), kept when the record it was for is
+    deleted. Each company sets its monthly AI limit (in tokens, or in money
+    at its prices) and the prices per million tokens; without its own limit
+    the server's default (HP_AI_MONTHLY_TOKENS) applies. Costs are estimates
+    at the current prices: the AI provider's bill is final. A month is a
+    calendar month in the agency's time zone (HP_TIME_ZONE).
+  permissions:
+    aiusage:read:
+      description: See the company's AI use and what it costs.
+      roles: [owner, admin]
+    aiusage:manage:
+      description: Set the monthly AI limit and the AI prices.
+      roles: [owner, admin]
+  errorCodes: {}
+  jobs: {}
+
+paths:
+  /v1/ai-usage:
+    get:
+      operationId: getAiUsage
+      tags: [aiusage]
+      summary: This month's AI use and cost (by feature and by person), the months before it, and the limit
+      x-permission: aiusage:read
+      parameters:
+        - name: months
+          in: query
+          required: false
+          description: How many months to list, this one included (12 unless given).
+          schema: { type: integer, minimum: 1, maximum: 24 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiUsage' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/ai-usage/settings:
+    get:
+      operationId: getAiUsageSettings
+      tags: [aiusage]
+      summary: The company's monthly AI limit and AI prices
+      x-permission: aiusage:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiUsageSettings' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: putAiUsageSettings
+      tags: [aiusage]
+      summary: Set the monthly AI limit and the AI prices
+      x-permission: aiusage:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiUsageSettingsUpdate' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiUsageSettings' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/ai-usage/status:
+    get:
+      operationId: getAiUsageStatus
+      tags: [aiusage]
+      summary: How much of this month's AI limit is used, for the notice shown to everyone
+      description: No token counts or money, only the share of the limit used.
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiUsageStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+components:
+  schemas:
+    AiFeature:
+      type: string
+      description: >
+        What the AI was used for: assistant (AI assistant answers),
+        assistant_email (AI email writing), fit_score (CV vs job fit scores),
+        talent_search (AI candidate search), cv_reading (reading CVs with the
+        AI), cv_studio (formatted CVs), jd_blind (blind job ads), jd_reading
+        (reading job descriptions with the AI), industry_pick (company
+        industry picks), interview_prep (interview prep material),
+        provider_check (AI provider checks in Settings).
+      enum: [assistant, assistant_email, fit_score, talent_search, cv_reading, cv_studio, jd_blind, jd_reading, industry_pick, interview_prep, provider_check]
+    AiUsageLimitKind:
+      type: string
+      description: tokens = a number of tokens a month; money = an amount a month, at the company's prices.
+      enum: [tokens, money]
+    AiPrice:
+      type: string
+      description: A price per million tokens, with up to 4 decimal places, as a string so no precision is lost.
+      pattern: '^(0|[1-9][0-9]{0,9})(\.[0-9]{1,4})?$'
+      example: '0.2700'
+    AiCost:
+      type: string
+      description: >
+        An estimated cost at the company's current prices, with 4 decimal
+        places (rounded half up), as a string so no precision is lost.
+      pattern: '^(0|[1-9][0-9]*)\.[0-9]{4}$'
+      example: '1.2345'
+    AiUsageSettings:
+      type: object
+      required: [limitKind, limitTokens, serverDefaultTokens, limitMoney, currency, priceInputPerMillion, priceOutputPerMillion, warnPercent, version, updatedAt]
+      properties:
+        limitKind: { $ref: '#/components/schemas/AiUsageLimitKind' }
+        limitTokens: { type: integer, format: int64, nullable: true, description: "Tokens a month (null: the server's default, serverDefaultTokens)." }
+        serverDefaultTokens: { type: integer, format: int64, description: "The server's default monthly limit (HP_AI_MONTHLY_TOKENS)." }
+        limitMoney:
+          description: The most to spend a month, in currency (money limit).
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        priceInputPerMillion:
+          description: What a million input tokens (what is sent to the AI) cost, in currency; null when not set.
+          allOf: [{ $ref: '#/components/schemas/AiPrice' }]
+          nullable: true
+        priceOutputPerMillion:
+          description: What a million output tokens (what the AI writes) cost, in currency; null when not set.
+          allOf: [{ $ref: '#/components/schemas/AiPrice' }]
+          nullable: true
+        warnPercent: { type: integer, minimum: 1, maximum: 99, description: "Warn when this share of the month's limit is used." }
+        version: { type: integer, description: "0 until first saved." }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    AiUsageSettingsUpdate:
+      type: object
+      additionalProperties: false
+      required: [limitKind, limitTokens, limitMoney, currency, priceInputPerMillion, priceOutputPerMillion, warnPercent, version]
+      properties:
+        limitKind: { $ref: '#/components/schemas/AiUsageLimitKind' }
+        limitTokens: { type: integer, format: int64, nullable: true, minimum: 0, maximum: 1000000000000, description: "null: the server's default." }
+        limitMoney:
+          description: Needed for a money limit.
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        priceInputPerMillion:
+          description: Both prices are needed for a money limit.
+          allOf: [{ $ref: '#/components/schemas/AiPrice' }]
+          nullable: true
+        priceOutputPerMillion:
+          allOf: [{ $ref: '#/components/schemas/AiPrice' }]
+          nullable: true
+        warnPercent: { type: integer, minimum: 1, maximum: 99 }
+        version: { type: integer, minimum: 0, description: The version you loaded (0 before the settings were first saved). }
+    AiUsageFeature:
+      type: object
+      required: [feature, uses, inputTokens, outputTokens, cost]
+      properties:
+        feature: { $ref: '#/components/schemas/AiFeature' }
+        uses: { type: integer, format: int64 }
+        inputTokens: { type: integer, format: int64 }
+        outputTokens: { type: integer, format: int64 }
+        cost:
+          description: null when the prices are not set.
+          allOf: [{ $ref: '#/components/schemas/AiCost' }]
+          nullable: true
+    AiUsagePerson:
+      type: object
+      required: [userId, name, uses, tokens, cost]
+      properties:
+        userId:
+          description: null for what the system did on its own (named Automatic).
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+          nullable: true
+        name: { type: string }
+        uses: { type: integer, format: int64 }
+        tokens: { type: integer, format: int64, description: Input and output together. }
+        cost:
+          allOf: [{ $ref: '#/components/schemas/AiCost' }]
+          nullable: true
+    AiUsageMonth:
+      type: object
+      required: [month, uses, inputTokens, outputTokens, cost, byFeature]
+      properties:
+        month: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$', example: '2026-11' }
+        uses: { type: integer, format: int64 }
+        inputTokens: { type: integer, format: int64 }
+        outputTokens: { type: integer, format: int64 }
+        cost:
+          allOf: [{ $ref: '#/components/schemas/AiCost' }]
+          nullable: true
+        byFeature:
+          type: array
+          description: Features used in the month, most tokens first.
+          items: { $ref: '#/components/schemas/AiUsageFeature' }
+    AiUsageLimit:
+      type: object
+      required: [kind, tokens, money, currency, warnPercent, usedPercent, reached, resetsAt]
+      properties:
+        kind: { $ref: '#/components/schemas/AiUsageLimitKind' }
+        tokens: { type: integer, format: int64, nullable: true, description: "The month's limit in tokens (null for a money limit)." }
+        money:
+          description: The month's limit in money (null for a token limit).
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        warnPercent: { type: integer }
+        usedPercent: { type: integer, description: "The share of the limit used this month (can pass 100)." }
+        reached: { type: boolean, description: "The whole limit is used: AI features wait for next month." }
+        resetsAt: { type: string, format: date-time, description: The start of next month. }
+    AiUsage:
+      type: object
+      required: [month, uses, inputTokens, outputTokens, cost, byFeature, byPerson, months, limit, pricesSet]
+      description: >
+        Costs are estimates from each row's input and output tokens at the
+        company's current prices; the AI provider's bill is final.
+      properties:
+        month: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$', description: This month. }
+        uses: { type: integer, format: int64 }
+        inputTokens: { type: integer, format: int64 }
+        outputTokens: { type: integer, format: int64 }
+        cost:
+          allOf: [{ $ref: '#/components/schemas/AiCost' }]
+          nullable: true
+        byFeature:
+          type: array
+          description: This month, most tokens first.
+          items: { $ref: '#/components/schemas/AiUsageFeature' }
+        byPerson:
+          type: array
+          description: This month, most tokens first.
+          items: { $ref: '#/components/schemas/AiUsagePerson' }
+        months:
+          type: array
+          description: This month and those before it, newest first, months without use included.
+          items: { $ref: '#/components/schemas/AiUsageMonth' }
+        limit: { $ref: '#/components/schemas/AiUsageLimit' }
+        pricesSet: { type: boolean, description: Both prices are set (costs are null otherwise). }
+    AiUsageStatus:
+      type: object
+      required: [usedPercent, warn, reached, resetsAt]
+      properties:
+        usedPercent: { type: integer, description: "The share of this month's AI limit used (can pass 100)." }
+        warn: { type: boolean, description: "The warning level is reached, but not the whole limit." }
+        reached: { type: boolean, description: "The whole limit is used: AI features wait until resetsAt." }
+        resetsAt: { type: string, format: date-time, description: The start of next month. }

@@ -128,6 +128,8 @@ details get their own permissions.
 | `matching:read` (fit scores and reasons; the CV quotes in them also need `documents:read`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `interview_prep:read`, `interview_prep:manage` (a job's interview insights: questions asked and the AI's interview prep) | ✓ | ✓ | ✓ | ✓ | | |
 | `matching:create` (ask for fit scores; uses the AI allowance) | ✓ | ✓ | ✓ | ✓ | | |
+| `aiusage:read` (the company's AI use and its estimated cost, month by month) | ✓ | ✓ | | | | |
+| `aiusage:manage` (the monthly AI limit and the AI prices) | ✓ | ✓ | | | | |
 | `privacy:read`, `privacy:record` (a candidate's consent and data protection requests; record them) | ✓ | ✓ | ✓ | ✓ | | |
 | `privacy:manage` (the Data protection page, decide requests, download a copy of a candidate's data) | ✓ | ✓ | | | | |
 | `identity.roles:manage` (Roles and access: what each role may do and which candidates it sees) | ✓ | | | | | |
