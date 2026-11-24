@@ -66,6 +66,58 @@ func (q *Queries) ClearSuggestions(ctx context.Context, companyID string) error 
 	return err
 }
 
+const companiesNamedLike = `-- name: CompaniesNamedLike :many
+SELECT c.id, c.name, c.city, c.website, c.linkedin_url, c.industry,
+       (c.name_core = me.core)::boolean AS same_name
+FROM company c, (SELECT app_company_name_core($1::text) AS core) me
+WHERE me.core <> ''
+  AND (c.name_core = me.core OR similarity(c.name_core, me.core) >= 0.6)
+ORDER BY (c.name_core = me.core) DESC, similarity(c.name_core, me.core) DESC, c.id DESC
+LIMIT 5
+`
+
+type CompaniesNamedLikeRow struct {
+	ID          string
+	Name        string
+	City        *string
+	Website     *string
+	LinkedinUrl *string
+	Industry    *string
+	SameName    bool
+}
+
+// Companies whose name is the same as a name (a lead's company) once its
+// legal form is set aside, or much like it, as SimilarCompanies decides.
+// The same names first, then the most similar. None when only a legal form
+// is left.
+func (q *Queries) CompaniesNamedLike(ctx context.Context, name string) ([]CompaniesNamedLikeRow, error) {
+	rows, err := q.db.Query(ctx, companiesNamedLike, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompaniesNamedLikeRow
+	for rows.Next() {
+		var i CompaniesNamedLikeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.City,
+			&i.Website,
+			&i.LinkedinUrl,
+			&i.Industry,
+			&i.SameName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const companyDuplicateGroups = `-- name: CompanyDuplicateGroups :many
 SELECT kind::text AS kind, ids::text[] AS ids FROM (
   SELECT 'similar_name' AS kind, array_agg(id ORDER BY id) AS ids FROM company WHERE name_core <> '' GROUP BY name_core HAVING count(*) > 1

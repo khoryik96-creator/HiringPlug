@@ -1836,6 +1836,27 @@ class SimilarCompanies(BaseModel):
     items: list[CompanyLookalike]
 
 
+class CompanyNamedLike(BaseModel):
+    id: CompanyId
+    name: str
+    city: Annotated[str | None, Field(...)]
+    website: Annotated[str | None, Field(...)]
+    linkedinUrl: Annotated[str | None, Field(...)]
+    industry: Annotated[str | None, Field(...)]
+    sameName: Annotated[
+        bool,
+        Field(
+            description='The same name once its legal form ("Sdn Bhd", "Berhad"...), case and accents are set aside.'
+        ),
+    ]
+
+
+class CompaniesNamedLike(BaseModel):
+    items: Annotated[
+        list[CompanyNamedLike], Field(description="Same names first, then the most similar; at most 5.")
+    ]
+
+
 class CompanyDuplicateGroup(BaseModel):
     reasons: list[CompanyDuplicateReason]
     companies: Annotated[

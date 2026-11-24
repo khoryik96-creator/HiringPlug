@@ -1211,6 +1211,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/companies/named-like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Companies whose name is the same as or much like a name (a lead's company, before linking it)
+         * @description Up to 5 companies: those with the same name once its legal form and case are set aside ("MAJU FOODS BERHAD" and "Maju Foods Bhd") first, then the most similar names. None for a name that is only a legal form ("Sdn Bhd").
+         */
+        get: operations["listCompaniesNamedLike"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/companies/{companyId}/similar": {
         parameters: {
             query?: never;
@@ -7242,6 +7262,20 @@ export interface components {
         };
         SimilarCompanies: {
             items: components["schemas"]["CompanyLookalike"][];
+        };
+        CompanyNamedLike: {
+            id: components["schemas"]["CompanyId"];
+            name: string;
+            city: string | null;
+            website: string | null;
+            linkedinUrl: string | null;
+            industry: string | null;
+            /** @description The same name once its legal form ("Sdn Bhd", "Berhad"...), case and accents are set aside. */
+            sameName: boolean;
+        };
+        CompaniesNamedLike: {
+            /** @description Same names first, then the most similar; at most 5. */
+            items: components["schemas"]["CompanyNamedLike"][];
         };
         CompanyDuplicateGroup: {
             reasons: components["schemas"]["CompanyDuplicateReason"][];
@@ -14508,6 +14542,32 @@ export interface operations {
                     "application/json": components["schemas"]["CompanyDuplicateGroups"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listCompaniesNamedLike: {
+        parameters: {
+            query: {
+                /** @description The company name to look for. */
+                name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompaniesNamedLike"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

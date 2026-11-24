@@ -3,6 +3,8 @@
  * of the company: its name, industry, company size, website and
  * headquarters, and its overview. Read in a background tab the companion
  * opened at that exact company page, for a new company in HiringPlug.
+ * On a LinkedIn companies search (readSearch), the companies it shows, each
+ * with its own LinkedIn page, for a lead whose company is not yet linked.
  * Written in the style of CV Studio's reader: only the page asked for, only
  * what is shown, nothing guessed. Runs in the extension's isolated world; no
  * network.
@@ -95,5 +97,42 @@
     };
   }
 
-  globalThis.HiringplugCompany = {readAbout};
+  // A companies search (Find HR for a lead): the result cards, each with the
+  // company's own page, its name and the line under it (industry, place).
+  // Links to anything but a company page (a school, a showcase, a person)
+  // are left out, and a company shown twice is listed once.
+  function readSearch(expectedName) {
+    if (location.origin !== 'https://www.linkedin.com') return {failed: true};
+    const main = document.querySelector('main');
+    const scope = main?.querySelector('[aria-label="Primary content"]') || main;
+    const selector = '[componentkey^="SearchResults_"] [role="listitem"], [role="list"] > [role="listitem"], li.reusable-search__result-container, .entity-result';
+    const cards = scope ? [...scope.querySelectorAll(selector)].filter(n => visible(n) && !n.parentElement?.closest(selector)) : [];
+    const problem = issue(!cards.length);
+    if (problem) return {blocked: problem};
+    const keywords = new URLSearchParams(location.search).get('keywords');
+    if (!/^\/search\/results\/companies\/?$/.test(location.pathname) || compact(keywords).toLowerCase() !== compact(expectedName).toLowerCase()) {
+      return {failed: true};
+    }
+    if (!scope) return {loading: true};
+    const companies = [], seen = new Set();
+    for (const card of cards) {
+      const legacy = card.querySelector('.entity-result__title-text a[href]');
+      const paragraphs = [...card.querySelectorAll('p')].filter(visible);
+      const link = legacy || paragraphs[0]?.querySelector('a[href]') || paragraphs[0]?.closest('a[href]');
+      const url = companyURL(link?.href || '');
+      const name = compact(legacy ? text(legacy) : text(paragraphs[0])).slice(0, 200);
+      const subtitle = compact(legacy ? text(card.querySelector('.entity-result__primary-subtitle')) : text(paragraphs[1])).slice(0, 300);
+      if (!url || !name || seen.has(url.toLowerCase())) continue;
+      seen.add(url.toLowerCase());
+      companies.push({url, name, subtitle});
+      if (companies.length >= 10) break;
+    }
+    const empty = /\b(?:no results found|no results|0 results)\b/i.test(text(scope));
+    // Cards that show no company yet may still be drawing: wait (the worker
+    // says, if it stays so, that LinkedIn showed no company page).
+    if (!companies.length && !empty) return {loading: true, cards: cards.length};
+    return {companies, empty: !companies.length};
+  }
+
+  globalThis.HiringplugCompany = {readAbout, readSearch};
 })();

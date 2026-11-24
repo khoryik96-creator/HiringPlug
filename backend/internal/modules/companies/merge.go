@@ -7,6 +7,7 @@ package companies
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -84,6 +85,35 @@ func (s *Service) Similar(ctx context.Context, p authz.Principal, id string) ([]
 			}
 			slices.Sort(l.Reasons)
 			out = append(out, l)
+		}
+		return err
+	})
+	return out, err
+}
+
+// NamedLike is a company whose name is the same as or much like a name
+// looked for; SameName when only the legal form or case differs.
+type NamedLike struct {
+	ID, Name                             string
+	City, Website, LinkedinURL, Industry *string
+	SameName                             bool
+}
+
+// NamedLike returns up to 5 companies named like name (a lead's company):
+// the same name once its legal form is set aside first, then the most
+// similar. A blank name is refused.
+func (s *Service) NamedLike(ctx context.Context, p authz.Principal, name string) ([]NamedLike, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		var errs apperr.FieldErrors
+		errs.Add("name", "is required")
+		return nil, errs.Err()
+	}
+	out := []NamedLike{}
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		rows, err := store.New(tx).CompaniesNamedLike(ctx, name)
+		for _, r := range rows {
+			out = append(out, NamedLike{ID: r.ID, Name: r.Name, City: r.City, Website: r.Website, LinkedinURL: r.LinkedinUrl, Industry: r.Industry, SameName: r.SameName})
 		}
 		return err
 	})

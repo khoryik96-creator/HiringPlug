@@ -239,6 +239,19 @@ WHERE c.id <> @id
 ORDER BY c.id DESC
 LIMIT 20;
 
+-- Companies whose name is the same as a name (a lead's company) once its
+-- legal form is set aside, or much like it, as SimilarCompanies decides.
+-- The same names first, then the most similar. None when only a legal form
+-- is left.
+-- name: CompaniesNamedLike :many
+SELECT c.id, c.name, c.city, c.website, c.linkedin_url, c.industry,
+       (c.name_core = me.core)::boolean AS same_name
+FROM company c, (SELECT app_company_name_core(@name::text) AS core) me
+WHERE me.core <> ''
+  AND (c.name_core = me.core OR similarity(c.name_core, me.core) >= 0.6)
+ORDER BY (c.name_core = me.core) DESC, similarity(c.name_core, me.core) DESC, c.id DESC
+LIMIT 5;
+
 -- Every group of companies sharing a website, a LinkedIn page or a name
 -- without its legal form (the Possible duplicates list).
 -- name: CompanyDuplicateGroups :many
