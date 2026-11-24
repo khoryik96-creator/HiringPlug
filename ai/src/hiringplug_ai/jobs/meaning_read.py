@@ -35,18 +35,17 @@ from ..meaning.families import NEAR
 from ..meaning.model import NAME, as_list
 from ..meaning.passages import needs, passages
 from ..meaning.recruiter import (
-    LEVEL_NAMES,
     expand,
-    family,
+    job_reading,
     level,
     read_search,
-    reading,
     reading_in_work,
     reading_with_work,
     said_level,
     search_reading,
     work_family,
 )
+from ..meaning.words import LEVEL_NAMES
 from ..queue import FollowUp
 
 if TYPE_CHECKING:
@@ -219,13 +218,15 @@ def run_query(payload: MeaningReadQueryJob, deps: Deps) -> list[FollowUp]:
 def _read_job(
     payload: MeaningReadQueryJob, title: str, embed: Callable[[Sequence[str]], np.ndarray]
 ) -> MeaningQueryReadJob:
-    """A job: its title is the role; the needs its description lists are
-    each compared with CV passages; its title and needs together are the whole."""
+    """A job: its title is the role (placed by the work it lists when the
+    title alone cannot say: an "Account Executive" keeping the books is an
+    accounts job); the needs its description lists are each compared with CV
+    passages; its title and needs together are the whole."""
     listed = needs(payload.body)
+    found, role = job_reading(title, " ".join(listed) or payload.body)
     whole = (expand(title) + ". " + (" ".join(listed) or payload.body))[:WHOLE_CHARS]
-    vectors = embed([reading(title), whole, *listed])
+    vectors = embed([role, whole, *listed])
     lvl = said_level(title)
-    found = family(title)
     return MeaningQueryReadJob(
         queryId=payload.queryId,
         model=NAME,

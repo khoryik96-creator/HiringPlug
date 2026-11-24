@@ -55,6 +55,23 @@ def _overlap(a: tuple[float, float], b: tuple[float, float]) -> float:
     return max(0.0, min(a[1], b[1]) - max(a[0], b[0]))
 
 
+Cell = tuple[tuple[float, float], str]  # (left, right) and its text
+
+
+def nested_merged(rows: list[tuple[tuple[float, float], list[Cell]]]) -> list[list[Cell]]:
+    """Rows (top and bottom, cells) with any row that lies within the one
+    above it merged into it: a cell's lines under inner rules ("Factory" /
+    "Automations/Home" in one Industry cell), or a job's last lines below one
+    ("09/2010 to" / "03/2013"), stay that job's. Pure: unit tested."""
+    out: list[tuple[tuple[float, float], list[Cell]]] = []
+    for (top, bottom), cells in rows:
+        if out and top >= out[-1][0][0] - 0.5 and bottom <= out[-1][0][1] + 0.5:
+            out[-1][1].extend(cells)
+        else:
+            out.append(((top, bottom), list(cells)))
+    return [cells for _, cells in out]
+
+
 def rows_as_lines(
     header: list[tuple[tuple[float, float], str]], rows: list[list[tuple[tuple[float, float], str]]]
 ) -> str:
@@ -115,14 +132,19 @@ def work_tables(page: Any) -> list[WorkTable]:
             for box, text in zip(table.rows[0].cells, cells, strict=False)
             if box is not None and text
         ]
-        rows = [
+        rows = nested_merged(
             [
-                ((box[0], box[2]), _plain(text))
-                for box, text in zip(r.cells, t, strict=False)
-                if box is not None
+                (
+                    (float(r.bbox[1]), float(r.bbox[3])),
+                    [
+                        ((box[0], box[2]), _plain(text))
+                        for box, text in zip(r.cells, t, strict=False)
+                        if box is not None
+                    ],
+                )
+                for r, t in zip(table.rows[1:], texts[1:], strict=False)
             ]
-            for r, t in zip(table.rows[1:], texts[1:], strict=False)
-        ]
+        )
         text = rows_as_lines(header, rows)
         if text:
             x0, top, x1, bottom = (float(v) for v in table.bbox)

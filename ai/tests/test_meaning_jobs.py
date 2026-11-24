@@ -185,6 +185,29 @@ def test_a_job_is_read_as_its_title_and_the_needs_it_lists() -> None:
     assert "fintech" not in " ".join(texts)
 
 
+def test_a_job_title_that_cannot_say_is_placed_by_the_work_it_lists() -> None:
+    """Many accounts jobs in Malaysia are titled "Account Executive": the
+    duties place it, as a candidate's work places their title."""
+    books = (
+        "Job Responsibilities:\n- Handle full set of accounts and month-end closing\n"
+        "- Prepare bank reconciliation, accruals and management accounts\n"
+        "- Liaise with auditors and tax agents\n"
+    )
+    got, texts = read_query(MeaningReadQueryJob(queryId="mnq_6", title="Account Executive", body=books))
+    assert got.understood is not None
+    assert got.understood.family == "accounting"
+    assert got.understood.near is not None
+    assert "finance management" in got.understood.near
+    assert "sales" not in got.understood.near
+    assert texts[0].startswith("accounting:")
+    assert "sales" not in texts[0], "keeping the books, not selling"
+    selling = "Job Responsibilities:\n- Sell our HR software to SMEs\n- Prospect and close new business\n"
+    got, texts = read_query(MeaningReadQueryJob(queryId="mnq_7", title="Account Executive", body=selling))
+    assert got.understood is not None
+    assert got.understood.family == "sales"
+    assert texts[0].startswith("sales:")
+
+
 def test_a_job_title_naming_only_the_job_asks_for_no_level() -> None:
     job = MeaningReadQueryJob(queryId="mnq_5", title="Software Engineer (Backend)", body="- Go and SQL")
     got, _ = read_query(job)
