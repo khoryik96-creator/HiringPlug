@@ -72,10 +72,19 @@ describe("audit log filters", () => {
   });
 
   it("turns What into the action the API finds", () => {
+    const later = new Date(2026, 11, 2, 9, 0);
     const f = { who: "system", what: "sign-ins", from: "2026-11-01", to: "2026-11-24" };
-    expect(changesQuery(f)).toEqual({ actor: "system", action: "user.signed_in", from: "2026-11-01", to: "2026-11-24" });
-    expect(changesQuery({ ...f, who: "", what: "pipeline", from: "" })).toEqual({ action: "application", to: "2026-11-24" });
-    expect(salaryQuery({ ...f, who: "usr_1", what: "candidate_list" })).toEqual({ user: "usr_1", kind: "candidate_list", from: "2026-11-01", to: "2026-11-24" });
+    expect(changesQuery(f, later)).toEqual({ actor: "system", action: "user.signed_in", from: "2026-11-01", to: "2026-11-24" });
+    expect(changesQuery({ ...f, who: "", what: "pipeline", from: "" }, later)).toEqual({ action: "application", to: "2026-11-24" });
+    expect(salaryQuery({ ...f, who: "usr_1", what: "candidate_list" }, later)).toEqual({ user: "usr_1", kind: "candidate_list", from: "2026-11-01", to: "2026-11-24" });
+  });
+
+  it("sends no end when To is today (the API's days are the agency's, which may still be on)", () => {
+    const today = new Date(2026, 10, 24, 23, 30);
+    const f = { who: "", what: "", from: "2026-11-01", to: "2026-11-24" };
+    expect(changesQuery(f, today)).toEqual({ from: "2026-11-01" });
+    expect(salaryQuery(f, today)).toEqual({ from: "2026-11-01" });
+    expect(changesQuery({ ...f, to: "2026-11-23" }, today)).toEqual({ from: "2026-11-01", to: "2026-11-23" });
   });
 
   it("writes days as today, yesterday, or the date", () => {

@@ -70,16 +70,20 @@ describe("Settings › Audit log", () => {
     const get = serve(() => ({ items: [entry({})], nextCursor: null }));
     renderWithClient(<AuditLog canSeeSalaryViews />);
     await screen.findByText("Changed a candidate");
-    expect(calls(get, "/v1/audit-log")[0]).toEqual({ from: "2026-10-26", to: "2026-11-24", limit: 50 });
+    expect(calls(get, "/v1/audit-log")[0], "To left at today: no end, so nothing from the agency's today is cut off").toEqual({ from: "2026-10-26", limit: 50 });
 
     await screen.findByRole("option", { name: "Wei Jie Tan" });
     fireEvent.change(screen.getByLabelText("Who"), { target: { value: "usr_wei" } });
     fireEvent.change(screen.getByLabelText("What"), { target: { value: "sign-ins" } });
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-11-01" } });
     await waitFor(() => {
-      expect(calls(get, "/v1/audit-log").at(-1)).toEqual({ actor: "usr_wei", action: "user.signed_in", from: "2026-11-01", to: "2026-11-24", limit: 50 });
+      expect(calls(get, "/v1/audit-log").at(-1)).toEqual({ actor: "usr_wei", action: "user.signed_in", from: "2026-11-01", limit: 50 });
     });
     expect(window.location.hash).toBe("#/settings/audit-log?who=usr_wei&what=sign-ins&from=2026-11-01&to=2026-11-24");
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-11-20" } });
+    await waitFor(() => { expect(calls(get, "/v1/audit-log").at(-1)).toMatchObject({ from: "2026-11-01", to: "2026-11-20" }); });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-11-24" } });
+    await waitFor(() => { expect(calls(get, "/v1/audit-log").at(-1)).not.toHaveProperty("to"); });
 
     fireEvent.change(screen.getByLabelText("Who"), { target: { value: "system" } });
     fireEvent.change(screen.getByLabelText("What"), { target: { value: "pipeline" } });
@@ -169,6 +173,6 @@ describe("Settings › Audit log", () => {
     await waitFor(() => { expect(saved).toBe("Audit log.xlsx"); });
     const [path, init] = fetch.mock.calls[0] as [string, RequestInit];
     expect([path, init.method]).toEqual(["/v1/audit-log/export", "POST"]);
-    expect(JSON.parse(init.body as string)).toEqual({ format: "xlsx", action: "candidate", from: "2026-11-01", to: "2026-11-24" });
+    expect(JSON.parse(init.body as string), "To is today: up to now").toEqual({ format: "xlsx", action: "candidate", from: "2026-11-01" });
   });
 });

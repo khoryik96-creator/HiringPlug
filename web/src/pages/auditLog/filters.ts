@@ -90,15 +90,24 @@ export function viewHash(tab: Tab, f: Filters): string {
 }
 
 type Days = { from?: string; to?: string };
-const days = (f: Filters): Days => ({ ...(f.from ? { from: f.from } : {}), ...(f.to ? { to: f.to } : {}) });
+
+/**
+ * The days sent. "To" left at today (its default) is sent as no end at all: the API counts days in
+ * the agency's time zone, and the viewer's today may end before the agency's, which would leave out
+ * what happened since.
+ */
+const days = (f: Filters, now: Date): Days => ({
+  ...(f.from ? { from: f.from } : {}),
+  ...(f.to && f.to !== localDay(now) ? { to: f.to } : {}),
+});
 
 /** The audit log query (and export body) for the filters. */
-export function changesQuery(f: Filters): Days & { actor?: string; action?: string } {
+export function changesQuery(f: Filters, now = new Date()): Days & { actor?: string; action?: string } {
   const action = CHANGE_KINDS.find((k) => k.key === f.what)?.action;
-  return { ...(f.who ? { actor: f.who } : {}), ...(action ? { action } : {}), ...days(f) };
+  return { ...(f.who ? { actor: f.who } : {}), ...(action ? { action } : {}), ...days(f, now) };
 }
 
 /** The salary views query (and export body) for the filters. */
-export function salaryQuery(f: Filters): Days & { user?: string; kind?: SalaryKind } {
-  return { ...(f.who ? { user: f.who } : {}), ...(isSalaryKind(f.what) ? { kind: f.what } : {}), ...days(f) };
+export function salaryQuery(f: Filters, now = new Date()): Days & { user?: string; kind?: SalaryKind } {
+  return { ...(f.who ? { user: f.who } : {}), ...(isSalaryKind(f.what) ? { kind: f.what } : {}), ...days(f, now) };
 }
