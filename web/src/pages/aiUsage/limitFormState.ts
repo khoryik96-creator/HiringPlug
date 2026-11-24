@@ -16,6 +16,8 @@ export type Draft = {
   priceIn: string;
   priceOut: string;
   warn: string;
+  /** The version the draft was started from: a save over newer settings is refused (409), however often they were refetched since. */
+  version: number;
 };
 
 export function draftOf(s: Settings): Draft {
@@ -28,6 +30,7 @@ export function draftOf(s: Settings): Draft {
     priceIn: s.priceInputPerMillion ?? "",
     priceOut: s.priceOutputPerMillion ?? "",
     warn: String(s.warnPercent),
+    version: s.version,
   };
 }
 
@@ -37,8 +40,9 @@ function amount(value: string): string | null {
   return v === "" ? null : v;
 }
 
-/** The body to save; FormInvalid for whole numbers that are not (the API checks the rest). */
-export function bodyOf(d: Draft, version: number): SettingsUpdate {
+/** The body to save; FormInvalid for whole numbers that are not (the API checks the rest). Both limits are
+ * sent whichever kind is in use, so a problem with the other kind's limit is shown too (see hiddenField). */
+export function bodyOf(d: Draft): SettingsUpdate {
   const problems: Record<string, string> = {};
   const tokens = d.tokens.replace(/[\s,]/g, "");
   if (!d.useDefault && !/^\d+$/.test(tokens)) problems.limitTokens = "Enter a whole number of tokens, or use the server default.";
@@ -52,11 +56,18 @@ export function bodyOf(d: Draft, version: number): SettingsUpdate {
     priceInputPerMillion: amount(d.priceIn),
     priceOutputPerMillion: amount(d.priceOut),
     warnPercent: Number(d.warn.trim()),
-    version,
+    version: d.version,
   };
 }
 
 /** The settings as the server applies them: back to its default token limit, prices and currency kept. */
 export function serverDefault(d: Draft, serverDefaultTokens: number): Draft {
   return { ...d, kind: "tokens", useDefault: true, tokens: String(serverDefaultTokens) };
+}
+
+/** The limit field of the kind not in use, which the form does not show: its errors are listed under the form. */
+export function hiddenField(d: Draft): { field: "limitTokens" | "limitMoney"; label: string } {
+  return d.kind === "money"
+    ? { field: "limitTokens", label: "Monthly limit (tokens)" }
+    : { field: "limitMoney", label: `Monthly limit (${d.currency})` };
 }

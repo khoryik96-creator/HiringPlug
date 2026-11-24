@@ -1,9 +1,11 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { failure, invalidField, ok, renderWithClient, sentBody } from "../test-utils";
+import { aiUsageStatusKey } from "../components/AiLimitNotice";
 import { AiUsage } from "./AiUsage";
+import { aiUsageSettingsKey } from "./aiUsage/LimitForm";
 
 afterEach(() => {
   cleanup();
@@ -24,7 +26,7 @@ const moneyUsage: Schemas["AiUsage"] = {
   ],
   byPerson: [
     { userId: "usr_01jbz6w0m0k8q9x2r3s4t5v6w7", name: "Aina Rahman", uses: 400, tokens: 900_000, cost: "2.9000" },
-    { userId: null, name: "Automatic", uses: 212, tokens: 310_442, cost: "0.9412" },
+    { userId: null, name: "", uses: 212, tokens: 310_442, cost: "0.9412" },
   ],
   months: months(
     { month: "2026-11", uses: 612, inputTokens: 1_000_000, outputTokens: 210_442, cost: "3.8412", byFeature: [] },
@@ -155,12 +157,58 @@ describe("Settings › AI usage", () => {
       saved = { ...moneySettings, limitMoney: "25.00", version: 4 };
       return Promise.resolve(failure("CONFLICT_STALE_VERSION", "Someone else changed the AI usage settings.", undefined, 409));
     }) as never);
-    renderWithClient(<AiUsage canManage />);
+    const { client } = renderWithClient(<AiUsage canManage />);
+    client.setQueryData(aiUsageStatusKey, { reached: false });
     fireEvent.change(await screen.findByLabelText("Monthly limit (USD)"), { target: { value: "12.00" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText(/Someone else changed these settings while you were editing/)).toBeTruthy();
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Monthly limit (USD)").value).toBe("25.00"); });
     expect(get.mock.calls.filter((c) => c[0] === "/v1/ai-usage/settings").length).toBeGreaterThan(1);
+    // This month's figures and the app's banner follow their limit too.
+    expect(get.mock.calls.filter((c) => c[0] === "/v1/ai-usage").length).toBeGreaterThan(1);
+    expect(client.getQueryState(aiUsageStatusKey)?.isInvalidated).toBe(true);
+  });
+
+  it("saves against the version the edit started from, though the settings were fetched again meanwhile", async () => {
+    let saved = moneySettings;
+    reads(moneyUsage, () => saved);
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(failure("CONFLICT_STALE_VERSION", "Someone else changed the AI usage settings.", undefined, 409));
+    const { client } = renderWithClient(<AiUsage canManage />);
+    fireEvent.change(await screen.findByLabelText("Monthly limit (USD)"), { target: { value: "12.00" } });
+    saved = { ...moneySettings, warnPercent: 95, version: 4 }; // someone else saved; the window got focus again
+    await act(async () => {
+      await client.refetchQueries({ queryKey: aiUsageSettingsKey });
+      await new Promise((r) => { setTimeout(r, 0); }); // react-query tells the form on its next tick
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toMatchObject({ limitMoney: "12.00", warnPercent: 80, version: 3 });
+    expect(await screen.findByText(/Someone else changed these settings while you were editing/)).toBeTruthy();
+  });
+
+  it("shows a problem with the limit of the kind not in use", async () => {
+    reads(tokenUsage, { ...defaults, limitTokens: 500_000, version: 2 });
+    const put = vi.spyOn(api, "PUT");
+    renderWithClient(<AiUsage canManage />);
+    fireEvent.change(await screen.findByLabelText("Monthly limit (tokens)"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Limit in"), { target: { value: "money" } });
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), { target: { value: "50.00" } });
+    fireEvent.change(screen.getByLabelText("Price per 1M tokens in"), { target: { value: "0.27" } });
+    fireEvent.change(screen.getByLabelText("Price per 1M tokens out"), { target: { value: "1.10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Monthly limit (tokens): Enter a whole number of tokens, or use the server default.");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("shows the API's problem with the money limit after going back to tokens", async () => {
+    reads(tokenUsage, defaults);
+    vi.spyOn(api, "PUT").mockResolvedValue(invalidField("limitMoney", "must be an amount with at most 2 decimal places, e.g. 50.00"));
+    renderWithClient(<AiUsage canManage />);
+    fireEvent.change(await screen.findByLabelText("Limit in"), { target: { value: "money" } });
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), { target: { value: "50.555" } });
+    fireEvent.change(screen.getByLabelText("Limit in"), { target: { value: "tokens" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Monthly limit (USD): must be an amount with at most 2 decimal places, e.g. 50.00");
   });
 
   it("lists who used the AI this month, with the system's own use as Automatic", async () => {

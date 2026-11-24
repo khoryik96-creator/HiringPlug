@@ -33,8 +33,9 @@ RETURNING *;
 -- name: QueueParse :one
 UPDATE document SET parse_status = 'queued', parse_error = NULL, updated_at = now() WHERE id = @id RETURNING *;
 
--- The parser's result, once per reading: no row when the document is not
--- waiting for one (a repeated result).
+-- The parser's result. The last result to land is kept (as before the AI
+-- use ledger): a reading asked for again while one ran replaces it. A repeated
+-- result is counted once in the ledger by its reading's own key.
 -- name: SaveParse :one
 UPDATE document SET
   parse_status = @parse_status,
@@ -42,7 +43,7 @@ UPDATE document SET
   parsed_profile = sqlc.narg(parsed_profile),
   parser = sqlc.narg(parser),
   updated_at = now()
-WHERE id = @id AND parse_status = 'queued'
+WHERE id = @id
 RETURNING *;
 
 -- name: MoveDocumentsToCandidate :execrows

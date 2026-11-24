@@ -185,15 +185,10 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 			"skills": len(grounded.Skills), "dropped": grounded.Dropped,
 		}
 	}
-	if _, err := q.SaveParse(ctx, params); database.IsNoRows(err) {
-		// Not waiting for a reading: a repeated result, or a reading asked for
-		// again while this one ran (the first result to land is kept). The AI
-		// was used all the same: counted once, by the reading's own key.
-		if result.AiTokens == nil || result.RunKey == nil || *result.RunKey == "" {
-			return nil
-		}
-		return s.recordAI(ctx, tx, job, row, result.RunKey, int64(min(*result.AiTokens, 1<<30)))
-	} else if err != nil {
+	// The last result to land is kept, so a CV read again while an earlier
+	// reading ran ends with the reading asked for last. Its AI use counts once
+	// per reading (by its key), however often the result is delivered.
+	if _, err := q.SaveParse(ctx, params); err != nil {
 		return err
 	}
 	if result.AiTokens != nil && *result.AiTokens > 0 {

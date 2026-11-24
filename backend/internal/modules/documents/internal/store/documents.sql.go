@@ -941,7 +941,7 @@ UPDATE document SET
   parsed_profile = $3,
   parser = $4,
   updated_at = now()
-WHERE id = $5 AND parse_status = 'queued'
+WHERE id = $5
 RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at
 `
 
@@ -953,8 +953,9 @@ type SaveParseParams struct {
 	ID            string
 }
 
-// The parser's result, once per reading: no row when the document is not
-// waiting for one (a repeated result).
+// The parser's result. The last result to land is kept (as before the AI
+// use ledger): a reading asked for again while one ran replaces it. A repeated
+// result is counted once in the ledger by its reading's own key.
 func (q *Queries) SaveParse(ctx context.Context, arg SaveParseParams) (Document, error) {
 	row := q.db.QueryRow(ctx, saveParse,
 		arg.ParseStatus,

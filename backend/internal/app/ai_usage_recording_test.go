@@ -221,7 +221,8 @@ func TestAKeyCheckCountsInTheCompanysAIUse(t *testing.T) {
 }
 
 // A CV read again while its first reading is still with the AI is two AI
-// runs: both count, though only the first result to land is kept.
+// runs: both count, and the reading asked for last is the one kept (with
+// the hooks that run when a reading ends).
 func TestACVReadAgainWhileBeingReadCountsBothReadings(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t, bigAllowance)
@@ -240,20 +241,24 @@ func TestACVReadAgainWhileBeingReadCountsBothReadings(t *testing.T) {
 	require.NoError(t, json.Unmarshal(second.Payload, &secondPayload))
 	require.NotEqual(t, *firstPayload.RunKey, *secondPayload.RunKey, "each reading has its own key")
 
-	reading := func(runKey *string, tokens int) api.DocumentCvParsedJob {
+	reading := func(runKey *string, tokens int, parser string) api.DocumentCvParsedJob {
 		return api.DocumentCvParsedJob{
 			DocumentId: doc.Id, ErrorMessage: nullable.NewNullNullable[string](), AiTokens: &tokens, RunKey: runKey,
 			Profile: nullable.NewNullableWithValue(api.ParsedProfile{
-				Parser: "rules@1+ai", FullName: sourced("Siti Aisyah", "SITI AISYAH"),
+				Parser: parser, FullName: sourced("Siti Aisyah", "SITI AISYAH"),
 				Skills: []api.SourcedText{}, Experience: []api.ParsedJob{}, Education: []api.ParsedEducation{},
 			}),
 		}
 	}
-	answerAIJob(t, a, aiConn, first, api.JobKindDocumentCvParsed, reading(firstPayload.RunKey, 1700))
-	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300))
-	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300)) // delivered again
+	answerAIJob(t, a, aiConn, first, api.JobKindDocumentCvParsed, reading(firstPayload.RunKey, 1700, "rules@1+ai first"))
+	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300, "rules@1+ai second"))
+	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300, "rules@1+ai second")) // delivered again
 	assert.EqualValues(t, 1700+1300, a.usedThisMonth(token), "both readings used the AI")
 	assert.Equal(t, 2, countRows(t, `SELECT count(*) FROM ai_use WHERE tenant_id = $1 AND feature = 'cv_reading'`, tenant.ID))
+	var kept string
+	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(),
+		`SELECT parser FROM document WHERE id = $1`, doc.Id).Scan(&kept))
+	assert.Equal(t, "rules@1+ai second", kept, "the reading asked for last is the one kept")
 }
 
 // A job description uploaded last month and read by the AI this month

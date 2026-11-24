@@ -36,8 +36,8 @@ describe("AI usage numbers", () => {
   it("checks whole numbers before sending", () => {
     const d = draftOf({ limitKind: "tokens", limitTokens: 5000, serverDefaultTokens: 2_000_000, limitMoney: null, currency: "USD",
       priceInputPerMillion: null, priceOutputPerMillion: null, warnPercent: 80, version: 1, updatedAt: null });
-    expect(bodyOf({ ...d, tokens: "1,500,000" }, 1).limitTokens).toBe(1_500_000);
-    expect(() => bodyOf({ ...d, tokens: "" }, 1)).toThrow("Some fields need attention.");
-    expect(bodyOf({ ...d, tokens: "", useDefault: true }, 1).limitTokens).toBeNull();
+    expect(bodyOf({ ...d, tokens: "1,500,000" }).limitTokens).toBe(1_500_000);
+    expect(() => bodyOf({ ...d, tokens: "" })).toThrow("Some fields need attention.");
+    expect(bodyOf({ ...d, tokens: "", useDefault: true }).limitTokens).toBeNull();
   });
 });
