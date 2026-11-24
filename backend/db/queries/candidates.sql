@@ -284,6 +284,10 @@ WHERE m.candidate_id = sqlc.arg(from_id)::text
 -- name: CountCandidates :one
 SELECT count(*)::integer FROM candidate;
 
+-- At most n candidates the user may see (search by meaning compares a few exactly).
+-- name: VisibleCandidateIDs :many
+SELECT id FROM candidate ORDER BY id LIMIT @n::int;
+
 -- Through a database function: whoever hands a candidate over may no longer
 -- see them, which a plain UPDATE would be refused for (row-level security).
 -- name: SetCandidateOwner :one

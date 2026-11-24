@@ -225,6 +225,10 @@ x-error-codes:
     module: matching
     status: 409
     description: There is nothing to compare yet - the candidate has no CV with readable text, or the job has no description or ad text. The message says which.
+  MEANING_READING:
+    module: meaning
+    status: 409
+    description: The search by meaning is still being read (a moment); ask again.
   MEANING_UNAVAILABLE:
     module: meaning
     status: 409
@@ -1130,6 +1134,11 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: A search by meaning not read yet (MEANING_READING) or not set up on this server (MEANING_UNAVAILABLE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
         '422':
           description: Too many rows (EXPORT_TOO_LARGE).
           content:
@@ -3248,7 +3257,7 @@ paths:
       tags: [documents]
       summary: Read the profile details out of a CV again
       description: >
-        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer parser. Returns the document with parseStatus `queued`.
+        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`.
 
       x-permission: documents:create
       responses:
@@ -9220,6 +9229,7 @@ components:
         - MATCHING_OFF
         - MATCH_CONSENT_WITHDRAWN
         - MATCH_NEEDS_TEXT
+        - MEANING_READING
         - MEANING_UNAVAILABLE
         - METHOD_NOT_ALLOWED
         - NOT_FOUND
@@ -10592,7 +10602,7 @@ components:
       properties:
         format: {$ref: '#/components/schemas/ExportFormat'}
         search:
-          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone.
+          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone. With meaning, the best matches the page shows (at most 100, best first).
           allOf: [{$ref: '#/components/schemas/CandidateSearch'}]
     CandidateSearch:
       type: object
@@ -12623,6 +12633,10 @@ components:
           type: string
           nullable: true
           description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+        readOutdated:
+          type: boolean
+          description: >-
+            A CV the candidate sent, read by older CV-reading rules than this server's: reading it again (POST .../parse) may find more. Reviewing its details reads it again first.
         parsedProfile:
           allOf: [{$ref: '#/components/schemas/ParsedProfile'}]
           nullable: true
@@ -15960,8 +15974,8 @@ components:
       required: [available, read, total]
       properties:
         available: {type: boolean, description: False when the AI worker has no meaning model.}
-        read: {type: integer, description: Candidates read so far (those with a title or a CV).}
-        total: {type: integer, description: Candidates with a title or a CV to read.}
+        read: {type: integer, description: "The company's candidates read so far (counted by the read-through, not per user)."}
+        total: {type: integer, description: "The company's candidates to read (counted at the start of each read-through)."}
     MeaningOutcome:
       type: object
       required: [status, understood]
@@ -15975,8 +15989,8 @@ components:
           description: How the search was read, in words.
           allOf: [{$ref: '#/components/schemas/MeaningUnderstood'}]
           nullable: true
-        read: {type: integer, description: Candidates read so far.}
-        total: {type: integer, description: Candidates to read.}
+        read: {type: integer, description: "The company's candidates read so far (counted by the read-through, not per user)."}
+        total: {type: integer, description: "The company's candidates to read (counted at the start of each read-through)."}
     MeaningUnderstood:
       type: object
       required: [describes]
@@ -16000,7 +16014,7 @@ components:
         score: {type: number, description: "0 to 1, best first."}
         strength: {type: string, enum: [strong, good, possible]}
         title: {type: string, description: The title of theirs that matched.}
-        titleWhen: {type: string, description: '"now", or "until 2019".'}
+        titleWhen: {type: string, description: '"now", "until 2019", or "earlier" (a past job whose dates are not known).'}
         family: {type: string, description: The title's job family.}
         level: {type: string, description: Their level in that title.}
         passage: {type: string, description: The part of their CV that matched (for roles that may read CVs).}
@@ -16069,6 +16083,7 @@ components:
         family: {type: string, maxLength: 60}
         level: {type: integer, minimum: 0, maximum: 7}
         endYear: {type: integer, nullable: true}
+        current: {type: boolean, description: 'Their job now (as sent); a past job with no end year is not.'}
         field: {$ref: '#/components/schemas/MeaningVector'}
         work: {$ref: '#/components/schemas/MeaningVector'}
     MeaningPassageRead:

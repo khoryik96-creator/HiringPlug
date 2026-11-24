@@ -2272,6 +2272,31 @@ func (q *Queries) UsedValues(ctx context.Context) ([]UsedValuesRow, error) {
 	return items, nil
 }
 
+const visibleCandidateIDs = `-- name: VisibleCandidateIDs :many
+SELECT id FROM candidate ORDER BY id LIMIT $1::int
+`
+
+// At most n candidates the user may see (search by meaning compares a few exactly).
+func (q *Queries) VisibleCandidateIDs(ctx context.Context, n int32) ([]string, error) {
+	rows, err := q.db.Query(ctx, visibleCandidateIDs, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const workOf = `-- name: WorkOf :many
 SELECT candidate_id, position, title, company, start_date, end_date, is_current, description
 FROM candidate_work WHERE candidate_id = ANY($1::text[]) ORDER BY candidate_id, position

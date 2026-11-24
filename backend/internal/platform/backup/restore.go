@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -42,9 +41,10 @@ func Restore(ctx context.Context, o Options, name string) (result error) {
 	if err != nil {
 		return err
 	}
-	pgRestore, err := o.tools().tool("pg_restore", major)
-	if err != nil {
-		return err
+	for _, tool := range []string{"pg_restore", "psql"} { // both are needed: find out now, before anything moves
+		if _, err := o.tools().tool(tool, major); err != nil {
+			return err
+		}
 	}
 	if o.FilesDir == "" {
 		return errors.New("a files folder is required")
@@ -137,10 +137,8 @@ func Restore(ctx context.Context, o Options, name string) (result error) {
 			return undo(err)
 		}
 	}
-	out, err := exec.CommandContext(ctx, pgRestore, "--clean", "--if-exists", "--single-transaction", //nolint:gosec // configured PostgreSQL tool
-		"--dbname", o.AdminURL, filepath.Join(dir, "database.dump")).CombinedOutput()
-	if err != nil {
-		return undo(fmt.Errorf("pg_restore: %w: %s", err, hidePassword(string(out), o.AdminURL)))
+	if err := restoreDatabase(ctx, o, major, filepath.Join(dir, "database.dump")); err != nil {
+		return undo(err)
 	}
 	return nil
 }

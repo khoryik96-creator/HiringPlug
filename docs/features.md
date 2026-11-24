@@ -26,7 +26,10 @@ orange with a timer while it reads and a bar filling under it, as Format a CV
 does, then green; the review opens by itself when it was asked for. **Review
 details** opens the review **beside the CV** (in place of the list of files),
 the CV staying in view while the review scrolls; **Read this CV again** is at
-the review's foot. When the details cannot be read, the bar says so with
+the review's foot, and reads the file's text afresh too (with the reader as it
+is now: a table of jobs read row by row, a name in a Word file's header), the
+old text kept should the file not read. A CV read by an older reader is read
+again by itself when its review is opened (1.40.3). When the details cannot be read, the bar says so with
 where the reader broke (its error type and line, never CV text), until
 dismissed; asking again clears it. A formatted CV (our own output) has no
 review: it is read for comparing, again from its ⋯ menu. Jobs uses the
@@ -196,8 +199,10 @@ engineers"), and candidates are found by what they do, whatever their
 titles say and whether or not their CVs use your words. A recruiter's
 reading comes first: abbreviations spelt out (TA, AR/AP, HRBP), tools and
 qualifications placed (S/4HANA is SAP, ACCA is accounting, HACCP is food
-quality, Android is mobile), every title put in its job family (about 55:
-recruitment, accounting, software testing, factory quality...), and titles
+quality, Android is mobile, CISSP is cyber security, Snowflake is data),
+every title put in its job family (about 57, covering the agency's
+verticals: software, data, DevOps, cyber security, sales, marketing,
+finance, operations, compliance and more), and titles
 that mislead read by the work under them: an Account Executive who keeps
 the books is accounting, one who sells is sales; a "Principal Consultant"
 placing accountants is a recruiter. The newest title counts most, an old one
@@ -208,15 +213,19 @@ in another field counts less, however close the words (a salesperson is at
 most a possible match for "accounts executive"); the fields a recruiter
 would also look at are not (an HR generalist for talent acquisition, a
 finance manager for accounts). A tool or code in the search (S/4HANA, ACCA)
-counts most where a CV names it. Each candidate shows why: **Strong**,
-**Good** or **Possible match**, the title of theirs that matched with its
-field (and level, when the search named one), and the part of their CV
-that matched (for those who may read CVs). The other filters and folders
+counts most where a CV names it. Each candidate shows why, in a **Match**
+column beside the name: **Strong**, **Good** or **Possible match**, the
+title of theirs that matched with its field (and level, when the search
+named one), and the part of their CV that matched (three lines, all of it
+on hover; for those who may read CVs). The other filters and folders
 still apply. A line above the list says how the search was read ("Searching
 for accounts executive (accounting), executive level first, whatever their
 titles say") and, while the company's CVs are still being read, how far it
 has got. When a word search finds few, it offers to search the same words
-by meaning.
+by meaning. **Export** of a search by meaning exports its best 100, in order.
+Only candidates you may see are searched (your scope, never the Bin); with up
+to 2,000 to consider (a folder, filters, or a small company), every one is
+compared, beyond that the nearest are found by an index and compared.
 
 How: a small meaning model runs in the AI worker on this server (nothing is
 sent anywhere, no AI provider or allowance needed). Every candidate is read
@@ -226,7 +235,9 @@ Measured on three recruiter benches of made-up candidates and the searches a
 recruiter types (the third written after the rules were tuned, measured
 once): right people first 0.97, 0.95 and 0.96 (NDCG@10) against 0.62, 0.66
 and 0.61 for a keyword search. Without the model installed, the page says
-so and offers the word search.
+so and offers the word search. What was read is not in backups (it is
+read again after a restore); a job is never counted as their job now unless
+the CV says so.
 
 **AI candidate search** (Candidates, "AI search"; CV Studio's AI Crawler, on
 the company's own candidates): drop the client's JD (PDF, Word or text; it is
@@ -1839,8 +1850,11 @@ finds any by typing a name (Enter opens it). Shift-click selects a run of
 tabs, Ctrl-click (Cmd on a Mac) picks several: **Close selected**, **Select
 all**, **Close all**; closing the one you are on opens the one beside it. A
 tab lights **green** when work on its record finishes while you are elsewhere
-(a CV formatted), until you open it. Drag a tab to the browser's tab bar (or
-middle-click it) to open the record in a new browser tab: a new tab takes the
+(a CV formatted), until you open it. The tabs stay at the top as the page
+scrolls (1.40.3). Ctrl-, Shift- or middle-click on a link to a candidate,
+contact, company or job anywhere opens it as a tab here, behind the page you
+are on, not as a browser tab; middle-click on a tab goes to it. Drag a tab
+(or a link) to the browser's tab bar to open the record in a new browser tab: a new tab takes the
 sign-in of a HiringPlug tab already open (with none open, it asks to sign in;
 closing every tab still signs out). The tabs are the signed-in user's own,
 forgotten on signing out, and the same in every window; closing the page you

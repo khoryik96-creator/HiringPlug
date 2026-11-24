@@ -62,6 +62,13 @@ func (s *Service) applyExtraction(ctx context.Context, tx pgx.Tx, tenantID strin
 	if m, err := result.ErrorMessage.Get(); err == nil {
 		errMsg = &m
 	}
+	if result.Status != api.ExtractionStatusExtracted { // read again and it failed: the text read before is kept, and read
+		before, err := store.New(tx).GetDocument(ctx, result.DocumentId)
+		if err == nil && before.Status == string(api.DocumentStatusExtracted) && hasText(before.ExtractedText) {
+			logx.From(ctx).Warn("a document's text could not be read again; the text read before is kept", "document_id", result.DocumentId)
+			return s.queueParse(ctx, tx, tenantID, before)
+		}
+	}
 	row, err := store.New(tx).SaveExtraction(ctx, store.SaveExtractionParams{
 		ID: result.DocumentId, Status: string(result.Status), ExtractedText: text,
 		PageCount: pages, Extractor: &result.Extractor, ErrorMessage: errMsg,

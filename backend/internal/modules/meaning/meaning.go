@@ -19,6 +19,7 @@
 //	domain.go       the ranking and the fingerprints (unit tested)
 //	sweep.go        reading the company's candidates in the background
 //	rank.go         reading a search or a job, and ranking candidates for it
+//	gather.go       who a search compares: everyone when few enough, else the nearest by the indexes
 //	jobs.go         handlers for the module's jobs on the core queue
 //	http.go         HTTP handlers: contract types <-> service calls
 //	internal/store  generated SQL (db/queries/meaning.sql); private to this module
@@ -48,12 +49,18 @@ type CV struct {
 	DocumentID, Text string
 }
 
+// CVKey is which CV is a candidate's newest, and which reading of it (a CV
+// read again is another version), without its text.
+type CVKey struct {
+	DocumentID, Version string
+}
+
 // Source is what is read of a candidate.
 type Source struct {
 	CandidateID  string
 	CurrentTitle string
 	Work         []Work
-	CV           *CV
+	CV           *CVKey
 }
 
 // Term is a word or phrase to look for in CVs, with how much it counts.
@@ -77,10 +84,14 @@ type Deps struct {
 		// Sources returns these candidates' titles and work (those that exist).
 		Sources(ctx context.Context, tx pgx.Tx, ids []string) ([]Source, error)
 		Count(ctx context.Context, tx pgx.Tx) (int, error)
+		// Visible returns the ids of at most limit candidates the user may see.
+		Visible(ctx context.Context, tx pgx.Tx, limit int) ([]string, error)
 	}
 	CVs interface {
-		// NewestCVs returns each candidate's newest CV they sent that has text (salary taken out).
+		// NewestCVs returns each candidate's newest CV they sent that has text.
 		NewestCVs(ctx context.Context, tx pgx.Tx, candidateIDs []string) (map[string]CV, error)
+		// NewestCVKeys returns which CV NewestCVs would return for each, without its text.
+		NewestCVKeys(ctx context.Context, tx pgx.Tx, candidateIDs []string) (map[string]CVKey, error)
 		// CandidateOf returns the candidate a document belongs to ("" for none or a formatted CV).
 		CandidateOf(ctx context.Context, tx pgx.Tx, documentID string) (string, error)
 		// SearchCVs returns the candidates whose CVs best match the terms, best first.
@@ -115,4 +126,11 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 // its candidate is read again by meaning (now, not at the next sweep).
 func (m *Module) ReadDone(ctx context.Context, tx pgx.Tx, tenantID, documentID string, _ *api.ParsedProfile) error {
 	return m.service.cvRead(ctx, tx, tenantID, documentID)
+}
+
+// CVBinned is the documents module's hook for a CV a candidate sent, moved
+// to the Bin (binned) or back from it: what was read of a CV in the Bin goes
+// at once, and the candidate is read again with their newest CV now.
+func (m *Module) CVBinned(ctx context.Context, tx pgx.Tx, tenantID, candidateID, documentID string, binned bool) error {
+	return m.service.cvChanged(ctx, tx, tenantID, candidateID, documentID, binned)
 }

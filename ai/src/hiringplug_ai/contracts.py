@@ -167,6 +167,7 @@ class ErrorCode(StrEnum):
     MATCHING_OFF = "MATCHING_OFF"
     MATCH_CONSENT_WITHDRAWN = "MATCH_CONSENT_WITHDRAWN"
     MATCH_NEEDS_TEXT = "MATCH_NEEDS_TEXT"
+    MEANING_READING = "MEANING_READING"
     MEANING_UNAVAILABLE = "MEANING_UNAVAILABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
@@ -5310,8 +5311,16 @@ class MatchScoredJob(BaseModel):
 
 class MeaningStatus(BaseModel):
     available: Annotated[bool, Field(description="False when the AI worker has no meaning model.")]
-    read: Annotated[int, Field(description="Candidates read so far (those with a title or a CV).")]
-    total: Annotated[int, Field(description="Candidates with a title or a CV to read.")]
+    read: Annotated[
+        int,
+        Field(
+            description="The company's candidates read so far (counted by the read-through, not per user)."
+        ),
+    ]
+    total: Annotated[
+        int,
+        Field(description="The company's candidates to read (counted at the start of each read-through)."),
+    ]
 
 
 class Status9(StrEnum):
@@ -5350,7 +5359,10 @@ class MeaningWhy(BaseModel):
     score: Annotated[float, Field(description="0 to 1, best first.")]
     strength: Strength1
     title: Annotated[str | None, Field(description="The title of theirs that matched.")] = None
-    titleWhen: Annotated[str | None, Field(description='"now", or "until 2019".')] = None
+    titleWhen: Annotated[
+        str | None,
+        Field(description='"now", "until 2019", or "earlier" (a past job whose dates are not known).'),
+    ] = None
     family: Annotated[str | None, Field(description="The title's job family.")] = None
     level: Annotated[str | None, Field(description="Their level in that title.")] = None
     passage: Annotated[
@@ -5420,6 +5432,9 @@ class MeaningRoleRead(BaseModel):
     family: Annotated[str | None, Field(max_length=60)] = None
     level: Annotated[int | None, Field(ge=0, le=7)] = None
     endYear: int | None = None
+    current: Annotated[
+        bool | None, Field(description="Their job now (as sent); a past job with no end year is not.")
+    ] = None
     field: MeaningVector
     work: MeaningVector
 
@@ -8056,6 +8071,12 @@ class Document(BaseModel):
             description="Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
         ),
     ]
+    readOutdated: Annotated[
+        bool | None,
+        Field(
+            description="A CV the candidate sent, read by older CV-reading rules than this server's: reading it again (POST .../parse) may find more. Reviewing its details reads it again first."
+        ),
+    ] = None
     parsedProfile: Annotated[
         ParsedProfile | None, Field(description="Only included when fetching a single document.")
     ] = None
@@ -8698,8 +8719,16 @@ class MeaningOutcome(BaseModel):
         ),
     ]
     understood: Annotated[MeaningUnderstood | None, Field(description="How the search was read, in words.")]
-    read: Annotated[int | None, Field(description="Candidates read so far.")] = None
-    total: Annotated[int | None, Field(description="Candidates to read.")] = None
+    read: Annotated[
+        int | None,
+        Field(
+            description="The company's candidates read so far (counted by the read-through, not per user)."
+        ),
+    ] = None
+    total: Annotated[
+        int | None,
+        Field(description="The company's candidates to read (counted at the start of each read-through)."),
+    ] = None
 
 
 class Offer(BaseModel):
@@ -9135,7 +9164,7 @@ class CandidateExport(BaseModel):
     search: Annotated[
         CandidateSearch | None,
         Field(
-            description="The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone."
+            description="The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone. With meaning, the best matches the page shows (at most 100, best first)."
         ),
     ] = None
 

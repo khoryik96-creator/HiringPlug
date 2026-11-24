@@ -196,6 +196,7 @@ func NewModules(d Deps) *Modules {
 	// Last: search by meaning reads the candidate as the CV left them.
 	m.Documents.WhenReadDone(m.Intake.ReadDone, workAuthFromCV{m.Documents, m.Candidates}.ReadDone,
 		profileFromNewestCV{m.Documents, m.Candidates}.ReadDone, m.Meaning.ReadDone)
+	m.Documents.WhenCVBinned(m.Meaning.CVBinned)
 	m.Market = market.New(d.Pool, market.Deps{
 		Jobs: marketJobs{m.Jobs}, Candidates: marketCandidates{m.Candidates}, Insights: marketInsights{m.Assistant},
 	})

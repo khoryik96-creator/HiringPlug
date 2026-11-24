@@ -12,6 +12,7 @@ from hiringplug_ai.meaning.recruiter import (
     family_of_work,
     field,
     level,
+    names_a_skill,
     read_search,
     reading,
     reading_in_work,
@@ -234,3 +235,206 @@ def test_neighbouring_families_are_real_and_go_both_ways() -> None:
     assert "sales" not in NEAR["accounting"]  # Account Executive (sales) is not Accounts Executive
     assert "sales" not in NEAR["erp"]  # an ERP sales director is not an SAP consultant
     assert "executive assistant" not in NEAR["corporate secretarial"]
+
+
+@pytest.mark.parametrize(
+    ("title", "want"),
+    [
+        # An administrator of systems is IT; "admin" is a whole word.
+        ("Database Administrator", "it infrastructure"),
+        ("Network Administrator", "it infrastructure"),
+        ("Linux System Administrator", "it infrastructure"),
+        ("IT Administrator", "it infrastructure"),
+        ("DBA", "it infrastructure"),
+        ("Admin Executive", "administration"),
+        ("Senior Administrator", "administration"),
+        ("Administrative Assistant", "administration"),
+        ("Payroll Administrator", "payroll"),
+        ("Data Entry Clerk", "administration"),  # keying data in, not analysing it
+        ("Palm Oil Mill Engineer", "plantation"),  # not oil and gas
+        ("Oil Palm Estate Manager", "plantation"),
+        ("Oil and Gas Engineer", "oil and gas"),
+        ("Telecommunications Engineer", "telecommunications"),  # not marketing communications
+        ("Corporate Communications Manager", "marketing"),
+        ("ICT Executive", "it support"),
+        ("IT Service Delivery Manager", "it support"),  # an IT service, not deliveries
+        ("Power Distribution Engineer", "electrical engineering"),  # the grid, not goods
+        ("Distribution Manager", "logistics"),
+        ("Delivery Driver", "logistics"),
+        ("Financial Planner", "banking"),  # not supply chain planning
+        ("Tax Executive", "tax"),
+        ("F&B Server", "hospitality"),  # not a computer server
+        ("Guest Experience Executive", "hospitality"),
+    ],
+)
+def test_a_word_inside_another_word_or_field_does_not_place_a_title(title: str, want: str) -> None:
+    found = family(title)
+    assert found is not None, title
+    assert found[0] == want
+
+
+def test_a_taxi_driver_is_not_in_tax() -> None:
+    assert family("Taxi Driver") is None
+
+
+def test_an_oil_pipeline_or_prospect_is_not_selling() -> None:
+    sales = ("sales", FAMILY_WORDS["sales"])
+    oil = "Subsea pipeline design and installation for offshore gas platforms; pipeline integrity."
+    assert work_family("Senior Engineer", oil) == ("oil and gas", FAMILY_WORDS["oil and gas"])
+    assert family_of_work("Matured exploration prospects for drilling in the Malay basin.") != sales
+    assert family_of_work("Built ETL pipelines in Python into BigQuery.") != sales
+    assert work_family("Account Executive", "Managed the sales pipeline in HubSpot; closed deals.") == sales
+
+
+@pytest.mark.parametrize(
+    ("title", "fam", "lvl"),
+    [
+        ("Personal Assistant to CEO", "executive assistant", 2),  # not general management, not a director
+        ("PA to MD", "executive assistant", 2),
+        ("Secretary to the Managing Director", "executive assistant", 2),
+        ("Executive Assistant to the CFO", "executive assistant", 2),
+        ("Finance Manager reporting to the CFO", "finance management", 5),
+        ("Head of Sales", "sales", 5),
+        ("Business Development Manager", "sales", 5),
+        ("P2P Specialist", "procurement", 2),  # procure to pay: a process, not a boss
+    ],
+)
+def test_whom_a_person_works_for_is_not_what_they_do(title: str, fam: str, lvl: int) -> None:
+    found = family(title)
+    assert found is not None
+    assert found[0] == fam
+    assert level(title) == lvl
+    assert said_level(title) in (None, lvl)  # never the boss's level
+
+
+def test_an_assistant_to_someone_is_left_to_the_work() -> None:
+    assert family("Assistant to the Finance Director") is None
+    assert "director" not in field("Personal Assistant to the Finance Director")
+
+
+@pytest.mark.parametrize(
+    ("text", "want"),
+    [
+        ("ta executive", "talent acquisition executive"),
+        ("qs", "quantity surveyor"),
+        ("bdm", "business development manager"),
+        ("pa to md", "personal assistant to managing director"),
+        ("it executive", "information technology executive"),
+        ("it", "information technology"),
+        ("head of it", "head of information technology"),
+        ("hr/admin executive", "human resources / admin executive"),
+        ("senior hr manager", "senior human resources manager"),
+    ],
+)
+def test_abbreviations_are_spelt_out_whatever_the_case(text: str, want: str) -> None:
+    assert expand(text) == want
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["someone who has led a team in it", "rm 60k pa", "8 hr shift", "bi-weekly reports", "final sem intern"],
+)
+def test_abbreviations_that_are_also_ordinary_words_stay_words(text: str) -> None:
+    assert expand(text) == text
+
+
+@pytest.mark.parametrize(
+    "search",
+    [
+        "TA Executive",
+        "QS",
+        "BDM",
+        "PA to MD",
+        "IT Executive",
+        "Head of IT",
+        "HR/Admin Executive",
+        "SAP FICO consultant",
+        "Customer Experience Manager",
+        "Accountant KL",
+        "someone who has led a team in IT",
+    ],
+)
+def test_a_search_reads_the_same_whatever_its_case(search: str) -> None:
+    """The app keeps one reading per search, however it was capitalised."""
+
+    def read(text: str) -> tuple[object, ...]:
+        s = read_search(text)
+        return (s.family, s.describes, s.level, s.exact, search_reading(s), expand(s.context).lower())
+
+    assert read(search) == read(search.lower()) == read(search.upper())
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Customer Experience Manager",
+        "User Experience Designer",
+        "Guest Experience Executive",
+        "Experience Designer",
+        "Managed Services Engineer",
+        "LED lighting engineer",
+    ],
+)
+def test_a_title_with_a_word_that_can_describe_work_is_read_as_a_title(title: str) -> None:
+    s = read_search(title)
+    assert not s.describes
+    assert s.role == title
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "someone who has managed a team of accountants",
+        "has managed payroll for 500 staff",
+        "managed a team of accountants",
+        "led the finance team",
+        "experience in SAP FICO",
+        "5 years of experience in audit",
+        "accountant who has led audits",
+    ],
+)
+def test_work_described_is_read_as_work(text: str) -> None:
+    assert read_search(text).describes
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "accountant KL",
+        "Accountant PJ",
+        "accountant in KLCC",
+        "ACCOUNTANT",  # caps lock
+        "SALES MANAGER",
+        "3 years",
+        "accountant with 5+ years",
+        "HR/Admin Executive",
+        "Sales/Marketing Executive",
+        "ar/ap",
+        "FP&A analyst",
+    ],
+)
+def test_places_numbers_words_and_spelt_out_abbreviations_are_not_codes(text: str) -> None:
+    assert not names_a_skill(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "S/4HANA",
+        "ACCA",
+        "CPA",
+        "CISSP",
+        "ISO 27001",
+        "ISO 9001",
+        "C++",
+        "C#",
+        ".NET",
+        "SAP FICO",
+        "AWS",
+        "PRINCE2",
+    ],
+)
+def test_tools_qualifications_and_codes_are_exact_whatever_the_case(text: str) -> None:
+    assert names_a_skill(text)
+    assert names_a_skill(text.lower())
+    assert names_a_skill(text.upper())

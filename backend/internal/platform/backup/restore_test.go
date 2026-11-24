@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/backup"
@@ -61,4 +62,62 @@ func TestFailedRestorePreservesDatabaseAndFiles(t *testing.T) {
 	require.Error(t, backup.Restore(ctx, backup.Options{AdminURL: target, FilesDir: dest, Dir: root}, filepath.Base(made)))
 	require.FileExists(t, marker)
 	require.NoFileExists(t, filepath.Join(dest, "old.pdf"))
+}
+
+// A backup made before an update is put back over the updated database: what
+// the update added (here a table referring to tenant, and a function) goes,
+// for `hp bootstrap` to make again; it does not stop the restore.
+func TestARestoreOverANewerDatabaseReplacesIt(t *testing.T) {
+	requireTools(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t)
+	root := t.TempDir()
+	made, err := backup.Run(ctx, testutil.Current.Admin, backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: t.TempDir(), Dir: root, Keep: 1})
+	require.NoError(t, err)
+	target := freshDatabase(t)
+	o := backup.Options{AdminURL: target, FilesDir: t.TempDir(), Dir: root}
+	require.NoError(t, backup.Restore(ctx, o, filepath.Base(made)))
+
+	pool, err := database.Connect(ctx, target)
+	require.NoError(t, err)
+	defer pool.Close()
+	_, err = pool.Exec(ctx, `CREATE TABLE newer_thing (tenant_id text NOT NULL REFERENCES tenant (id));
+		INSERT INTO newer_thing VALUES ('`+tenant.ID+`');
+		CREATE FUNCTION newer_count() RETURNS bigint LANGUAGE sql AS 'SELECT count(*) FROM newer_thing';`)
+	require.NoError(t, err)
+	pool.Close()
+
+	require.NoError(t, backup.Restore(ctx, o, filepath.Base(made)), "the newer table no longer stops the restore")
+	pool, err = database.Connect(ctx, target)
+	require.NoError(t, err)
+	var tenants int
+	var table, fn *string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM tenant WHERE id = $1),
+		to_regclass('public.newer_thing')::text, to_regprocedure('public.newer_count()')::text`, tenant.ID).Scan(&tenants, &table, &fn))
+	assert.Equal(t, 1, tenants)
+	assert.Nil(t, table, "what the update added is gone (bootstrap makes it again)")
+	assert.Nil(t, fn)
+}
+
+// A backup leaves out what search by meaning read (numbers its read-through
+// reads again after a restore): tens of KB per candidate otherwise.
+func TestABackupLeavesOutWhatMeaningReadsAgain(t *testing.T) {
+	requireTools(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t)
+	_, err := testutil.Current.Admin.Exec(ctx, `INSERT INTO meaning_query (tenant_id, text_hash, body, status)
+		VALUES ($1, repeat('b', 64), 'accountant', 'ready')`, tenant.ID)
+	require.NoError(t, err)
+	root := t.TempDir()
+	made, err := backup.Run(ctx, testutil.Current.Admin, backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: t.TempDir(), Dir: root, Keep: 1})
+	require.NoError(t, err)
+	target := freshDatabase(t)
+	require.NoError(t, backup.Restore(ctx, backup.Options{AdminURL: target, FilesDir: t.TempDir(), Dir: root}, filepath.Base(made)))
+	pool, err := database.Connect(ctx, target)
+	require.NoError(t, err)
+	defer pool.Close()
+	var tenants, queries int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM tenant WHERE id = $1), (SELECT count(*) FROM meaning_query)`, tenant.ID).Scan(&tenants, &queries))
+	assert.Equal(t, 1, tenants)
+	assert.Zero(t, queries)
 }

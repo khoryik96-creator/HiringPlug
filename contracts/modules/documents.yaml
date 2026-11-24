@@ -151,7 +151,11 @@ paths:
       summary: Read the profile details out of a CV again
       description: >
         CVs are parsed automatically after their text is read. Use this for CVs
-        uploaded before parsing existed, or to re-run a newer parser. Returns
+        uploaded before parsing existed, or to re-run a newer reader: the text
+        is taken out of the file again (a newer reader may see more, such as
+        tables), then the details are read. A text, RTF or ODT file's text is
+        read on the server and only its details are read again. If taking the
+        text out fails, the text read before is kept and read again. Returns
         the document with parseStatus `queued`.
       x-permission: documents:create
       responses:
@@ -419,6 +423,11 @@ components:
           type: string
           nullable: true
           description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+        readOutdated:
+          type: boolean
+          description: >-
+            A CV the candidate sent, read by older CV-reading rules than this server's: reading it again
+            (POST .../parse) may find more. Reviewing its details reads it again first.
         parsedProfile:
           allOf: [{ $ref: '#/components/schemas/ParsedProfile' }]
           nullable: true

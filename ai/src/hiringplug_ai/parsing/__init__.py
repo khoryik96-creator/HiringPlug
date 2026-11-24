@@ -16,7 +16,7 @@ from .names import name
 from .residence import residence_country
 from .skills import skills
 
-PARSER = "rules@1"
+PARSER = "rules@2"
 
 
 def _sourced(found: tuple[str, str] | None) -> SourcedText | None:

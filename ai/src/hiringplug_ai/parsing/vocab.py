@@ -26,12 +26,38 @@ ROLE_RE = re.compile(
     r"controller|planner|buyer|merchandiser|tester|writer|editor|founder|owner|secretary|dba|devops|sre|"
     r"receptionist|agent|attendant|worker|support|president|chairman|pharmacist|doctor|surgeon|"
     r"therapist|researcher|instructor|trainer|strategist|investigator|inspector|surveyor|draughtsman|"
-    r"principal|sme|expert|professional|commercial|sales|marketing|headhunter|sourcer)\b",
+    r"principal|sme|expert|professional|commercial|sales|marketing|headhunter|sourcer|resourcer|partner)\b",
     re.IGNORECASE,
 )
 # A firm's name that has a title word in it: "Sampel Executive Search" is a
-# headhunting firm, not an executive (but "Executive Search Consultant" is a title).
+# headhunting firm, not an executive (is_firm_name).
 FIRM_NAME_RE = re.compile(r"\bexecutive search\b", re.IGNORECASE)
+_BEFORE_A_PRACTICE = re.compile(r"[,;|(]|\s[-–—]\s|[-–—]$")
+
+
+def is_firm_name(piece: str) -> bool:
+    """Whether "executive search" is part of a firm's name: a name before it
+    ("Sampel Executive Search", "Kerry Executive Search Sdn Bhd"). With
+    nothing or a title before it, it is the practice in a title: "Executive
+    Search Partner", "Partner, Executive Search", "Director - Executive Search"."""
+    m = FIRM_NAME_RE.search(piece)
+    if not m:
+        return False
+    name = piece[: m.start()].strip()
+    return bool(name) and not _BEFORE_A_PRACTICE.search(name) and not ROLE_RE.search(name)
+
+
+# A work-history table's columns, by their header: a header row read as a line
+# ("Organization Location Role Industry Duration") is neither a title nor an
+# employer, and a row written "a | b | c" is read by its columns.
+COLUMN_ROLE_RE = re.compile(r"^(?:role|position|designation|job\s*title|title|jawatan)$", re.IGNORECASE)
+COLUMN_ORG_RE = re.compile(r"^(?:organi[sz]ation|company(?:\s+name)?|employer|syarikat)$", re.IGNORECASE)
+_COLUMN = (
+    r"(?:organi[sz]ation|company(?:\s+name)?|employer|syarikat|role|position|designation|job\s*title|title|"
+    r"jawatan|location|client|customer|industry|sector|duration|period|dates?|tenure|from|to|years?|"
+    r"department|project|responsibilit(?:y|ies)|country|city|level|grade|reporting\s+to|description|remarks?)"
+)
+TABLE_HEADER_RE = re.compile(rf"^\s*{_COLUMN}(?:\s*[|,\t]?\s*{_COLUMN})+\s*\|?\s*$", re.IGNORECASE)
 QUALIFICATION_RE = re.compile(
     r"\b(?:bachelor'?s?|degree|ijazah|diploma|master'?s?|mba|phd|ph\.d|doctor(?:ate)?|certificate|"
     r"sijil|spm|stpm|uec|a-levels?|o-levels?|igcse|foundation|asasi|matriculation|matrikulasi|b\.?sc|b\.?a\b|"

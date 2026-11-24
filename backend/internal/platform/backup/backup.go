@@ -29,6 +29,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// rebuilt are the tables a backup keeps empty: what search by meaning read
+// of each candidate and search (tens of KB per candidate, as numbers), which
+// its read-through reads again after a restore, from the CVs and profiles.
+var rebuilt = []string{"meaning_candidate", "meaning_role", "meaning_passage", "meaning_pending", "meaning_query", "meaning_query_need", "meaning_sweep"}
+
 // Options say what to back up and where.
 type Options struct {
 	AdminURL string  // the database, as its owner (pg_dump needs to read every table)
@@ -169,7 +174,12 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 		return "", 0, err
 	}
 	dump := filepath.Join(tmp, "database.dump")
-	if out, err := exec.CommandContext(ctx, pgDump, "--format=custom", "--file", dump, "--dbname", o.AdminURL).CombinedOutput(); err != nil { //nolint:gosec // a PostgreSQL tool; the URL is our own setting
+	args := []string{"--format=custom", "--file", dump}
+	for _, table := range rebuilt {
+		args = append(args, "--exclude-table-data="+table)
+	}
+	args = append(args, "--dbname", o.AdminURL)
+	if out, err := exec.CommandContext(ctx, pgDump, args...).CombinedOutput(); err != nil { //nolint:gosec // a PostgreSQL tool; the URL is our own setting
 		return "", 0, fmt.Errorf("pg_dump: %w: %s", err, hidePassword(string(out), o.AdminURL))
 	}
 	if err := os.Chmod(dump, 0o600); err != nil { // it holds every company's data

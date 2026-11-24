@@ -29,6 +29,28 @@ function openAll(records: [string, string][]) {
 const names = () => [...screen.getByRole("navigation", { name: "Open records" }).querySelectorAll(".open-tab-name")].map((n) => n.textContent);
 
 describe("open records", () => {
+  it("opens a record Ctrl-, Shift- or middle-clicked anywhere as a tab here, not a browser tab", () => {
+    bell();
+    renderWithClient(<><OpenTabs hash="#/candidates" /><a href="#/candidates/cand_01aina">Aina Lee</a><a href="#/jobs/jo_01acc">Accountant</a><a href="#/reports">Reports</a></>);
+    const ctrl = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    act(() => { screen.getByText("Aina Lee").dispatchEvent(ctrl); });
+    expect(ctrl.defaultPrevented).toBe(true); // no browser tab
+    const middle = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+    act(() => { screen.getByText("Accountant").dispatchEvent(middle); });
+    expect(middle.defaultPrevented).toBe(true);
+    expect(names()).toEqual(["Aina Lee", "Accountant"]);
+    expect(window.location.hash).not.toBe("#/candidates/cand_01aina"); // still on the page you were on
+    const other = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    act(() => { screen.getByText("Reports").dispatchEvent(other); });
+    expect(other.defaultPrevented).toBe(false); // not a record: the browser does as usual
+    // Middle-click on a tab here goes to it, not to a browser tab.
+    const tab = screen.getByRole("navigation", { name: "Open records" }).querySelector<HTMLAnchorElement>('a[href="#/jobs/jo_01acc"]');
+    const onTab = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+    act(() => { tab?.dispatchEvent(onTab); });
+    expect(onTab.defaultPrevented).toBe(true);
+    expect(window.location.hash).toBe("#/jobs/jo_01acc");
+  });
+
   it("knows which record a page is about", () => {
     expect(recordOf("#/candidates/cand_01abc")).toEqual({ href: "#/candidates/cand_01abc", kind: "candidate" });
     expect(recordOf("#/candidates/cand_01abc/screening")).toEqual({ href: "#/candidates/cand_01abc", kind: "candidate" });

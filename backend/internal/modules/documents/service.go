@@ -30,6 +30,7 @@ type Service struct {
 	candidates     Candidates
 	whenRead       []TextReadHook
 	whenDone       []ReadDoneHook
+	whenBinned     []CVBinnedHook
 	enrichIndustry func(context.Context, pgx.Tx, *api.ParsedProfile) error
 	industryLabels func(context.Context, pgx.Tx) ([]string, error)
 	recordBinned   func(context.Context, pgx.Tx, string, string, string, string) error
@@ -50,6 +51,24 @@ type ReadDoneHook func(ctx context.Context, tx pgx.Tx, tenantID, documentID stri
 // TextReadHook runs when a candidate's CV (not one the app made) has been
 // read, in the same transaction (e.g. CV vs job matching scores them again).
 type TextReadHook func(ctx context.Context, tx pgx.Tx, tenantID, candidateID string) error
+
+// CVBinnedHook runs when a CV a candidate sent (not one the app made) is
+// moved to the Bin (binned) or back from it, in the same transaction (e.g.
+// search by meaning stops using what it read of a CV in the Bin).
+type CVBinnedHook func(ctx context.Context, tx pgx.Tx, tenantID, candidateID, documentID string, binned bool) error
+
+// cvBinned runs the hooks for a document moved to or from the Bin.
+func (s *Service) cvBinned(ctx context.Context, tx pgx.Tx, tenantID, candidateID, documentID, source string, binned bool) error {
+	if source == "formatted" {
+		return nil
+	}
+	for _, hook := range s.whenBinned {
+		if err := hook(ctx, tx, tenantID, candidateID, documentID, binned); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // Upload stores a file for a candidate and queues its text extraction. The
 // document row and the job are committed together: there is never a document
@@ -199,12 +218,15 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Docume
 	return doc, err
 }
 
-// Parse queues parsing of a document's text again (for CVs uploaded before
-// parsing existed, or after the parser improved).
+// Parse reads a document again (for CVs uploaded before parsing existed, or
+// after the reader improved): its text is taken out of the file again (a
+// newer reader sees more, such as tables), then its details are read. A file
+// whose text is read here (text, RTF, ODT) only has its details read again.
 func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Document, error) {
 	var doc Document
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		row, err := store.New(tx).GetDocument(ctx, id)
+		q := store.New(tx)
+		row, err := q.GetDocument(ctx, id)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("document")
 		}
@@ -214,7 +236,12 @@ func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Docu
 		if !hasText(row.ExtractedText) {
 			return apperr.New(api.ErrorCodeDOCUMENTHASNOTEXT, "This document has no text to read yet.")
 		}
-		if err := s.queueParse(ctx, tx, p.TenantID, row); err != nil {
+		if filekind.ReadHere(row.ContentType) {
+			err = s.queueParse(ctx, tx, p.TenantID, row)
+		} else {
+			err = s.queueExtraction(ctx, tx, p.TenantID, row)
+		}
+		if err != nil {
 			return err
 		}
 		queued := string(api.DocumentParseStatusQueued)
@@ -225,12 +252,27 @@ func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Docu
 	return doc, err
 }
 
+// queueExtraction takes a stored file's text out again (then its details are
+// read, as after an upload); until then it shows as being read.
+func (s *Service) queueExtraction(ctx context.Context, tx pgx.Tx, tenantID string, row store.Document) error {
+	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
+		DocumentId: row.ID, DownloadUrl: s.files.SignedURL(row.StorageKey, downloadLinkTTL),
+		ContentType: row.ContentType, FileName: row.FileName, SizeBytes: row.SizeBytes,
+	}); err != nil {
+		return err
+	}
+	_, err := store.New(tx).QueueParse(ctx, row.ID)
+	return err
+}
+
 func fromRow(r store.Document) Document {
 	d := Document{
 		ID: r.ID, CandidateID: r.CandidateID, Source: r.Source, FileName: r.FileName,
 		ContentType: r.ContentType, SizeBytes: r.SizeBytes, SHA256: r.Sha256, Status: r.Status,
 		Extractor: r.Extractor, ErrorMessage: r.ErrorMessage, Warnings: r.ExtractionWarnings,
 		ParseStatus: r.ParseStatus, ParseError: r.ParseError, PdfStatus: r.PdfStatus, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		ReadOutdated: r.Source != "formatted" && r.ParseStatus != nil && *r.ParseStatus == string(api.DocumentParseStatusParsed) &&
+			(r.Parser == nil || *r.Parser != CVReader),
 	}
 	if d.Warnings == nil {
 		d.Warnings = []string{}

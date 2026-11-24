@@ -90,7 +90,6 @@ type CVTextOfRow struct {
 	Text        string
 }
 
-// A document's candidate, kind and text (for other modules reading a CV just read).
 func (q *Queries) CVTextOf(ctx context.Context, id string) (CVTextOfRow, error) {
 	row := q.db.QueryRow(ctx, cVTextOf, id)
 	var i CVTextOfRow
@@ -180,6 +179,24 @@ func (q *Queries) DeleteFormattedDocument(ctx context.Context, id string) (Delet
 	row := q.db.QueryRow(ctx, deleteFormattedDocument, id)
 	var i DeleteFormattedDocumentRow
 	err := row.Scan(&i.StorageKey, &i.PdfKey)
+	return i, err
+}
+
+const documentOwner = `-- name: DocumentOwner :one
+SELECT candidate_id, source FROM document WHERE id = $1
+`
+
+type DocumentOwnerRow struct {
+	CandidateID string
+	Source      string
+}
+
+// A document's candidate, kind and text (for other modules reading a CV just read).
+// Whose a document is and what kind, without its text.
+func (q *Queries) DocumentOwner(ctx context.Context, id string) (DocumentOwnerRow, error) {
+	row := q.db.QueryRow(ctx, documentOwner, id)
+	var i DocumentOwnerRow
+	err := row.Scan(&i.CandidateID, &i.Source)
 	return i, err
 }
 
@@ -591,6 +608,44 @@ func (q *Queries) NewestCVID(ctx context.Context, candidateID string) (string, e
 	return id, err
 }
 
+const newestCVKeys = `-- name: NewestCVKeys :many
+SELECT DISTINCT ON (candidate_id) candidate_id, id, updated_at
+FROM document
+WHERE candidate_id = ANY($1::text[]) AND source <> 'formatted' AND binned_at IS NULL
+  AND extracted_text IS NOT NULL AND extracted_text <> '' AND source IN ('original', 'linkedin', 'jobstreet')
+ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC
+`
+
+type NewestCVKeysRow struct {
+	CandidateID string
+	ID          string
+	UpdatedAt   time.Time
+}
+
+// Search by meaning: each candidate's newest CV with text that they sent
+// (their CV first, then a LinkedIn or JobStreet one; not one the app made,
+// not in the bin).
+// Which CV NewestCVTexts gives for each, and which reading of it, without its text.
+func (q *Queries) NewestCVKeys(ctx context.Context, candidateIds []string) ([]NewestCVKeysRow, error) {
+	rows, err := q.db.Query(ctx, newestCVKeys, candidateIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NewestCVKeysRow
+	for rows.Next() {
+		var i NewestCVKeysRow
+		if err := rows.Scan(&i.CandidateID, &i.ID, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const newestCVOfTypes = `-- name: NewestCVOfTypes :one
 SELECT id FROM document
 WHERE candidate_id = $1 AND source <> 'formatted' AND binned_at IS NULL AND content_type = ANY($2::text[])
@@ -627,9 +682,6 @@ type NewestCVTextsRow struct {
 	Text        string
 }
 
-// Search by meaning: each candidate's newest CV with text that they sent
-// (their CV first, then a LinkedIn or JobStreet one; not one the app made,
-// not in the bin).
 func (q *Queries) NewestCVTexts(ctx context.Context, candidateIds []string) ([]NewestCVTextsRow, error) {
 	rows, err := q.db.Query(ctx, newestCVTexts, candidateIds)
 	if err != nil {

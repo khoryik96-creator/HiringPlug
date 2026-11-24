@@ -32,6 +32,17 @@ describe("the boolean search box", () => {
     expect(document.querySelector(".bool-mirror")?.textContent).toBe("SAP AND BW");
     expect(screen.getByLabelText("Search candidates").getAttribute("aria-describedby"), "says it is read as a boolean").toBe(screen.getByText("Boolean").id);
   });
+
+  it("reads no rules while searching by meaning: nothing in blue, no badge", () => {
+    render(<BooleanSearchBox value={'"talent acquisition" -agency OR TA'} byMeaning describedBy="rules-hint" onChange={() => undefined}
+      label="Search candidates by meaning" placeholder="Search" />);
+    expect(document.querySelector(".bool-mirror, .bool-rule")).toBeNull();
+    expect(screen.queryByText("Boolean")).toBeNull();
+    expect(document.querySelector(".bool-box")?.className).toBe("bool-box");
+    const box = screen.getByLabelText("Search candidates by meaning");
+    expect(box.getAttribute("aria-describedby"), "described by the page's line about it").toBe("rules-hint");
+    expect(box.getAttribute("spellcheck"), "words, spell-checked").toBe("true");
+  });
 });
 
 describe("a boolean search that cannot be read", () => {

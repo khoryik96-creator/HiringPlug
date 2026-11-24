@@ -133,6 +133,12 @@ func claimAIJobOfKind(t *testing.T, conn *pgx.Conn, tenantID string, kind api.Jo
 // tenant with the stand-in model, and saves what it read (the Go worker).
 func readByMeaning(t *testing.T, a *testApp, conn *pgx.Conn, tenantID string) int {
 	t.Helper()
+	return readByMeaningWith(t, a, conn, tenantID, "stand-in")
+}
+
+// readByMeaningWith is readByMeaning with a model of that name.
+func readByMeaningWith(t *testing.T, a *testApp, conn *pgx.Conn, tenantID, model string) int {
+	t.Helper()
 	runCoreJobsUntilIdle(t, a, tenantID) // the read-through queues them
 	read := 0
 	for {
@@ -142,7 +148,7 @@ func readByMeaning(t *testing.T, a *testApp, conn *pgx.Conn, tenantID string) in
 		}
 		var asked api.MeaningReadCandidatesJob
 		require.NoError(t, json.Unmarshal(job.Payload, &asked))
-		out := api.MeaningCandidatesReadJob{Model: "stand-in", Candidates: []api.MeaningCandidateRead{}}
+		out := api.MeaningCandidatesReadJob{Model: model, Candidates: []api.MeaningCandidateRead{}}
 		for _, c := range asked.Candidates {
 			r := api.MeaningCandidateRead{CandidateId: c.CandidateId, Fingerprint: c.Fingerprint, Roles: []api.MeaningRoleRead{}, Passages: []api.MeaningPassageRead{}}
 			var titles []string
@@ -156,8 +162,8 @@ func readByMeaning(t *testing.T, a *testApp, conn *pgx.Conn, tenantID string) in
 					placedBy += ". " + c.Cv.Text // the newest title, placed by the CV's lines as the worker does
 				}
 				r.Roles = append(r.Roles, api.MeaningRoleRead{
-					Ordinal: role.Ordinal, Title: role.Title, EndYear: role.EndYear, Field: fakeMeaning(role.Title), Work: fakeMeaning(work),
-					Family: standInFamily(placedBy),
+					Ordinal: role.Ordinal, Title: role.Title, EndYear: role.EndYear, Current: &role.Current,
+					Field: fakeMeaning(role.Title), Work: fakeMeaning(work), Family: standInFamily(placedBy),
 				})
 				titles = append(titles, role.Title)
 			}

@@ -60,3 +60,16 @@ def test_a_hung_libreoffice_is_stopped_with_its_children(
     time.sleep(0.2)
     # The child was stopped too: gone, or a zombie waiting to be reaped.
     assert not stat.exists() or stat.read_text().split(") ", 1)[1].startswith("Z")
+
+
+def test_a_name_and_email_in_the_page_header_are_read() -> None:
+    # antiword leaves out a page's header (and text boxes), where many CVs put
+    # their name and contacts: with no email in its text, LibreOffice reads it.
+    doc = (Path(__file__).parent / "fixtures" / "old-word-header.doc").read_bytes()
+    result = extract(doc, ocr=None)
+    assert result.status == "extracted", result.error
+    assert result.extractor.startswith("libreoffice+")
+    assert result.text
+    assert "Kavitha Ramasamy PMP" in result.text
+    assert "kavitha.r@example.com" in result.text
+    assert "Professional Summary" in result.text

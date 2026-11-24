@@ -106,3 +106,64 @@ def test_a_job_description_without_headings_gives_its_bullets_or_its_sentences()
         "We need a recruiter who has hired engineers.",
         "You will run interviews and offers.",
     ]
+
+
+JOBSTREET = """Job Responsibilities:
+- Handle full set of accounts
+- Prepare monthly management reports
+- Liaise with auditors and tax agents
+
+Job Requirements:
+- Degree in Accounting
+- ACCA
+- Experience in AutoCount
+- At least 2 years of working experience
+- Able to start immediately
+"""
+
+
+def test_jobstreet_headings_keep_every_duty_and_requirement() -> None:
+    assert needs(JOBSTREET) == [
+        "Handle full set of accounts",
+        "Prepare monthly management reports",
+        "Liaise with auditors and tax agents",
+        "Degree in Accounting",
+        "Experience in AutoCount",  # a need that starts with a heading's word, not a heading
+        "At least 2 years of working experience",
+        "Able to start immediately",
+    ]
+
+
+def test_a_need_starting_with_a_headings_word_is_not_a_heading() -> None:
+    listed = [
+        "Degree in Accounting or equivalent",
+        "Experience in full set of accounts",
+        "Experience with SQL Account software",
+        "Must have own transport",
+        "Skills in Excel and SAP",
+        "Good command of English and Bahasa Malaysia",
+    ]
+    assert needs("Requirements:\n" + "".join(f"- {line}\n" for line in listed)) == listed
+
+
+def test_bullets_before_a_later_heading_are_kept_and_the_companys_are_not() -> None:
+    jd = (
+        "We are hiring an Accounts Executive!\n"
+        "- Handle full set of accounts\n"
+        "- Prepare monthly reports for management\n"
+        "Your Mission:\n"  # a heading that says neither
+        "- Close the books every month on time\n"
+        "Requirements: Degree in Accounting or ACCA\n"  # a heading with its first need
+        "- Two years in an audit firm\n"
+        "Why join us?\n"
+        "- Great team and a fun culture\n"
+        "About Contoh\n"
+        "- Founded in 2001 with 300 staff\n"
+    )
+    assert needs(jd) == [
+        "Handle full set of accounts",
+        "Prepare monthly reports for management",
+        "Close the books every month on time",
+        "Requirements: Degree in Accounting or ACCA",
+        "Two years in an audit firm",
+    ]

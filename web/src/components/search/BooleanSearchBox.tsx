@@ -1,7 +1,8 @@
 // The search box of the candidate, company and contact lists. Typed plainly,
 // it finds names, emails, phones and the like; as soon as it holds boolean
 // rules (AND, OR, NOT, NEAR/n, brackets, "phrases", word*, -word) those show
-// in blue and the list runs a boolean search instead.
+// in blue and the list runs a boolean search instead. Searching candidates by
+// meaning, the words are read as a whole: nothing shows as a rule.
 import { type ReactNode, useId, useLayoutEffect, useRef } from "react";
 
 import { ErrorMessage } from "../ErrorMessage";
@@ -44,17 +45,21 @@ export function booleanParts(q: string): BoolPart[] {
   return out;
 }
 
-export function BooleanSearchBox({ value, onChange, placeholder, label, children }: {
+export function BooleanSearchBox({ value, onChange, placeholder, label, byMeaning = false, describedBy, children }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   label: string;
+  /** Searching by meaning: no rule is read, so none is coloured or badged as one. */
+  byMeaning?: boolean;
+  /** The id of a line that says more about what is typed (when it is not read as a boolean). */
+  describedBy?: string;
   /** Buttons inside the box, at its right (Mine, Filters, AI). */
   children?: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
-  const boolean = looksBoolean(value);
+  const boolean = !byMeaning && looksBoolean(value);
   const hintId = useId();
   // The coloured copy sits exactly under the typed text: same font, padding and scroll.
   useLayoutEffect(() => {
@@ -77,7 +82,7 @@ export function BooleanSearchBox({ value, onChange, placeholder, label, children
           </div>
         )}
         <input ref={input} aria-label={label} placeholder={placeholder} value={value} spellCheck={!boolean}
-          aria-describedby={boolean ? hintId : undefined}
+          aria-describedby={boolean ? hintId : describedBy}
           onChange={(e) => { onChange(e.target.value); }}
           onScroll={(e) => { if (mirror.current) mirror.current.scrollLeft = e.currentTarget.scrollLeft; }} />
       </div>

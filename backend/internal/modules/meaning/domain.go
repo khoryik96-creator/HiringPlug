@@ -30,7 +30,12 @@ const (
 
 	levelStep, levelMaxSteps = 0.03, 3    // a level away from the one asked for
 	oldRoleStep, oldRoleLow  = 0.05, 0.55 // a year since a title ended, and the least it keeps
+	pastUnknown              = 0.8        // a past job whose end year is not known (about four years ago)
 	otherField               = 0.75       // their best title in another field: what the rest counts for
+
+	// A typed search's own words in CVs: a CV needs two of them, or one that
+	// counts more (a code, or the search's only word: "ACCA", "S/4HANA").
+	wordWeight, codeWeight = 1, 2.5
 
 	// What a score says (measured on the benches: right answers mostly
 	// above Strong, wrong ones almost all below Shown).
@@ -70,7 +75,8 @@ type RoleSim struct {
 	Title   string
 	Family  *string
 	Level   *int
-	EndYear *int // nil: their job now
+	Now     bool // their job now
+	EndYear *int // when it ended (nil: not known, or their job now)
 	Field   float64
 	Work    float64
 }
@@ -87,6 +93,7 @@ type Evidence struct {
 	Words          float64   // the search's own words in their CV, 0 to 1
 	WordsFound     []string
 	Read           bool // they have been read by meaning (else only their words were compared)
+	SameRules      bool // ... by the reading rules that read the search (else by older ones, being read again)
 }
 
 // Scored is a candidate's score and what made it.
@@ -98,13 +105,20 @@ type Scored struct {
 	AnotherField bool // their best title is in another field: it counted for less
 }
 
-// Recency is what a title counts for: 1 for their job now, less each year
-// since it ended, never below oldRoleLow (it is still their experience).
-func Recency(endYear *int, thisYear int) float64 {
-	if endYear == nil {
+// Recency is what a title counts for: 1 for their job now (or one that ends
+// this year or later), less each year since it ended, never below oldRoleLow
+// (it is still their experience); a past job whose end is not known counts
+// as a few years ago.
+func Recency(r RoleSim, thisYear int) float64 {
+	switch {
+	case r.Now:
+		return 1
+	case r.EndYear == nil:
+		return pastUnknown
+	case *r.EndYear >= thisYear:
 		return 1
 	}
-	return math.Max(oldRoleLow, 1-oldRoleStep*float64(thisYear-*endYear))
+	return math.Max(oldRoleLow, 1-oldRoleStep*float64(thisYear-*r.EndYear))
 }
 
 // LevelFit is 1 at the level asked for, a little less each level away.
@@ -121,7 +135,7 @@ func Score(q Query, e Evidence, thisYear int) Scored {
 	var out Scored
 	for i := range e.Roles {
 		r := &e.Roles[i]
-		s := math.Max(r.Field, r.Work) * Recency(r.EndYear, thisYear) * LevelFit(q.Level, r.Level)
+		s := math.Max(r.Field, r.Work) * Recency(*r, thisYear) * LevelFit(q.Level, r.Level)
 		if out.Role == nil || s > out.RoleScore {
 			out.Role, out.RoleScore = r, s
 		}
@@ -153,7 +167,8 @@ func Score(q Query, e Evidence, thisYear int) Scored {
 	}
 	// However close the words, a recruiter does not take another field for
 	// this one; their CV naming the search's own words (below) still counts.
-	if q.HasRole && out.Role != nil && q.InAnotherField(out.Role.Family) {
+	// Families read by older rules (being read again) may be named otherwise.
+	if q.HasRole && out.Role != nil && e.SameRules && q.InAnotherField(out.Role.Family) {
 		out.Score *= otherField
 		out.AnotherField = true
 	}
@@ -180,12 +195,27 @@ func Strength(score float64) string {
 	}
 }
 
-// When says when a title was theirs: "now", or "until 2019".
-func When(endYear *int) string {
-	if endYear == nil {
+// When says when a title was theirs: "now", "until 2019", or "earlier" (a
+// past job whose dates are not known).
+func When(r RoleSim) string {
+	switch {
+	case r.Now:
 		return "now"
+	case r.EndYear == nil:
+		return "earlier"
 	}
-	return "until " + strconv.Itoa(*endYear)
+	return "until " + strconv.Itoa(*r.EndYear)
+}
+
+// Space is the model a reading was made with, without its reading rules
+// ("all-MiniLM-L6-v2@1110a243/r5" is all-MiniLM-L6-v2@1110a243): vectors of
+// the same model can be compared (older rules read a little differently
+// until everyone is read again); those of another model never are.
+func Space(model string) string {
+	if i := strings.LastIndex(model, "/r"); i > 0 {
+		return model[:i]
+	}
+	return model
 }
 
 // LevelNames are the levels' names (the AI worker reads titles with the same).
@@ -206,20 +236,14 @@ func QueryHash(model, title, body string) string {
 }
 
 // Fingerprint identifies what is read of a candidate: their titles and work,
-// and their newest CV (which one, and its text). A change in any of them
-// means reading them again.
+// and their newest CV (which one, and which reading of it). A change in any
+// of them means reading them again.
 func Fingerprint(s Source) string {
-	type cv struct{ ID, Text string }
-	var c *cv
-	if s.CV != nil {
-		sum := sha256.Sum256([]byte(s.CV.Text))
-		c = &cv{s.CV.DocumentID, hex.EncodeToString(sum[:8])}
-	}
 	data, _ := json.Marshal(struct { //nolint:errchkjson // plain strings and ints
 		Title string
 		Work  []Work
-		CV    *cv
-	}{s.CurrentTitle, s.Work, c})
+		CV    *CVKey
+	}{s.CurrentTitle, s.Work, s.CV})
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:16])
 }
@@ -254,6 +278,30 @@ func init() {
 }
 
 var searchWord = regexp.MustCompile(`[\p{L}\p{N}][\p{L}\p{N}+#./&-]*[\p{L}\p{N}+#]|[\p{L}\p{N}]{2,}`)
+
+// SearchTerms are a typed search's own words to find in CVs: a code (ACCA,
+// S/4HANA, C++, ISO 27001) or the search's only word counts enough on its
+// own; other words count when a CV has two of them.
+func SearchTerms(text string) []Term {
+	words := SearchWords(text)
+	terms := make([]Term, len(words))
+	for i, w := range words {
+		weight := float32(wordWeight)
+		if len(words) == 1 || looksLikeCode(w) {
+			weight = codeWeight
+		}
+		terms[i] = Term{Text: w, Weight: weight}
+	}
+	return terms
+}
+
+var codeMark = regexp.MustCompile(`[0-9/+#&]|^[A-Z][A-Z0-9]+$`)
+
+// looksLikeCode says whether a word, as typed, is a code: capitals (ACCA,
+// CPA), a digit, or a slash, plus or hash (S/4HANA, C++, C#).
+func looksLikeCode(w string) bool {
+	return len(w) >= 2 && codeMark.MatchString(w)
+}
 
 // SearchWords are a search's own distinctive words (and its codes, such as
 // S/4HANA or C++), to find in CVs: at most eight.

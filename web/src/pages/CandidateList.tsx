@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Fragment, useCallback, useRef, useState } from "react";
+import { Fragment, useCallback, useId, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
@@ -15,7 +15,7 @@ import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
 import { ResumeReader } from "../components/search/ResumeReader";
-import { looksLikeWork, MeaningBanner, MeaningSwitch, readingInterval, useMeaningMode, useReadingTooLong, WhyLine } from "../components/search/MeaningSearch";
+import { MeaningBanner, MeaningRulesHint, MeaningSwitch, readingInterval, useMeaningMode, useMeaningOffer, useReadingTooLong, WhyLine } from "../components/search/MeaningSearch";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
 import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
 import { useRowPicking } from "../components/useRowPicking";
@@ -65,9 +65,12 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   // One search once typing pauses (not one per key, nor errors for a half-typed boolean).
   const typed = useDebounced(q, 350);
   // Search by meaning: the typed words are a role or the work, ranked by meaning (with the filters).
-  const [byMeaning, setByMeaning] = useMeaningMode();
+  // A search given in the address (a name, email or phone from the dashboard) is by words, this visit.
+  const [byMeaning, setByMeaning] = useMeaningMode(hashParam("q") !== "");
   const meaningText = byMeaning ? typed.trim() : "";
   const boolQ = !byMeaning && looksBoolean(typed);
+  const rulesTyped = byMeaning && looksBoolean(q); // AND, OR, NOT or quotes, which a search by meaning does not read
+  const rulesHint = useId();
   const effective: SearchState = boolQ ? { ...adv, boolean: adv.boolean.trim() ? `(${adv.boolean.trim()}) AND (${typed.trim()})` : typed.trim() } : adv;
   const plainQ = boolQ || byMeaning ? "" : typed;
   const advanced = meaningText !== "" || !isEmpty(effective);
@@ -77,6 +80,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     return Object.values(SORTABLE).some((s) => (s.asc === kept || s.desc === kept) && (!s.salary || canSeeSalary)) ? kept : "newest";
   });
   const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
+  // A search by meaning is best match first: no order applies (the kept one is back with the words).
+  const order = meaningText ? null : sortBy;
   const list = useInfiniteQuery({
     queryKey: [...candidatesKey, plainQ, mine, sortBy, folder],
     enabled: !advanced && folders.ready,
@@ -97,7 +102,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     ? { ...toBody(effective, "", mine, undefined, "newest", folder), meaning: meaningText, limit: 100 }
     : toBody(effective, plainQ, mine, page, sortBy, folder));
   const found = useInfiniteQuery({
-    queryKey: [...candidatesKey, "search", plainQ, mine, effective, sortBy, folder, meaningText],
+    queryKey: [...candidatesKey, "search", plainQ, mine, effective, order, folder, meaningText],
     enabled: advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: searchBody(pageParam) })),
@@ -113,15 +118,18 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     : (list.data?.pages.flatMap((pg) => pg.items.map((c) => ({ candidate: c, matchedIn: [], cvSnippet: null }))) ?? []);
   // A sorted list pages by position: if a record moved between pages, it is shown once.
   const hits = allHits.filter((h, i) => allHits.findIndex((x) => x.candidate.id === h.candidate.id) === i);
+  const offerMeaning = useMeaningOffer(plainQ, shownList.data !== undefined && hits.length === 0); // words that found no one
   const inFolders = useInFolders(folders, hits.map((h) => h.candidate.id));
   const terms = found.data?.pages[0]?.terms ?? [];
   const hl = advanced && effective.boolean.trim() ? `?hl=${encodeURIComponent(effective.boolean.trim())}` : "";
   const industries = useIndustries();
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
   const filtersOn = chips.length + (mine ? 1 : 0); // on the Filters button
-  const width = cols.columns.length + (folders.hasFolders ? 2 : 1);
+  // Searching by meaning: why each candidate was found, in a column of its own beside the name.
+  const matchCol = meaningText !== "";
+  const width = cols.columns.length + (folders.hasFolders ? 2 : 1) + (matchCol ? 1 : 0);
   const tableRef = useRef<HTMLTableElement>(null);
-  const widths = useColumnWidths("candidates", ["name", ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
+  const widths = useColumnWidths("candidates", ["name", ...(matchCol ? ["match"] : []), ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
   // The columns after the name move by dragging their headings; the order is kept with the choice of columns.
   const moveColumn = useColumnMove(tableRef, cols.columns, (next) => { cols.save.mutate(next); });
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
@@ -132,7 +140,6 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     set: (ids, on) => { pick.pick(hits.filter((h) => ids.includes(h.candidate.id)).map((h) => personOf(h.candidate)), on); },
   });
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
-    snippet = snippet ?? hits.find((h) => h.candidate.id === c.id)?.why; // a why line is under the row too
     if (!canPick) return { className: snippet ? "has-snippet" : undefined };
     const row = picking.rowProps(c.id);
     return { ...row, className: `${row.className ?? ""}${snippet ? " has-snippet" : ""}` };
@@ -154,7 +161,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         </div>
       )}
       <div className="list-top">
-        <BooleanSearchBox value={q} onChange={setQ} label={byMeaning ? "Search candidates by meaning" : "Search candidates"}
+        <BooleanSearchBox value={q} onChange={setQ} byMeaning={byMeaning} describedBy={rulesTyped ? rulesHint : undefined} label={byMeaning ? "Search candidates by meaning" : "Search candidates"}
           placeholder={byMeaning ? "Who do you need? A role or the work, in your words: talent acquisition, someone who hired engineers…" : "Search by name, email, phone, title or company, or AND, OR, NOT…"}>
           <MeaningSwitch on={byMeaning} onChange={setByMeaning} />
           <button type="button" className={`search-pill${filtersOn > 0 ? " on" : ""}`} aria-expanded={panel} title="Filters (and Mine only)"
@@ -165,7 +172,9 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         </BooleanSearchBox>
         {canImport && !dropped && <DropHint accept={CV_TYPES} label="Drop CVs anywhere to upload" onPick={drop.take} skipped={drop.skipped} />}
       </div>
-      {meaningText && <MeaningBanner outcome={meaning} text={meaningText} tooLong={tooLong} onWords={() => { setByMeaning(false); }} />}
+      {rulesTyped && <MeaningRulesHint id={rulesHint} />}
+      {meaningText && <MeaningBanner outcome={meaning} text={meaningText} tooLong={tooLong} onWords={() => { setByMeaning(false); }}
+        onAgain={() => { void found.refetch(); }} />}
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} mine={{ on: mine, set: setMine }} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && filtersOn > 0 && (
         <div className="active-filters" aria-label="Search filters">
@@ -188,17 +197,17 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
       <WithFolders view={folders} tools={<>
         {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
         <OpenAsSwitch compact value={openAs} onChange={setOpenAs} />
-        {canExport && <ExportButton what="candidates" run={(format) => downloadExport("/v1/candidates/export", { format, search: toBody(effective, plainQ, mine, undefined, sortBy, folder) })} />}
+        {canExport && <ExportButton what="candidates" run={(format) => downloadExport("/v1/candidates/export", { format, search: searchBody() })} />}
       </>}>
       <div className="list-meta">
         <span role="status">
           {shownList.data && meaning?.status !== "reading" && (hits.length === 0 ? (folder && !q.trim() && !advanced && !mine ? "Nothing in this folder yet: choose candidates under All candidates, then Add to folder (or drag them onto it)." : meaningText ? "No one matches by meaning." : "No candidates match.")
             : `${String(hits.length)}${shownList.hasNextPage ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}${meaningText ? ", best match first" : ""}`)}
-          {!byMeaning && shownList.data && hits.length < 3 && looksLikeWork(plainQ) && (
+          {offerMeaning && (
             <> · <button type="button" className="link small" onClick={() => { setByMeaning(true); }}>Search “{plainQ.trim()}” by meaning</button>: titles that differ, CVs without the words</>
           )}
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
-          {sortBy !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
+          {order !== null && order !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
         </span>
         {canPick && !emailing && (
           <PickBar count={pick.picked.size} onEmail={canEmail ? () => { setEmailing(true); } : undefined} onClear={pick.clear}
@@ -218,7 +227,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
       )}
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {openAs === "resume" && (
-        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder])} hits={hits} highlight={advanced ? effective.boolean.trim() : ""} seen={seen} onSeen={markSeen}
+        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder, byMeaning])} hits={hits} highlight={advanced ? effective.boolean.trim() : ""}
+          showLevel={Boolean(meaning?.understood?.levelName)} seen={seen} onSeen={markSeen}
           chosen={canPick ? pick.ids : undefined} onChoose={canPick ? (c, on) => { pick.pick([personOf(c)], on); } : undefined} chooseToEmail={canEmail}
           canAddToJob={canAddToJob} more={more} onMore={shownList.hasNextPage ? () => { void shownList.fetchNextPage(); } : undefined} />
       )}
@@ -229,15 +239,16 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         <table ref={tableRef} {...picking.tableProps} className={`candidates-table${canPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
           <thead>
             <tr>
-              <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />
-              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} move={moveColumn} />)}
+              <SortHeader column="name" label="Name" sort={order} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />
+              {matchCol && <th {...widths.head("match", "Match")}>Match{widths.handle("match", "Match")}</th>}
+              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={order} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} move={moveColumn} />)}
               {folders.hasFolders && <th {...widths.head("folders", "In folders")}>In folders{widths.handle("folders", "In folders")}</th>}
             </tr>
           </thead>
           <tbody>
             {hits.map(({ candidate: c, matchedIn, cvSnippet, why }) => (
               <Fragment key={c.id}>
-                <tr {...rowProps(c, cvSnippet ?? why)}>
+                <tr {...rowProps(c, cvSnippet)}>
                   <td className="name-cell" {...folders.drag(c.id, pick.ids)}>
                     <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
                       {" "}
@@ -246,14 +257,10 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
                       {canPick && pick.ids.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
                     </WaName>
                   </td>
+                  {matchCol && <td className="col-match">{why && <WhyLine why={why} showLevel={Boolean(meaning?.understood?.levelName)} inCell />}</td>}
                   {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}
                   {folders.hasFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
                 </tr>
-                {why && (
-                  <tr className="snippet-row why-row">
-                    <td colSpan={width}><WhyLine why={why} showLevel={Boolean(meaning?.understood?.levelName)} /></td>
-                  </tr>
-                )}
                 {cvSnippet && (
                   <tr className="snippet-row">
                     <td colSpan={width}>
@@ -284,16 +291,20 @@ function keepSort(v: CandidateSort) {
   try { window.localStorage.setItem(SORT_KEY, v); } catch { /* only a convenience */ }
 }
 
-/** A column header; for sortable columns, a button that sorts (and flips) the list, like a spreadsheet. */
+/**
+ * A column header; for sortable columns, a button that sorts (and flips) the
+ * list, like a spreadsheet. With no sort (null: best match first, searching by
+ * meaning), every header is plain.
+ */
 function SortHeader({ column, label, sort, onSort, canSeeSalary, widths, move }: {
-  column: string; label: string; sort: CandidateSort; onSort: (s: CandidateSort) => void; canSeeSalary: boolean; widths: ColumnWidths;
+  column: string; label: string; sort: CandidateSort | null; onSort: (s: CandidateSort) => void; canSeeSalary: boolean; widths: ColumnWidths;
   /** Given, the heading can be dragged to move the column. */
   move?: ColumnMove<Column>;
 }) {
   const sortable = SORTABLE[column];
   const edge = widths.handle(column, label);
   const moving = move?.props(column as Column); // only given for the chosen columns
-  if (!sortable || (sortable.salary && !canSeeSalary)) return <th {...widths.head(column, label)} {...moving}>{label}{edge}</th>;
+  if (!sortable || sort === null || (sortable.salary && !canSeeSalary)) return <th {...widths.head(column, label)} {...moving}>{label}{edge}</th>;
   const way = sortOf(sort, column);
   return (
     <th {...widths.head(column, label)} {...moving} aria-sort={way ?? "none"}>

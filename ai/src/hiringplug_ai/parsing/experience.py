@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from .dates import DateRange, find_range
 from .layout import BULLET, Line, is_bullet
+from .table_rows import by_columns, header_above
 from .vocab import (
     COMPANY_RE,
     FIRM_NAME_RE,
@@ -28,6 +29,8 @@ from .vocab import (
     LEGAL_SUFFIX_RE,
     QUALIFICATION_RE,
     ROLE_RE,
+    TABLE_HEADER_RE,
+    is_firm_name,
     is_place,
     is_sentence,
     strip_duration,
@@ -75,7 +78,7 @@ _DUTY_START = re.compile(
     r"^(?:responsible|manag(?:e|ed|ing)|assist(?:ed|ing)?|handl(?:e|ed|ing)|prepar(?:e|ed|ing)|develop(?:ed|ing)?|"
     r"led|lead\s+(?:a|the)\b|coordinat(?:e|ed|ing)|ensur(?:e|ed|ing)|perform(?:ed|ing)?|maintain(?:ed|ing)?|"
     r"provid(?:e|ed|ing)|support(?:ed|ing)|implement(?:ed|ing)?|work(?:ed|ing)|key\s+(?:responsibilities|"
-    r"achievements)|achievements?|duties|reporting\s+to)\b",
+    r"achievements)|responsibilit(?:y|ies)|achievements?|duties|reporting\s+to)\b",
     re.IGNORECASE,
 )
 
@@ -120,19 +123,26 @@ def headline(text: str) -> bool:
         and not (_CONTINUATION.match(text) and not ROLE_RE.search(text))
         and not _DUTY_START.match(text)
         and not _OTHER_LABEL.match(text)
+        and not TABLE_HEADER_RE.match(text)  # a table's header row: "Organization Role Duration"
         and not is_sentence(text)
     )
 
 
 def kind(piece: str) -> str:
-    """'company', 'title', '' (could be either) or 'skip' (a place, a sentence, a school)."""
-    if not re.search(r"[^\W\d_]{2}", piece) or is_place(piece) or is_sentence(piece):
+    """'company', 'title', '' (could be either) or 'skip' (a place, a sentence,
+    a school, a table's header row)."""
+    if (
+        not re.search(r"[^\W\d_]{2}", piece)
+        or is_place(piece)
+        or is_sentence(piece)
+        or TABLE_HEADER_RE.match(piece)
+    ):
         return "skip"
     if LEGAL_SUFFIX_RE.search(piece):
         return "company"
-    firm = bool(FIRM_NAME_RE.search(piece))
+    firm = is_firm_name(piece)
     company = firm or bool(COMPANY_RE.search(piece))
-    role = bool(ROLE_RE.search(FIRM_NAME_RE.sub(" ", piece)))
+    role = bool(ROLE_RE.search(FIRM_NAME_RE.sub(" ", piece) if firm else piece))
     if not (company or role) and (INSTITUTION_RE.search(piece) or QUALIFICATION_RE.search(piece)):
         return "skip"
     if company and not role:
@@ -218,7 +228,10 @@ def _assign(segments: list[str]) -> Found:
         k = kind(seg)
         if "," in seg and COMPANY_RE.search(seg) and ROLE_RE.search(seg):
             mixed.append(seg)
-        if k == "company" and company is None:
+        # The employer: the first company, or a later one with a legal name ("Contoh Sdn Bhd").
+        if k == "company" and (
+            company is None or (LEGAL_SUFFIX_RE.search(seg) and not LEGAL_SUFFIX_RE.search(company))
+        ):
             company = seg
         elif k == "title" and title is None:
             title = seg
@@ -387,6 +400,10 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
     rest = section[i].replace(dates.quote, " ", 1)
     title = company = None
     unknown: list[str] = []
+    if columns := by_columns(header_above(section, i), rest):
+        # A table's row ("Contoh Sdn Bhd | Accountant | 2019 - 2021"): its own cells, never a neighbour's.
+        title, company = _clean(columns[0]) or None, _clean(columns[1]) or None
+        return Job(title=title, company=company, dates=dates) if title or company else None
     if not _OTHER_LABEL.match(rest.strip()) and headline(_clean(rest) or "x"):
         title, company, unknown = from_text(rest)
     # Labelled lines on the job's own side first ("Duration:" above "Role:" and
@@ -420,6 +437,18 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
             title = name
         elif company is None and name != title:
             company = name
+    title, company = _tidied(title, company, lt, lc)
+    if not (title or company) or _is_school(title, company):
+        return None
+    return Job(title=title, company=company, dates=dates)
+
+
+def _tidied(
+    title: str | None, company: str | None, lt: str | None, lc: str | None
+) -> tuple[str | None, str | None]:
+    """A job's title and employer without what is neither (a client, a team,
+    an aside; lt and lc came labelled), "Promoted to" off the title, and a
+    name in capitals taken for the employer."""
     if title and (
         _NOT_A_JOB_PART.match(title)
         or (title != lt and _ACCOUNT_PREFIX.match(title) and not ROLE_RE.search(title))
@@ -432,9 +461,7 @@ def _job(section: list[str], i: int, start: int, end: int, *, dates_first: bool)
         title = _TEAM_SIZE.sub("", _PROMOTED.sub("", title)).strip() or None
     if title and company is None and not ROLE_RE.search(title) and _SHOUTED.match(title):
         title, company = None, title  # "IBM GDC MALAYSIA | Mar 2018 - May 2021": a name, not a role
-    if not (title or company) or _is_school(title, company):
-        return None
-    return Job(title=title, company=company, dates=dates)
+    return title, company
 
 
 def _is_school(title: str | None, company: str | None) -> bool:

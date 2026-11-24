@@ -25,10 +25,9 @@ from hiringplug_ai.meaning import model as meaning_model
 from hiringplug_ai.meaning.families import NEAR
 from hiringplug_ai.meaning.recruiter import (
     expand,
-    family,
+    job_reading,
     level,
     read_search,
-    reading,
     reading_in_work,
     reading_with_work,
     said_level,
@@ -50,6 +49,7 @@ WORDS = 0.06  # the search's own words in the CV
 WORDS_EXACT = 0.25  # ... when it names a tool, qualification or code (S/4HANA, ACCA)
 LEVEL_STEP, LEVEL_MAX_STEPS = 0.03, 3
 OLD_ROLE_STEP, OLD_ROLE_FLOOR = 0.05, 0.55
+PAST_UNKNOWN = 0.8  # a past job whose end year is not known
 OTHER_FIELD = 0.75  # their best title in another field, not a neighbour (families.NEAR)
 GOOD = 0.5  # what a score must reach to be called a good match
 
@@ -64,8 +64,14 @@ def model() -> meaning_model.MeaningModel:
     return loaded
 
 
-def recency(end: int | None) -> float:
-    return 1.0 if end is None else max(OLD_ROLE_FLOOR, 1 - OLD_ROLE_STEP * (THIS_YEAR - end))
+def recency(end: int | None, now: bool) -> float:
+    """Go's meaning.Recency: their job now, or one ending this year or later,
+    counts in full; a past job with no end year as about four years ago."""
+    if now or (end is not None and end >= THIS_YEAR):
+        return 1.0
+    if end is None:
+        return PAST_UNKNOWN
+    return max(OLD_ROLE_FLOOR, 1 - OLD_ROLE_STEP * (THIS_YEAR - end))
 
 
 def level_fit(want: int | None, have: int | None) -> float:
@@ -102,7 +108,8 @@ def read_bench(bench: ModuleType, m: meaning_model.MeaningModel) -> Read:
 def role_score(r: Read, i: int, role: np.ndarray, want: int | None) -> tuple[float, str | None]:
     """Their best title's score for the role asked for, and its family."""
     return max(
-        (max(float(f @ role), float(w @ role)) * recency(end) * level_fit(want, lvl), fam)
+        # The benches write their job now with no end year.
+        (max(float(f @ role), float(w @ role)) * recency(end, now=end is None) * level_fit(want, lvl), fam)
         for f, w, lvl, end, fam in r.roles[i]
     )
 
@@ -320,17 +327,17 @@ def test_possible_candidates_for_a_job_are_found_by_its_title_and_needs(
     r = read_bench(meaning_bench_a, model)
     results = []
     for title, needs, wanted in JOBS:
-        role = model.embed([reading(title)])[0]
+        asked, reading = job_reading(title, " ".join(needs))  # as the worker reads a job
+        role = model.embed([reading])[0]
         whole = model.embed([(expand(title) + ". " + " ".join(needs))])[0]
         need_v = model.embed(needs)
-        asked = family(title)
         roles, counts = best_roles(r, role, said_level(title), asked[0] if asked else None)
         met = (r.passages @ need_v.T).mean(axis=1)  # each need against their CV
         a, b, c = JOB
         scores = (a * roles + b * met + c * (r.profiles @ whole)) * counts
         grades = [grade(cand[3], cand[0], wanted) for cand in meaning_bench_a.C]
         results.append(ndcg(scores, grades))
-        assert family(title) is not None
+        assert asked is not None
     assert float(np.mean(results)) >= 0.93, (
         f"jobs NDCG@10 {np.mean(results):.3f}: {[round(x, 2) for x in results]}"
     )

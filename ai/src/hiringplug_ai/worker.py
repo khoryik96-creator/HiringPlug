@@ -138,16 +138,13 @@ def main() -> None:
         threading.Thread(target=run_slot, args=(q, deps, config, stop), name=f"slot-{i + 1}")
         for i, q in enumerate(queues)
     ]
-    # One more slot for search by meaning only: a recruiter's search is read
-    # at once, even while the other slots format CVs for minutes.
+    # One more slot for search by meaning, and only it reads by meaning: a
+    # recruiter's search is read at once, even while the other slots format
+    # CVs for minutes, and the background read-through never takes every slot.
     meaning_queue = Queue(config.database_url, f"{config.worker_id}/meaning")
     queues.append(meaning_queue)
     slots.append(
-        threading.Thread(
-            target=run_slot,
-            args=(meaning_queue, deps, config, stop, [k.value for k in MEANING_KINDS]),
-            name="slot-meaning",
-        )
+        threading.Thread(target=run_slot, args=(meaning_queue, deps, config, stop, True), name="slot-meaning")
     )
     for t in slots:
         t.start()
@@ -162,15 +159,16 @@ def slot_id(worker_id: str, i: int, n: int) -> str:
     return worker_id if n == 1 else f"{worker_id}/{i + 1}"
 
 
-def run_slot(
-    queue: Queue, deps: Deps, config: Config, stop: threading.Event, kinds: list[str] | None = None
-) -> None:
-    """Runs jobs one after another until stop is set (one of several slots);
-    with kinds, only jobs of those kinds."""
+def run_slot(queue: Queue, deps: Deps, config: Config, stop: threading.Event, meaning: bool = False) -> None:
+    """Runs jobs one after another until stop is set (one of several slots):
+    the meaning slot only search by meaning's, the others all but those."""
+    kinds = [k.value for k in MEANING_KINDS]
     while not stop.is_set():
         try:
             job = (
-                queue.claim_kinds(config.lease_seconds, kinds) if kinds else queue.claim(config.lease_seconds)
+                queue.claim_kinds(config.lease_seconds, kinds)
+                if meaning
+                else queue.claim_except(config.lease_seconds, kinds)
             )
             if job is None:
                 queue.wait_for_work(config.poll_seconds)

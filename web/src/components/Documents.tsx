@@ -50,6 +50,9 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
   // whose details were asked for (their review opens once read).
   const [watched, setWatched] = useState<ReadonlySet<string>>(new Set());
   const [asked, setAsked] = useState<ReadonlySet<string>>(new Set());
+  // CVs read again because their reading was out of date: once each, so a
+  // server not yet reading them the new way never keeps the review away.
+  const [refreshed, setRefreshed] = useState<ReadonlySet<string>>(new Set());
   const [comparing, setComparing] = useState(false);
   const canFormat = permissions.includes("cvformats:create");
   const studio = useStudioRun(candidateId, canFormat);
@@ -164,6 +167,13 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
   };
   const review = (id: string) => {
     if (reviewing === id) { setReviewing(null); return; }
+    // Read by older rules: read again first (the review opens once read).
+    const d = all.find((x) => x.id === id);
+    if (d?.readOutdated && canUpload && !refreshed.has(id) && !isReading(d)) {
+      setRefreshed(new Set([...refreshed, id]));
+      parse.mutate(id);
+      return;
+    }
     setReviewing(id);
     setPicked(id);
     forget(id);

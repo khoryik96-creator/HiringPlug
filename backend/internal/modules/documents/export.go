@@ -71,6 +71,9 @@ func (m *Module) WhenTextRead(hooks ...TextReadHook) { m.service.whenRead = hook
 // WhenReadDone registers what runs when reading a document has ended.
 func (m *Module) WhenReadDone(hooks ...ReadDoneHook) { m.service.whenDone = hooks }
 
+// WhenCVBinned registers what runs when a candidate's CV is moved to the Bin or back.
+func (m *Module) WhenCVBinned(hooks ...CVBinnedHook) { m.service.whenBinned = hooks }
+
 // UseAI lets the AI fill in what the rules leave empty when reading CVs,
 // while ai allows it.
 func (m *Module) UseAI(ai AIAllowance) { m.service.ai = ai }

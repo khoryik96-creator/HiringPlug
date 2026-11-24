@@ -2,18 +2,28 @@
 -- and the comparisons. Vectors come in as text ('[0.1,0.2,...]') and are
 -- compared here; Go never reads them back.
 
+-- The company's read-through (a plain read: searches never wait on it).
 -- name: GetSweep :one
-SELECT tenant_id, chain, cursor_id, passes, due_at, ran_at, model, unavailable_until FROM meaning_sweep;
+SELECT * FROM meaning_sweep;
 
--- The company's read-through, made if it has none (inserted: it was made now).
--- name: EnsureSweep :one
-INSERT INTO meaning_sweep (tenant_id) VALUES (app_current_tenant())
-ON CONFLICT (tenant_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id
-RETURNING tenant_id, chain, cursor_id, passes, due_at, ran_at, model, unavailable_until, (xmax = 0)::boolean AS inserted;
+-- The company's read-through, made now (no row: another request made it meanwhile).
+-- name: StartSweep :one
+INSERT INTO meaning_sweep (tenant_id) VALUES (app_current_tenant()) ON CONFLICT (tenant_id) DO NOTHING
+RETURNING *;
 
--- The read-through stalled (its job died) or must start again: a new chain.
+-- The read-through stalled (its job died) or must start again: a new chain,
+-- from where it got to or, for a new model, from the beginning.
 -- name: RestartSweep :one
-UPDATE meaning_sweep SET chain = chain + 1, due_at = now() RETURNING chain;
+UPDATE meaning_sweep SET chain = chain + 1, due_at = now(), cursor_id = CASE WHEN @from_start::boolean THEN '' ELSE cursor_id END
+RETURNING chain;
+
+-- How far the read-through has got, counted at the start of each pass (and every few minutes).
+-- name: SetSweepCounts :exec
+UPDATE meaning_sweep SET read_count = @read_count::int, total_count = @total_count::int, counted_at = now();
+
+-- Candidates read now by the model the read-through uses: that many more read.
+-- name: AddRead :exec
+UPDATE meaning_sweep SET read_count = coalesce(read_count, 0) + @n::int WHERE model = @model;
 
 -- name: SweepRan :exec
 UPDATE meaning_sweep SET cursor_id = @cursor_id, passes = passes + @finished::int, due_at = @due_at, ran_at = now()
@@ -22,7 +32,8 @@ WHERE chain = @chain;
 -- The model (and reading rules) that read the latest; changed: everyone is read again.
 -- name: SetSweepModel :one
 WITH before AS (SELECT model FROM meaning_sweep)
-UPDATE meaning_sweep SET model = @model, unavailable_until = NULL
+UPDATE meaning_sweep SET model = @model, unavailable_until = NULL,
+  read_count = CASE WHEN meaning_sweep.model IS DISTINCT FROM @model THEN 0 ELSE read_count END
 WHERE meaning_sweep.model IS DISTINCT FROM @model OR unavailable_until IS NOT NULL
 RETURNING ((SELECT before.model FROM before) IS DISTINCT FROM @model)::boolean AS changed;
 
@@ -58,20 +69,27 @@ DELETE FROM meaning_role WHERE candidate_id = @candidate_id;
 -- name: DeletePassages :exec
 DELETE FROM meaning_passage WHERE candidate_id = @candidate_id;
 
--- name: SaveRead :exec
+-- A CV moved to the Bin: what was read of it goes at once.
+-- name: DeleteDocumentPassages :exec
+DELETE FROM meaning_passage WHERE document_id = @document_id;
+
+-- newly: not read by this model before (counted as read).
+-- name: SaveRead :one
+WITH before AS (SELECT model FROM meaning_candidate WHERE candidate_id = @candidate_id)
 INSERT INTO meaning_candidate (tenant_id, candidate_id, fingerprint, model, profile, read_at)
 VALUES (app_current_tenant(), @candidate_id, @fingerprint, @model, sqlc.narg(profile)::text::vector, now())
 ON CONFLICT (tenant_id, candidate_id) DO UPDATE
-SET fingerprint = EXCLUDED.fingerprint, model = EXCLUDED.model, profile = EXCLUDED.profile, read_at = now();
+SET fingerprint = EXCLUDED.fingerprint, model = EXCLUDED.model, profile = EXCLUDED.profile, read_at = now()
+RETURNING ((SELECT before.model FROM before) IS DISTINCT FROM @model)::boolean AS newly;
 
 -- Levels and years of -1 are none.
 -- name: InsertRoles :exec
-INSERT INTO meaning_role (tenant_id, candidate_id, ordinal, title, family, level, end_year, field, work)
+INSERT INTO meaning_role (tenant_id, candidate_id, ordinal, title, family, level, end_year, current, field, work)
 SELECT app_current_tenant(), sqlc.arg(candidate_id)::text, r.ordinal, r.title, nullif(r.family, ''), nullif(r.level, -1),
-       nullif(r.end_year, -1), r.field::vector, r.work::vector
+       nullif(r.end_year, -1), r.current, r.field::vector, r.work::vector
 FROM (SELECT unnest(@ordinals::smallint[]) AS ordinal, unnest(@titles::text[]) AS title, unnest(@families::text[]) AS family,
              unnest(@levels::smallint[]) AS level, unnest(@end_years::smallint[]) AS end_year,
-             unnest(@fields::text[]) AS field, unnest(@works::text[]) AS work) r;
+             unnest(@currents::boolean[]) AS current, unnest(@fields::text[]) AS field, unnest(@works::text[]) AS work) r;
 
 -- name: InsertPassages :exec
 INSERT INTO meaning_passage (tenant_id, candidate_id, ordinal, document_id, passage, vec)
@@ -84,7 +102,7 @@ SELECT count(*) FROM meaning_candidate WHERE model = @model;
 
 -- A search or a job, as read.
 -- name: QueryByHash :one
-SELECT id, status, level, describes, exact, understood, created_at, read_at, (role IS NOT NULL)::boolean AS has_role,
+SELECT id, status, level, describes, exact, understood, created_at, read_at, rereads, (role IS NOT NULL)::boolean AS has_role,
        (context IS NOT NULL)::boolean AS has_context,
        (SELECT count(*) FROM meaning_query_need n WHERE n.query_id = q.id)::int AS needs
 FROM meaning_query q WHERE text_hash = @text_hash;
@@ -96,7 +114,7 @@ ON CONFLICT (tenant_id, text_hash) DO UPDATE SET used_at = now()
 RETURNING id, status, created_at;
 
 -- name: RereadQuery :exec
-UPDATE meaning_query SET status = 'reading', created_at = now(), read_at = NULL WHERE id = @id;
+UPDATE meaning_query SET status = 'reading', created_at = now(), read_at = NULL, rereads = least(rereads + 1, 100) WHERE id = @id;
 
 -- name: TouchQuery :exec
 UPDATE meaning_query SET used_at = now() WHERE id = @id AND used_at < now() - interval '1 hour';
@@ -122,7 +140,7 @@ INSERT INTO meaning_query_need (tenant_id, query_id, ordinal, need, vec)
 SELECT app_current_tenant(), sqlc.arg(query_id)::text, n.ordinal, n.need, n.vec::vector
 FROM (SELECT unnest(@ordinals::smallint[]) AS ordinal, unnest(@needs::text[]) AS need, unnest(@vecs::text[]) AS vec) n;
 
--- Searches not used for 90 days are forgotten.
+-- Searches not used for 90 days are forgotten (the read-through, at the end of each pass).
 -- name: ForgetOldQueries :exec
 DELETE FROM meaning_query WHERE used_at < now() - interval '90 days';
 
@@ -130,28 +148,43 @@ DELETE FROM meaning_query WHERE used_at < now() - interval '90 days';
 -- name: SearchWidely :exec
 SELECT set_config('hnsw.ef_search', @ef::text, true);
 
+-- An index search goes on past the rows the user may not see (or that are
+-- left out) until it has found enough (pgvector 0.8 and later).
+-- name: SearchIteratively :exec
+SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true), set_config('hnsw.max_scan_tuples', @max_tuples::text, true);
+
 -- The nearest titles to the role asked for (read as fields, then with the
 -- work), the nearest CV passages and profiles to the whole search: who to
--- look at closely.
+-- look at closely; n candidates each (one may have several titles or
+-- passages near), leaving out those already on the job.
 -- name: NearByField :many
-SELECT candidate_id::text FROM meaning_role
-ORDER BY field <=> (SELECT role FROM meaning_query WHERE id = @query_id) LIMIT @n;
+SELECT x.candidate_id::text FROM (
+  SELECT candidate_id, field <=> (SELECT q.role FROM meaning_query q WHERE q.id = @query_id) AS d FROM meaning_role
+  WHERE NOT (candidate_id = ANY(@exclude::text[]))
+  ORDER BY field <=> (SELECT q.role FROM meaning_query q WHERE q.id = @query_id) LIMIT @rows::int
+) x GROUP BY x.candidate_id ORDER BY min(x.d) LIMIT @n::int;
 
 -- name: NearByWork :many
-SELECT candidate_id::text FROM meaning_role
-ORDER BY work <=> (SELECT role FROM meaning_query WHERE id = @query_id) LIMIT @n;
+SELECT x.candidate_id::text FROM (
+  SELECT candidate_id, work <=> (SELECT q.role FROM meaning_query q WHERE q.id = @query_id) AS d FROM meaning_role
+  WHERE NOT (candidate_id = ANY(@exclude::text[]))
+  ORDER BY work <=> (SELECT q.role FROM meaning_query q WHERE q.id = @query_id) LIMIT @rows::int
+) x GROUP BY x.candidate_id ORDER BY min(x.d) LIMIT @n::int;
 
 -- name: NearByPassage :many
-SELECT candidate_id::text FROM meaning_passage
-ORDER BY vec <=> (SELECT coalesce(context, whole) FROM meaning_query WHERE id = @query_id) LIMIT @n;
+SELECT x.candidate_id::text FROM (
+  SELECT candidate_id, vec <=> (SELECT coalesce(q.context, q.whole) FROM meaning_query q WHERE q.id = @query_id) AS d FROM meaning_passage
+  WHERE NOT (candidate_id = ANY(@exclude::text[]))
+  ORDER BY vec <=> (SELECT coalesce(q.context, q.whole) FROM meaning_query q WHERE q.id = @query_id) LIMIT @rows::int
+) x GROUP BY x.candidate_id ORDER BY min(x.d) LIMIT @n::int;
 
 -- name: NearByProfile :many
-SELECT candidate_id::text FROM meaning_candidate WHERE profile IS NOT NULL
-ORDER BY profile <=> (SELECT whole FROM meaning_query WHERE id = @query_id) LIMIT @n;
+SELECT candidate_id::text FROM meaning_candidate WHERE profile IS NOT NULL AND NOT (candidate_id = ANY(@exclude::text[]))
+ORDER BY profile <=> (SELECT whole FROM meaning_query WHERE id = @query_id) LIMIT @n::int;
 
 -- Then exactly, for those: each title, ...
 -- name: RoleScores :many
-SELECT r.candidate_id::text, r.ordinal, r.title, r.family, r.level, r.end_year,
+SELECT r.candidate_id::text, r.ordinal, r.title, r.family, r.level, r.end_year, r.current,
        (1 - (r.field <=> q.role))::float4 AS field_sim, (1 - (r.work <=> q.role))::float4 AS work_sim
 FROM meaning_role r, (SELECT role FROM meaning_query WHERE id = @query_id) q
 WHERE r.candidate_id = ANY(@candidate_ids::text[]) AND q.role IS NOT NULL;
@@ -174,7 +207,7 @@ GROUP BY x.candidate_id;
 
 -- ... their whole profile ...
 -- name: ProfileScores :many
-SELECT m.candidate_id::text, coalesce(1 - (m.profile <=> q.whole), 0)::float4 AS sim
+SELECT m.candidate_id::text, m.model, coalesce(1 - (m.profile <=> q.whole), 0)::float4 AS sim
 FROM meaning_candidate m, (SELECT whole FROM meaning_query WHERE id = @query_id) q
 WHERE m.candidate_id = ANY(@candidate_ids::text[]);
 

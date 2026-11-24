@@ -55,8 +55,15 @@ _LABEL = re.compile(
     r"^(?:(?:full\s+)?name|contact|curriculum\s+vitae\s+(?:for|of)|resume\s+of|cv\s+of)\b\s*[:：]?\s*", re.I
 )
 _CONTACT_SPLIT = re.compile(
-    r"\s*(?:[|•·,]|\s(?=\+?\(?\d)|\b(?:phone|mobile|email|e-mail|tel|hp|h/p)\b\s*[:：]?)", re.IGNORECASE
+    r"\s*(?:[|•·,]|\s(?=\+?\(?\d)|\b(?:phone|mobile|email|e-mail|mail|tel|hp|h/p)\b\s*[:：]?|\s(?=\S+@))",
+    re.IGNORECASE,
 )
+# Qualifications written after a name: "Srinivas Rao PMP", "Lim Mei Ling ACCA, CPA".
+_LETTERS_AFTER = (
+    "PMP|CAPM|CPA|ACCA|FCCA|CFA|CIMA|CMA|CIA|CISA|CISM|CISSP|CEH|MBA|PhD|Ph\\.D|PHD|MSc|BSc|BEng|MEng|CEng|"
+    "MIA|CFP|FRM|CAIA|ITIL|P\\.Eng|CIPD|CHRP|SHRM-CP|SHRM|CSCP|CPIM|CQE|CSM|PSM|LSSBB|LSSGB|CCNA|CCNP|CCIE"
+)
+_TRAILING_LETTERS = re.compile(rf"(?:[\s,]+(?:{_LETTERS_AFTER})\.?)+$")
 # "TAN PEI YIN Senior ...", "THAM AH MENG (JORDAN) Curriculum Vitae", "TERRY GOH 60142002101"
 _CAPS_RUN = re.compile(r"^((?:[A-Z][A-Z'’.\-/]*\s+){1,5}[A-Z][A-Z'’.\-/]*)(?=\s+(?:[A-Z]?[a-z]|\(|\d)|\s*$)")
 _OCR_I = re.compile(r"(?<=[^\W\d_])[\]!](?=\s|$)")
@@ -73,6 +80,7 @@ def _value(text: str) -> str:
     the name or nickname, ALL CAPS in Title Case."""
     text = _NICKNAME.sub("", _POST_NOMINALS.sub("", _HONORIFIC.sub("", _ocr_fixed(text.strip()))))
     text = re.sub(r"\s+", " ", text).strip(" ,.")
+    text = _TRAILING_LETTERS.sub("", text).strip(" ,.") or text
     if text.isupper():
         return " ".join(w if w in {"A/L", "A/P"} else w.capitalize() for w in text.split())
     return text

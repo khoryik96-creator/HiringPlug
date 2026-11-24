@@ -72,33 +72,55 @@ func (s *Service) candidatesRead(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	if err != nil {
 		return err
 	}
-	here := map[string]bool{}
-	for _, src := range sources {
-		here[src.CandidateID] = true
+	if sources, err = s.withCVKeys(ctx, tx, sources); err != nil {
+		return err
 	}
+	now := map[string]string{} // what each is now (their fingerprint)
+	for _, src := range sources {
+		now[src.CandidateID] = Fingerprint(src)
+	}
+	newly := 0
 	for _, c := range payload.Candidates {
-		if !here[c.CandidateId] {
-			continue // deleted while being read
+		fp, here := now[c.CandidateId]
+		switch {
+		case !here:
+			continue // deleted (or moved to the Bin) while being read
+		case fp != c.Fingerprint:
+			// Changed while being read (a new CV): this reading is out of date,
+			// and a newer one is queued or will be by the read-through.
+			if err := q.ClearPending(ctx, store.ClearPendingParams{CandidateID: c.CandidateId, Fingerprint: c.Fingerprint}); err != nil {
+				return err
+			}
+			continue
 		}
-		if err := s.saveRead(ctx, tx, payload.Model, c); err != nil {
+		counted, err := s.saveRead(ctx, tx, payload.Model, c)
+		if err != nil {
 			return err
 		}
+		if counted {
+			newly++
+		}
 	}
-	return nil
+	if newly == 0 {
+		return nil
+	}
+	return q.AddRead(ctx, store.AddReadParams{N: int32(newly), Model: &payload.Model}) //nolint:gosec // at most a batch
 }
 
-func (s *Service) saveRead(ctx context.Context, tx pgx.Tx, model string, c api.MeaningCandidateRead) error {
+// saveRead replaces what was read of a candidate; counted: not read by this model before.
+func (s *Service) saveRead(ctx context.Context, tx pgx.Tx, model string, c api.MeaningCandidateRead) (bool, error) {
 	q := store.New(tx)
 	if err := q.DeleteRoles(ctx, c.CandidateId); err != nil {
-		return err
+		return false, err
 	}
 	if err := q.DeletePassages(ctx, c.CandidateId); err != nil {
-		return err
+		return false, err
 	}
-	if err := q.SaveRead(ctx, store.SaveReadParams{
+	counted, err := q.SaveRead(ctx, store.SaveReadParams{
 		CandidateID: c.CandidateId, Fingerprint: c.Fingerprint, Model: model, Profile: optionalVector(c.Profile),
-	}); err != nil {
-		return err
+	})
+	if err != nil {
+		return false, err
 	}
 	if len(c.Roles) > 0 {
 		in := store.InsertRolesParams{CandidateID: c.CandidateId}
@@ -116,18 +138,20 @@ func (s *Service) saveRead(ctx context.Context, tx pgx.Tx, model string, c api.M
 				end = &y
 			}
 			in.EndYears = append(in.EndYears, smallint(end))
+			// A worker that does not say: no end year was their job now.
+			in.Currents = append(in.Currents, (r.Current != nil && *r.Current) || (r.Current == nil && end == nil))
 			in.Fields = append(in.Fields, vector(r.Field))
 			in.Works = append(in.Works, vector(r.Work))
 		}
 		if err := q.InsertRoles(ctx, in); err != nil {
-			return err
+			return false, err
 		}
 	}
 	if len(c.Passages) > 0 {
 		// Only of a CV that is still there (it may have been deleted while being read).
 		exists, err := s.deps.CVs.DocumentExists(ctx, tx, c.Passages[0].DocumentId)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if exists {
 			in := store.InsertPassagesParams{CandidateID: c.CandidateId}
@@ -138,11 +162,11 @@ func (s *Service) saveRead(ctx context.Context, tx pgx.Tx, model string, c api.M
 				in.Vecs = append(in.Vecs, vector(p.Vec))
 			}
 			if err := q.InsertPassages(ctx, in); err != nil {
-				return err
+				return false, err
 			}
 		}
 	}
-	return q.ClearPending(ctx, store.ClearPendingParams{CandidateID: c.CandidateId, Fingerprint: c.Fingerprint})
+	return counted, q.ClearPending(ctx, store.ClearPendingParams{CandidateID: c.CandidateId, Fingerprint: c.Fingerprint})
 }
 
 // queryRead handles meaning.query_read.
@@ -197,8 +221,8 @@ func (s *Service) queryRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 }
 
 // modelRead notes the model (and reading rules) that read the latest; a new
-// one starts the company's read-through again at once, so everyone is read
-// with it (vectors of different models are not compared).
+// one starts the company's read-through again at once, from the beginning,
+// so everyone is read with it (vectors of different models are not compared).
 func (s *Service) modelRead(ctx context.Context, tx pgx.Tx, tenantID, model string) error {
 	q := store.New(tx)
 	changed, err := q.SetSweepModel(ctx, &model)
@@ -211,7 +235,7 @@ func (s *Service) modelRead(ctx context.Context, tx pgx.Tx, tenantID, model stri
 	if _, err := s.ensureRunning(ctx, tx, tenantID); err != nil {
 		return err
 	}
-	chain, err := q.RestartSweep(ctx)
+	chain, err := q.RestartSweep(ctx, true)
 	if err != nil {
 		return err
 	}

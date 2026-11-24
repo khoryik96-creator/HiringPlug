@@ -154,13 +154,18 @@ def _merge_bullet_level_lists(*lists):
     return [{"text": k, "level": v} for k, v in best.items() if v >= 1]
 
 
-# Copied from app.py:12462-12498
+# Copied from app.py:12462-12498 (HiringPlug: levels follow how deep each
+# bullet sits on the page, not Word's raw level number).
 def _extract_docx_bullet_levels(file_bytes):
-    """Map nested (w:ilvl >= 1) list paragraphs to their indent level.
+    """Map nested list paragraphs to their indent level.
 
     Word stores list nesting in w:numPr/w:ilvl, which the plain-text extraction
     discards. This side-channel lets the renderer restore the indent
     deterministically by matching parsed bullet text back to its source level.
+    A CV often sets a list level's indent by hand (level 3 drawn as shallow as
+    level 0, its own sub-points deeper), so within each run of list
+    paragraphs the level is the rank of the bullet's indent on the page: the
+    shallowest is 0, the next 1, and so on.
     Only levels >= 1 are recorded; every unmatched bullet renders at level 0.
     """
     import io as _io
@@ -172,17 +177,46 @@ def _extract_docx_bullet_levels(file_bytes):
         doc = _docx.Document(_io.BytesIO(file_bytes))
     except Exception:
         return out
+    numbering = _list_level_indents(doc)
+
+    def indent_of(p, num_id, level):
+        own = p.xpath("./w:pPr/w:ind/@w:left") or p.xpath("./w:pPr/w:ind/@w:start")
+        if own:
+            try:
+                return int(own[0])
+            except (TypeError, ValueError):
+                pass
+        found = numbering.get((num_id, level))
+        return found if found is not None else 720 * (level + 1)
+
+    # Read as an outline: a bullet deeper than the one before it is a level
+    # below it; one as deep (within a seventh of an inch: 359 twips set by
+    # hand beside the numbering's 360) is a sibling; a shallower one goes
+    # back up. A paragraph that is not a list item, or a list item styled as
+    # a heading, starts afresh.
+    stack = []
     for p in doc.element.body.iter(qn("w:p")):
         ilvl_vals = p.xpath("./w:pPr/w:numPr/w:ilvl/@w:val")
-        if not ilvl_vals:
+        num_vals = p.xpath("./w:pPr/w:numPr/w:numId/@w:val")
+        style = (p.xpath("./w:pPr/w:pStyle/@w:val") or [""])[0].lower()
+        text = "".join(node.text or "" for node in p.iter(qn("w:t"))).strip()
+        if (not ilvl_vals and not num_vals) or style.startswith("heading"):
+            if text:
+                stack = []
+            continue
+        if not text:
             continue
         try:
-            level = int(ilvl_vals[0])
+            raw = int(ilvl_vals[0]) if ilvl_vals else 0
         except (TypeError, ValueError):
             continue
+        ind = indent_of(p, num_vals[0] if num_vals else "", raw)
+        while stack and ind <= stack[-1] + 150:
+            stack.pop()
+        level = len(stack)
+        stack.append(ind)
         if level < 1:
             continue
-        text = "".join(node.text or "" for node in p.iter(qn("w:t"))).strip()
         key = _cv_bullet_match_key(text)
         if not key:
             continue
@@ -191,6 +225,41 @@ def _extract_docx_bullet_levels(file_bytes):
             continue
         seen.add(dedup)
         out.append({"text": key, "level": min(level, 8)})
+    return out
+
+
+def _list_level_indents(doc):
+    """(numId, level) -> the left indent (twips) Word's numbering gives it."""
+    from docx.oxml.ns import qn
+    out = {}
+    try:
+        root = doc.part.numbering_part.element
+    except Exception:
+        return out
+
+    def left(ppr):
+        ind = ppr.find(qn("w:ind")) if ppr is not None else None
+        value = None if ind is None else (ind.get(qn("w:left")) or ind.get(qn("w:start")))
+        try:
+            return int(value) if value is not None else None
+        except ValueError:
+            return None
+
+    abstract = {}
+    for a in root.iter(qn("w:abstractNum")):
+        for lvl in a.iter(qn("w:lvl")):
+            ind = left(lvl.find(qn("w:pPr")))
+            if ind is not None:
+                try:
+                    abstract[(a.get(qn("w:abstractNumId")), int(lvl.get(qn("w:ilvl"))))] = ind
+                except (TypeError, ValueError):
+                    pass
+    for num in root.iter(qn("w:num")):
+        ref = num.find(qn("w:abstractNumId"))
+        aid = ref.get(qn("w:val")) if ref is not None else None
+        for (a, level), ind in abstract.items():
+            if a == aid:
+                out[(num.get(qn("w:numId")), level)] = ind
     return out
 
 

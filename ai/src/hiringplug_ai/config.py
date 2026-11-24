@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .meaning.model import default_folder
+from .meaning.folder import default_folder
 
 
 @dataclass(frozen=True)

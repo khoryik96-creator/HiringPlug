@@ -123,6 +123,10 @@ func documentToAPI(d Document, withText bool) api.Document {
 		CreatedAt:          d.CreatedAt, UpdatedAt: d.UpdatedAt,
 	}
 	out.ParseError = apiconv.OrNull(d.ParseError)
+	if d.ReadOutdated {
+		outdated := true
+		out.ReadOutdated = &outdated
+	}
 	if d.ParseStatus != nil {
 		out.ParseStatus = nullable.NewNullableWithValue(api.DocumentParseStatus(*d.ParseStatus))
 	} else {

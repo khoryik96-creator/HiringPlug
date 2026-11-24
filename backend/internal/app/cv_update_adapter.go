@@ -23,7 +23,7 @@ func (a profileFromNewestCV) ReadDone(ctx context.Context, tx pgx.Tx, _, documen
 	if profile == nil {
 		return nil
 	}
-	candidateID, source, _, err := a.documents.CVTextOf(ctx, tx, documentID)
+	candidateID, source, err := a.documents.DocumentOwner(ctx, tx, documentID)
 	if err != nil || source == "formatted" {
 		return err
 	}
