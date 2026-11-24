@@ -136,6 +136,10 @@ func TestCVParsingKeepsOnlyValuesFoundInTheCV(t *testing.T) {
 		var queued api.Document
 		again.JSON(&queued)
 		assert.Equal(t, api.DocumentParseStatusQueued, queued.ParseStatus.MustGet())
+		// Its text is taken out of the file again first (a newer reader may see more), then read.
+		extract := claimAIJobFor(t, aiConn, doc.Id)
+		require.Equal(t, "document.extract_text", extract.Kind)
+		answerAIJob(t, a, aiConn, extract, api.JobKindDocumentTextExtracted, extractedText(doc.Id, parsedCV))
 		assert.Equal(t, "document.parse_cv", claimAIJobFor(t, aiConn, doc.Id).Kind)
 	})
 

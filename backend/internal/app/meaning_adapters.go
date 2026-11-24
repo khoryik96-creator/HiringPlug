@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -47,6 +48,10 @@ func (a meaningCandidates) Count(ctx context.Context, tx pgx.Tx) (int, error) {
 	return a.candidates.Count(ctx, tx)
 }
 
+func (a meaningCandidates) Visible(ctx context.Context, tx pgx.Tx, limit int) ([]string, error) {
+	return a.candidates.VisibleIDs(ctx, tx, limit)
+}
+
 type meaningCVs struct{ documents *documents.Module }
 
 func (a meaningCVs) NewestCVs(ctx context.Context, tx pgx.Tx, candidateIDs []string) (map[string]meaning.CV, error) {
@@ -54,6 +59,15 @@ func (a meaningCVs) NewestCVs(ctx context.Context, tx pgx.Tx, candidateIDs []str
 	out := make(map[string]meaning.CV, len(found))
 	for id, cv := range found {
 		out[id] = meaning.CV{DocumentID: cv.DocumentID, Text: cv.Text}
+	}
+	return out, err
+}
+
+func (a meaningCVs) NewestCVKeys(ctx context.Context, tx pgx.Tx, candidateIDs []string) (map[string]meaning.CVKey, error) {
+	found, err := a.documents.NewestCVKeys(ctx, tx, candidateIDs)
+	out := make(map[string]meaning.CVKey, len(found))
+	for id, k := range found {
+		out[id] = meaning.CVKey{DocumentID: k.DocumentID, Version: k.Version.UTC().Format(time.RFC3339Nano)}
 	}
 	return out, err
 }
@@ -86,8 +100,8 @@ func (a meaningCVs) DocumentExists(ctx context.Context, tx pgx.Tx, documentID st
 // candidatesMeaning lets the advanced search rank by meaning.
 type candidatesMeaning struct{ meaning *meaning.Module }
 
-func (a candidatesMeaning) Search(ctx context.Context, tx pgx.Tx, p authz.Principal, text string, limit int) (api.MeaningOutcome, []candidates.MeaningHit, error) {
-	res, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Body: text, Limit: limit})
+func (a candidatesMeaning) Search(ctx context.Context, tx pgx.Tx, p authz.Principal, text string, within []string, limit int) (api.MeaningOutcome, []candidates.MeaningHit, error) {
+	res, err := a.meaning.Rank(ctx, tx, p, meaning.Ask{Body: text, Within: within, Limit: limit})
 	hits := make([]candidates.MeaningHit, len(res.Found))
 	for i, r := range res.Found {
 		hits[i] = candidates.MeaningHit{CandidateID: r.CandidateID, Why: r.Why}

@@ -26,6 +26,12 @@ const (
 )
 
 // Document is a file attached to a candidate.
+// CVReader is the AI worker's CV-reading version (PARSER in
+// ai/src/hiringplug_ai/parsing/__init__.py, checked by a test): a CV read by
+// another was read by older rules (or its text taken out by an older reader),
+// and reviewing it reads it again first.
+const CVReader = "rules@2"
+
 type Document struct {
 	ID            string
 	CandidateID   string
@@ -42,6 +48,7 @@ type Document struct {
 	ExtractedText *string  // only loaded for single-document reads
 	ParseStatus   *string  // queued, parsed, failed; nil when never parsed
 	ParseError    *string  // why the details could not be read (failed only)
+	ReadOutdated  bool     // a candidate's CV read by older CV-reading rules than CVReader
 	ParsedProfile []byte   // JSON (api.ParsedProfile); only loaded for single-document reads
 	PdfStatus     *string  // formatted CVs made by the app: queued, ready, failed
 	CreatedAt     time.Time

@@ -23,7 +23,7 @@ func (s *Service) Status(ctx context.Context, p authz.Principal) (api.MeaningSta
 			return err
 		}
 		var outcome api.MeaningOutcome
-		if err := s.progress(ctx, tx, &outcome, sweep.Model); err != nil {
+		if err := s.progress(ctx, tx, &outcome, sweep); err != nil {
 			return err
 		}
 		out = api.MeaningStatus{

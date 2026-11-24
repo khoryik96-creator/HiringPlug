@@ -86,6 +86,12 @@ func (m *Module) Count(ctx context.Context, tx pgx.Tx) (int, error) {
 	return int(n), err
 }
 
+// VisibleIDs returns the ids of at most limit candidates the user may see,
+// in the caller's transaction.
+func (m *Module) VisibleIDs(ctx context.Context, tx pgx.Tx, limit int) ([]string, error) {
+	return store.New(tx).VisibleCandidateIDs(ctx, int32(limit)) //nolint:gosec // a small limit
+}
+
 // Brief is what other modules need to show a candidate.
 type Brief struct {
 	Name         string

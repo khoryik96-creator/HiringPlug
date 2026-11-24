@@ -61,6 +61,11 @@ paths:
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A search by meaning not read yet (MEANING_READING) or not set up on this server (MEANING_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '422':
           description: Too many rows (EXPORT_TOO_LARGE).
           content:
@@ -900,7 +905,7 @@ components:
       properties:
         format: { $ref: '#/components/schemas/ExportFormat' }
         search:
-          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone.
+          description: The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone. With meaning, the best matches the page shows (at most 100, best first).
           allOf: [{ $ref: '#/components/schemas/CandidateSearch' }]
     CandidateSearch:
       type: object

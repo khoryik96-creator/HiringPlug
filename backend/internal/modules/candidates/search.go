@@ -120,16 +120,6 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	}
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	sort, cur, offset := f.Order.paging(p, cursor)
-	var why map[string]api.MeaningWhy
-	var ranked []string
-	pageSize := limit
-	if f.Meaning != nil {
-		if ranked, why, err = s.byMeaning(ctx, tx, p, *f.Meaning, &page); err != nil || ranked == nil {
-			return page, err // still being read, or no model: nothing yet
-		}
-		inIDs = keepOrder(ranked, inIDs)
-		sort, cur, offset, limit = "newest", nil, 0, len(inIDs) // all of them, ordered by meaning below
-	}
 	in := store.SearchCandidatesParams{
 		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), BooleanPlan: plan, Prefilter: prefilter,
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
@@ -137,14 +127,29 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
 		Specializations: orEmpty(f.Specializations), Certifications: orEmpty(f.Certifications),
 		NoticeMaxDays: notice, SalaryMax: f.SalaryMax, SalaryCurrency: f.SalaryCurrency, Owner: f.Owner, InIds: inIDs,
-		UpdatedWithinDays: updated, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+		UpdatedWithinDays: updated,
 	}
+	var why map[string]api.MeaningWhy
+	var ranked []string
+	pageSize := limit
+	if f.Meaning != nil {
+		within, err := meaningWithinOf(ctx, store.New(tx), f, in)
+		if err != nil {
+			return page, err
+		}
+		if ranked, why, err = s.byMeaning(ctx, tx, p, *f.Meaning, within, &page); err != nil || ranked == nil {
+			return page, err // still being read, or no model: nothing yet
+		}
+		in.InIds = keepOrder(ranked, inIDs)
+		sort, in.Cursor, offset, limit = "newest", nil, 0, len(in.InIds) // all of them, ordered by meaning below
+	}
+	in.RowLimit = int32(limit + 1) //nolint:gosec // limit is 1..100 per the contract (a meaning search: at most MeaningPool)
 	rows, err := searchRows(ctx, store.New(tx), in, sort, offset)
 	if err != nil {
 		return page, err
 	}
 	if ranked != nil { // best by meaning first; one page, no more
-		rows = inOrder(rows, inIDs, func(r store.SearchCandidatesRow) string { return r.ID })
+		rows = inOrder(rows, in.InIds, func(r store.SearchCandidatesRow) string { return r.ID })
 		rows, limit = rows[:min(len(rows), pageSize)], pageSize
 	}
 	if len(rows) > limit {
@@ -170,7 +175,8 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		return page, err
 	}
 	snippets := map[string]string{}
-	if len(matched) > 0 && s.cvs != nil && !f.NoSnippets {
+	// CV text only to those who may read CVs (the boolean still finds by it).
+	if len(matched) > 0 && s.cvs != nil && !f.NoSnippets && p.Can(api.PermissionDocumentsRead) {
 		if snippets, err = s.cvs.CVSnippets(ctx, tx, *ts, matched); err != nil {
 			return page, err
 		}

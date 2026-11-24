@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
 )
 
 // MeaningMatch is a candidate found for a job by meaning.
@@ -30,11 +31,11 @@ type MeaningFound struct {
 
 // JobMeaningText is what a job is read by meaning from, besides its title:
 // its description and its ad (not its employer or place: those say nothing
-// about who fits).
+// about who fits), without salary figures (never sent to be read, or kept).
 func JobMeaningText(j Job) string {
 	var parts []string
 	for _, s := range []*string{j.Description, j.AdText} {
-		if t := trimmed(s); t != "" {
+		if t := strings.TrimSpace(redact.WithoutSalary(trimmed(s))); t != "" {
 			parts = append(parts, t)
 		}
 	}

@@ -591,6 +591,44 @@ func (q *Queries) NewestCVID(ctx context.Context, candidateID string) (string, e
 	return id, err
 }
 
+const newestCVKeys = `-- name: NewestCVKeys :many
+SELECT DISTINCT ON (candidate_id) candidate_id, id, updated_at
+FROM document
+WHERE candidate_id = ANY($1::text[]) AND source <> 'formatted' AND binned_at IS NULL
+  AND extracted_text IS NOT NULL AND extracted_text <> '' AND source IN ('original', 'linkedin', 'jobstreet')
+ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC
+`
+
+type NewestCVKeysRow struct {
+	CandidateID string
+	ID          string
+	UpdatedAt   time.Time
+}
+
+// Search by meaning: each candidate's newest CV with text that they sent
+// (their CV first, then a LinkedIn or JobStreet one; not one the app made,
+// not in the bin).
+// Which CV NewestCVTexts gives for each, and which reading of it, without its text.
+func (q *Queries) NewestCVKeys(ctx context.Context, candidateIds []string) ([]NewestCVKeysRow, error) {
+	rows, err := q.db.Query(ctx, newestCVKeys, candidateIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NewestCVKeysRow
+	for rows.Next() {
+		var i NewestCVKeysRow
+		if err := rows.Scan(&i.CandidateID, &i.ID, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const newestCVOfTypes = `-- name: NewestCVOfTypes :one
 SELECT id FROM document
 WHERE candidate_id = $1 AND source <> 'formatted' AND binned_at IS NULL AND content_type = ANY($2::text[])
@@ -627,9 +665,6 @@ type NewestCVTextsRow struct {
 	Text        string
 }
 
-// Search by meaning: each candidate's newest CV with text that they sent
-// (their CV first, then a LinkedIn or JobStreet one; not one the app made,
-// not in the bin).
 func (q *Queries) NewestCVTexts(ctx context.Context, candidateIds []string) ([]NewestCVTextsRow, error) {
 	rows, err := q.db.Query(ctx, newestCVTexts, candidateIds)
 	if err != nil {

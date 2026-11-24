@@ -97,6 +97,9 @@ def test_each_candidate_is_read_title_by_title_with_their_cv() -> None:
         None,
     )
     assert (sales.family, sales.level, sales.endYear) == ("sales", 2, 2019)
+    # Whether each title is their job now goes back as sent: a past job with
+    # no end year must not be taken for their job now.
+    assert (consultant.current, sales.current) == (True, False)
     assert len(consultant.field.root) == DIMENSIONS
     assert [p.documentId for p in first.passages] == ["doc_1"] * len(first.passages)
     assert "360 desk" in first.passages[0].passage

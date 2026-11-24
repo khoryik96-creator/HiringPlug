@@ -46,9 +46,16 @@ func (s *Service) Export(ctx context.Context, p authz.Principal, f SearchFilter,
 			}
 		}
 		var cursor *string
+		limit := exportPage
+		if f.Meaning != nil { // the best matches the page shows, best first
+			limit = MeaningShown
+		}
 		for {
-			page, err := s.searchTx(ctx, tx, p, f, cursor, exportPage)
+			page, err := s.searchTx(ctx, tx, p, f, cursor, limit)
 			if err != nil {
+				return err
+			}
+			if err := meaningReady(page.Meaning); err != nil {
 				return err
 			}
 			for _, hit := range page.Items {

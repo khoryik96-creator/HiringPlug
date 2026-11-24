@@ -10,6 +10,21 @@ import (
 	"time"
 )
 
+const addRead = `-- name: AddRead :exec
+UPDATE meaning_sweep SET read_count = coalesce(read_count, 0) + $1::int WHERE model = $2
+`
+
+type AddReadParams struct {
+	N     int32
+	Model *string
+}
+
+// Candidates read now by the model the read-through uses: that many more read.
+func (q *Queries) AddRead(ctx context.Context, arg AddReadParams) error {
+	_, err := q.db.Exec(ctx, addRead, arg.N, arg.Model)
+	return err
+}
+
 const clearPending = `-- name: ClearPending :exec
 DELETE FROM meaning_pending WHERE candidate_id = $1 AND fingerprint = $2
 `
@@ -46,6 +61,16 @@ func (q *Queries) CountRead(ctx context.Context, model string) (int64, error) {
 	return count, err
 }
 
+const deleteDocumentPassages = `-- name: DeleteDocumentPassages :exec
+DELETE FROM meaning_passage WHERE document_id = $1
+`
+
+// A CV moved to the Bin: what was read of it goes at once.
+func (q *Queries) DeleteDocumentPassages(ctx context.Context, documentID string) error {
+	_, err := q.db.Exec(ctx, deleteDocumentPassages, documentID)
+	return err
+}
+
 const deleteNeeds = `-- name: DeleteNeeds :exec
 DELETE FROM meaning_query_need WHERE query_id = $1
 `
@@ -74,42 +99,6 @@ func (q *Queries) DeleteRoles(ctx context.Context, candidateID string) error {
 	return err
 }
 
-const ensureSweep = `-- name: EnsureSweep :one
-INSERT INTO meaning_sweep (tenant_id) VALUES (app_current_tenant())
-ON CONFLICT (tenant_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id
-RETURNING tenant_id, chain, cursor_id, passes, due_at, ran_at, model, unavailable_until, (xmax = 0)::boolean AS inserted
-`
-
-type EnsureSweepRow struct {
-	TenantID         string
-	Chain            int32
-	CursorID         string
-	Passes           int32
-	DueAt            time.Time
-	RanAt            *time.Time
-	Model            *string
-	UnavailableUntil *time.Time
-	Inserted         bool
-}
-
-// The company's read-through, made if it has none (inserted: it was made now).
-func (q *Queries) EnsureSweep(ctx context.Context) (EnsureSweepRow, error) {
-	row := q.db.QueryRow(ctx, ensureSweep)
-	var i EnsureSweepRow
-	err := row.Scan(
-		&i.TenantID,
-		&i.Chain,
-		&i.CursorID,
-		&i.Passes,
-		&i.DueAt,
-		&i.RanAt,
-		&i.Model,
-		&i.UnavailableUntil,
-		&i.Inserted,
-	)
-	return i, err
-}
-
 const failQuery = `-- name: FailQuery :exec
 UPDATE meaning_query SET status = 'failed', read_at = now() WHERE id = $1
 `
@@ -123,7 +112,7 @@ const forgetOldQueries = `-- name: ForgetOldQueries :exec
 DELETE FROM meaning_query WHERE used_at < now() - interval '90 days'
 `
 
-// Searches not used for 90 days are forgotten.
+// Searches not used for 90 days are forgotten (the read-through, at the end of each pass).
 func (q *Queries) ForgetOldQueries(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, forgetOldQueries)
 	return err
@@ -141,12 +130,13 @@ func (q *Queries) ForgetStalePending(ctx context.Context) error {
 
 const getSweep = `-- name: GetSweep :one
 
-SELECT tenant_id, chain, cursor_id, passes, due_at, ran_at, model, unavailable_until FROM meaning_sweep
+SELECT tenant_id, chain, cursor_id, passes, due_at, ran_at, model, unavailable_until, read_count, total_count, counted_at FROM meaning_sweep
 `
 
 // meaning module: what the meaning model read of candidates and searches,
 // and the comparisons. Vectors come in as text ('[0.1,0.2,...]') and are
 // compared here; Go never reads them back.
+// The company's read-through (a plain read: searches never wait on it).
 func (q *Queries) GetSweep(ctx context.Context) (MeaningSweep, error) {
 	row := q.db.QueryRow(ctx, getSweep)
 	var i MeaningSweep
@@ -159,6 +149,9 @@ func (q *Queries) GetSweep(ctx context.Context) (MeaningSweep, error) {
 		&i.RanAt,
 		&i.Model,
 		&i.UnavailableUntil,
+		&i.ReadCount,
+		&i.TotalCount,
+		&i.CountedAt,
 	)
 	return i, err
 }
@@ -239,12 +232,12 @@ func (q *Queries) InsertQuery(ctx context.Context, arg InsertQueryParams) (Inser
 }
 
 const insertRoles = `-- name: InsertRoles :exec
-INSERT INTO meaning_role (tenant_id, candidate_id, ordinal, title, family, level, end_year, field, work)
+INSERT INTO meaning_role (tenant_id, candidate_id, ordinal, title, family, level, end_year, current, field, work)
 SELECT app_current_tenant(), $1::text, r.ordinal, r.title, nullif(r.family, ''), nullif(r.level, -1),
-       nullif(r.end_year, -1), r.field::vector, r.work::vector
+       nullif(r.end_year, -1), r.current, r.field::vector, r.work::vector
 FROM (SELECT unnest($2::smallint[]) AS ordinal, unnest($3::text[]) AS title, unnest($4::text[]) AS family,
              unnest($5::smallint[]) AS level, unnest($6::smallint[]) AS end_year,
-             unnest($7::text[]) AS field, unnest($8::text[]) AS work) r
+             unnest($7::boolean[]) AS current, unnest($8::text[]) AS field, unnest($9::text[]) AS work) r
 `
 
 type InsertRolesParams struct {
@@ -254,6 +247,7 @@ type InsertRolesParams struct {
 	Families    []string
 	Levels      []int16
 	EndYears    []int16
+	Currents    []bool
 	Fields      []string
 	Works       []string
 }
@@ -267,6 +261,7 @@ func (q *Queries) InsertRoles(ctx context.Context, arg InsertRolesParams) error 
 		arg.Families,
 		arg.Levels,
 		arg.EndYears,
+		arg.Currents,
 		arg.Fields,
 		arg.Works,
 	)
@@ -290,31 +285,42 @@ func (q *Queries) MarkPending(ctx context.Context, arg MarkPendingParams) error 
 }
 
 const nearByField = `-- name: NearByField :many
-SELECT candidate_id::text FROM meaning_role
-ORDER BY field <=> (SELECT role FROM meaning_query WHERE id = $1) LIMIT $2
+SELECT x.candidate_id::text FROM (
+  SELECT candidate_id, field <=> (SELECT q.role FROM meaning_query q WHERE q.id = $1) AS d FROM meaning_role
+  WHERE NOT (candidate_id = ANY($2::text[]))
+  ORDER BY field <=> (SELECT q.role FROM meaning_query q WHERE q.id = $1) LIMIT $3::int
+) x GROUP BY x.candidate_id ORDER BY min(x.d) LIMIT $4::int
 `
 
 type NearByFieldParams struct {
 	QueryID string
+	Exclude []string
+	Rows    int32
 	N       int32
 }
 
 // The nearest titles to the role asked for (read as fields, then with the
 // work), the nearest CV passages and profiles to the whole search: who to
-// look at closely.
+// look at closely; n candidates each (one may have several titles or
+// passages near), leaving out those already on the job.
 func (q *Queries) NearByField(ctx context.Context, arg NearByFieldParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, nearByField, arg.QueryID, arg.N)
+	rows, err := q.db.Query(ctx, nearByField,
+		arg.QueryID,
+		arg.Exclude,
+		arg.Rows,
+		arg.N,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var items []string
 	for rows.Next() {
-		var candidate_id string
-		if err := rows.Scan(&candidate_id); err != nil {
+		var x_candidate_id string
+		if err := rows.Scan(&x_candidate_id); err != nil {
 			return nil, err
 		}
-		items = append(items, candidate_id)
+		items = append(items, x_candidate_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -323,28 +329,38 @@ func (q *Queries) NearByField(ctx context.Context, arg NearByFieldParams) ([]str
 }
 
 const nearByPassage = `-- name: NearByPassage :many
-SELECT candidate_id::text FROM meaning_passage
-ORDER BY vec <=> (SELECT coalesce(context, whole) FROM meaning_query WHERE id = $1) LIMIT $2
+SELECT x.candidate_id::text FROM (
+  SELECT candidate_id, vec <=> (SELECT coalesce(q.context, q.whole) FROM meaning_query q WHERE q.id = $1) AS d FROM meaning_passage
+  WHERE NOT (candidate_id = ANY($2::text[]))
+  ORDER BY vec <=> (SELECT coalesce(q.context, q.whole) FROM meaning_query q WHERE q.id = $1) LIMIT $3::int
+) x GROUP BY x.candidate_id ORDER BY min(x.d) LIMIT $4::int
 `
 
 type NearByPassageParams struct {
 	QueryID string
+	Exclude []string
+	Rows    int32
 	N       int32
 }
 
 func (q *Queries) NearByPassage(ctx context.Context, arg NearByPassageParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, nearByPassage, arg.QueryID, arg.N)
+	rows, err := q.db.Query(ctx, nearByPassage,
+		arg.QueryID,
+		arg.Exclude,
+		arg.Rows,
+		arg.N,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var items []string
 	for rows.Next() {
-		var candidate_id string
-		if err := rows.Scan(&candidate_id); err != nil {
+		var x_candidate_id string
+		if err := rows.Scan(&x_candidate_id); err != nil {
 			return nil, err
 		}
-		items = append(items, candidate_id)
+		items = append(items, x_candidate_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -353,17 +369,18 @@ func (q *Queries) NearByPassage(ctx context.Context, arg NearByPassageParams) ([
 }
 
 const nearByProfile = `-- name: NearByProfile :many
-SELECT candidate_id::text FROM meaning_candidate WHERE profile IS NOT NULL
-ORDER BY profile <=> (SELECT whole FROM meaning_query WHERE id = $1) LIMIT $2
+SELECT candidate_id::text FROM meaning_candidate WHERE profile IS NOT NULL AND NOT (candidate_id = ANY($1::text[]))
+ORDER BY profile <=> (SELECT whole FROM meaning_query WHERE id = $2) LIMIT $3::int
 `
 
 type NearByProfileParams struct {
+	Exclude []string
 	QueryID string
 	N       int32
 }
 
 func (q *Queries) NearByProfile(ctx context.Context, arg NearByProfileParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, nearByProfile, arg.QueryID, arg.N)
+	rows, err := q.db.Query(ctx, nearByProfile, arg.Exclude, arg.QueryID, arg.N)
 	if err != nil {
 		return nil, err
 	}
@@ -383,28 +400,38 @@ func (q *Queries) NearByProfile(ctx context.Context, arg NearByProfileParams) ([
 }
 
 const nearByWork = `-- name: NearByWork :many
-SELECT candidate_id::text FROM meaning_role
-ORDER BY work <=> (SELECT role FROM meaning_query WHERE id = $1) LIMIT $2
+SELECT x.candidate_id::text FROM (
+  SELECT candidate_id, work <=> (SELECT q.role FROM meaning_query q WHERE q.id = $1) AS d FROM meaning_role
+  WHERE NOT (candidate_id = ANY($2::text[]))
+  ORDER BY work <=> (SELECT q.role FROM meaning_query q WHERE q.id = $1) LIMIT $3::int
+) x GROUP BY x.candidate_id ORDER BY min(x.d) LIMIT $4::int
 `
 
 type NearByWorkParams struct {
 	QueryID string
+	Exclude []string
+	Rows    int32
 	N       int32
 }
 
 func (q *Queries) NearByWork(ctx context.Context, arg NearByWorkParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, nearByWork, arg.QueryID, arg.N)
+	rows, err := q.db.Query(ctx, nearByWork,
+		arg.QueryID,
+		arg.Exclude,
+		arg.Rows,
+		arg.N,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var items []string
 	for rows.Next() {
-		var candidate_id string
-		if err := rows.Scan(&candidate_id); err != nil {
+		var x_candidate_id string
+		if err := rows.Scan(&x_candidate_id); err != nil {
 			return nil, err
 		}
-		items = append(items, candidate_id)
+		items = append(items, x_candidate_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -536,7 +563,7 @@ func (q *Queries) PendingOf(ctx context.Context, candidateIds []string) ([]Pendi
 }
 
 const profileScores = `-- name: ProfileScores :many
-SELECT m.candidate_id::text, coalesce(1 - (m.profile <=> q.whole), 0)::float4 AS sim
+SELECT m.candidate_id::text, m.model, coalesce(1 - (m.profile <=> q.whole), 0)::float4 AS sim
 FROM meaning_candidate m, (SELECT whole FROM meaning_query WHERE id = $1) q
 WHERE m.candidate_id = ANY($2::text[])
 `
@@ -548,6 +575,7 @@ type ProfileScoresParams struct {
 
 type ProfileScoresRow struct {
 	MCandidateID string
+	Model        string
 	Sim          float32
 }
 
@@ -561,7 +589,7 @@ func (q *Queries) ProfileScores(ctx context.Context, arg ProfileScoresParams) ([
 	var items []ProfileScoresRow
 	for rows.Next() {
 		var i ProfileScoresRow
-		if err := rows.Scan(&i.MCandidateID, &i.Sim); err != nil {
+		if err := rows.Scan(&i.MCandidateID, &i.Model, &i.Sim); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -670,19 +698,21 @@ func (q *Queries) RereadQuery(ctx context.Context, id string) error {
 }
 
 const restartSweep = `-- name: RestartSweep :one
-UPDATE meaning_sweep SET chain = chain + 1, due_at = now() RETURNING chain
+UPDATE meaning_sweep SET chain = chain + 1, due_at = now(), cursor_id = CASE WHEN $1::boolean THEN '' ELSE cursor_id END
+RETURNING chain
 `
 
-// The read-through stalled (its job died) or must start again: a new chain.
-func (q *Queries) RestartSweep(ctx context.Context) (int32, error) {
-	row := q.db.QueryRow(ctx, restartSweep)
+// The read-through stalled (its job died) or must start again: a new chain,
+// from where it got to or, for a new model, from the beginning.
+func (q *Queries) RestartSweep(ctx context.Context, fromStart bool) (int32, error) {
+	row := q.db.QueryRow(ctx, restartSweep, fromStart)
 	var chain int32
 	err := row.Scan(&chain)
 	return chain, err
 }
 
 const roleScores = `-- name: RoleScores :many
-SELECT r.candidate_id::text, r.ordinal, r.title, r.family, r.level, r.end_year,
+SELECT r.candidate_id::text, r.ordinal, r.title, r.family, r.level, r.end_year, r.current,
        (1 - (r.field <=> q.role))::float4 AS field_sim, (1 - (r.work <=> q.role))::float4 AS work_sim
 FROM meaning_role r, (SELECT role FROM meaning_query WHERE id = $1) q
 WHERE r.candidate_id = ANY($2::text[]) AND q.role IS NOT NULL
@@ -700,6 +730,7 @@ type RoleScoresRow struct {
 	Family       *string
 	Level        *int16
 	EndYear      *int16
+	Current      *bool
 	FieldSim     float32
 	WorkSim      float32
 }
@@ -721,6 +752,7 @@ func (q *Queries) RoleScores(ctx context.Context, arg RoleScoresParams) ([]RoleS
 			&i.Family,
 			&i.Level,
 			&i.EndYear,
+			&i.Current,
 			&i.FieldSim,
 			&i.WorkSim,
 		); err != nil {
@@ -770,11 +802,13 @@ func (q *Queries) SaveQuery(ctx context.Context, arg SaveQueryParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
-const saveRead = `-- name: SaveRead :exec
+const saveRead = `-- name: SaveRead :one
+WITH before AS (SELECT model FROM meaning_candidate WHERE candidate_id = $1)
 INSERT INTO meaning_candidate (tenant_id, candidate_id, fingerprint, model, profile, read_at)
 VALUES (app_current_tenant(), $1, $2, $3, $4::text::vector, now())
 ON CONFLICT (tenant_id, candidate_id) DO UPDATE
 SET fingerprint = EXCLUDED.fingerprint, model = EXCLUDED.model, profile = EXCLUDED.profile, read_at = now()
+RETURNING ((SELECT before.model FROM before) IS DISTINCT FROM $3)::boolean AS newly
 `
 
 type SaveReadParams struct {
@@ -784,13 +818,27 @@ type SaveReadParams struct {
 	Profile     *string
 }
 
-func (q *Queries) SaveRead(ctx context.Context, arg SaveReadParams) error {
-	_, err := q.db.Exec(ctx, saveRead,
+// newly: not read by this model before (counted as read).
+func (q *Queries) SaveRead(ctx context.Context, arg SaveReadParams) (bool, error) {
+	row := q.db.QueryRow(ctx, saveRead,
 		arg.CandidateID,
 		arg.Fingerprint,
 		arg.Model,
 		arg.Profile,
 	)
+	var newly bool
+	err := row.Scan(&newly)
+	return newly, err
+}
+
+const searchIteratively = `-- name: SearchIteratively :exec
+SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true), set_config('hnsw.max_scan_tuples', $1::text, true)
+`
+
+// An index search goes on past the rows the user may not see (or that are
+// left out) until it has found enough (pgvector 0.8 and later).
+func (q *Queries) SearchIteratively(ctx context.Context, maxTuples string) error {
+	_, err := q.db.Exec(ctx, searchIteratively, maxTuples)
 	return err
 }
 
@@ -804,9 +852,25 @@ func (q *Queries) SearchWidely(ctx context.Context, ef string) error {
 	return err
 }
 
+const setSweepCounts = `-- name: SetSweepCounts :exec
+UPDATE meaning_sweep SET read_count = $1::int, total_count = $2::int, counted_at = now()
+`
+
+type SetSweepCountsParams struct {
+	ReadCount  int32
+	TotalCount int32
+}
+
+// How far the read-through has got, counted at the start of each pass (and every few minutes).
+func (q *Queries) SetSweepCounts(ctx context.Context, arg SetSweepCountsParams) error {
+	_, err := q.db.Exec(ctx, setSweepCounts, arg.ReadCount, arg.TotalCount)
+	return err
+}
+
 const setSweepModel = `-- name: SetSweepModel :one
 WITH before AS (SELECT model FROM meaning_sweep)
-UPDATE meaning_sweep SET model = $1, unavailable_until = NULL
+UPDATE meaning_sweep SET model = $1, unavailable_until = NULL,
+  read_count = CASE WHEN meaning_sweep.model IS DISTINCT FROM $1 THEN 0 ELSE read_count END
 WHERE meaning_sweep.model IS DISTINCT FROM $1 OR unavailable_until IS NOT NULL
 RETURNING ((SELECT before.model FROM before) IS DISTINCT FROM $1)::boolean AS changed
 `
@@ -826,6 +890,31 @@ UPDATE meaning_sweep SET unavailable_until = $1
 func (q *Queries) SetUnavailable(ctx context.Context, until *time.Time) error {
 	_, err := q.db.Exec(ctx, setUnavailable, until)
 	return err
+}
+
+const startSweep = `-- name: StartSweep :one
+INSERT INTO meaning_sweep (tenant_id) VALUES (app_current_tenant()) ON CONFLICT (tenant_id) DO NOTHING
+RETURNING tenant_id, chain, cursor_id, passes, due_at, ran_at, model, unavailable_until, read_count, total_count, counted_at
+`
+
+// The company's read-through, made now (no row: another request made it meanwhile).
+func (q *Queries) StartSweep(ctx context.Context) (MeaningSweep, error) {
+	row := q.db.QueryRow(ctx, startSweep)
+	var i MeaningSweep
+	err := row.Scan(
+		&i.TenantID,
+		&i.Chain,
+		&i.CursorID,
+		&i.Passes,
+		&i.DueAt,
+		&i.RanAt,
+		&i.Model,
+		&i.UnavailableUntil,
+		&i.ReadCount,
+		&i.TotalCount,
+		&i.CountedAt,
+	)
+	return i, err
 }
 
 const sweepRan = `-- name: SweepRan :exec

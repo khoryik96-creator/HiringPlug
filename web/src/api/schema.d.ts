@@ -1984,7 +1984,7 @@ export interface paths {
         put?: never;
         /**
          * Read the profile details out of a CV again
-         * @description CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer parser. Returns the document with parseStatus `queued`.
+         * @description CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`.
          */
         post: operations["parseDocument"];
         delete?: never;
@@ -5691,7 +5691,7 @@ export interface components {
         /** @enum {string} */
         Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "meaning.candidates_read" | "meaning.query_read" | "meaning.read_candidates" | "meaning.read_query" | "meaning.sweep" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
@@ -6517,7 +6517,7 @@ export interface components {
         };
         CandidateExport: {
             format: components["schemas"]["ExportFormat"];
-            /** @description The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone. */
+            /** @description The search whose candidates to export (its limit, cursor and offset are ignored); none for everyone. With meaning, the best matches the page shows (at most 100, best first). */
             search?: components["schemas"]["CandidateSearch"];
         };
         CandidateSearch: {
@@ -8077,6 +8077,8 @@ export interface components {
             parseStatus: components["schemas"]["DocumentParseStatus"] | null;
             /** @description Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise. */
             parseError: string | null;
+            /** @description A CV the candidate sent, read by older CV-reading rules than this server's: reading it again (POST .../parse) may find more. Reviewing its details reads it again first. */
+            readOutdated?: boolean;
             /** @description Only included when fetching a single document. */
             parsedProfile?: components["schemas"]["ParsedProfile"] | null;
             /** Format: date-time */
@@ -10301,9 +10303,9 @@ export interface components {
         MeaningStatus: {
             /** @description False when the AI worker has no meaning model. */
             available: boolean;
-            /** @description Candidates read so far (those with a title or a CV). */
+            /** @description The company's candidates read so far (counted by the read-through, not per user). */
             read: number;
-            /** @description Candidates with a title or a CV to read. */
+            /** @description The company's candidates to read (counted at the start of each read-through). */
             total: number;
         };
         /** @description How a search by meaning went. */
@@ -10315,9 +10317,9 @@ export interface components {
             status: "ready" | "reading" | "unavailable";
             /** @description How the search was read, in words. */
             understood: components["schemas"]["MeaningUnderstood"] | null;
-            /** @description Candidates read so far. */
+            /** @description The company's candidates read so far (counted by the read-through, not per user). */
             read?: number;
-            /** @description Candidates to read. */
+            /** @description The company's candidates to read (counted at the start of each read-through). */
             total?: number;
         };
         MeaningUnderstood: {
@@ -10344,7 +10346,7 @@ export interface components {
             strength: "strong" | "good" | "possible";
             /** @description The title of theirs that matched. */
             title?: string;
-            /** @description "now", or "until 2019". */
+            /** @description "now", "until 2019", or "earlier" (a past job whose dates are not known). */
             titleWhen?: string;
             /** @description The title's job family. */
             family?: string;
@@ -10390,6 +10392,8 @@ export interface components {
             family?: string;
             level?: number;
             endYear?: number | null;
+            /** @description Their job now (as sent); a past job with no end year is not. */
+            current?: boolean;
             field: components["schemas"]["MeaningVector"];
             work: components["schemas"]["MeaningVector"];
         };
@@ -13215,6 +13219,15 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            /** @description A search by meaning not read yet (MEANING_READING) or not set up on this server (MEANING_UNAVAILABLE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Too many rows (EXPORT_TOO_LARGE). */
             422: {
                 headers: {

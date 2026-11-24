@@ -87,6 +87,9 @@ func (s *Service) binReplaced(ctx context.Context, tx pgx.Tx, tenantID, actorID 
 			if err := s.recordBinned(ctx, tx, tenantID, row.ID, row.FileName, actorID); err != nil {
 				return err
 			}
+			if err := s.cvBinned(ctx, tx, tenantID, row.CandidateID, row.ID, row.Source, true); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -125,7 +128,10 @@ func (m *Module) BinActiveDocument(ctx context.Context, tx pgx.Tx, id string) er
 	if err == nil && n != 1 {
 		return apperr.NotFound("active document")
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return m.service.cvBinned(ctx, tx, row.TenantID, row.CandidateID, row.ID, row.Source, true)
 }
 
 // RestoreDocument restores one file from the Bin when its category has room.
@@ -155,7 +161,10 @@ func (m *Module) RestoreDocument(ctx context.Context, tx pgx.Tx, id string) erro
 	if err == nil && n != 1 {
 		return apperr.NotFound("binned document")
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return m.service.cvBinned(ctx, tx, row.TenantID, row.CandidateID, row.ID, row.Source, false)
 }
 
 // PurgeDocument removes a binned document and returns the files to delete after commit.

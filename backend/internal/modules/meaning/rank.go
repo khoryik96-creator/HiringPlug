@@ -2,11 +2,9 @@ package meaning
 
 // Ranking candidates for a search or a job: the words are read once by the
 // AI worker (a moment; the caller asks again while they are being read),
-// then the database's nearest-neighbour indexes gather who to look at (by
-// their titles, CV passages and profiles, and by the search's own words in
-// their CVs), each of those is compared exactly, and domain.go ranks them.
-// Everything runs as the user: the database leaves out the candidates they
-// may not see.
+// then who to look at is gathered (gather.go), each of those is compared
+// exactly, and domain.go ranks them. Everything runs as the user: the
+// database leaves out the candidates they may not see.
 
 import (
 	"context"
@@ -23,16 +21,13 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
 )
 
 const (
 	rereadAfter = 2 * time.Minute // a search still being read after this is queued again (its job died)
-	searchWidth = "400"           // neighbours each index search looks at
-	nearTitles  = 200
-	nearCVs     = 300
-	nearWhole   = 150
-	byWords     = 100
-	passageMax  = 300 // characters of a passage shown
+	byWords     = 100             // candidates found by the search's own words in their CVs
+	passageMax  = 300             // characters of a passage shown
 )
 
 // Ranked is a candidate found by meaning, with why.
@@ -56,8 +51,14 @@ type Ask struct {
 	Title, Body string   // a job: its title and description; a search: its words (Body)
 	Exclude     []string // candidates left out (those already on the job)
 	Words       []CVHit  // a job's distinctive words found in CVs (the caller's keyword search)
+	Within      []string // only these candidates (a folder or filters), when not nil
 	Limit       int
 }
+
+// ExactMax is how many candidates a search compares one by one at most: a
+// company (or what the user may see, or a folder or filters) of at most this
+// many is compared exactly, none missed; a larger one through the indexes.
+const ExactMax = 2000
 
 // Rank finds the candidates for a search or a job, best first, in the
 // caller's transaction. While the words are being read the outcome says
@@ -68,11 +69,15 @@ func (m *Module) Rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask Ask
 
 func (s *Service) rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask Ask) (Result, error) {
 	res := Result{Outcome: api.MeaningOutcome{Status: api.MeaningOutcomeStatusReading, Understood: nullable.NewNullNullable[api.MeaningUnderstood]()}}
+	ask.Title, ask.Body = withoutMoney(ask.Title), strings.TrimSpace(redact.WithoutSalary(ask.Body))
+	if ask.Title == "" { // a typed search: any amount goes, salary word or not
+		ask.Body = withoutMoney(ask.Body)
+	}
 	sweep, err := s.ensureRunning(ctx, tx, p.TenantID)
 	if err != nil {
 		return res, err
 	}
-	if err := s.progress(ctx, tx, &res.Outcome, sweep.Model); err != nil {
+	if err := s.progress(ctx, tx, &res.Outcome, sweep); err != nil {
 		return res, err
 	}
 	if sweep.UnavailableUntil != nil && sweep.UnavailableUntil.After(s.now()) {
@@ -92,23 +97,40 @@ func (s *Service) rank(ctx context.Context, tx pgx.Tx, p authz.Principal, ask As
 	if len(query.Understood) > 0 && json.Unmarshal(query.Understood, &understood) == nil && string(query.Understood) != "null" {
 		res.Outcome.Understood = nullable.NewNullableWithValue(understood)
 	}
-	res.Found, res.NotMatched, err = s.rankFor(ctx, tx, p, query, understood, ask)
+	res.Found, res.NotMatched, err = s.rankFor(ctx, tx, p, query, understood, ask, sweep, model)
 	return res, err
 }
 
-// progress says how many candidates are read, of how many.
-func (s *Service) progress(ctx context.Context, tx pgx.Tx, out *api.MeaningOutcome, model *string) error {
+var placeholders = strings.NewReplacer("[amount removed]", " ", "[salary removed]", " ")
+
+// withoutMoney takes any amount of money out of a short text someone typed.
+func withoutMoney(text string) string {
+	return strings.Join(strings.Fields(placeholders.Replace(redact.WithoutMoney(text))), " ")
+}
+
+// progress says how many of the company's candidates are read, of how many,
+// as the read-through counted them (counting the company on every search
+// would take seconds in a large one); before its first count, counted now.
+func (s *Service) progress(ctx context.Context, tx pgx.Tx, out *api.MeaningOutcome, sweep store.MeaningSweep) error {
+	if sweep.TotalCount != nil {
+		total, read := int(*sweep.TotalCount), 0
+		if sweep.ReadCount != nil {
+			read = min(int(*sweep.ReadCount), total)
+		}
+		out.Read, out.Total = &read, &total
+		return nil
+	}
 	total, err := s.deps.Candidates.Count(ctx, tx)
 	if err != nil {
 		return err
 	}
 	read := int64(0)
-	if model != nil {
-		if read, err = store.New(tx).CountRead(ctx, *model); err != nil {
+	if sweep.Model != nil {
+		if read, err = store.New(tx).CountRead(ctx, *sweep.Model); err != nil {
 			return err
 		}
 	}
-	r := int(read)
+	r := min(int(read), total)
 	out.Read, out.Total = &r, &total
 	return nil
 }
@@ -125,7 +147,7 @@ func (s *Service) readQuery(ctx context.Context, tx pgx.Tx, tenantID, model stri
 			t = clipText(t, 300)
 			title = &t
 		}
-		ins, err := q.InsertQuery(ctx, store.InsertQueryParams{TextHash: hash, Title: title, Body: clipText(strings.TrimSpace(ask.Body), 20000)})
+		ins, err := q.InsertQuery(ctx, store.InsertQueryParams{TextHash: hash, Title: title, Body: clipText(ask.Body, 20000)})
 		if err != nil {
 			return row, false, err
 		}
@@ -161,30 +183,29 @@ func (s *Service) queueQuery(ctx context.Context, tx pgx.Tx, tenantID, id string
 }
 
 // rankFor gathers who to look at, compares each exactly and ranks them; it
-// also says who it read and judged not to match.
-func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, query store.QueryByHashRow, understood api.MeaningUnderstood, ask Ask) ([]Ranked, []string, error) {
-	q := store.New(tx)
-	if err := q.SearchWidely(ctx, searchWidth); err != nil {
-		return nil, nil, err
-	}
+// also says who it read and judged not to match: by a title they hold, read
+// by the rules that read the search (someone with no title, or not yet read
+// again by new rules, is not turned down).
+func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, query store.QueryByHashRow, understood api.MeaningUnderstood,
+	ask Ask, sweep store.MeaningSweep, model string,
+) ([]Ranked, []string, error) {
 	words := ask.Words
 	if ask.Title == "" { // a typed search: its own words in CVs
-		terms := []Term{}
-		for _, w := range SearchWords(ask.Body) {
-			terms = append(terms, Term{Text: w, Weight: 1})
-		}
-		if len(terms) > 0 {
+		if terms := SearchTerms(ask.Body); len(terms) > 0 {
 			var err error
 			if words, err = s.deps.CVs.SearchCVs(ctx, tx, terms, ask.Exclude, byWords); err != nil {
 				return nil, nil, err
 			}
 		}
 	}
-	ids, err := s.gather(ctx, q, query, words, ask.Exclude)
+	if ask.Within != nil { // the caller's folder or filters: only those
+		words = onlyWithin(words, ask.Within)
+	}
+	ids, err := s.gather(ctx, tx, query, words, ask, sweep)
 	if err != nil || len(ids) == 0 {
 		return nil, nil, err
 	}
-	evidence, err := s.compare(ctx, q, query, ids, words)
+	evidence, err := s.compare(ctx, store.New(tx), query, model, ids, words)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -206,7 +227,7 @@ func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, que
 		e := evidence[id]
 		scored := Score(meta, e, year)
 		if scored.Score < Shown {
-			if e.Read { // not someone it has yet to read
+			if e.Read && e.SameRules && len(e.Roles) > 0 {
 				notMatched = append(notMatched, id)
 			}
 			continue
@@ -220,108 +241,11 @@ func (s *Service) rankFor(ctx context.Context, tx pgx.Tx, p authz.Principal, que
 	return out, notMatched, nil
 }
 
-// gather returns who to look at: the nearest by each index, and those whose CVs have the words.
-func (s *Service) gather(ctx context.Context, q *store.Queries, query store.QueryByHashRow, words []CVHit, exclude []string) ([]string, error) {
-	seen := map[string]bool{}
-	for _, id := range exclude {
-		seen[id] = true
-	}
-	var ids []string
-	add := func(found []string, err error) error {
-		for _, id := range found {
-			if !seen[id] {
-				seen[id] = true
-				ids = append(ids, id)
-			}
-		}
-		return err
-	}
-	if query.HasRole {
-		if err := add(q.NearByField(ctx, store.NearByFieldParams{QueryID: query.ID, N: nearTitles})); err != nil {
-			return nil, err
-		}
-		if err := add(q.NearByWork(ctx, store.NearByWorkParams{QueryID: query.ID, N: nearTitles})); err != nil {
-			return nil, err
-		}
-	}
-	if err := add(q.NearByPassage(ctx, store.NearByPassageParams{QueryID: query.ID, N: nearCVs})); err != nil {
-		return nil, err
-	}
-	if err := add(q.NearByProfile(ctx, store.NearByProfileParams{QueryID: query.ID, N: nearWhole})); err != nil {
-		return nil, err
-	}
-	for _, h := range words {
-		if err := add([]string{h.CandidateID}, nil); err != nil {
-			return nil, err
-		}
-	}
-	return ids, nil
-}
-
-// compare gathers, for each candidate, every comparison the ranking needs.
-func (s *Service) compare(ctx context.Context, q *store.Queries, query store.QueryByHashRow, ids []string, words []CVHit) (map[string]Evidence, error) {
-	out := make(map[string]Evidence, len(ids))
-	roles, err := q.RoleScores(ctx, store.RoleScoresParams{QueryID: query.ID, CandidateIds: ids})
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range roles {
-		e := out[r.RCandidateID]
-		e.Roles = append(e.Roles, RoleSim{
-			Title: r.Title, Family: r.Family, Level: intOf(r.Level), EndYear: intOf(r.EndYear),
-			Field: float64(r.FieldSim), Work: float64(r.WorkSim),
-		})
-		out[r.RCandidateID] = e
-	}
-	passages, err := q.PassageScores(ctx, store.PassageScoresParams{QueryID: query.ID, CandidateIds: ids})
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range passages {
-		e := out[p.XCandidateID]
-		e.PassageWhole, e.PassageContext, e.Passage = float64(p.WholeSim), float64(p.ContextSim), p.Passage
-		out[p.XCandidateID] = e
-	}
-	profiles, err := q.ProfileScores(ctx, store.ProfileScoresParams{QueryID: query.ID, CandidateIds: ids})
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range profiles {
-		e := out[p.MCandidateID]
-		e.Profile, e.Read = float64(p.Sim), true
-		out[p.MCandidateID] = e
-	}
-	if query.Needs > 0 {
-		needs, err := q.NeedScores(ctx, store.NeedScoresParams{QueryID: query.ID, CandidateIds: ids})
-		if err != nil {
-			return nil, err
-		}
-		for _, n := range needs {
-			e := out[n.PCandidateID]
-			e.Needs = append(e.Needs, float64(n.Sim))
-			out[n.PCandidateID] = e
-		}
-	}
-	best := 0.0
-	for _, h := range words {
-		best = max(best, h.Rank)
-	}
-	for _, h := range words {
-		e := out[h.CandidateID]
-		if best > 0 {
-			e.Words = h.Rank / best
-		}
-		e.WordsFound = WordsIn(h.Snippet)
-		out[h.CandidateID] = e
-	}
-	return out, nil
-}
-
 // why says, in words, what found a candidate; their CV only to those who may read CVs.
 func why(scored Scored, e Evidence, mayReadCVs bool) api.MeaningWhy {
 	w := api.MeaningWhy{Score: float32(min(1, scored.Score)), Strength: api.MeaningWhyStrength(Strength(scored.Score)), Words: []string{}}
 	if r := scored.Role; r != nil {
-		title, when := r.Title, When(r.EndYear)
+		title, when := r.Title, When(*r)
 		w.Title, w.TitleWhen, w.Family = &title, &when, r.Family
 		if r.Level != nil {
 			if name, ok := LevelNames[*r.Level]; ok {

@@ -18,6 +18,9 @@ x-module:
     MEANING_UNAVAILABLE:
       status: 409
       description: Search by meaning is not set up on this server (the AI worker has no meaning model).
+    MEANING_READING:
+      status: 409
+      description: The search by meaning is still being read (a moment); ask again.
   jobs:
     meaning.sweep:
       queue: core
@@ -67,8 +70,8 @@ components:
       required: [available, read, total]
       properties:
         available: { type: boolean, description: False when the AI worker has no meaning model. }
-        read: { type: integer, description: Candidates read so far (those with a title or a CV). }
-        total: { type: integer, description: Candidates with a title or a CV to read. }
+        read: { type: integer, description: "The company's candidates read so far (counted by the read-through, not per user)." }
+        total: { type: integer, description: "The company's candidates to read (counted at the start of each read-through)." }
     MeaningOutcome:
       type: object
       required: [status, understood]
@@ -82,8 +85,8 @@ components:
           description: How the search was read, in words.
           allOf: [{ $ref: '#/components/schemas/MeaningUnderstood' }]
           nullable: true
-        read: { type: integer, description: Candidates read so far. }
-        total: { type: integer, description: Candidates to read. }
+        read: { type: integer, description: "The company's candidates read so far (counted by the read-through, not per user)." }
+        total: { type: integer, description: "The company's candidates to read (counted at the start of each read-through)." }
     MeaningUnderstood:
       type: object
       required: [describes]
@@ -108,7 +111,7 @@ components:
         score: { type: number, description: "0 to 1, best first." }
         strength: { type: string, enum: [strong, good, possible] }
         title: { type: string, description: The title of theirs that matched. }
-        titleWhen: { type: string, description: '"now", or "until 2019".' }
+        titleWhen: { type: string, description: '"now", "until 2019", or "earlier" (a past job whose dates are not known).' }
         family: { type: string, description: The title's job family. }
         level: { type: string, description: Their level in that title. }
         passage: { type: string, description: The part of their CV that matched (for roles that may read CVs). }
@@ -177,6 +180,7 @@ components:
         family: { type: string, maxLength: 60 }
         level: { type: integer, minimum: 0, maximum: 7 }
         endYear: { type: integer, nullable: true }
+        current: { type: boolean, description: 'Their job now (as sent); a past job with no end year is not.' }
         field: { $ref: '#/components/schemas/MeaningVector' }
         work: { $ref: '#/components/schemas/MeaningVector' }
     MeaningPassageRead:

@@ -1493,6 +1493,7 @@ type MeaningRole struct {
 	EndYear     *int16
 	Field       string
 	Work        string
+	Current     *bool
 }
 
 type MeaningSweep struct {
@@ -1504,6 +1505,9 @@ type MeaningSweep struct {
 	RanAt            *time.Time
 	Model            *string
 	UnavailableUntil *time.Time
+	ReadCount        *int32
+	TotalCount       *int32
+	CountedAt        *time.Time
 }
 
 type Note struct {

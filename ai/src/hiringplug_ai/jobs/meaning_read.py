@@ -106,6 +106,7 @@ class _Plan:
 
     def read(self, vectors: np.ndarray) -> MeaningCandidateRead:
         doc = self.source.cv.documentId if self.source.cv else ""
+        now = {r.ordinal: r.current for r in self.source.roles}  # a past job with no end year is not now
         return MeaningCandidateRead(
             candidateId=self.source.candidateId,
             fingerprint=self.source.fingerprint,
@@ -117,6 +118,7 @@ class _Plan:
                     family=fam,
                     level=lvl,
                     endYear=end,
+                    current=now.get(ordinal, False),
                     field=_vector(vectors[f]),
                     work=_vector(vectors[w]),
                 )

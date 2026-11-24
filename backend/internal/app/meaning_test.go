@@ -188,6 +188,8 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 	a.addToJob(token, job.Id, cara.Id)
 	dina := a.createCandidate(token, map[string]any{"firstName": "Dina", "currentTitle": "Procurement Manager"})
 	withCV(t, a, aiConn, token, dina.Id, "Interviews and offers with suppliers; tenders and contracts.") // the job's words, not its work
+	fiona := a.createCandidate(token, map[string]any{"firstName": "Fiona"}) // no title: meaning cannot say her field
+	withCV(t, a, aiConn, token, fiona.Id, "Interviews and offers for our engineering teams.")
 	a.request(http.MethodGet, "/v1/meaning/status", token, nil)
 	readByMeaning(t, a, aiConn, tenant.ID)
 	eve := a.createCandidate(token, map[string]any{"firstName": "Eve"})
@@ -211,7 +213,7 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 	outcome, err := list.Meaning.Get()
 	require.NoError(t, err)
 	assert.Equal(t, api.MeaningOutcomeStatusReading, outcome.Status, "the job is read first; meanwhile by its words")
-	assert.ElementsMatch(t, []string{dina.Id, eve.Id}, ids(list), "those whose CVs share the job's words")
+	assert.ElementsMatch(t, []string{dina.Id, eve.Id, fiona.Id}, ids(list), "those whose CVs share the job's words")
 	asked, ok := readSearch(t, a, aiConn, tenant.ID, api.MeaningUnderstood{Role: str("talent acquisition lead"), Family: str("recruitment")})
 	require.True(t, ok)
 	require.NotNil(t, asked.Title)
@@ -220,10 +222,12 @@ func TestPossibleCandidatesForAJobAreFoundByMeaning(t *testing.T) {
 	assert.NotContains(t, asked.Body, "Maju", "never its employer")
 
 	list = suggest()
-	require.Equal(t, []string{aina.Id, eve.Id}, ids(list),
-		"by meaning first; then by the job's words Eve, not yet read, but not Dina, whom meaning read and turned down; "+
-			"never the accountant, nor Cara who is on the job")
-	assert.False(t, list.Items[1].Why.IsSpecified() && !list.Items[1].Why.IsNull(), "Eve: by the job's words only")
+	require.Len(t, list.Items, 3)
+	assert.Equal(t, aina.Id, list.Items[0].CandidateId, "by meaning first")
+	assert.ElementsMatch(t, []string{eve.Id, fiona.Id}, ids(list)[1:],
+		"then by the job's words: Eve, not yet read, and Fiona, whose field meaning cannot tell (no title); "+
+			"not Dina, whom meaning read by her title and turned down; never the accountant, nor Cara who is on the job")
+	assert.False(t, list.Items[1].Why.IsSpecified() && !list.Items[1].Why.IsNull(), "by the job's words only")
 	why, err := list.Items[0].Why.Get()
 	require.NoError(t, err)
 	assert.Equal(t, "Senior Recruiter", *why.Title)
@@ -254,22 +258,37 @@ func TestANewMeaningModelReadsEveryoneAgain(t *testing.T) {
 	require.True(t, ok)
 	var asked api.MeaningReadQueryJob
 	require.NoError(t, json.Unmarshal(job.Payload, &asked))
+	// The read-through is part-way through a pass when the new model comes.
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE meaning_sweep SET cursor_id = $2 WHERE tenant_id = $1`, tenant.ID, c.Id)
+	require.NoError(t, err)
 	v := fakeMeaning("recruiter")
 	answerAIJob(t, a, aiConn, job, api.JobKindMeaningQueryRead, api.MeaningQueryReadJob{
 		QueryId: asked.QueryId, Model: "stand-in, rules 2", Role: &v, Whole: &v, Needs: []api.MeaningNeedRead{},
 	})
-	runCoreJobsUntilIdle(t, a, tenant.ID) // the read-through starts again at once
+	runCoreJobsUntilIdle(t, a, tenant.ID) // the read-through starts again at once, from the beginning
 	job, ok = claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadCandidates)
-	require.True(t, ok, "everyone is read again with the new model")
+	require.True(t, ok, "everyone is read again with the new model, those before where the pass had got to too")
 	assert.Contains(t, string(job.Payload), c.Id)
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET status = 'pending', locked_by = NULL, locked_until = NULL WHERE id = $1`, job.ID)
+	require.NoError(t, err) // put back: read below
 
-	var page api.CandidateSearchPage
-	a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"meaning": "recruiter"}).JSON(&page)
-	outcome, err := page.Meaning.Get()
+	search := func() api.CandidateSearchPage {
+		var page api.CandidateSearchPage
+		a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"meaning": "recruiter"}).JSON(&page)
+		return page
+	}
+	outcome, err := search().Meaning.Get()
 	require.NoError(t, err)
 	assert.Equal(t, api.MeaningOutcomeStatusReading, outcome.Status, "and the search: its words are read again by the new rules")
-	_, ok = claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadQuery)
-	assert.True(t, ok)
+	job, ok = claimAIJobOfKind(t, aiConn, tenant.ID, api.JobKindMeaningReadQuery)
+	require.True(t, ok)
+	require.NoError(t, json.Unmarshal(job.Payload, &asked))
+	answerAIJob(t, a, aiConn, job, api.JobKindMeaningQueryRead, api.MeaningQueryReadJob{
+		QueryId: asked.QueryId, Model: "stand-in, rules 2", Role: &v, Whole: &v, Needs: []api.MeaningNeedRead{},
+	})
+	assert.Empty(t, names(search()), "Aina's reading by the other model is not compared with the new one")
+	require.Equal(t, 1, readByMeaningWith(t, a, aiConn, tenant.ID, "stand-in, rules 2"))
+	assert.Equal(t, []string{"Aina"}, names(search()), "once read again, she is found")
 }
 
 // A recruiter does not take another field for the one asked for, however

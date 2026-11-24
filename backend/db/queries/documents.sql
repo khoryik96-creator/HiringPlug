@@ -229,6 +229,14 @@ DELETE FROM document WHERE id = @id AND binned_at IS NOT NULL RETURNING storage_
 -- Search by meaning: each candidate's newest CV with text that they sent
 -- (their CV first, then a LinkedIn or JobStreet one; not one the app made,
 -- not in the bin).
+-- Which CV NewestCVTexts gives for each, and which reading of it, without its text.
+-- name: NewestCVKeys :many
+SELECT DISTINCT ON (candidate_id) candidate_id, id, updated_at
+FROM document
+WHERE candidate_id = ANY(@candidate_ids::text[]) AND source <> 'formatted' AND binned_at IS NULL
+  AND extracted_text IS NOT NULL AND extracted_text <> '' AND source IN ('original', 'linkedin', 'jobstreet')
+ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC;
+
 -- name: NewestCVTexts :many
 SELECT DISTINCT ON (candidate_id) candidate_id, id, extracted_text::text AS text
 FROM document
