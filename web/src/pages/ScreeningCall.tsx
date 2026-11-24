@@ -7,12 +7,14 @@ import { CvPane, useCandidateCv } from "../components/CvPane";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { ScreeningCalls } from "../components/ScreeningCalls";
 import { ScreeningForm } from "../components/ScreeningForm";
+import { candidateShowsSalary } from "../api/salaryShown";
 
 /** A screening call: the CV on one side, the call's notes and questions on the other, with the AI assistant. */
 export function ScreeningCall({ candidateId, permissions }: { candidateId: string; permissions: Permission[] }) {
   const candidate = useQuery({
     queryKey: candidateKey(candidateId),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}", { params: { path: { candidateId } } })),
+    refetchOnWindowFocus: (q) => !candidateShowsSalary(q.state.data),
   });
   const { docs, list, selected, setPicked, doc } = useCandidateCv(candidateId, permissions.includes("documents:read"));
 

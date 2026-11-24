@@ -27,6 +27,7 @@ import { SimilarCandidates } from "../components/SimilarCandidates";
 import { StageMoves } from "../components/StageMoves";
 import { CvBeside, useCvBeside } from "../components/CvBeside";
 import { useFieldSettings } from "../components/useFieldSettings";
+import { candidateShowsSalary } from "../api/salaryShown";
 /**
  * One candidate: profile, salary (if permitted) and documents. Render it with
  * key={id}: edit state belongs to one candidate and must not carry over.
@@ -44,6 +45,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   const candidate = useQuery({
     queryKey: candidateKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}", { params: { path: { candidateId: id } } })),
+    refetchOnWindowFocus: (q) => !candidateShowsSalary(q.state.data),
   });
   // Its tab in the strip of open records, by the candidate's name.
   useTabName(`#/candidates/${id}`, candidate.data && [candidate.data.firstName, candidate.data.lastName].filter(Boolean).join(" "));

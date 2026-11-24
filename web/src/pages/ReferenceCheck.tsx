@@ -6,6 +6,7 @@ import { activityKey, candidateKey, notesKey } from "../api/keys";
 import { CallItems, type CallAnswers, callNote, useCallItems } from "../components/CallItems";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Field } from "../components/Field";
+import { candidateShowsSalary } from "../api/salaryShown";
 
 /** A reference check: the questions set in Settings > Reference check, saved as a note on the candidate. */
 export function ReferenceCheck({ candidateId, permissions }: { candidateId: string; permissions: Permission[] }) {
@@ -13,6 +14,7 @@ export function ReferenceCheck({ candidateId, permissions }: { candidateId: stri
   const candidate = useQuery({
     queryKey: candidateKey(candidateId),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}", { params: { path: { candidateId } } })),
+    refetchOnWindowFocus: (q) => !candidateShowsSalary(q.state.data),
   });
   const items = useCallItems("reference_check");
   const [answers, setAnswers] = useState<CallAnswers>({});

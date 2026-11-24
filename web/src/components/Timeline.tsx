@@ -10,6 +10,7 @@ import { Field } from "./Field";
 import { CallQA } from "./callLines";
 import { ScreeningCalls } from "./ScreeningCalls";
 import { fieldErrors } from "./forms";
+import { callsShowSalary } from "../api/salaryShown";
 
 type Subject = Schemas["NoteSubjectType"];
 
@@ -63,6 +64,7 @@ export function Timeline({ subjectType, subjectId, permissions, compact = false 
     queryKey: screeningCallsKey(subjectId),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/screening-calls", { params: { path: { candidateId: subjectId } } })).items,
     enabled: subjectType === "candidate",
+    refetchOnWindowFocus: (q) => !callsShowSalary(q.state.data),
   });
 
   const allNotes = notes.data?.items ?? [];
