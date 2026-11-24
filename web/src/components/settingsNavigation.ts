@@ -5,7 +5,7 @@ export const settingsGroups = [
   { label: "My settings", sections: ["account", "my-dropdowns"] },
   { label: "Recruiting setup", sections: ["settings-stages", "settings-lists", "industries", "settings-salary", "cv-templates"] },
   { label: "Email & scheduling", sections: ["email-connection", "email-templates", "whatsapp-templates", "booking-calendars", "automations"] },
-  { label: "Team & agency", sections: ["settings", "team", "access", "privacy"] },
+  { label: "Team & agency", sections: ["settings", "team", "access", "privacy", "audit-log"] },
   { label: "Finance", sections: ["invoicing", "settings-targets", "settings-claims-storage"] },
   { label: "System & integrations", sections: ["integrations", "ai-provider", "ai-usage", "companion", "system", "backups", "bin"] },
 ];
@@ -27,6 +27,7 @@ const aliases: Record<string, string> = {
   team: "invite users staff teammates recruiter onboarding",
   access: "permissions user access admin roles visibility",
   privacy: "privacy consent retention data deletion do not contact",
+  "audit-log": "audit history who changed log changes activity salary views who saw salary viewed",
   invoicing: "invoice billing placement fees finance",
   "settings-targets": "activity targets KPI goals calls CVs sent interviews placements recruiter revenue forecast pipeline weights",
   "settings-claims-storage": "receipt files scans expenses claim uploads OneDrive Google Drive Dropbox",

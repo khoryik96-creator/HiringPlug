@@ -48,6 +48,13 @@ describe("the route table", () => {
     expect(menu("settings", ["aiusage:read"]).map((r) => r.menu?.label)).toContain("AI usage");
   });
 
+  it("opens Settings › Audit log only with auditlog:read, filters and all", () => {
+    expect(resolve("#/settings/audit-log", [...RECRUITER, "auditlog:read"]).route.section).toBe("audit-log");
+    expect(resolve("#/settings/audit-log?tab=salary&who=usr_1&from=2026-11-01&to=2026-11-24", [...RECRUITER, "auditlog:read"]).route.section).toBe("audit-log");
+    expect(resolve("#/settings/audit-log", RECRUITER).route.section).not.toBe("audit-log");
+    expect(menu("settings", [...OWNERISH, "auditlog:read"]).map((r) => r.menu?.label)).toContain("Audit log");
+  });
+
   it("lists only what the user may open, in order", () => {
     expect(menu("main", RECRUITER).map((r) => r.menu?.label)).toEqual(["Jobs", "Candidates", "Companies", "Contacts", "Import"]);
     expect(menu("settings", RECRUITER).map((r) => r.menu?.label)).toEqual(["AI provider", "Your account", "My dropdowns", "LinkedIn companion"]);

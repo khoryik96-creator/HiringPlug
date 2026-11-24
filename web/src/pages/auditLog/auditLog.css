@@ -1,0 +1,43 @@
+/* Settings › Audit log (option A): tabs, the filters across the top, the
+   count and download, then the table, which scrolls inside its box on a phone. */
+.audit-log { --audit-from: #b91c1c; --audit-to: #157a3c; }
+.audit-log > .panel { padding-top: 0.5rem; }
+.audit-log .candidate-tablist { margin-bottom: 1rem; }
+.audit-log .candidate-tablist [role=tab] { font-size: 0.95rem; font-weight: 600; }
+.audit-panel { display: grid; gap: 0.75rem; min-width: 0; }
+.audit-log > .panel > .audit-panel { padding-top: 0.75rem; }
+
+.audit-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem 0.75rem; }
+.audit-filters .field { font-size: 0.85rem; color: var(--muted); }
+.audit-filters .field :is(input, select) { color: var(--text); font-size: 0.95rem; min-width: 0; }
+
+.audit-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.audit-head button { color: var(--accent); }
+
+.audit-table { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.audit-table td { padding: 0.6rem 0.9rem; }
+.audit-table th { padding: 0.6rem 0.9rem; }
+.audit-table :is(td, th).num { text-align: right; white-space: nowrap; }
+.audit-table .audit-when { white-space: nowrap; }
+.audit-row { cursor: pointer; }
+.audit-row:hover > td { background: var(--soft); }
+.audit-row.open > td { background: var(--soft); border-bottom-color: transparent; }
+.audit-toggle { color: var(--text); font-weight: 500; display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.audit-chevron { display: inline-block; width: 0.7rem; color: var(--muted); font-weight: 700; transition: transform 0.12s; }
+.audit-toggle[aria-expanded=true] .audit-chevron { transform: rotate(90deg); color: var(--accent); }
+
+.audit-diff-row > td { background: var(--soft); padding-top: 0; }
+.audit-diff { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.9rem; font-size: 0.88rem; display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
+.audit-field { font-weight: 600; color: var(--ink); }
+.audit-diff s { color: var(--audit-from); }
+.audit-diff ins { color: var(--audit-to); text-decoration: none; font-weight: 500; }
+
+.audit-empty { margin: 0; padding: 1.5rem 1rem; text-align: center; color: var(--muted); background: var(--soft); border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+.audit-more { justify-self: center; }
+
+@media (max-width: 760px) {
+  .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .audit-table :is(td, th) { padding: 0.5rem 0.6rem; }
+}

@@ -32,6 +32,17 @@ describe("Settings navigation", () => {
     expect(searchSettings(entriesFor([]), "AI cost")).toEqual([]);
   });
 
+  it("finds the audit log under Team & agency by history, who changed and who saw salary", () => {
+    const entries = entriesFor(["auditlog:read", "settings:manage", "identity.team:manage", "identity.roles:manage", "privacy:manage"]);
+    for (const query of ["audit", "history", "who changed", "log", "salary views", "who saw salary"]) {
+      expect(searchSettings(entries, query)[0]?.href, query).toBe("#/settings/audit-log");
+    }
+    expect(searchSettings(entries, "who can see salary?")[0]?.href, "the salary settings stay first").toBe("#/settings/salary#salary-in-emails");
+    expect(groupSettings(menu("settings", ["auditlog:read", "settings:manage", "identity.team:manage", "identity.roles:manage", "privacy:manage"]))
+      .find((g) => g.label === "Team & agency")?.pages.map((p) => p.section)).toEqual(["settings", "team", "access", "privacy", "audit-log"]);
+    expect(searchSettings(entriesFor([]), "audit")).toEqual([]);
+  });
+
   it("only indexes permitted Settings pages and usable feature shortcuts", () => {
     const entries = entriesFor([]);
     expect(entries.map(({ href }) => href)).toEqual(["#/account", "#/my-dropdowns", "#/ai-provider", "#/companion", "#/help"]);
