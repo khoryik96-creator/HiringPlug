@@ -105,3 +105,39 @@ func TestAnInvoiceThatPrintsTheSalaryCountsIt(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	assert.Zero(t, counted(flat), "a fee typed in as an amount: no salary on the invoice")
 }
+
+// An invoice whose template puts the salary only in the email it is sent
+// with: its file (the preview) shows none, and is not counted; sending it
+// is.
+func TestAnInvoiceFileWithoutTheSalaryIsNotCountedThoughItsEmailHasIt(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.sameSalaryDay()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	var s api.InvoiceSettings
+	a.request(http.MethodGet, "/v1/invoice-settings", owner, nil).JSON(&s)
+	res := a.request(http.MethodPut, "/v1/invoice-settings", owner, map[string]any{"version": s.Version, "issuer": s.Issuer,
+		"bankDetails": s.BankDetails, "numberPrefix": s.NumberPrefix, "nextNumber": s.NextNumber, "taxLabel": s.TaxLabel,
+		"taxPercent": s.TaxPercent, "lineText": "Recruitment fee: {{candidate.name}}", "footer": s.Footer, "emailSubject": s.EmailSubject,
+		"emailBody": "The fee is {{fee.basis}}.", "sendHour": s.SendHour})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	rt := recruiter.Token
+	company := a.createCompany(rt, map[string]any{"name": "Contoh Berhad"})
+	billing := a.createContact(rt, map[string]any{"companyId": company.Id, "firstName": "Ken", "email": "ken." + tenant.ID + "@contoh.test"})
+	job := a.createJob(rt, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	c := a.createCandidate(rt, map[string]any{"firstName": "Siti"})
+	app := a.addToJob(rt, job.Id, c.Id)
+	today := time.Now().In(a.deps.Config.TimeZone).Format(time.DateOnly)
+	p := a.placement(http.MethodPost, "/v1/applications/"+app.Id+"/placement", rt, map[string]any{"startDate": today,
+		"money": map[string]any{"salary": map[string]any{"amount": "7345", "currency": "MYR", "period": "month"}, "feePercent": "20"}}, http.StatusCreated)
+	a.placement(http.MethodPut, "/v1/placements/"+p.Id+"/invoicing", rt, map[string]any{"contactId": billing.Id, "paymentTermsDays": 30, "dueOn": nil, "autoSend": false}, http.StatusOK)
+	counted := func() int { return a.seen(owner, recruiter.ID)["placement:"+c.Id].Count }
+
+	res = a.request(http.MethodGet, "/v1/placements/"+p.Id+"/invoice/file?format=docx", rt, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Zero(t, counted(), "the file does not print the salary")
+	res = a.request(http.MethodPost, "/v1/placements/"+p.Id+"/invoice", rt, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, 1, counted(), "its email does")
+}
