@@ -79,6 +79,7 @@ func TestOnlyThoseWhoMaySeeSalariesOpenAFormattedCVWithIt(t *testing.T) {
 func TestACopyOfTheirDataHoldsASalaryCVsTextOnlyForThoseWhoMaySeeSalaries(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleSourcer)
 	owner, sourcer := tenant.Users[api.RoleOwner], tenant.Users[api.RoleSourcer]
 	c := a.withSalary(owner.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah", "email": "siti@example.com"})

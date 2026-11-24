@@ -64,6 +64,18 @@ func (a *testApp) recordSeen(p authz.Principal, kind string, ids ...string) {
 	}))
 }
 
+// salaryDay is the agency's day a test's salary views fall on (see
+// sameSalaryDay).
+var salaryDay = time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+
+// sameSalaryDay keeps every salary view of the test on one day of the
+// agency (salaryDay, from noon in Kuala Lumpur, as time goes on): a test
+// that runs across midnight would otherwise see two lines a day apart.
+func (a *testApp) sameSalaryDay() {
+	start, noon := time.Now(), time.Date(2026, 3, 10, 4, 0, 0, 0, time.UTC) // 12:00 in Kuala Lumpur
+	a.modules.AuditLog.UseClock(func() time.Time { return noon.Add(time.Since(start)) })
+}
+
 func orEmpty(n nullable.Nullable[string]) string {
 	v, _ := n.Get()
 	return v
@@ -77,6 +89,7 @@ func principalOf(t *testing.T, tenantID string, u testutil.User) authz.Principal
 func TestSalaryViewsCollapseToOneLineADayWithACount(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t) // Asia/Kuala_Lumpur, UTC+8
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
 	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
@@ -191,6 +204,7 @@ func TestTheSystemAndTheAINeverCountAsSeeingASalary(t *testing.T) {
 func TestOnlyOwnersAndAdminsSeeWhoWasShownASalary(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter, api.RoleSourcer, api.RoleHiringManager, api.RoleViewer)
 	recruiter := tenant.Users[api.RoleRecruiter]
 	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti"})
@@ -227,6 +241,7 @@ func TestOnlyOwnersAndAdminsSeeWhoWasShownASalary(t *testing.T) {
 func TestSalaryViewsStayInTheirCompanyAndScope(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter, api.RoleSourcer)
 	owner, recruiter, sourcer := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter], tenant.Users[api.RoleSourcer]
 	mine := a.withSalary(recruiter.Token, map[string]any{"firstName": "Mine"})
@@ -277,6 +292,7 @@ func TestSalaryViewsStayInTheirCompanyAndScope(t *testing.T) {
 func TestSalaryViewsDownload(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
 	owner, admin, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleRecruiter]
 	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
@@ -293,7 +309,7 @@ func TestSalaryViewsDownload(t *testing.T) {
 	require.Len(t, rows, 2, "the filter: candidate pages only")
 	assert.Equal(t, []string{"Day", "Who", "Where", "Candidate", "Candidate id", "Candidates", "Times", "First", "Last"}, rows[0])
 	assert.Equal(t, []string{"Test recruiter", "Candidate page", "Siti Aisyah", c.Id, "1", "2"}, rows[1][1:7])
-	assert.Equal(t, time.Now().In(kualaLumpur(t)).Format(time.DateOnly), rows[1][0], "the agency's day")
+	assert.Equal(t, salaryDay.Format(time.DateOnly), rows[1][0], "the agency's day")
 
 	all := a.request(http.MethodPost, "/v1/salary-views/export", admin, map[string]any{"format": "xlsx"})
 	require.Equal(t, http.StatusOK, all.Status)

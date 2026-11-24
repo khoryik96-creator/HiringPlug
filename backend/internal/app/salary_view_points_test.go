@@ -18,6 +18,7 @@ import (
 func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
 	owner, admin, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin], tenant.Users[api.RoleRecruiter]
 	rt := recruiter.Token
@@ -176,6 +177,7 @@ func with(body map[string]any, key string, value any) map[string]any {
 func TestAShortlistEmailToACandidateCountsTheRecipientsOwnSalary(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
 	rt := recruiter.Token
@@ -231,6 +233,7 @@ func TestAShortlistEmailToACandidateCountsTheRecipientsOwnSalary(t *testing.T) {
 func TestACandidateSentBackWithTheirSalaryIsCounted(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
 	rt := recruiter.Token
@@ -286,6 +289,7 @@ func TestACandidateSentBackWithTheirSalaryIsCounted(t *testing.T) {
 func TestAMergeMovesWhoWasShownTheDuplicatesSalary(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
 	owner, admin, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin], tenant.Users[api.RoleRecruiter]
 	keep := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
@@ -320,6 +324,7 @@ func TestAMergeMovesWhoWasShownTheDuplicatesSalary(t *testing.T) {
 func TestASalaryCVThatCannotBeOpenedIsNotCounted(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
+	a.sameSalaryDay()
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
 	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti"})
