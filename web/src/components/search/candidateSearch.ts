@@ -92,6 +92,16 @@ export function wantsSalary(canSeeSalary: boolean, columns: readonly string[], r
   return reader || columns.some((c) => SORTABLE[c]?.salary === true);
 }
 
+/**
+ * Whether a page is counted in the log of who was shown a salary: salaries in it, or found by the
+ * expected salary or ordered by a salary (who is found, and in which order, tells about each). Such a
+ * page is read when asked for, never again just because the window got focus.
+ */
+export function countsSalary(includeSalary: boolean, sort: CandidateSort | null, salaryMax = ""): boolean {
+  const bySalary = Object.values(SORTABLE).some((s) => s.salary && (s.asc === sort || s.desc === sort));
+  return includeSalary || bySalary || salaryMax.replace(/[^0-9.]/g, "") !== "";
+}
+
 /** The request for a page of the search (q and "mine" come from the page's own boxes). */
 export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, sort: CandidateSort = "newest", folderId?: string): Schemas["CandidateSearch"] {
   const body: Schemas["CandidateSearch"] = { limit: 25, skillsMatch: s.skillsMatch };
