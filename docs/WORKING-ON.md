@@ -19,3 +19,12 @@ How to write an entry (newest at the top, one per task):
 ```
 
 ## In progress
+
+### WhatsApp window: insert field, save as template, manage templates
+- Who: Claude (account A), session "Hiring Plug"
+- Branch: claude/relaxed-hopper-ex7y3v
+- Touches: emails module (WhatsApp draft gives its fields' values), web/src/components/WhatsApp*.tsx, web/src/pages/WhatsAppTemplates.tsx
+- Started: 24 Nov 2026    Last update: 24 Nov 2026
+- State: in progress
+- Next: Insert field (the person's value at the cursor), Save as template (values back to fields), add/edit/rename/delete templates from the WhatsApp window and Settings
+
