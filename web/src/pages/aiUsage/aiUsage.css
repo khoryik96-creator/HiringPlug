@@ -1,0 +1,68 @@
+/* Settings › AI usage (option A): this month and the limit side by side,
+   then the tables, then the 12-month chart. */
+.ai-usage { --ai-ok: #157a3c; --ai-ok-soft: #dcfce7; --ai-warn: #b45309; --ai-warn-soft: #fef3c7; --ai-stop: #b91c1c; --ai-stop-soft: #fee2e2; --ai-bar: #b9a4ef; }
+.ai-usage-top { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 0 1rem; align-items: stretch; }
+.ai-usage-top > .panel { align-content: start; }
+.ai-usage-top > .panel:only-child { grid-column: 1 / -1; }
+.ai-usage-month, .ai-usage-limit { display: grid; gap: 0.75rem; }
+.ai-usage-month h3, .ai-usage-limit h3 { margin: 0; }
+.ai-usage-month p, .ai-usage-limit p { margin: 0; }
+
+.ai-usage-pill { border: 1px solid currentColor; }
+.ai-usage-pill.ok { color: var(--ai-ok); background: var(--ai-ok-soft); }
+.ai-usage-pill.warn { color: var(--ai-warn); background: var(--ai-warn-soft); }
+.ai-usage-pill.stop { color: var(--ai-stop); background: var(--ai-stop-soft); }
+
+.ai-usage-stats { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 2rem; }
+.ai-usage-big { font-family: var(--display); font-weight: 700; font-size: 2.3rem; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ai-usage-stat + .ai-usage-stat .ai-usage-big { font-size: 1.7rem; }
+
+.ai-usage-meter { position: relative; height: 12px; border-radius: 999px; background: var(--accent-soft); }
+.ai-usage-meter > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.ai-usage-meter.warn > span { background: var(--ai-warn); }
+.ai-usage-meter.stop > span { background: var(--ai-stop); }
+.ai-usage-tick { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: var(--ink); border-radius: 2px; box-shadow: 0 0 0 1.5px var(--surface); }
+.ai-usage-stop { color: var(--ai-stop); font-weight: 600; }
+
+.ai-usage-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
+.ai-usage-fields .field { font-size: 0.85rem; color: var(--muted); }
+.ai-usage-fields .field :is(input, select) { color: var(--text); font-size: 0.95rem; }
+.ai-usage-fields .check { grid-column: 1 / -1; font-size: 0.88rem; margin-top: -0.2rem; }
+.ai-usage-limit form { display: grid; gap: 0.6rem; }
+.ai-usage-limit form > .muted { margin: 0; }
+.ai-usage-values { grid-template-columns: auto minmax(0, 1fr); }
+
+.ai-usage-tables .candidate-tablist { margin-bottom: 0.75rem; }
+.ai-usage-tables .candidate-tablist [role=tab] { font-size: 0.9rem; font-weight: 600; }
+.ai-usage-table { font-variant-numeric: tabular-nums; }
+.ai-usage-table :is(td, th).num { text-align: right; white-space: nowrap; }
+.ai-usage-table td { padding: 0.6rem 1rem; }
+.ai-usage-table td:first-child { white-space: nowrap; }
+
+.ai-usage-plot { overflow: hidden; }
+.ai-usage-chart svg { display: block; margin: 0.5rem 0; overflow: visible; }
+.ai-usage-chart svg text { fill: var(--muted); font-size: 12px; }
+.ai-usage-chart .axis { stroke: var(--line-strong); }
+.ai-usage-chart .grid { stroke: var(--line); stroke-dasharray: 3 4; }
+.ai-usage-chart .limit line { stroke: var(--ai-warn); stroke-width: 1.5; }
+.ai-usage-chart .limit text { fill: var(--ai-warn); font-weight: 600; }
+.ai-usage-bar { cursor: pointer; outline: none; }
+.ai-usage-bar .hit { fill: transparent; }
+.ai-usage-bar .fill { fill: var(--ai-bar); }
+.ai-usage-bar.current .fill { fill: var(--accent); }
+.ai-usage-bar:hover .hit, .ai-usage-bar:focus-visible .hit { fill: var(--soft); }
+.ai-usage-bar.picked .hit { fill: var(--accent-soft); }
+.ai-usage-bar.picked text { fill: var(--ink); font-weight: 700; }
+.ai-usage-picked { border-top: 1px solid var(--line); padding-top: 0.75rem; }
+.ai-usage-picked h4 { margin: 0; }
+
+.ai-usage-note { border-left: 3px solid var(--accent); padding: 0.2rem 0 0.2rem 0.75rem; color: var(--muted); font-size: 0.9rem; }
+
+@media (max-width: 900px) {
+  .ai-usage-top { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .ai-usage-fields { grid-template-columns: minmax(0, 1fr); }
+  .ai-usage-table :is(td, th) { padding: 0.55rem 0.6rem; }
+  .ai-usage-values { grid-template-columns: minmax(0, 1fr); }
+}

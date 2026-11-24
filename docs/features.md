@@ -503,7 +503,7 @@ the panel takes the whole width).
 
 ### AI usage and its limit
 
-Built in 1.44.0 (the usage page in Settings comes next).
+Built in 1.44.0.
 
 - **One ledger.** Every AI run (assistant answers and emails, fit scores, AI
   candidate searches, CV readings, formatted CVs, blind ads, JD readings,
@@ -533,6 +533,16 @@ Built in 1.44.0 (the usage page in Settings comes next).
   the last months. Costs are estimates from the company's current prices; the
   provider's bill is final. History before 1.44.0 was copied into the ledger
   from each feature's own records.
+- **The page: Settings › AI usage** (`#/settings/ai-usage`, `aiusage:read`).
+  This month on top: the cost against a money limit (or the tokens against a
+  token limit), the tokens and uses beside it, a meter with the warning mark,
+  and when the limit starts again. Beside it the limit and prices: a form for
+  `aiusage:manage` (tokens or money, warning percent, currency, price per
+  million tokens in and out, "Use the server default"), the values for those
+  who only read them. Then this month by feature and by person (what the
+  system did on its own is "Automatic"), and the last 12 months as bars with
+  the limit as a line: clicking a month lists its features. Money is shown
+  exactly as the API sends it (decimal strings, never rounded in the browser).
 
 ### AI help in the email windows ✅
 

@@ -42,6 +42,12 @@ describe("the route table", () => {
     expect(menu("settings", OWNERISH).filter((r) => r.section === "ai-provider")).toHaveLength(1);
   });
 
+  it("opens Settings › AI usage only with aiusage:read", () => {
+    expect(resolve("#/settings/ai-usage", [...RECRUITER, "aiusage:read"]).route.section).toBe("ai-usage");
+    expect(resolve("#/settings/ai-usage", RECRUITER).route.section).not.toBe("ai-usage");
+    expect(menu("settings", ["aiusage:read"]).map((r) => r.menu?.label)).toContain("AI usage");
+  });
+
   it("lists only what the user may open, in order", () => {
     expect(menu("main", RECRUITER).map((r) => r.menu?.label)).toEqual(["Jobs", "Candidates", "Companies", "Contacts", "Import"]);
     expect(menu("settings", RECRUITER).map((r) => r.menu?.label)).toEqual(["AI provider", "Your account", "My dropdowns", "LinkedIn companion"]);

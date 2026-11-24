@@ -22,6 +22,7 @@ function page<M extends Record<K, AnyComponent>, K extends keyof M>(load: () => 
 const EmailConnection = page(() => import("./pages/EmailConnection"), "EmailConnection");
 const Access = page(() => import("./pages/Access"), "Access");
 const AiProvider = page(() => import("./pages/AiProvider"), "AiProvider");
+const AiUsage = page(() => import("./pages/AiUsage"), "AiUsage");
 const BookingHours = page(() => import("./components/BookingHours"), "BookingHours");
 const TeamBookings = page(() => import("./components/TeamBookings"), "TeamBookings");
 const Bin = page(() => import("./pages/Bin"), "Bin");
@@ -165,6 +166,8 @@ export const ROUTES: Route[] = [
         </section>
       </main>
     ) },
+  { section: "ai-usage", path: /^#\/settings\/ai-usage/, permission: "aiusage:read", menu: { in: "settings", label: "AI usage", href: "#/settings/ai-usage" },
+    render: (c) => <AiUsage canManage={can(c, "aiusage:manage")} /> },
   { section: "team", path: /^#\/team/, permission: "identity.team:manage", menu: { in: "settings", label: "Team", href: "#/team" },
     render: (c) => <Team myRole={c.me.role} myId={c.me.user.id} /> },
   { section: "access", path: /^#\/access/, permission: "identity.roles:manage", menu: { in: "settings", label: "Roles and access", href: "#/access" },

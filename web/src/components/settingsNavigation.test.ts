@@ -23,6 +23,15 @@ describe("Settings navigation", () => {
     expect(href("nonsense")).toBeUndefined();
   });
 
+  it("finds the AI usage page by cost, tokens and limit, for those who may see it", () => {
+    const entries = entriesFor(["aiusage:read", "aiproviders:manage"]);
+    for (const query of ["AI cost", "tokens", "AI limit", "usage", "monthly AI spend"]) {
+      expect(searchSettings(entries, query)[0]?.href, query).toBe("#/settings/ai-usage");
+    }
+    expect(groupSettings(menu("settings", ["aiusage:read"])).find((g) => g.label === "System & integrations")?.pages.map((p) => p.section)).toEqual(["ai-provider", "ai-usage", "companion"]);
+    expect(searchSettings(entriesFor([]), "AI cost")).toEqual([]);
+  });
+
   it("only indexes permitted Settings pages and usable feature shortcuts", () => {
     const entries = entriesFor([]);
     expect(entries.map(({ href }) => href)).toEqual(["#/account", "#/my-dropdowns", "#/ai-provider", "#/companion", "#/help"]);
