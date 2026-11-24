@@ -39,6 +39,8 @@ export function useFieldValues({ key, body, html, subject = "", enabled = true }
     data,
     values: data?.fieldValues,
     withheld: salary.data ? [] : withheld,
+    /** A salary field's value is being asked for (it goes in once it comes). */
+    filling: wanted && salary.isFetching,
     error: base.error ?? salary.error,
     isPending: base.isPending,
   };

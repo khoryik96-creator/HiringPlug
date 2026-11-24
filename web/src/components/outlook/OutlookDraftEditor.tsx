@@ -10,7 +10,8 @@ import { Field } from "../Field";
 import { fieldErrors, FormInvalid } from "../forms";
 import { wallTime, zonedInput } from "../calendar/dates";
 import { RichEditor } from "../clientEmail/RichEditor";
-import { editorText, plainToHtml, withoutCaretMarks } from "../clientEmail/richText";
+import { editorText, fillTokens, plainToHtml, withoutCaretMarks } from "../clientEmail/richText";
+import { mentionsField } from "../clientEmail/useFieldValues";
 import { useCandidatePackages } from "../clientEmail/useCandidatePackages";
 import { OutlookCandidateDetails } from "./OutlookCandidateDetails";
 import { type ComposeContext, OutlookComposeTools, useComposeData } from "./OutlookComposeTools";
@@ -89,6 +90,9 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   const [candidate, setCandidate] = useState<{ id: string; name: string } | null>(null);
   const [aboutPage, setAboutPage] = useState(about);
   const tools = useComposeData(candidate ? { candidateId: candidate.id } : aboutPage, form);
+  // Fields in the subject show the candidate's values, as in the message (the editor fills those).
+  const subject = tools.values ? fillTokens(form.subject, tools.fields, tools.values) : form.subject;
+  const filled = { ...form, subject };
   // The page's candidate is ready to have their details put in (their name shows once read).
   const packages = useCandidatePackages(about.candidateId ? [{ candidateId: about.candidateId, name: "This candidate" }] : []);
   /** Puts new content in the message (a template, the signature), and shows it. */
@@ -134,7 +138,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
             throw new Error("Choose a non-empty file up to 10 MB.");
           }
           if (!opened) {
-            opened = unwrap(await api.POST("/v1/outlook/drafts", { body: inputOf(form) }));
+            opened = unwrap(await api.POST("/v1/outlook/drafts", { body: inputOf(filled) }));
             setDraft(opened);
           }
           setDraft(await uploadOutlookDraftFile(opened.messageId, opened.version, file));
@@ -160,7 +164,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
           throw new FormInvalid({ sendAt: error instanceof Error ? error.message : "Choose a valid send time." });
         }
       }
-      const changes = inputOf(form, draft);
+      const changes = inputOf(filled, draft);
       let saved = draft;
       if (!saved) {
         saved = unwrap(await api.POST("/v1/outlook/drafts", { body: changes }));
@@ -209,7 +213,9 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   const errorFor = (name: string) => errors[name] ?? Object.entries(errors).find(([field]) => field.startsWith(`${name}.`) || field.startsWith(`${name}[`))?.[1];
   const update = (field: keyof typeof form, value: string) => { setForm({ ...form, [field]: value }); setNotice(""); };
   const messageText = editorText(form.html).replace(/\s+/g, " ");
-  const readyToSend = !!form.to.trim() && !!form.subject.trim() && !!messageText && messageText !== originalReplyText;
+  // A salary field whose value is still to come (asked for once it is in): never sent as [Expected salary].
+  const salaryToCome = tools.withheld.filter((t) => mentionsField(`${subject}\n${messageText}`, [t]));
+  const readyToSend = !!form.to.trim() && !!subject.trim() && !!messageText && messageText !== originalReplyText && salaryToCome.length === 0;
   return <>
     <div className="row spread outlook-draft-head">
       <h3 id="outlook-draft-heading">{draft ? "Outlook draft" : "New Outlook message"}</h3>
@@ -223,8 +229,8 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
           <Field label="Cc" error={errorFor("cc")}><input value={form.cc} onChange={(e) => { update("cc", e.target.value); }}/></Field>
           <Field label="Bcc" error={errorFor("bcc")}><input value={form.bcc} onChange={(e) => { update("bcc", e.target.value); }}/></Field>
         </div>}
-        <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={form.subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
-        {!draft?.bodyTruncated && <OutlookComposeTools data={tools} html={form.html} subject={form.subject} permissions={permissions}
+        <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
+        {!draft?.bodyTruncated && <OutlookComposeTools data={tools} html={form.html} subject={subject} permissions={permissions}
           candidate={candidate} onCandidate={(c) => {
             setCandidate(c);
             if (!c) setAboutPage({});
@@ -260,6 +266,9 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
         <Field label={`Send at · ${zone}`} error={errorFor("sendAt")}><input type="datetime-local" value={at} onChange={(e) => { setAt(e.target.value); }}/></Field>
         <button type="button" disabled={!at || !readyToSend || action.isPending} onClick={() => { run("schedule"); }}>{plan ? "Update schedule" : "Schedule email"}</button>
       </div>}
+      {salaryToCome.length > 0 && <p className="full small muted" role="status">
+        {tools.filling ? `Putting in ${salaryToCome.join(", ")}…` : `${salaryToCome.join(", ")} could not be put in yet: take it out, or try again later.`} Sending waits for it.
+      </p>}
       <div className="full"><ErrorMessage error={action.error}/></div>
       {notice && <p className="full" role="status">{notice}</p>}
       <div className="row full outlook-actions">

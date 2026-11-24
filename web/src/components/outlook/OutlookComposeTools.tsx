@@ -32,7 +32,7 @@ export function useComposeData(about: ComposeContext, message: { html: string; s
     html: message.html, subject: message.subject,
   });
   return {
-    templates: templates.data?.items ?? [], fields: templates.data?.fields ?? [], values: context.values, withheld: context.withheld,
+    templates: templates.data?.items ?? [], fields: templates.data?.fields ?? [], values: context.values, withheld: context.withheld, filling: context.filling,
     banners: banners.banners, bannerUrls: banners.urls, uploadBanner: banners.upload,
     signature: signature.data?.bodyHtml ?? "", signatureLoaded: signature.isSuccess, error: templates.error ?? context.error ?? banners.upload.error,
   };
