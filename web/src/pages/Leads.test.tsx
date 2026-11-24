@@ -98,8 +98,8 @@ describe("leads", () => {
     const find = await screen.findByRole("button", { name: "Find HR for Contoh Berhad" });
     expect(find.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(find);
-    const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Berhad" });
-    expect(within(panel).getByRole("heading", { name: "1 · Which company is it?" })).toBeTruthy();
+    const first = screen.getByRole("complementary", { name: "Find HR for Contoh Berhad" });
+    expect(within(first).getByRole("heading", { name: "1 · Which company is it?" })).toBeTruthy();
     expect(find.getAttribute("aria-pressed")).toBe("true");
     expect(find.closest("tr")?.className).toBe("lead-open");
     // Another lead's button switches the panel to it.
@@ -108,8 +108,39 @@ describe("leads", () => {
     expect(screen.queryByRole("complementary", { name: "Find HR for Contoh Berhad" })).toBeNull();
     expect(find.getAttribute("aria-pressed")).toBe("false");
     fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.getByRole("complementary"), "Escape outside the panel is not the panel's").toBeTruthy();
+    const panel = screen.getByRole("complementary", { name: "Find HR for Nusantara Logistik Sdn Bhd" });
+    expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Find HR · Nusantara Logistik Sdn Bhd" }));
+    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.getByRole("region", { name: "Hiring leads" })).toBeTruthy();
+    // Back where it was opened from.
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Find HR for Nusantara Logistik Sdn Bhd" }));
+  });
+
+  it("links from the panel with the lead's newest version, even once a filter hides it", async () => {
+    let contacted = false;
+    vi.spyOn(companion, "useCompanion").mockReturnValue({ ready: false, version: null });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok({ items:
+      path === "/v1/job-leads" ? (contacted ? [] : [lead])
+        : path === "/v1/companies/named-like" ? [{ id: "comp_1", name: "Contoh Berhad", city: null, website: null, linkedinUrl: null, industry: null, sameName: true }] : [],
+    }))) as never);
+    const patch = vi.spyOn(api, "PATCH").mockImplementation(((_: string, init: { body: { status?: string } }) => {
+      if (init.body.status) {
+        contacted = true;
+        return Promise.resolve(ok({ ...lead, version: 2, status: "contacted" }));
+      }
+      return Promise.resolve(ok({ ...lead, version: 3, status: "contacted", companyId: "comp_1" }));
+    }) as never);
+    renderWithClient(<Leads permissions={[...manage, "companies:read", "contacts:read"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Find HR for Contoh Berhad" }));
+    // Its status changed in its row: the list (new leads only, say) no longer has it.
+    fireEvent.change(screen.getByLabelText("Status of Account Executive at Contoh Berhad"), { target: { value: "contacted" } });
+    await waitFor(() => { expect(screen.queryByRole("button", { name: "Find HR for Contoh Berhad" })).toBeNull(); });
+    const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Berhad" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "This one: Contoh Berhad" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
+    expect(sentBody(patch, 1)).toEqual({ version: 2, companyId: "comp_1" });
   });
 
   it("offers Find HR only to those who may read companies and contacts", async () => {

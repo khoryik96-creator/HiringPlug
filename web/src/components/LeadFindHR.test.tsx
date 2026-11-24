@@ -156,19 +156,49 @@ describe("a lead's Find HR panel", () => {
     expect(await screen.findByText(/adding it needs the permission to edit companies/)).toBeTruthy();
   });
 
-  it("closes with Escape or its close button, but not on Escape in a dialog", async () => {
-    serve();
+  it("closes with Escape in the panel or its close button, but not on Escape elsewhere, while typing, or in a dialog", async () => {
+    serve({ matches: [] });
     const onClose = vi.fn();
     show({}, ALL, onClose);
-    await screen.findByText("Contoh Logistics Berhad");
+    const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Logistik Sdn Bhd" });
+    const form = await within(panel).findByRole("form", { name: "New company" });
+    // Elsewhere on the page (the open records bar, the list's search box): not the panel's.
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    // Typing in the panel: what was typed stays.
+    fireEvent.keyDown(within(form).getByLabelText("Name"), { key: "Escape" });
+    fireEvent.keyDown(within(form).getByLabelText("LinkedIn page"), { key: "Escape" });
     const dialog = document.createElement("dialog");
-    document.body.append(dialog);
-    fireEvent.keyDown(dialog, { key: "Escape" });
+    const inDialog = document.createElement("button");
+    dialog.append(inDialog);
+    panel.append(dialog);
+    fireEvent.keyDown(inDialog, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
     dialog.remove();
-    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.keyDown(within(panel).getByRole("heading", { name: "Find HR · Contoh Logistik Sdn Bhd" }), { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it("puts the focus on its title when it opens, and sticks under the bars at the top of the page", async () => {
+    const bar = document.createElement("header");
+    bar.className = "topbar";
+    Object.defineProperty(bar, "offsetHeight", { value: 56 });
+    const tabs = document.createElement("nav");
+    tabs.className = "open-tabs";
+    Object.defineProperty(tabs, "offsetHeight", { value: 40 });
+    document.body.append(bar, tabs);
+    try {
+      serve();
+      show();
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Find HR · Contoh Logistik Sdn Bhd" }));
+      const panel = screen.getByRole("complementary", { name: "Find HR for Contoh Logistik Sdn Bhd" });
+      expect(panel.style.getPropertyValue("--lead-hr-top")).toBe("108px");
+      await screen.findByText("Contoh Logistics Berhad");
+    } finally {
+      bar.remove();
+      tabs.remove();
+    }
+  });
 });
+

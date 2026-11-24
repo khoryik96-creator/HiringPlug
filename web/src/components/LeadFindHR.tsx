@@ -3,7 +3,7 @@
 // company's Find HR scan, laid out for the panel. A lead linked already
 // starts at step 2, asking first for the company's LinkedIn page if it has none.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { api, type Company, type Permission, type Schemas, unwrap } from "../api/client";
 import { companyKey } from "../api/keys";
@@ -18,27 +18,44 @@ export function LeadFindHR({ lead, permissions, onClose }: { lead: Schemas["JobL
   // Linked here: step 2 at once, before the list is read again.
   const [linkedId, setLinkedId] = useState<string | null>(null);
   const companyId = linkedId ?? lead.companyId;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      // Escape in a dialog opened from the panel (Apollo) closes that dialog only.
-      if (document.querySelector("dialog[open]") || (e.target instanceof Element && e.target.closest("dialog"))) return;
-      onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); };
-  }, [onClose]);
+  const top = useUnderBars();
+  const head = useRef<HTMLHeadingElement>(null);
+  // Into view with the focus on its title (on a narrow screen the panel is above the list).
+  useEffect(() => { head.current?.focus(); }, []);
+  // Escape in the panel closes it, but not while typing in it or in a dialog opened from it (Apollo).
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    const t = e.target instanceof Element ? e.target : null;
+    if (document.querySelector("dialog[open]") || t?.closest("dialog, input, textarea, select, [contenteditable='true']")) return;
+    onClose();
+  };
 
   return (
-    <aside className="panel lead-hr" aria-label={`Find HR for ${lead.companyName}`}>
+    <aside className="panel lead-hr" aria-label={`Find HR for ${lead.companyName}`} onKeyDown={onKeyDown}
+      style={top === null ? undefined : { "--lead-hr-top": `${String(top + 12)}px` } as CSSProperties}>
       <div className="lead-hr-head">
-        <h3>Find HR · {lead.companyName}</h3>
+        <h3 ref={head} tabIndex={-1}>Find HR · {lead.companyName}</h3>
         <button type="button" className="icon-action" aria-label="Close" onClick={onClose}>✕</button>
       </div>
       {companyId ? <LinkedCompany id={companyId} permissions={permissions} />
         : <LeadCompanyChoice lead={lead} permissions={permissions} onLinked={setLinkedId} />}
     </aside>
   );
+}
+
+/** The height of the bars kept at the top as the page scrolls (the top bar, the open records), so the panel sticks under them. */
+function useUnderBars(): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const bars = [".topbar", ".open-tabs"].flatMap((s) => document.querySelector<HTMLElement>(s) ?? []);
+    const measure = () => { setHeight(bars.reduce((sum, b) => sum + b.offsetHeight, 0)); };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const watch = new ResizeObserver(measure);
+    bars.forEach((b) => { watch.observe(b); });
+    return () => { watch.disconnect(); };
+  }, []);
+  return height;
 }
 
 function LinkedCompany({ id, permissions }: { id: string; permissions: Permission[] }) {

@@ -24,10 +24,19 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
   });
   const [adding, setAdding] = useState(false);
   const [sources, setSources] = useState(false);
-  // Find HR for one lead, in a panel beside the list (the list as read now, else as it was when opened).
+  // Find HR for one lead, in a panel beside the list: the newest copy of it read or saved here, so a link
+  // from the panel sends its current version even once a filter hides it (its status changed, say).
   const [finding, setFinding] = useState<Lead | null>(null);
-  const shown = finding ? (list.data?.find((l) => l.id === finding.id) ?? finding) : null;
-  const closeFinding = useCallback(() => { setFinding(null); }, []);
+  const inList = finding ? list.data?.find((l) => l.id === finding.id) : undefined;
+  if (finding && inList && inList !== finding && inList.version >= finding.version) setFinding(inList);
+  const shown = inList && finding && inList.version >= finding.version ? inList : finding;
+  const savedLead = useCallback((saved: Lead) => { setFinding((f) => (f?.id === saved.id && saved.version >= f.version ? saved : f)); }, []);
+  const findingId = finding?.id;
+  const closeFinding = useCallback(() => {
+    setFinding(null);
+    // Back to the lead's Find HR button, where the panel was opened from.
+    if (findingId) document.getElementById(findHrButtonId(findingId))?.focus();
+  }, [findingId]);
   return (
     <main className="list-page">
       {/* Like the other lists: the filters and the buttons beside the title. */}
@@ -56,7 +65,7 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
             <table>
               <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th>{canFindHR && <th><span className="visually-hidden">Find HR</span></th>}</tr></thead>
               <tbody>{list.data.map((l) => (
-                <LeadRow key={l.id} lead={l} canManage={canManage} open={shown?.id === l.id}
+                <LeadRow key={l.id} lead={l} canManage={canManage} open={shown?.id === l.id} onSaved={savedLead}
                   onFindHR={canFindHR ? () => { setFinding(shown?.id === l.id ? null : l); } : undefined} />
               ))}</tbody>
             </table>
@@ -68,11 +77,16 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
   );
 }
 
-function LeadRow({ lead: l, canManage, open, onFindHR }: { lead: Lead; canManage: boolean; open: boolean; onFindHR: (() => void) | undefined }) {
+const findHrButtonId = (leadId: string) => `find-hr-${leadId}`;
+
+function LeadRow({ lead: l, canManage, open, onSaved, onFindHR }: {
+  lead: Lead; canManage: boolean; open: boolean; onSaved: (saved: Lead) => void; onFindHR: (() => void) | undefined;
+}) {
   const queryClient = useQueryClient();
   const setStatus = useMutation({
     mutationFn: async (status: Schemas["LeadStatus"]) =>
       unwrap(await api.PATCH("/v1/job-leads/{jobLeadId}", { params: { path: { jobLeadId: l.id } }, body: { version: l.version, status } })),
+    onSuccess: onSaved,
     onSettled: async () => { await queryClient.invalidateQueries({ queryKey: ["job-leads"] }); },
   });
   return (
@@ -91,7 +105,7 @@ function LeadRow({ lead: l, canManage, open, onFindHR }: { lead: Lead; canManage
         <ErrorMessage error={setStatus.error} />
       </td>
       {onFindHR && <td className="lead-find-hr">
-        <button type="button" className="doc-btn" aria-pressed={open} aria-label={`Find HR for ${l.companyName}`} onClick={onFindHR}>Find HR</button>
+        <button type="button" id={findHrButtonId(l.id)} className="doc-btn" aria-pressed={open} aria-label={`Find HR for ${l.companyName}`} onClick={onFindHR}>Find HR</button>
       </td>}
     </tr>
   );
