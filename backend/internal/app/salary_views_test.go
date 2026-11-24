@@ -1,7 +1,9 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"net/http"
 	"testing"
 	"time"
@@ -255,4 +257,37 @@ func TestSalaryViewsStayInTheirCompanyAndScope(t *testing.T) {
 		about = append(about, orEmpty(v.CandidateId))
 	}
 	assert.ElementsMatch(t, []string{mine.Id, ""}, about)
+}
+
+func TestSalaryViewsDownload(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
+	owner, admin, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleRecruiter]
+	c := a.withSalary(recruiter.Token, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
+	for range 2 {
+		require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+c.Id, recruiter.Token, nil).Status)
+	}
+	require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates?includeSalary=true", recruiter.Token, nil).Status)
+
+	res := a.request(http.MethodPost, "/v1/salary-views/export", admin, map[string]any{"format": "csv", "kind": "candidate", "user": recruiter.ID})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Contains(t, res.Header.Get("Content-Disposition"), "Salary views")
+	rows, err := csv.NewReader(bytes.NewReader(bytes.TrimPrefix(res.Body, []byte("\xef\xbb\xbf")))).ReadAll()
+	require.NoError(t, err)
+	require.Len(t, rows, 2, "the filter: candidate pages only")
+	assert.Equal(t, []string{"Day", "Who", "Where", "Candidate", "Candidate id", "Candidates", "Times", "First", "Last"}, rows[0])
+	assert.Equal(t, []string{"Test recruiter", "Candidate page", "Siti Aisyah", c.Id, "1", "2"}, rows[1][1:7])
+	assert.Equal(t, time.Now().In(kualaLumpur(t)).Format(time.DateOnly), rows[1][0], "the agency's day")
+
+	all := a.request(http.MethodPost, "/v1/salary-views/export", admin, map[string]any{"format": "xlsx"})
+	require.Equal(t, http.StatusOK, all.Status)
+	assert.Equal(t, "PK", string(all.Body[:2]))
+	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodPost, "/v1/salary-views/export", admin, map[string]any{"format": "csv", "kind": "salary"}).Status)
+
+	// Each download is in the audit log, with no amount.
+	exp := a.auditLog(owner.Token, "?action=auditlog.exported")
+	require.Len(t, exp.Items, 2)
+	assert.Equal(t, map[string]any{"list": "salary_views", "count": float64(1), "format": "csv"}, exp.Items[1].Changes)
+	assert.Equal(t, map[string]any{"list": "salary_views", "count": float64(2), "format": "xlsx"}, exp.Items[0].Changes)
 }
