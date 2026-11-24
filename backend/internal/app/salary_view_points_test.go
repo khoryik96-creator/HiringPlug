@@ -222,3 +222,60 @@ func TestAShortlistEmailToACandidateCountsTheRecipientsOwnSalary(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, email("/v1/emails", noSalary).Status, "no value for the recipient")
 	assert.NotContains(t, a.seen(owner, recruiter.ID), "email_fields:"+shortlisted.Id)
 }
+
+// A change that sends the candidate back with their salary shows it as much
+// as their page does: a profile change, their history, a merge and a
+// screening call that did not set the salary are counted; a call that set
+// it is not (what they just typed in). Salary notes alone, or a formatted
+// CV "with the salary" of a candidate who has none, show no salary.
+func TestACandidateSentBackWithTheirSalaryIsCounted(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter]
+	rt := recruiter.Token
+	c := a.withSalary(rt, map[string]any{"firstName": "Siti", "email": "siti@example.com"})
+	dup := a.createCandidate(rt, map[string]any{"firstName": "Siti", "lastName": "Dup"})
+	pages := func() int {
+		t.Helper()
+		return a.seen(owner, recruiter.ID)["candidate:"+c.Id].Count
+	}
+	var got api.Candidate
+	send := func(method, path string, body map[string]any) {
+		t.Helper()
+		res := a.request(method, path, rt, body)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		if method == http.MethodPost && strings.HasSuffix(path, "/screening-calls") {
+			var out api.ScreeningCallResult
+			res.JSON(&out)
+			got = out.Candidate
+		} else {
+			res.JSON(&got)
+		}
+		require.True(t, got.Compensation.IsSpecified() && !got.Compensation.IsNull(), "sent back with the salary")
+	}
+
+	send(http.MethodPatch, "/v1/candidates/"+c.Id, map[string]any{"version": c.Version, "currentTitle": "Auditor"})
+	assert.Equal(t, 1, pages(), "a profile change")
+	send(http.MethodPut, "/v1/candidates/"+c.Id+"/history", map[string]any{"version": got.Version, "experience": []any{}, "education": []any{}})
+	assert.Equal(t, 2, pages(), "their history")
+	send(http.MethodPost, "/v1/candidates/"+c.Id+"/merge", map[string]any{"duplicateId": dup.Id, "version": got.Version})
+	assert.Equal(t, 3, pages(), "a merge")
+	send(http.MethodPost, "/v1/candidates/"+c.Id+"/screening-calls", map[string]any{"version": got.Version, "notes": "Called"})
+	assert.Equal(t, 4, pages(), "a call that left the salary as it was")
+	send(http.MethodPost, "/v1/candidates/"+c.Id+"/screening-calls", map[string]any{"version": got.Version, "compensation": map[string]any{
+		"expectedVersion": 1, "currentSalary": map[string]any{"amount": "8600", "currency": "MYR", "period": "month"}, "expectedSalary": nil}})
+	assert.Equal(t, 4, pages(), "a call that set it: what they just typed in")
+
+	// Salary notes alone are not a salary; nor is a CV "with the salary" of someone who has none.
+	notes := a.createCandidate(rt, map[string]any{"firstName": "Notes"})
+	res := a.request(http.MethodPut, "/v1/candidates/"+notes.Id+"/compensation", rt, map[string]any{
+		"expectedVersion": 0, "currentSalary": nil, "expectedSalary": nil, "salaryNotes": "Ask again in March",
+	})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	require.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/candidates/"+notes.Id, rt, nil).Status)
+	require.Equal(t, http.StatusCreated, a.request(http.MethodPost, "/v1/candidates/"+notes.Id+"/formatted-cvs", rt, map[string]any{"includeSalary": true}).Status)
+	seen := a.seen(owner, recruiter.ID)
+	assert.NotContains(t, seen, "candidate:"+notes.Id)
+	assert.NotContains(t, seen, "cv:"+notes.Id)
+}

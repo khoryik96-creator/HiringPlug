@@ -184,6 +184,11 @@ func (s *Service) RecordScreening(ctx context.Context, p authz.Principal, id str
 			out.NoteID = &noteID
 		}
 		out.View = view
+		if !out.SalaryApplied { // the salary it sends back is not what they just typed in
+			if err := s.pageShown(ctx, tx, view); err != nil {
+				return err
+			}
+		}
 		row, err := q.InsertScreeningCall(ctx, store.InsertScreeningCallParams{
 			CandidateID: id, CalledOn: pgtype.Date{Time: calledOn, Valid: true}, CalledBy: calledBy, NoteID: out.NoteID, SalaryRecorded: out.SalaryApplied,
 		})

@@ -113,8 +113,10 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		if err != nil {
 			return err
 		}
-		out, err = s.loadView(ctx, tx, s.users, p, fromRow(row))
-		return err
+		if out, err = s.loadView(ctx, tx, s.users, p, fromRow(row)); err != nil {
+			return err
+		}
+		return s.pageShown(ctx, tx, out)
 	})
 	return out, err
 }

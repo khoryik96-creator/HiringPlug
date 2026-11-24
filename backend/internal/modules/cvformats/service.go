@@ -242,7 +242,7 @@ func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID str
 		}); err != nil {
 			return err
 		}
-		if o.IncludeSalary { // the salary is in the file made
+		if o.IncludeSalary && (cand.CurrentSalary != nil || cand.ExpectedSalary != nil) { // a salary is in the file made
 			if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.CV, candidateID); err != nil {
 				return err
 			}

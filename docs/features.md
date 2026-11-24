@@ -1688,7 +1688,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
 - **Who was shown a salary** (`GET /v1/salary-views`,
   `auditlog.salary_views:read`, sensitive: owners and admins by default). A
   salary counts as shown when it really reaches a person: a candidate's page
-  with it (`candidate`), their screening calls' salaries (`screening`), a
+  with it, or the candidate a change sends back with it (a profile change,
+  their history, a merge, a screening call that did not set the salary:
+  `candidate`), their screening calls' salaries (`screening`), a
   candidate list or search that asked for salaries (`candidate_list`), an
   export of candidates or placements with them (`export`), an email being
   written whose fields came back with it, or a draft from a template that
@@ -1700,7 +1702,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   changed on the dashboard: `placement`). One line per
   person, kind, candidate and day (the agency's day), with how often and the
   first and last time; a list, search or export is one line a day with the
-  number of different candidates it showed. Never an amount. Filters: who,
+  number of different candidates it showed. A salary is a current or
+  expected salary: notes alone, or a formatted CV "with the salary" of a
+  candidate who has none, are not counted. Never an amount. Filters: who,
   candidate (lists and exports that showed them too), kind, days; Excel or
   CSV download (audited). Lines about candidates the user may not see are
   left out; a list or export line shows (and is found by) only the

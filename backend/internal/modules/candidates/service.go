@@ -117,10 +117,10 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 		if err != nil {
 			return err
 		}
-		if view, err = s.loadView(ctx, tx, s.users, p, fromRow(row)); err != nil || view.Compensation == nil {
+		if view, err = s.loadView(ctx, tx, s.users, p, fromRow(row)); err != nil {
 			return err
 		}
-		return salaryview.In(ctx, tx, s.salaryViews, salaryview.Candidate, id)
+		return s.pageShown(ctx, tx, view)
 	})
 	return view, err
 }
@@ -136,8 +136,10 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 			}
 		}
 		var err error
-		view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply, false)
-		return err
+		if view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply, false); err != nil {
+			return err
+		}
+		return s.pageShown(ctx, tx, view)
 	})
 	if err == nil {
 		s.used.learn(p.TenantID, view.Profile)
