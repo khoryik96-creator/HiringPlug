@@ -7623,6 +7623,12 @@ paths:
       parameters:
         - {name: applicationId, in: query, required: false, schema: {$ref: '#/components/schemas/ApplicationId'}}
         - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/OfferStatus'}}
+        - name: includeSalary
+          in: query
+          description: >
+            Return the salaries offered (only with offers.salary:read). Ask only when they are shown: each list with salaries is counted in the log of who was shown a salary. Without it every salary is null.
+
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
@@ -8075,6 +8081,12 @@ paths:
         - {name: invoiceStatus, in: query, required: false, schema: {$ref: '#/components/schemas/InvoiceStatus'}}
         - {name: startFrom, in: query, required: false, description: Started on or after this day., schema: {type: string, format: date}}
         - {name: startTo, in: query, required: false, description: Started on or before this day., schema: {type: string, format: date}}
+        - name: includeSalary
+          in: query
+          description: >
+            Return the agreed salary in `money` (only with placements.fees:read). Ask only when it is shown: each list with salaries is counted in the log of who was shown a salary. Without it `money.salary` is null (the fee is still there).
+
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
@@ -16876,7 +16888,9 @@ components:
         companyName: {type: string}
         status: {$ref: '#/components/schemas/OfferStatus'}
         salary:
-          description: Left out (and listed in restrictedFields) without offers.salary:read. null means none set.
+          description: >
+            Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or (in GET /v1/offers) that includeSalary was not given.
+
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
           nullable: true
         startDate: {type: string, format: date, nullable: true}
@@ -17453,7 +17467,7 @@ components:
           allOf: [{$ref: '#/components/schemas/PlacementRetainer'}]
           nullable: true
         salary:
-          description: The agreed salary.
+          description: The agreed salary (in GET /v1/placements only with includeSalary).
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
           nullable: true
         feePercent:

@@ -104,7 +104,7 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	ok(a.request(http.MethodGet, "/v1/documents/"+noPay.DocumentId+"/file", rt, nil), http.StatusOK)
 	assert.Equal(t, 4, counted(recruiter.ID, "cv", c.Id), "a CV without the salary")
 
-	// Offers: where the app shows the salary (an application's offers, those waiting for approval).
+	// Offers: only lists that ask for the salary get it, and count it.
 	company := a.createCompany(rt, map[string]any{"name": "Contoh Berhad"})
 	job := a.createJob(rt, map[string]any{"companyId": company.Id, "title": "Accountant"})
 	app := a.addToJob(rt, job.Id, c.Id)
@@ -112,9 +112,14 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	assert.Zero(t, counted(recruiter.ID, "offer", c.Id), "what they just typed in")
 	ok(a.request(http.MethodGet, "/v1/offers?status=sent", rt, nil), http.StatusOK)
 	ok(a.request(http.MethodGet, "/v1/offers", rt, nil), http.StatusOK)
-	assert.Zero(t, counted(recruiter.ID, "offer", c.Id), "lists that do not show it")
-	ok(a.request(http.MethodGet, "/v1/offers?applicationId="+app.Id, rt, nil), http.StatusOK)
+	unasked := ok(a.request(http.MethodGet, "/v1/offers?applicationId="+app.Id, rt, nil), http.StatusOK)
+	assert.NotContains(t, string(unasked.Body), "9123", "checking whether an offer is open gets no salary")
+	assert.Zero(t, counted(recruiter.ID, "offer", c.Id), "lists that do not ask for it")
+	asked := ok(a.request(http.MethodGet, "/v1/offers?applicationId="+app.Id+"&includeSalary=true", rt, nil), http.StatusOK)
+	assert.Contains(t, string(asked.Body), "9123")
 	assert.Equal(t, 1, counted(recruiter.ID, "offer", c.Id))
+	ok(a.request(http.MethodGet, "/v1/offers?includeSalary=true", rt, nil), http.StatusOK)
+	assert.Equal(t, 2, counted(recruiter.ID, "offer", c.Id), "any list that asks")
 
 	// Placements: an application's placement.
 	job2 := a.createJob(rt, map[string]any{"companyId": company.Id, "title": "Auditor"})
@@ -122,9 +127,13 @@ func TestEveryPlaceThatShowsASalaryCountsItOncePerView(t *testing.T) {
 	a.placement(http.MethodPost, "/v1/applications/"+app2.Id+"/placement", rt, map[string]any{
 		"startDate": "2026-12-01", "money": map[string]any{"salary": map[string]any{"amount": "7345", "currency": "MYR", "period": "month"}, "feePercent": "20"},
 	}, http.StatusCreated)
-	ok(a.request(http.MethodGet, "/v1/placements", rt, nil), http.StatusOK)
-	assert.Zero(t, counted(recruiter.ID, "placement", c.Id), "the dashboard does not show it")
+	dashboard := ok(a.request(http.MethodGet, "/v1/placements", rt, nil), http.StatusOK)
+	assert.NotContains(t, string(dashboard.Body), "7345", "the dashboard does not show it")
+	assert.Contains(t, string(dashboard.Body), "feeAmount", "the fee is still there")
 	ok(a.request(http.MethodGet, "/v1/placements?applicationId="+app2.Id, rt, nil), http.StatusOK)
+	assert.Zero(t, counted(recruiter.ID, "placement", c.Id))
+	shown := ok(a.request(http.MethodGet, "/v1/placements?applicationId="+app2.Id+"&includeSalary=true", rt, nil), http.StatusOK)
+	assert.Contains(t, string(shown.Body), "7345")
 	assert.Equal(t, 1, counted(recruiter.ID, "placement", c.Id))
 
 	// Exports with salaries: one line a day for all of them.

@@ -21,7 +21,8 @@ export function ApplicationOffers({ applicationId, stage, permissions }: { appli
   const shown = ["submitted", "interview", "offer", "placed"].includes(stage);
   const list = useQuery({
     queryKey: applicationOffersKey(applicationId),
-    queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { applicationId } } })).items,
+    // Shows the salary offered: asked for, and counted as shown.
+    queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { applicationId, includeSalary: true } } })).items,
     enabled: shown,
   });
   if (!shown) return null;
@@ -188,7 +189,7 @@ export function OffersToApprove({ permissions }: { permissions: Permission[] }) 
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   const list = useQuery({
     queryKey: [...offersKey, "pending_approval"],
-    queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { status: "pending_approval" } } })).items,
+    queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { status: "pending_approval", includeSalary: true } } })).items,
   });
   const mine = list.data?.filter((o) => o.requestedBy !== me.data?.user.id) ?? [];
   if (mine.length === 0) return <ErrorMessage error={list.error} />;

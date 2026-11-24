@@ -11,16 +11,21 @@ import { billingTimeline, feeNote, invoiceBadge, monthsLong, todayISO, trimZeros
 
 type Placement = Schemas["Placement"];
 
+/** An application's placement with its agreed salary (asked for, so counted as shown). */
+export function useApplicationPlacement(applicationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: applicationPlacementKey(applicationId),
+    queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { applicationId, includeSalary: true } } })).items,
+    refetchInterval: (q) => q.state.data?.some((p) => p.invoicing.deliveryStatus === "queued") ? 5000 : false,
+    enabled,
+  });
+}
+
 /** An application's placement, or recording one (offer and placed stages). */
 export function ApplicationPlacement({ applicationId, stage, permissions }: { applicationId: string; stage: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
   const canManage = permissions.includes("placements:manage");
-  const list = useQuery({
-    queryKey: applicationPlacementKey(applicationId),
-    queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { applicationId } } })).items,
-    refetchInterval: (q) => q.state.data?.some((p) => p.invoicing.deliveryStatus === "queued") ? 5000 : false,
-    enabled: stage === "offer" || stage === "placed",
-  });
+  const list = useApplicationPlacement(applicationId, stage === "offer" || stage === "placed");
   const placement = list.data?.[0];
   if (stage !== "offer" && stage !== "placed") return null;
   if (editing) {

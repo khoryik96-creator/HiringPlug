@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { ok, RECRUITER, renderWithClient, sentBody, testMe } from "../test-utils";
-import { ApplicationOffers, OfferItem } from "./Offers";
+import { ApplicationOffers, OfferItem, OffersToApprove } from "./Offers";
 
 afterEach(() => {
   cleanup();
@@ -25,6 +25,15 @@ const reads = (items: Schemas["Offer"][]) =>
 const manage = ["offers:read", "offers:manage", "offers.salary:read", "offers.salary:update"] as const;
 
 describe("offers", () => {
+  it("asks for the salaries only where it shows them (each such list is counted as a salary shown)", async () => {
+    const get = reads([offer({ status: "pending_approval", requestedBy: "usr_rec" })]);
+    renderWithClient(<><ApplicationOffers applicationId="appl_1" stage="offer" permissions={[...manage]} /><OffersToApprove permissions={["offers:read", "offers:approve", "offers.salary:read"]} /></>);
+    await waitFor(() => { expect(screen.getAllByText(/MYR 9,000.00 a month/)).toHaveLength(2); });
+    const queries = get.mock.calls.map((c) => c as unknown[]).filter((c) => c[0] === "/v1/offers").map((c) => c[1]);
+    expect(queries).toContainEqual({ params: { query: { applicationId: "appl_1", includeSalary: true } } });
+    expect(queries).toContainEqual({ params: { query: { status: "pending_approval", includeSalary: true } } });
+  });
+
   it("drafts an offer with its salary", async () => {
     reads([]);
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(offer()));

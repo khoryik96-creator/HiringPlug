@@ -43,6 +43,13 @@ paths:
       parameters:
         - { name: applicationId, in: query, required: false, schema: { $ref: '#/components/schemas/ApplicationId' } }
         - { name: status, in: query, required: false, schema: { $ref: '#/components/schemas/OfferStatus' } }
+        - name: includeSalary
+          in: query
+          description: >
+            Return the salaries offered (only with offers.salary:read). Ask
+            only when they are shown: each list with salaries is counted in the
+            log of who was shown a salary. Without it every salary is null.
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: OK
@@ -206,7 +213,9 @@ components:
         companyName: { type: string }
         status: { $ref: '#/components/schemas/OfferStatus' }
         salary:
-          description: Left out (and listed in restrictedFields) without offers.salary:read. null means none set.
+          description: >
+            Left out (and listed in restrictedFields) without offers.salary:read.
+            null means none set, or (in GET /v1/offers) that includeSalary was not given.
           allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
           nullable: true
         startDate: { type: string, format: date, nullable: true }

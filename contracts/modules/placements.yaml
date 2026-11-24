@@ -83,6 +83,14 @@ paths:
         - { name: invoiceStatus, in: query, required: false, schema: { $ref: '#/components/schemas/InvoiceStatus' } }
         - { name: startFrom, in: query, required: false, description: Started on or after this day., schema: { type: string, format: date } }
         - { name: startTo, in: query, required: false, description: Started on or before this day., schema: { type: string, format: date } }
+        - name: includeSalary
+          in: query
+          description: >
+            Return the agreed salary in `money` (only with placements.fees:read).
+            Ask only when it is shown: each list with salaries is counted in the
+            log of who was shown a salary. Without it `money.salary` is null
+            (the fee is still there).
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: OK
@@ -583,7 +591,7 @@ components:
           allOf: [{ $ref: '#/components/schemas/PlacementRetainer' }]
           nullable: true
         salary:
-          description: The agreed salary.
+          description: The agreed salary (in GET /v1/placements only with includeSalary).
           allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
           nullable: true
         feePercent:

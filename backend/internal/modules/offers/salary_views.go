@@ -1,9 +1,10 @@
 package offers
 
 // Who was shown a salary (salaryview): an offer's salary is counted where
-// the app shows it - an application's offers, and the offers waiting for
-// approval. Lists that do not show it (offers sent, on the dashboard and
-// the pipeline) are not counted.
+// it is shown - a list that asked for salaries (an application's offers, the
+// offers waiting for approval). Lists that do not show it (offers sent, on
+// the dashboard and the pipeline; checking whether an offer is open) do not
+// ask, and get none.
 
 import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
@@ -13,9 +14,12 @@ import (
 // auditlog module).
 func (m *Module) RecordSalaryViewsWith(r salaryview.Recorder) { m.HTTP.svc.salaryViews = r }
 
-// showsSalary: the list asked for is one the app shows offers' salaries in.
-func showsSalary(appID, status *string) bool {
-	return appID != nil || (status != nil && *status == "pending_approval")
+// withoutSalaries leaves the salaries out of views (a list that did not
+// ask for them).
+func withoutSalaries(views []View) {
+	for i := range views {
+		views[i].Salary = nil
+	}
 }
 
 // offeredTo are the candidates whose offered salary is among views.

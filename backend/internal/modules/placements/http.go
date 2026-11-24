@@ -10,7 +10,6 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
 // HTTP implements the placements operations of the contract.
@@ -21,15 +20,10 @@ func (h *HTTP) ListPlacements(ctx context.Context, req api.ListPlacementsRequest
 	q := req.Params
 	listed, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
 		ApplicationID: q.ApplicationId, Status: c.Convert[string](q.Status), InvoiceStatus: c.Convert[string](q.InvoiceStatus),
-		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo),
+		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo), IncludeSalary: q.IncludeSalary != nil && *q.IncludeSalary,
 	})
 	if err != nil {
 		return nil, err
-	}
-	if q.ApplicationId != nil { // an application's placement: its salary is shown
-		if err := salaryview.Record(ctx, h.svc.pool, authz.MustFromContext(ctx), h.svc.salaryViews, salaryview.Placement, salaryOf(listed.Items)...); err != nil {
-			return nil, err
-		}
 	}
 	out := api.ListPlacements200JSONResponse{Items: make([]api.Placement, len(listed.Items)), Total: listed.Total,
 		Today: openapi_types.Date{Time: h.svc.Today(time.Now())}}

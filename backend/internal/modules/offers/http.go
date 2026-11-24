@@ -17,7 +17,8 @@ type HTTP struct{ svc *Service }
 
 // ListOffers handles GET /v1/offers.
 func (h *HTTP) ListOffers(ctx context.Context, req api.ListOffersRequestObject) (api.ListOffersResponseObject, error) {
-	views, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.ApplicationId, c.Convert[string](req.Params.Status))
+	views, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.ApplicationId, c.Convert[string](req.Params.Status),
+		req.Params.IncludeSalary != nil && *req.Params.IncludeSalary)
 	if err != nil {
 		return nil, err
 	}

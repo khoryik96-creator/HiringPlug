@@ -224,6 +224,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 type Filter struct {
 	ApplicationID, Status, InvoiceStatus *string
 	StartFrom, StartTo                   *time.Time
+	// IncludeSalary: the agreed salaries are shown (and counted as shown);
+	// without it they are left out of the money.
+	IncludeSalary bool
 }
 
 // List returns placements, newest start first (at most 500), and (with
@@ -253,8 +256,16 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) (Listed
 		}); err != nil {
 			return err
 		}
-		if out, err = s.views(ctx, tx, p, rows); err != nil || !p.Can(api.PermissionPlacementsFeesRead) {
+		if out, err = s.views(ctx, tx, p, rows); err != nil {
 			return err
+		}
+		if !f.IncludeSalary {
+			withoutSalaries(out)
+		} else if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.Placement, salaryOf(out)...); err != nil {
+			return err
+		}
+		if !p.Can(api.PermissionPlacementsFeesRead) {
+			return nil
 		}
 		sums, err := q.PlacementFeeTotals(ctx, store.PlacementFeeTotalsParams{
 			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,

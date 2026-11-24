@@ -218,16 +218,21 @@ func (s *Service) Decide(ctx context.Context, p authz.Principal, id string, vers
 	})
 }
 
-// List returns offers, newest first.
-func (s *Service) List(ctx context.Context, p authz.Principal, appID, status *string) ([]View, error) {
+// List returns offers, newest first; their salaries only when asked for
+// (includeSalary), and then counted as shown.
+func (s *Service) List(ctx context.Context, p authz.Principal, appID, status *string, includeSalary bool) ([]View, error) {
 	var out []View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListOffers(ctx, store.ListOffersParams{ApplicationID: appID, Status: status})
 		if err != nil {
 			return err
 		}
-		if out, err = s.views(ctx, tx, p, rows); err != nil || !showsSalary(appID, status) {
+		if out, err = s.views(ctx, tx, p, rows); err != nil {
 			return err
+		}
+		if !includeSalary {
+			withoutSalaries(out)
+			return nil
 		}
 		return salaryview.In(ctx, tx, s.salaryViews, salaryview.Offer, offeredTo(out)...)
 	})

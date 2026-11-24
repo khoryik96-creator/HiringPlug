@@ -1694,8 +1694,10 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   written whose fields came back with it, or a draft from a template that
   fills a salary field (`email_fields`), an email sent with it
   (`email_sent`), a formatted CV with it made, opened, downloaded or attached
-  to an email (`cv`), an application's offers and the offers waiting for
-  approval (`offer`), an application's placement (`placement`). One line per
+  to an email (`cv`), a list of offers that asked for their salaries (an
+  application's offers, the offers waiting for approval: `offer`), a list of
+  placements that asked for theirs (an application's placement, one being
+  changed on the dashboard: `placement`). One line per
   person, kind, candidate and day (the agency's day), with how often and the
   first and last time; a list, search or export is one line a day with the
   number of different candidates it showed. Never an amount. Filters: who,
@@ -1705,8 +1707,10 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   candidates they see, and is left out when they see none of them. Nothing in either log is deleted automatically.
 - **Not counted**: what the app reads for its own work (the AI never gets a
   salary; automatic emails; the system), what a person just typed in (saving
-  a salary, an offer or a placement), lists that do not show it (offers sent
-  on the dashboard and pipeline, the placements dashboard), reading back a
+  a salary, an offer or a placement, and the offer or placement sent back
+  after a change), lists that do not ask for it (offers sent on the dashboard
+  and pipeline, checking whether an offer is open, the placements
+  dashboard: they get no salary), reading back a
   sent email that shows a salary, invoices (their fee basis may name the
   salary), the market map and the salary section of a candidate's data copy
   (already audited; the text of a formatted CV with the salary in that copy
@@ -1716,6 +1720,9 @@ Built in 1.45.0 (the backend; the page comes once its layout is chosen).
   (for roles that may see them); the candidate list asks only while a salary
   column, a salary sort or the expected salary filter is used, so a name
   search or a pick-a-candidate box gets none. Exports always have them.
+  `GET /v1/offers` and `GET /v1/placements` do the same (`includeSalary`;
+  without it an offer's salary and a placement's agreed salary are null, the
+  fee stays).
 - **Formatted CVs made with the salary** open, download, turn into a PDF,
   show their text or go with an email only for roles that may see salaries;
   others see them listed but get "includes the candidate's salary". A copy

@@ -11031,7 +11031,7 @@ export interface components {
             jobTitle: string;
             companyName: string;
             status: components["schemas"]["OfferStatus"];
-            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set. */
+            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set, or (in GET /v1/offers) that includeSalary was not given. */
             salary?: components["schemas"]["SalaryAmount"] | null;
             /** Format: date */
             startDate: string | null;
@@ -11514,7 +11514,7 @@ export interface components {
         PlacementMoney: {
             /** @description The job's retainer when this is the first placement on a job with one. */
             retainer: components["schemas"]["PlacementRetainer"] | null;
-            /** @description The agreed salary. */
+            /** @description The agreed salary (in GET /v1/placements only with includeSalary). */
             salary: components["schemas"]["SalaryAmount"] | null;
             /** @description e.g. "20" for 20% of the yearly salary. */
             feePercent: components["schemas"]["DecimalAmount"] | null;
@@ -22046,6 +22046,8 @@ export interface operations {
             query?: {
                 applicationId?: components["schemas"]["ApplicationId"];
                 status?: components["schemas"]["OfferStatus"];
+                /** @description Return the salaries offered (only with offers.salary:read). Ask only when they are shown: each list with salaries is counted in the log of who was shown a salary. Without it every salary is null. */
+                includeSalary?: boolean;
             };
             header?: never;
             path?: never;
@@ -22610,6 +22612,8 @@ export interface operations {
                 startFrom?: string;
                 /** @description Started on or before this day. */
                 startTo?: string;
+                /** @description Return the agreed salary in `money` (only with placements.fees:read). Ask only when it is shown: each list with salaries is counted in the log of who was shown a salary. Without it `money.salary` is null (the fee is still there). */
+                includeSalary?: boolean;
             };
             header?: never;
             path?: never;
