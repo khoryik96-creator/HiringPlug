@@ -43,6 +43,9 @@ type Options struct {
 	Offsite  Offsite // where each backup is also copied, off this server (zero: not set up)
 	// Server names the database server (ServerID); "" asks the database.
 	Server string
+	// Owner is who restored files are given to (HP_FILES_OWNER): the user
+	// the API and workers run as. nil: they stay this process's own.
+	Owner  *Owner
 	Now    func() time.Time
 	finder *toolFinder // tests
 }

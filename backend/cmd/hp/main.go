@@ -10,6 +10,7 @@
 //	hp backup [-every 24h]             back up the database and files into HP_BACKUP_DIR
 //	hp restore NAME -yes               put a backup back (stop the API and workers first)
 //	hp fetch [NAME]                    bring a backup back from off the server (the newest unless named), then restore it
+//	hp repair-files [-apply]           check (and fix) that the API's user owns the uploaded files (HP_FILES_OWNER)
 package main
 
 import (
@@ -46,7 +47,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch|repair-files> [flags]")
 }
 
 func run(ctx context.Context, cmd string, args []string) error {
@@ -71,6 +72,8 @@ func run(ctx context.Context, cmd string, args []string) error {
 		return runFetch(ctx, args)
 	case "restore":
 		return runRestore(ctx, args)
+	case "repair-files":
+		return runRepairFiles(ctx, args)
 	default:
 		usage()
 		return fmt.Errorf("unknown command %q", cmd)

@@ -142,6 +142,9 @@ services:
       # The API runs as this user (not root): it is given the backups, so
       # Settings > Backups can list, download and delete them.
       HP_BACKUP_OWNER: "65532:65532"
+      # ...and the files a restore puts back (the API and worker read them as
+      # this user); `hp repair-files -apply` fixes a server restored before.
+      HP_FILES_OWNER: "65532:65532"
       # Each backup also copied off this server (see .env.example and
       # docs/playbooks/deploy-to-a-server.md); empty: not set up.
       HP_OFFSITE_S3_BUCKET: ${HP_OFFSITE_S3_BUCKET:-}

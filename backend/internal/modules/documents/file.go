@@ -16,6 +16,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
@@ -57,7 +58,7 @@ func (s *Service) openFile(ctx context.Context, tx pgx.Tx, row store.Document, k
 		return nil, apperr.NotFound(what)
 	}
 	if err != nil {
-		return nil, err
+		return nil, unreadable(ctx, err)
 	}
 	if salary {
 		if err := salaryview.In(ctx, tx, s.salaryViews, salaryview.CV, row.CandidateID); err != nil {
@@ -66,6 +67,15 @@ func (s *Service) openFile(ctx context.Context, tx pgx.Tx, row store.Document, k
 		}
 	}
 	return f, nil
+}
+
+// unreadable is a stored file that is there but cannot be opened (it
+// belongs to another user after a restore, a disk error): not "not found",
+// which would hide it, but a server error (500), logged with the key's hash
+// and the system's error number (blob.OpenError), never the file's path.
+func unreadable(ctx context.Context, err error) error {
+	logx.From(ctx).Error("a stored document file could not be opened", "file", err)
+	return err
 }
 
 // closeFile closes *f, if open, and forgets it.
@@ -119,7 +129,7 @@ func (m *Module) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (
 		return Document{}, nil, apperr.NotFound("document file")
 	}
 	if err != nil {
-		return Document{}, nil, err
+		return Document{}, nil, unreadable(ctx, err)
 	}
 	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(f)

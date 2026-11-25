@@ -67,14 +67,34 @@ func offsiteOptions() (backup.Offsite, error) {
 // to, so the API (another user than the backup service, in Docker) can list,
 // send and delete them. Unset: they stay the backup service's own.
 func backupOwner() (uid, gid int, set bool, err error) {
-	v := os.Getenv("HP_BACKUP_OWNER")
+	o, err := ownerSetting("HP_BACKUP_OWNER")
+	if o == nil || err != nil {
+		return 0, 0, false, err
+	}
+	return o.UID, o.GID, true, nil
+}
+
+// filesOwner reads who the uploaded files belong to: the user the API and
+// workers run as (HP_FILES_OWNER, else HP_BACKUP_OWNER: in Docker both are
+// 65532:65532). nil: neither is set, and restored files stay this
+// process's own (running HiringPlug as yourself, without Docker).
+func filesOwner() (*backup.Owner, error) {
+	if os.Getenv("HP_FILES_OWNER") != "" {
+		return ownerSetting("HP_FILES_OWNER")
+	}
+	return ownerSetting("HP_BACKUP_OWNER")
+}
+
+func ownerSetting(name string) (*backup.Owner, error) {
+	v := os.Getenv(name)
 	if v == "" {
-		return 0, 0, false, nil
+		return nil, nil //nolint:nilnil // not set: nobody to give the files to
 	}
-	if _, scanErr := fmt.Sscanf(v, "%d:%d", &uid, &gid); scanErr != nil || uid < 0 || gid < 0 {
-		return 0, 0, false, fmt.Errorf("HP_BACKUP_OWNER must be a user and group id like 65532:65532, got %q", v)
+	o, err := backup.ParseOwner(v)
+	if err != nil {
+		return nil, fmt.Errorf("%s %w", name, err)
 	}
-	return uid, gid, true, nil
+	return &o, nil
 }
 
 func runBackup(ctx context.Context, args []string) error {
@@ -182,11 +202,17 @@ func runRestore(ctx context.Context, args []string) error {
 	if o.AdminURL == "" {
 		return errors.New("HP_DATABASE_ADMIN_URL is required")
 	}
+	if o.Owner, err = filesOwner(); err != nil {
+		return err
+	}
 	if err := backup.Restore(ctx, o, fs.Arg(0)); err != nil {
 		return err
 	}
 	// A restore recreates pg_trgm, whose functions then lose their mark.
 	if err := database.AllowSearchIndexes(ctx, o.AdminURL, os.Stderr); err != nil {
+		return err
+	}
+	if err := verifyRestoredFiles(ctx, o); err != nil {
 		return err
 	}
 	fmt.Println("restored", fs.Arg(0), "- run `hp bootstrap` if this backup is from an older version, then start the API and workers")

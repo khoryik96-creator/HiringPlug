@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,7 +22,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // PathPrefix is where the API serves signed downloads.
@@ -38,6 +42,7 @@ type Store struct {
 	secret  []byte
 	baseURL string
 	now     func() time.Time
+	open    func(string) (*os.File, error) // os.Open; tests fake a failure
 }
 
 // New creates the directory if needed.
@@ -45,7 +50,7 @@ func New(dir string, secret []byte, baseURL string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("blob: %w", err)
 	}
-	return &Store{dir: dir, secret: secret, baseURL: strings.TrimRight(baseURL, "/"), now: time.Now}, nil
+	return &Store{dir: dir, secret: secret, baseURL: strings.TrimRight(baseURL, "/"), now: time.Now, open: os.Open}, nil
 }
 
 // Put writes data under key atomically (a reader never sees half a file).
@@ -107,13 +112,47 @@ func (s *Store) Open(key string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.Open(path) //nolint:gosec // path is validated against keyRe and joined under s.dir
+	f, err := s.open(path) // path is validated against keyRe and joined under s.dir
 	if errors.Is(err, os.ErrNotExist) {
 		if info, oldErr := os.Stat(s.flatPath(key)); oldErr == nil && info.Mode().IsRegular() {
-			return os.Open(s.flatPath(key)) //nolint:gosec // as above
+			f, err = s.open(s.flatPath(key))
 		}
 	}
-	return f, err //nolint:wrapcheck // callers check os.ErrNotExist
+	if err != nil {
+		return nil, openError(key, err)
+	}
+	return f, nil
+}
+
+// OpenError is why a stored file could not be opened, without its path (it
+// names the agency and the document): the key's hash and the system's error
+// number. errors.Is still finds os.ErrNotExist or os.ErrPermission in it.
+type OpenError struct {
+	KeyHash string        // the first 12 hex digits of the key's SHA-256
+	Errno   syscall.Errno // 0 when the system gave none
+	err     error
+}
+
+func openError(key string, err error) *OpenError {
+	sum := sha256.Sum256([]byte(key))
+	e := &OpenError{KeyHash: hex.EncodeToString(sum[:])[:12], err: err}
+	_ = errors.As(err, &e.Errno)
+	return e
+}
+
+func (e *OpenError) Error() string {
+	why := "unknown error"
+	if e.Errno != 0 {
+		why = e.Errno.Error()
+	}
+	return fmt.Sprintf("blob: stored file %s could not be opened: %s", e.KeyHash, why)
+}
+
+func (e *OpenError) Unwrap() error { return e.err }
+
+// LogValue keeps the key hash and the error number together in logs.
+func (e *OpenError) LogValue() slog.Value {
+	return slog.GroupValue(slog.String("key_hash", e.KeyHash), slog.Int("errno", int(e.Errno)), slog.String("error", e.Error()))
 }
 
 // ServeHTTP serves GET /internal/files/{key}?exp=...&sig=... for workers.
@@ -126,18 +165,23 @@ func (s *Store) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f, err := s.Open(key)
-	if errors.Is(err, ErrInvalidKey) {
+	switch {
+	case errors.Is(err, ErrInvalidKey):
 		http.Error(w, "invalid or expired link", http.StatusForbidden)
 		return
-	}
-	if err != nil {
+	case errors.Is(err, os.ErrNotExist): // gone for good: the worker gives up
 		http.Error(w, "not found", http.StatusNotFound)
+		return
+	case err != nil: // there but unreadable (its owner, a disk error): fixable, so the worker tries again
+		logx.From(r.Context()).Error("a stored file could not be opened for a worker", "file", err)
+		http.Error(w, "the file could not be opened", http.StatusInternalServerError)
 		return
 	}
 	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		logx.From(r.Context()).Error("a stored file could not be read for a worker", "file", openError(key, err))
+		http.Error(w, "the file could not be opened", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")

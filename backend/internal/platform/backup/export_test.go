@@ -3,6 +3,7 @@ package backup
 import (
 	"errors"
 	"fmt"
+	"os"
 )
 
 // Untar is untar, for tests.
@@ -35,3 +36,9 @@ var (
 	LinkFiles     = linkFiles
 	PreviousFiles = previousFiles
 )
+
+// FailChown makes giving files to their owner fail until the test ends.
+func FailChown(t interface{ Cleanup(func()) }, err error) {
+	lchown = func(string, int, int) error { return err }
+	t.Cleanup(func() { lchown = os.Lchown })
+}
