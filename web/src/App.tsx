@@ -18,6 +18,8 @@ import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { ClientShortlistPage, shortlistRoute } from "./pages/ClientShortlistPage";
 import { Careers } from "./pages/Careers";
 import { ChoosePassword } from "./pages/ChoosePassword";
+import { MicrosoftSignIn } from "./pages/MicrosoftSignIn";
+import { microsoftRoute } from "./microsoft";
 import { SignIn } from "./pages/SignIn";
 import { Menu } from "./components/Menu";
 import { Calendar, menu, resolve, type Route } from "./routes";
@@ -195,7 +197,7 @@ export function App() {
   // A new browser tab (a record dragged out): another signed-in tab's sign-in, if one is open.
   // Never on a public page (careers, booking, a client's shortlist, an invitation).
   const isPublic = () => !!(careersRoute(window.location) || bookingRoute(window.location) || shortlistRoute(window.location)
-    || authLinkRoute(window.location.hash));
+    || authLinkRoute(window.location.hash) || microsoftRoute(window.location.hash));
   const [asking, setAsking] = useState(() => !signedIn && !isPublic());
   useEffect(() => {
     if (!asking) return;
@@ -218,6 +220,8 @@ export function App() {
   const shortlist = shortlistRoute(window.location);
   // Invitation and password reset links: also never behind sign-in.
   const link = authLinkRoute(window.location.hash);
+  // Back from Microsoft's sign-in: finished here, signed in or not.
+  const microsoft = microsoftRoute(window.location.hash);
   const changeSession = (signedIn: boolean) => {
     // Pending mutations retain their original client. Give the next sign-in
     // a separate client so late responses cannot populate its cache.
@@ -240,6 +244,8 @@ export function App() {
       ) : careers ? (
         // Public: candidates are never asked to sign in.
         <Careers key={careers.slug} route={careers} pathStyle={!window.location.hash.startsWith("#/careers/")} />
+      ) : microsoft ? (
+        <MicrosoftSignIn onSignedIn={() => { changeSession(true); }} />
       ) : link ? (
         <ChoosePassword key={link.token} token={link.token} onSignedIn={() => { changeSession(true); }} />
       ) : signedIn ? (

@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { setToken } from "../auth";
 import { teamsKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { SignInMethods } from "../components/SignInMethods";
 import { SaveError } from "../components/SaveError";
 import { formatWhen, keysOf, ROLE, TEAM_STATUS } from "../labels";
 
@@ -65,7 +66,7 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
   const locked = me || rank(m.role) > rank(myRole);
   return (
     <tr>
-      <td>{m.name}{me && <span className="muted"> (you)</span>}</td>
+      <td>{m.name}{me && <span className="muted"> (you)</span>}<SignInMethods methods={m.signInMethods} /></td>
       <td>{m.email}</td>
       <td>
         {locked ? ROLE[m.role] : (
@@ -199,8 +200,8 @@ function Invite({ myRole }: { myRole: Schemas["Role"] }) {
   );
 }
 
-/** Change your own password (your other sessions are signed out). */
-export function ChangePassword() {
+/** Change your own password (your other sessions are signed out); none to change for Microsoft-only accounts. */
+export function ChangePassword({ hasPassword = true }: { hasPassword?: boolean }) {
   const [form, setForm] = useState({ currentPassword: "", newPassword: "" });
   const [done, setDone] = useState(false);
   const change = useMutation({
@@ -211,6 +212,14 @@ export function ChangePassword() {
       setDone(true);
     },
   });
+  if (!hasPassword) {
+    return (
+      <section className="panel" aria-label="Your password">
+        <h3>Your password</h3>
+        <p>You sign in with Microsoft, so there is no HiringPlug password to change.</p>
+      </section>
+    );
+  }
   return (
     <section className="panel" aria-label="Your password">
       <h3>Your password</h3>

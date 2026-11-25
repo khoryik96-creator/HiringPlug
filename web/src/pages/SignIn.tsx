@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api, ApiError, unwrap } from "../api/client";
 import { setToken } from "../auth";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { MicrosoftButton, OrDivider } from "../components/MicrosoftButton";
+import { SignInFrame } from "../components/SignInFrame";
 import { nextStepOf, TwoStepAtSignIn } from "../components/TwoStep";
 
 type Company = { slug: string; name: string };
@@ -30,26 +32,23 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const next = nextStepOf(signIn.error); // the password was right: a code next
   if (next) {
     return (
-      <main className="narrow">
-        <h1>HiringPlug</h1>
+      <SignInFrame>
         <TwoStepAtSignIn next={next} onSignedIn={onSignedIn} onCancel={() => { signIn.reset(); setForm({ ...form, password: "" }); }} />
-      </main>
+      </SignInFrame>
     );
   }
 
   if (mode === "sent") {
     return (
-      <main className="narrow">
-        <h1>HiringPlug</h1>
+      <SignInFrame>
         <p role="status">If {form.email} belongs to an account, a link to choose a new password is on its way. It works for one hour.</p>
         <button type="button" className="link" onClick={() => { setMode("sign-in"); }}>Back to sign in</button>
-      </main>
+      </SignInFrame>
     );
   }
   if (mode === "forgot") {
     return (
-      <main className="narrow">
-        <h1>HiringPlug</h1>
+      <SignInFrame>
         <form className="form-grid" aria-label="Reset password" onSubmit={(e) => { e.preventDefault(); reset.mutate(); }}>
           <p className="full">We will email you a link to choose a new password.</p>
           <label className="field full">Email<input type="email" required autoComplete="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); }} /></label>
@@ -59,12 +58,13 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
             <button type="button" className="link" onClick={() => { setMode("sign-in"); }}>Cancel</button>
           </div>
         </form>
-      </main>
+      </SignInFrame>
     );
   }
   return (
-    <main className="narrow">
-      <h1>HiringPlug</h1>
+    <SignInFrame after={<DeveloperToken onSignedIn={onSignedIn} />}>
+      <MicrosoftButton from={() => ({ email: form.email })} />
+      <OrDivider />
       <form className="form-grid" aria-label="Sign in" onSubmit={(e) => { e.preventDefault(); signIn.mutate(); }}>
         <label className="field full">Email
           <input type="email" required autoComplete="username" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value, company: "" }); }} />
@@ -82,14 +82,14 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
             ))}
           </fieldset>
         )}
+        {/* MICROSOFT_REQUIRED says so in the server's words: use the button above. */}
         {!companies && <ErrorMessage error={signIn.error} />}
-        <div className="row full">
+        <div className="sign-in-actions full">
           <button type="submit" disabled={signIn.isPending}>Sign in</button>
           <button type="button" className="link" onClick={() => { setMode("forgot"); }}>Forgot your password?</button>
         </div>
       </form>
-      <DeveloperToken onSignedIn={onSignedIn} />
-    </main>
+    </SignInFrame>
   );
 }
 

@@ -125,8 +125,8 @@ export function TwoStepAtSignIn({ next, onSignedIn, onCancel }: { next: NonNulla
 
 const statusKey = ["me", "two-step"] as const;
 
-/** Your account › Two-step sign-in: set it up, new recovery codes, or turn it off. */
-export function MyTwoStep() {
+/** Your account › Two-step sign-in: set it up, new recovery codes, or turn it off (with your password, or the app's code if you have none). */
+export function MyTwoStep({ hasPassword = true }: { hasPassword?: boolean }) {
   const cache = useQueryClient();
   const status = useQuery({ queryKey: statusKey, queryFn: async () => unwrap(await api.GET("/v1/me/two-step")) });
   const [mode, setMode] = useState<"" | "setup" | "codes" | "off">("");
@@ -140,7 +140,7 @@ export function MyTwoStep() {
   const confirm = useMutation({ mutationFn: async () => unwrap(await api.POST("/v1/me/two-step/confirm", { body: { code } })), onSuccess: done });
   const renew = useMutation({ mutationFn: async () => unwrap(await api.POST("/v1/me/two-step/recovery-codes", { body: { code } })), onSuccess: done });
   const off = useMutation({
-    mutationFn: async () => unwrap(await api.POST("/v1/me/two-step/disable", { body: { password } })),
+    mutationFn: async () => unwrap(await api.POST("/v1/me/two-step/disable", { body: hasPassword ? { password } : { code } })),
     onSuccess: async () => { setMode(""); await cache.invalidateQueries({ queryKey: statusKey }); },
   });
   const s = status.data;
@@ -179,7 +179,9 @@ export function MyTwoStep() {
       )}
       {mode === "off" && (
         <form className="form-grid" onSubmit={(e) => { e.preventDefault(); off.mutate(); }}>
-          <label className="field">Your password<input type="password" required autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); }} /></label>
+          {hasPassword
+            ? <label className="field">Your password<input type="password" required autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); }} /></label>
+            : <CodeInput value={code} onChange={setCode} />}
           <ErrorMessage error={off.error} />
           <div className="row full"><button type="submit" className="danger" disabled={off.isPending}>Turn off</button>
             <button type="button" className="link" onClick={() => { setMode(""); }}>Cancel</button></div>
