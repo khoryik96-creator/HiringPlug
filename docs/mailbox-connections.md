@@ -45,7 +45,8 @@ For the default local Docker setup that is
 return to `/#/email-connection` with only a success/failure indicator; tokens,
 provider errors and authorization codes never enter the frontend. Callback
 responses are not cached or used as referrers, and the bundled nginx proxy does
-not access-log the callback query.
+not access-log the callback query (nor that of any other callback: a test checks
+every `/callback` address in the contract).
 
 ### Microsoft
 
@@ -149,6 +150,26 @@ HTTP provider overrides exist only for in-process tests, never as user input.
 Calendar uses the same Microsoft app registration with a separate consent flow
 and `/v1/calendar/callback` Web redirect. See [calendar.md](calendar.md) before
 adding `Calendars.ReadWrite`; existing mailbox tokens/scopes remain separate.
+
+**Sign in with Microsoft** (1.46.0) uses the same Microsoft app too (the
+agency's, or else the server's) and needs one more Web redirect URI on it:
+
+```
+<HP_PUBLIC_URL>/v1/auth/microsoft/callback
+```
+
+(locally `http://localhost:3000/v1/auth/microsoft/callback`). It asks only
+`openid profile email`, and it needs no new setting. An owner turns it on in
+Settings › Roles and access with the organisation's *Directory (tenant) ID*,
+shown on the app's overview page in Microsoft Entra (only that organisation's
+accounts are accepted; personal accounts never are), and the same box shows
+the redirect URI to copy. The server's app should allow accounts in any
+organizational directory (multi-tenant): sign-ins that name no company go
+through it, and the account's organisation then finds the company. An agency's
+own single-tenant app is used whenever the sign-in names its company (its
+careers page address, an invitation, or an email on its team). The nginx proxy
+keeps this callback out of its access log too. See
+[access-control.md](access-control.md#who-is-calling) for how it is checked.
 
 ## Outlook Mail
 

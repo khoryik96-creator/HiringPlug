@@ -30,6 +30,61 @@ at their next sign-in, before any token is issued. Owners and admins can reset
 someone's two-step (a lost phone; only owners reset owners), which signs them
 out; the Team page shows who has it on.
 
+**Sign in with Microsoft** (✅ backend, 1.46.0; the sign-in page waits for the
+owner's choice of layout): an owner turns it on in Roles and access with the
+company's Microsoft organisation (the Entra *Directory (tenant) ID*;
+`PUT /v1/agency/microsoft-sign-in`, `identity.roles:manage`, audited as
+`agency.microsoft_sign_in_changed`). Only people already on the Team page
+(active, or invited: signing in accepts the invitation, without a password)
+with an account of that organisation can sign in; personal Microsoft accounts
+and other organisations are refused. The first sign-in links the account
+(organisation + object ID) to the team member with its address
+(`user.microsoft_linked`); later ones match the account, whatever its address
+has become. It goes through the company's own Microsoft app (Settings > Email
+connection) or the server's (`HP_MAIL_MICROSOFT_*`).
+
+- *Flow.* `POST /v1/auth/microsoft/start` (public) finds the company from an
+  invitation, a careers page address, the email (when exactly one company that
+  signs in with Microsoft has it on its team), the only such company on the
+  server, or else goes through the server's app for any organisation (the
+  account's organisation then finds the company; an account at several asks
+  which one). It saves the sign-in (`microsoft_sign_in_flow`, 10 minutes) with
+  the PKCE S256 verifier and nonce sealed (AES-GCM, key derived from
+  `HP_AUTH_JWT_SECRET`), the state's SHA-256, and the SHA-256 of a random value
+  the browser tab keeps in sessionStorage. Microsoft returns to
+  `GET /v1/auth/microsoft/callback`, which signs in nobody: it parks the code on
+  the sign-in once and sends the browser to `/#/sign-in/microsoft?ticket=…`
+  (or `error=cancelled|failed`; Microsoft's own text is never passed on), with
+  `Cache-Control: no-store` and `Referrer-Policy: no-referrer`; nginx keeps it
+  out of the access log. `POST /v1/auth/microsoft/complete` takes the ticket
+  (once: it is deleted as it is read) with the tab's value, so a ticket copied
+  to another browser, or a sign-in link someone else started, signs in no one.
+- *Checks.* The code is exchanged with the verifier; the ID token must be
+  RS256-signed by one of Microsoft's published keys (kept a day; a new key ID
+  fetches them again once, an unknown one at most once a minute), its issuer
+  the token's own organisation (`https://login.microsoftonline.com/<tid>/v2.0`),
+  its audience the app, within its times (2 minutes' leeway), with the nonce,
+  and its organisation the company's (never the personal-accounts one).
+- *Answers.* Refusals are `MICROSOFT_SIGN_IN_FAILED` with a reason:
+  `not_on_team` (also for deactivated members: the same words),
+  `other_organisation`, `personal_account` or `failed`. They come only after
+  Microsoft has vouched for the account, and only about it: the redirect is the
+  same for anyone. The pre-tenant lookups are `SECURITY DEFINER` functions
+  (`app_microsoft_*`, migration 00198); the app cannot read the sign-ins table
+  directly. Start and complete share the password sign-in limits per address
+  (start also per email).
+- *Sessions.* HiringPlug's own token says how it was signed in (`amr`: `pwd`
+  or `microsoft`). Microsoft sign-ins skip the two-step code (password sign-ins
+  still need it). An owner can **require** Microsoft: then signing in with a
+  password, two-step codes for a password sign-in begun before, password reset
+  emails (they explain how to sign in instead), reset and invitation links, and
+  changing a password are refused to everyone but owners (`MICROSOFT_REQUIRED`),
+  and their password sessions stop working at once. Owners keep their password
+  as a way back in. Someone who signs in only with Microsoft has no password
+  (`hasPassword` in `/v1/me`): changing one answers `PASSWORD_NOT_SET` (a reset
+  link sets one, unless Microsoft is required), and turning two-step off takes
+  the app's code instead. The Team page lists each member's sign-in methods.
+
 **Invitations and resets.** Owners and admins invite people (email, name,
 role); the invitation is emailed and its link is also shown, to pass on if
 email is not set up. "Forgot your password?" emails a reset link and says the
@@ -37,8 +92,8 @@ same whether or not the email is known. Links work once (invitations 7 days,
 resets 1 hour), a new one ends the old, and only their SHA-256 is stored. On
 the command line, `hp tenant` prints the first owner's link and
 `hp password-link -user usr_...` makes one for anyone. Developers can still
-use tokens (`hp dev-setup`, `hp token`); single sign-on (Google, Microsoft)
-can come later, changing only how a token is obtained.
+use tokens (`hp dev-setup`, `hp token`; they do not say how they were signed
+in, so a company that requires Microsoft refuses them to non-owners).
 
 **Team rules** (`identity.team:manage`: owners and admins): nobody changes
 their own role or deactivates themselves; only owners make, change or
