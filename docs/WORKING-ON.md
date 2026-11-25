@@ -20,10 +20,10 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Single sign-on with Microsoft
+### Post-migration fixes (owner's report): P0
 - Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v
-- Touches: identity module (sign-in, sessions, two-step), the sign-in page, Settings (Microsoft app registration and who may sign in), config HP_* for Microsoft sign-in
+- Branch: claude/relaxed-hopper-ex7y3v (one pull request per group)
+- Touches: backup/restore (platform/backup, cmd/hp), deploy Dockerfiles and compose, documents module (state on failed jobs), jobqueue (dead AI jobs, held jobs after a restore), aiproviders (paid-AI kill switch) and the AI worker, Settings › System, docs/playbooks
 - Started: 25 Nov 2026    Last update: 25 Nov 2026
 - State: in progress
-- Next: map sign-in and the existing Microsoft app settings; mockup for the owner; build, review, verify, merge as 1.46.0
+- Next: restored files owned by the runtime user; terminal AI-job failure updates the document; outbound jobs held after a restore from another server; global paid-AI switch; hp restore flags in any order. Then the HyPlug rename, then P1 and P2 of the report
