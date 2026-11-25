@@ -34,15 +34,22 @@ FROM app_accounts_by_email(sqlc.arg(email)::text);
 SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS user_id, kind::text AS kind
 FROM app_user_link(sqlc.arg(token_hash)::text);
 
+-- microsoft_required: the company requires Microsoft (passwords only for owners);
+-- microsoft_sign_in: it signs in with Microsoft at all (else Microsoft sessions stop).
 -- name: UserAuth :one
-SELECT id, tenant_id, email, name, role, team_id, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = @id;
+SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
+  u.microsoft_sessions_after, u.microsoft_connect_only,
+  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
+  coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
+FROM app_user u WHERE u.id = @id;
 
 -- name: SignedIn :exec
 UPDATE app_user SET last_sign_in_at = now() WHERE id = @id;
 
--- A new password; sessions from before it are signed out.
+-- A new password; sessions from before it are signed out (never moving an
+-- end already later back).
 -- name: SetPassword :exec
-UPDATE app_user SET password_hash = sqlc.narg(password_hash), tokens_valid_after = sqlc.narg(valid_after),
+UPDATE app_user SET password_hash = sqlc.narg(password_hash), tokens_valid_after = greatest(sqlc.narg(valid_after)::timestamptz, tokens_valid_after),
   active = CASE WHEN invited THEN true ELSE active END, invited = false,
   name = coalesce(sqlc.narg(name), name)
 WHERE id = @id;
@@ -56,6 +63,10 @@ RETURNING id;
 -- name: EndLinks :exec
 UPDATE user_link SET used_at = now() WHERE user_id = @user_id AND kind = @kind AND used_at IS NULL;
 
+-- Everyone's unused links of a kind end (the company's rows are held first).
+-- name: EndLinksOfKind :exec
+UPDATE user_link SET used_at = now() WHERE kind = @kind AND used_at IS NULL;
+
 -- name: ListTeam :many
 SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000;
 
@@ -68,10 +79,15 @@ RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, crea
 SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
 
 -- Deactivating signs the user out: tokens issued up to the end of this second
--- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
+-- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go),
+-- and any issued at an earlier end (a session is never issued before one).
+-- This second is the clock's now (clock_timestamp), not the transaction's
+-- start: a sign-in that committed while this waited for the row is ended
+-- too. The row is held first (HoldUser): an UPDATE that waits for a row
+-- computes the new values before it waits.
 -- name: UpdateMember :one
 UPDATE app_user SET role = @role, active = @active, team_id = sqlc.narg(team_id),
-  tokens_valid_after = CASE WHEN active AND NOT @active THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
+  tokens_valid_after = CASE WHEN active AND NOT @active THEN greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
 WHERE id = @id
 RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
 
@@ -82,6 +98,13 @@ DELETE FROM app_user WHERE id = @id AND invited;
 
 -- name: ActiveOwners :one
 SELECT count(*) FROM app_user WHERE role = 'owner' AND active;
+
+-- Changes of the team's roles and activity, one at a time per company until
+-- the transaction ends: taken before anything else is held (nothing else
+-- takes it, so it never deadlocks), it keeps two changes from each counting
+-- the other's owner (ActiveOwners) and leaving the company with none.
+-- name: HoldTeamChanges :exec
+SELECT pg_advisory_xact_lock(hashtextextended('team-changes:' || app_current_tenant(), 0));
 
 -- A company's own settings for one role (none: the contract's defaults).
 -- name: GetRoleSetting :one
@@ -210,13 +233,169 @@ SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL;
 -- name: TwoStepRequired :one
 SELECT two_step_required FROM tenant WHERE id = app_current_tenant();
 
--- name: SetTwoStepRequired :exec
-UPDATE tenant SET two_step_required = @required WHERE id = app_current_tenant();
+-- Rows changed: 0 when it was so already.
+-- name: SetTwoStepRequired :execrows
+UPDATE tenant SET two_step_required = @required WHERE id = app_current_tenant() AND two_step_required <> @required;
 
 -- Requiring two-step sign-in signs out everyone who has not set it up.
 -- name: EndSessionsWithoutTwoStep :exec
-UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second'
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL);
 
+-- Ends every session of theirs: after this second by the database's clock,
+-- and after every earlier end (a session issued at one is ended too).
 -- name: EndUserSessions :exec
-UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second' WHERE id = @id;
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') WHERE id = @id;
+
+-- Sign in with Microsoft ------------------------------------------------------
+
+-- Before anyone is signed in (no company scope yet): app_microsoft_* return
+-- only what routing and finishing a sign-in need (migration 00198).
+
+-- name: SaveMicrosoftFlow :exec
+SELECT app_microsoft_flow_save(@key_hash::text, @binding_hash::text, sqlc.narg(tenant_id)::text, @purpose::text, sqlc.narg(user_id)::text,
+  sqlc.narg(link_id)::text, sqlc.narg(link_kind)::text, @client_id::text, @authority::text, @sealed::text, @verified::boolean,
+  sqlc.narg(ticket_hash)::text, @seconds::integer);
+
+-- name: ParkMicrosoftFlow :one
+SELECT app_microsoft_flow_park(@key_hash::text, @sealed_code::text, @ticket_hash::text)::integer AS parked;
+
+-- name: TakeMicrosoftFlow :one
+SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id,
+  purpose::text AS purpose, coalesce(user_id, '')::text AS user_id, coalesce(link_id, '')::text AS link_id,
+  coalesce(link_kind, '')::text AS link_kind, client_id::text AS client_id, authority::text AS authority,
+  sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
+FROM app_microsoft_flow_take(@ticket_hash::text);
+
+-- name: MicrosoftSignInTenants :many
+SELECT tenant_id::text AS tenant_id, microsoft_tenant_id::text AS microsoft_tenant_id
+FROM app_microsoft_sign_in_tenants(sqlc.narg(slug)::text);
+
+-- name: MicrosoftAccounts :many
+SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
+  user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner, connect_only::boolean AS connect_only
+FROM app_microsoft_accounts(@ms_tenant_id::text, @ms_object_id::text, @addresses::text[]);
+
+-- Microsoft vouched, through the company's own app (client_id), for an
+-- account of its organisation: whether the token said member or guest
+-- (acct), which that app's settings in Entra decide. Without it, the app is
+-- kept (Settings warns while sign-in uses that very app).
+-- name: NoteMicrosoftClaims :exec
+UPDATE tenant SET microsoft_acct_missing_app = CASE WHEN @acct::boolean THEN NULL ELSE @client_id::text END
+WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = @ms_tenant_id
+  AND microsoft_acct_missing_app IS DISTINCT FROM (CASE WHEN @acct::boolean THEN NULL ELSE @client_id::text END);
+
+-- The company's Microsoft sign-in settings.
+-- name: MicrosoftSettings :one
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app FROM tenant WHERE id = app_current_tenant();
+
+-- The company's settings, kept from changing until the transaction ends:
+-- changing them (FOR NO KEY UPDATE), or the Microsoft app they rely on (FOR
+-- SHARE, emails module), waits for the other. Not FOR UPDATE: that would
+-- also stop every row naming the company being added (an audit entry of a
+-- sign-in holding a person's row, which this then waits for: a deadlock).
+-- name: LockMicrosoftSettings :exec
+SELECT id FROM tenant WHERE id = app_current_tenant() FOR NO KEY UPDATE;
+
+-- name: MicrosoftSignInHeld :one
+SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant() FOR SHARE;
+
+-- name: SetMicrosoftSettings :one
+UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(microsoft_tenant_id), microsoft_required = @required,
+  microsoft_acct_missing_app = CASE WHEN microsoft_tenant_id IS NOT DISTINCT FROM sqlc.narg(microsoft_tenant_id) THEN microsoft_acct_missing_app END
+WHERE id = app_current_tenant()
+RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
+
+-- A link to another organisation (left from before the company changed it)
+-- makes way for a new one.
+-- name: DropStaleMicrosoftLink :exec
+DELETE FROM user_microsoft WHERE user_id = @user_id AND ms_tenant_id <> @ms_tenant_id;
+
+-- name: LinkMicrosoft :exec
+INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id, linked_by)
+VALUES (app_current_tenant(), @user_id, @ms_tenant_id, @ms_object_id, @linked_by);
+
+-- name: UnlinkMicrosoft :one
+DELETE FROM user_microsoft WHERE user_id = @user_id RETURNING ms_tenant_id;
+
+-- Their account was unlinked, or they were made an owner: one is linked
+-- again only on purpose.
+-- name: MicrosoftConnectOnly :exec
+UPDATE app_user SET microsoft_connect_only = true WHERE id = @id;
+
+-- Someone made an owner keeps no account linked by a sign-in's address.
+-- name: UnlinkSignInLink :many
+DELETE FROM user_microsoft WHERE user_id = @user_id AND linked_by = 'sign_in' RETURNING ms_tenant_id;
+
+-- Who the Microsoft account is linked to here, if anyone.
+-- name: MicrosoftAccountHolder :one
+SELECT user_id FROM user_microsoft WHERE ms_tenant_id = @ms_tenant_id AND ms_object_id = @ms_object_id;
+
+-- A link, held until the transaction ends (using it, or seeing it used,
+-- waits for whoever holds it): whose, what for, and whether it still works.
+-- FOR NO KEY UPDATE, not FOR UPDATE: a sign-in started from the link (its
+-- microsoft_sign_in_flow names it) does not wait.
+-- name: HoldLink :one
+SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = @id FOR NO KEY UPDATE;
+
+-- Holds the person's row (role, password, whether they may be linked by
+-- address) until the transaction ends: a change to it waits, and so does
+-- another sign-in of theirs. FOR NO KEY UPDATE, not FOR SHARE: the holder
+-- updates the row afterwards (last sign-in, sessions ended), and two
+-- holders sharing it would wait for each other. No row: no such person
+-- here (pgx.ErrNoRows).
+-- name: HoldUser :one
+SELECT id FROM app_user WHERE id = @id FOR NO KEY UPDATE;
+
+-- Everyone in the company, held as HoldUser does (in the same order, by
+-- id), before links of many people are removed and their sessions ended.
+-- name: HoldTeam :exec
+SELECT id FROM app_user ORDER BY id FOR NO KEY UPDATE;
+
+-- The database's clock, to the second, as of the transaction's start: when
+-- a session is issued.
+-- name: DatabaseSecond :one
+SELECT date_trunc('second', now())::timestamptz AS now;
+
+-- The database's clock now, to the second (clock_timestamp: not the
+-- transaction's start, which may be long before, if it waited for a row):
+-- where an end of sessions is cut off (tokens_valid_after,
+-- microsoft_sessions_after), so that a session issued before it, even by a
+-- sign-in that committed while this transaction waited, is ended.
+-- name: CutOffSecond :one
+SELECT date_trunc('second', clock_timestamp())::timestamptz AS now;
+
+-- The company changed its organisation: links to any other go.
+-- name: UnlinkOtherOrganisations :execrows
+DELETE FROM user_microsoft WHERE ms_tenant_id <> coalesce(sqlc.narg(microsoft_tenant_id)::text, '');
+
+-- Ends sessions signed in with Microsoft until now (the next whole second,
+-- by the database's clock): one person's, or (no user) everyone's. Always
+-- later than every earlier end, of these or of all their sessions: a session
+-- signed in since (dated that end, in the same second) ends too.
+-- name: EndMicrosoftSessions :exec
+UPDATE app_user SET microsoft_sessions_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
+WHERE sqlc.narg(user_id)::text IS NULL OR id = sqlc.narg(user_id)::text;
+
+-- Whether the company signs in with Microsoft, and whether a Microsoft account is linked to them.
+-- name: MyMicrosoft :one
+SELECT coalesce((SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant()), false)::boolean AS sign_in,
+  EXISTS (SELECT 1 FROM user_microsoft WHERE user_id = @user_id)::boolean AS linked;
+
+-- The account linked to them is still this one (it may have been unlinked
+-- meanwhile: 0 rows).
+-- name: UsedMicrosoft :execrows
+UPDATE user_microsoft SET last_used_at = now() WHERE user_id = @user_id AND ms_tenant_id = @ms_tenant_id AND ms_object_id = @ms_object_id;
+
+-- Accepting an invitation with Microsoft: active, without a password.
+-- name: JoinWithMicrosoft :exec
+UPDATE app_user SET active = true, invited = false WHERE id = @id AND invited;
+
+-- How each person can sign in (for the team list).
+-- name: SignInMethods :many
+SELECT u.id, (u.password_hash IS NOT NULL)::boolean AS has_password,
+  EXISTS (SELECT 1 FROM user_microsoft m WHERE m.user_id = u.id)::boolean AS microsoft
+FROM app_user u;
+
+-- name: HasPassword :one
+SELECT (password_hash IS NOT NULL)::boolean AS has_password FROM app_user WHERE id = @id;

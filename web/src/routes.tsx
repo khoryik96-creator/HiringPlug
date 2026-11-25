@@ -10,6 +10,7 @@ import { type ComponentType, lazy, type LazyExoticComponent, type ReactNode } fr
 
 import type { Me, Permission } from "./api/client";
 import { MyTwoStep } from "./components/TwoStep";
+import { ConnectMicrosoft } from "./components/ConnectMicrosoft";
 import { NotificationSettings } from "./components/Notifications";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- React's own bound for lazy components
@@ -170,9 +171,9 @@ export const ROUTES: Route[] = [
   { section: "ai-usage", path: /^#\/settings\/ai-usage/, permission: "aiusage:read", menu: { in: "settings", label: "AI usage", href: "#/settings/ai-usage" },
     render: (c) => <AiUsage canManage={can(c, "aiusage:manage")} /> },
   { section: "team", path: /^#\/team/, permission: "identity.team:manage", menu: { in: "settings", label: "Team", href: "#/team" },
-    render: (c) => <Team myRole={c.me.role} myId={c.me.user.id} /> },
+    render: (c) => <Team myRole={c.me.role} myId={c.me.user.id} microsoft={c.me.microsoftSignIn} /> },
   { section: "access", path: /^#\/access/, permission: "identity.roles:manage", menu: { in: "settings", label: "Roles and access", href: "#/access" },
-    render: () => <Access /> },
+    render: (c) => <Access owner={c.me.role === "owner"} /> },
   { section: "privacy", path: /^#\/privacy/, permission: "privacy:manage", menu: { in: "settings", label: "Data protection", href: "#/privacy" },
     render: () => <Privacy /> },
   { section: "audit-log", path: /^#\/settings\/audit-log/, permission: "auditlog:read", menu: { in: "settings", label: "Audit log", href: "#/settings/audit-log" },
@@ -200,7 +201,7 @@ export const ROUTES: Route[] = [
     render: () => <Bin /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
     render: (c) => <main><h2>Your account</h2>{can(c, "notifications:read") && <NotificationSettings permissions={c.permissions} />}{can(c, "calendars:use") && <p><a href="#/calendar">Outlook calendar</a></p>}{can(c, "scheduling:use") && <BookingHours />}
-      {can(c, "emails:send") && <EmailSignature canUploadBanners={can(c, "emails.templates:manage")} />}<ChangePassword /><MyTwoStep /></main> },
+      {can(c, "emails:send") && <EmailSignature canUploadBanners={can(c, "emails.templates:manage")} />}<ConnectMicrosoft me={c.me} /><ChangePassword hasPassword={c.me.hasPassword} /><MyTwoStep hasPassword={c.me.hasPassword} /></main> },
   { section: "my-dropdowns", path: /^#\/my-dropdowns/, menu: { in: "settings", label: "My dropdowns", href: "#/my-dropdowns" },
     render: () => <MyDropdowns /> },
   { section: "companion", path: /^#\/companion/, menu: { in: "settings", label: "LinkedIn companion", href: "#/companion" },

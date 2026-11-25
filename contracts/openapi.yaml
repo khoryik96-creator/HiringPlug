@@ -237,6 +237,26 @@ x-error-codes:
     module: shared
     status: 405
     description: The endpoint exists but not with this HTTP method.
+  MICROSOFT_APP_OWNERS_ONLY:
+    module: emails
+    status: 403
+    description: The company signs in with Microsoft through its Microsoft app (Settings › Roles and access), so only an owner may change or remove the Microsoft app while that is on.
+  MICROSOFT_CONNECT_FAILED:
+    module: identity
+    status: 422
+    description: 'Connecting your Microsoft account (Your account) did not work. `details.reason` says why: `already_connected` (one is connected to you already: an owner unlinks it on the Team page first), `linked_elsewhere` (that Microsoft account is connected to someone else on the team), `other_organisation`, `personal_account` or `failed` (as for signing in). Starting it asks for your current password (and your two-step code, when you use one): a wrong one is a 400 on `password` or `code`.'
+  MICROSOFT_REQUIRED:
+    module: identity
+    status: 403
+    description: The company requires signing in with Microsoft. Passwords (signing in, password resets and links, sessions signed in with a password) then work only for owners.
+  MICROSOFT_SIGN_IN_FAILED:
+    module: identity
+    status: 401
+    description: 'Signing in with Microsoft did not work. `details.reason` says why: `not_on_team` (the Microsoft account is not on the team of a company that signs in with Microsoft, or was deactivated: an owner invites them), `other_organisation` (an account of another Microsoft organisation than the company''s, or a guest in it), `personal_account` (a personal Microsoft account: use the work account), `connect_first` (the account''s address is an owner''s, or someone''s whose Microsoft account was unlinked: an account is never linked to them by its address; they connect it from Your account, signed in, or with an invitation or reconnect link an owner sent), `linked_elsewhere` (an invitation or reconnect link was used with a Microsoft account connected to someone else on the team), `already_connected` (a reconnect link was used by someone who has another Microsoft account connected: an owner unlinks it first), `failed` (the sign-in expired, was used already or finished in another browser, or Microsoft''s answer could not be checked: start again).'
+  MICROSOFT_SIGN_IN_UNAVAILABLE:
+    module: identity
+    status: 422
+    description: Signing in with Microsoft is not set up for this company (or, when no company is named, on this server).
   NOT_FOUND:
     module: shared
     status: 404
@@ -269,6 +289,10 @@ x-error-codes:
     module: emails
     status: 503
     description: Outlook is unavailable or has not confirmed a write.
+  PASSWORD_NOT_SET:
+    module: identity
+    status: 422
+    description: You sign in with Microsoft and have no HiringPlug password to check or change. A password reset link sets one, unless the company requires Microsoft.
   PAYLOAD_TOO_LARGE:
     module: shared
     status: 413
@@ -317,7 +341,7 @@ x-error-codes:
   SIGN_IN_CHOOSE_COMPANY:
     module: identity
     status: 409
-    description: The email and password match accounts at several companies; send one of `details.companies` (slug) as `company`.
+    description: The email and password (or the Microsoft account) match accounts at several companies; send one of `details.companies` (slug) as `company`. After Microsoft, send it with `details.ticket` (a new one-time ticket) to /v1/auth/microsoft/complete.
   SIGN_IN_FAILED:
     module: identity
     status: 401
@@ -5110,7 +5134,7 @@ paths:
       tags: [emails]
       summary: Save the agency's app details for one provider (the secret is kept when left out)
       description: >
-        The secret is stored encrypted and never shown again, only its last four characters. Mailboxes connected with other details must connect again.
+        The secret is stored encrypted and never shown again, only its last four characters. Mailboxes connected with other details must connect again. While the company signs in with Microsoft, only an owner may save the Microsoft app (MICROSOFT_APP_OWNERS_ONLY): signing in uses it.
 
       x-permission: emails.apps:manage
       requestBody:
@@ -5131,6 +5155,7 @@ paths:
       operationId: deleteMailApp
       tags: [emails]
       summary: Remove the agency's app details for one provider (the server's are used again, if any)
+      description: While the company signs in with Microsoft, only an owner may remove the Microsoft app (MICROSOFT_APP_OWNERS_ONLY).
       x-permission: emails.apps:manage
       responses:
         '200':
@@ -5383,6 +5408,7 @@ paths:
               schema: {$ref: '#/components/schemas/Session'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/SignInFailed'}
+        '403': {$ref: '#/components/responses/MicrosoftRequired'}
         '409': {$ref: '#/components/responses/ChooseCompany'}
         '429': {$ref: '#/components/responses/TooManyAttempts'}
   /v1/auth/two-step:
@@ -5404,6 +5430,7 @@ paths:
               schema: {$ref: '#/components/schemas/Session'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/SignInFailed'}
+        '403': {$ref: '#/components/responses/MicrosoftRequired'}
         '429': {$ref: '#/components/responses/TooManyAttempts'}
   /v1/auth/two-step/setup:
     post:
@@ -5444,6 +5471,7 @@ paths:
               schema: {$ref: '#/components/schemas/TwoStepEnabled'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/SignInFailed'}
+        '403': {$ref: '#/components/responses/MicrosoftRequired'}
         '429': {$ref: '#/components/responses/TooManyAttempts'}
   /v1/me/two-step:
     get:
@@ -5515,7 +5543,7 @@ paths:
     post:
       operationId: disableMyTwoStep
       tags: [identity]
-      summary: Turn your two-step sign-in off, with your password (not while your company requires it)
+      summary: Turn your two-step sign-in off, with your password, or the app's code if you have no password (not while your company requires it)
       x-permission: authenticated
       requestBody:
         required: true
@@ -5566,6 +5594,188 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/TwoStepNotEnabled'}
+  /v1/auth/microsoft/start:
+    post:
+      operationId: startMicrosoftSignIn
+      tags: [identity]
+      summary: Start signing in with Microsoft (send the browser to the returned address)
+      description: >-
+        The company is found from, in order: the invitation, the careers page address (company), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). An invitation or reconnect link (invite) links the Microsoft account to its person, whatever the account's address (an account of the company's organisation, connected to nobody else there). The email is only suggested to Microsoft: it never chooses the company, so the answer never shows where an email is on a team. Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MicrosoftSignInStart'}
+      responses:
+        '200':
+          description: Where to send the browser (Microsoft's sign-in page)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MicrosoftSignInRedirect'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '410': {$ref: '#/components/responses/LinkNotValid'}
+        '422': {$ref: '#/components/responses/MicrosoftSignInUnavailable'}
+        '429': {$ref: '#/components/responses/TooManyAttempts'}
+  /v1/auth/microsoft/callback:
+    get:
+      operationId: microsoftSignInCallback
+      tags: [identity]
+      summary: Where Microsoft sends the browser back (register this address as the app's redirect URI)
+      description: >-
+        Nothing is signed in here: the code is kept for the sign-in that sent the browser, and the browser goes back to the app (/#/sign-in/microsoft) with a one-time ticket, or with error=cancelled or error=failed. Microsoft's own error text is never passed on.
+      x-permission: public
+      security: []
+      parameters:
+        - {in: query, name: code, schema: {type: string, maxLength: 4096}}
+        - {in: query, name: state, schema: {type: string, maxLength: 4096}}
+        - {in: query, name: error, schema: {type: string, maxLength: 4096}}
+      responses:
+        '303':
+          description: Back to the app's Microsoft sign-in page
+          headers:
+            Cache-Control: {schema: {type: string}}
+            Referrer-Policy: {schema: {type: string}}
+            Location:
+              schema:
+                type: string
+  /v1/auth/microsoft/complete:
+    post:
+      operationId: completeMicrosoftSignIn
+      tags: [identity]
+      summary: Finish signing in with Microsoft, in the browser tab that started it
+      description: >-
+        Send the ticket from the address Microsoft's sign-in came back to, and the value whose SHA-256 the start sent. A ticket works once. Microsoft sign-ins skip the two-step code.
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MicrosoftSignInComplete'}
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/MicrosoftSignInFailed'}
+        '409': {$ref: '#/components/responses/ChooseCompany'}
+        '429': {$ref: '#/components/responses/TooManyAttempts'}
+  /v1/me/microsoft/start:
+    post:
+      operationId: startConnectingMicrosoft
+      tags: [identity]
+      summary: Connect your Microsoft work account, to sign in with it (send the browser to the returned address)
+      description: >-
+        Signed in (with a session, not an API key), at a company that signs in with Microsoft, and proving it is you: your current password, and your two-step code (or a recovery code) when you use two-step sign-in (rate limited like changing your password). Microsoft's redirect comes back to /#/sign-in/microsoft as for signing in; finish with /v1/me/microsoft/complete in this browser tab, still signed in. The way owners link a Microsoft account (never linked to them by its address alone); anyone else may use it too. They are emailed.
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MicrosoftConnectStart'}
+      responses:
+        '200':
+          description: Where to send the browser (Microsoft's sign-in page)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MicrosoftSignInRedirect'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/MicrosoftConnectFailed'}
+        '429': {$ref: '#/components/responses/TooManyAttempts'}
+  /v1/me/microsoft/complete:
+    post:
+      operationId: finishConnectingMicrosoft
+      tags: [identity]
+      summary: Finish connecting your Microsoft account, in the browser tab that started it
+      description: Signed in with a session (not an API key). The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MicrosoftConnectComplete'}
+      responses:
+        '204': {description: Connected}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/MicrosoftConnectFailed'}
+        '429': {$ref: '#/components/responses/TooManyAttempts'}
+  /v1/team/{userId}/microsoft:
+    parameters:
+      - {name: userId, in: path, required: true, schema: {$ref: '#/components/schemas/UserId'}}
+    delete:
+      operationId: unlinkMicrosoft
+      tags: [identity]
+      summary: Unlink someone's Microsoft account; their Microsoft sessions end (only owners unlink owners)
+      description: >-
+        From then on a Microsoft account is linked to them only on purpose, never by a sign-in's address: they connect one from Your account (with their password), or with a reconnect link an owner sends (POST /v1/team/{userId}/microsoft/reconnect). Audited (user.microsoft_unlinked).
+      x-permission: identity.team:manage
+      responses:
+        '204': {description: Unlinked}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/TeamChangeNotAllowed'}
+  /v1/team/{userId}/microsoft/reconnect:
+    parameters:
+      - {name: userId, in: path, required: true, schema: {$ref: '#/components/schemas/UserId'}}
+    post:
+      operationId: sendMicrosoftReconnectLink
+      tags: [identity]
+      summary: Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners; not yourself)
+      description: >-
+        For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HiringPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
+      x-permission: identity.team:manage
+      responses:
+        '201':
+          description: Sent
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MicrosoftReconnectLink'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/TeamChangeNotAllowed'}
+  /v1/agency/microsoft-sign-in:
+    get:
+      operationId: getMicrosoftSignIn
+      tags: [identity]
+      summary: The company's sign-in with Microsoft settings, and the address to register with the app
+      x-permission: identity.roles:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MicrosoftSignInSettings'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: setMicrosoftSignIn
+      tags: [identity]
+      summary: Let the team sign in with Microsoft (accounts of the company's own organisation only), and require it
+      description: >-
+        Requiring Microsoft refuses passwords to everyone but owners at once: signing in, password resets and links, and sessions signed in with a password. Turning it off ends sessions signed in with Microsoft; changing the organisation ends them too, and removes links to Microsoft accounts of any other organisation (the audit entry counts them: linksRemoved).
+      x-permission: identity.roles:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MicrosoftSignInInput'}
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MicrosoftSignInSettings'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/auth/sign-out:
     post:
       operationId: signOut
@@ -5580,6 +5790,7 @@ paths:
       operationId: requestPasswordReset
       tags: [identity]
       summary: Email a password reset link (the answer is the same whether or not the email is known)
+      description: Someone whose company requires Microsoft (and who is not an owner there) is emailed how to sign in instead of a link.
       x-permission: public
       requestBody:
         required: true
@@ -5610,7 +5821,7 @@ paths:
       operationId: useAuthLink
       tags: [identity]
       summary: Choose a password with an invitation or reset link, and sign in
-      description: An invitation activates the account; a reset signs out every other session.
+      description: An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft). Never with a reconnect link (410).
       x-permission: public
       requestBody:
         required: true
@@ -5625,6 +5836,7 @@ paths:
               schema: {$ref: '#/components/schemas/Session'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/SignInFailed'}
+        '403': {$ref: '#/components/responses/MicrosoftRequired'}
         '410': {$ref: '#/components/responses/LinkNotValid'}
         '429': {$ref: '#/components/responses/TooManyAttempts'}
   /v1/me/preferences:
@@ -5677,6 +5889,8 @@ paths:
               schema: {$ref: '#/components/schemas/Session'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/MicrosoftRequired'}
+        '422': {$ref: '#/components/responses/PasswordNotSet'}
         '429': {$ref: '#/components/responses/TooManyAttempts'}
   /v1/team:
     get:
@@ -9287,6 +9501,31 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    MicrosoftSignInFailed:
+      description: Signing in with Microsoft did not work (MICROSOFT_SIGN_IN_FAILED; details.reason says why).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    MicrosoftConnectFailed:
+      description: Connecting your Microsoft account did not work (MICROSOFT_CONNECT_FAILED; details.reason says why).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    MicrosoftSignInUnavailable:
+      description: Signing in with Microsoft is not set up (MICROSOFT_SIGN_IN_UNAVAILABLE).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    MicrosoftRequired:
+      description: The company requires signing in with Microsoft (MICROSOFT_REQUIRED).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    PasswordNotSet:
+      description: You sign in with Microsoft and have no password (PASSWORD_NOT_SET).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     InterviewPrepConflict:
       description: The AI is off (INTERVIEW_PREP_AI_OFF), or there is too little to prepare from (INTERVIEW_PREP_TOO_LITTLE).
       content:
@@ -9501,6 +9740,11 @@ components:
         - MEANING_READING
         - MEANING_UNAVAILABLE
         - METHOD_NOT_ALLOWED
+        - MICROSOFT_APP_OWNERS_ONLY
+        - MICROSOFT_CONNECT_FAILED
+        - MICROSOFT_REQUIRED
+        - MICROSOFT_SIGN_IN_FAILED
+        - MICROSOFT_SIGN_IN_UNAVAILABLE
         - NOT_FOUND
         - OFFER_NOT_ALLOWED
         - OUTLOOK_ATTACHMENT_TOO_LARGE
@@ -9509,6 +9753,7 @@ components:
         - OUTLOOK_RULES_ACCESS
         - OUTLOOK_SEND_IN_PROGRESS
         - OUTLOOK_UNAVAILABLE
+        - PASSWORD_NOT_SET
         - PAYLOAD_TOO_LARGE
         - PLACEMENT_NOT_ALLOWED
         - ROLE_NOT_EDITABLE
@@ -14770,8 +15015,14 @@ components:
       enum: [currentRole, status, noticePeriod, currentSalary, expectedSalary, workAuthorization, nationality, residence, location, source, industry, tags, email, phone, updated]
     Me:
       type: object
-      required: [user, tenant, role, permissions]
+      required: [user, tenant, role, permissions, hasPassword, microsoftSignIn, microsoftLinked]
       properties:
+        microsoftSignIn: {type: boolean, description: "Your company lets the team sign in with Microsoft."}
+        microsoftLinked: {type: boolean, description: "A Microsoft account is linked to you (you can sign in with it)."}
+        signInMethod:
+          description: How this session was signed in (left out for sessions from before 1.46.0).
+          allOf: [{$ref: '#/components/schemas/SignInMethod'}]
+        hasPassword: {type: boolean, description: "False for people who sign in with Microsoft only: there is no password to change."}
         user: {$ref: '#/components/schemas/User'}
         tenant: {$ref: '#/components/schemas/Tenant'}
         role: {$ref: '#/components/schemas/Role'}
@@ -14836,9 +15087,10 @@ components:
     TwoStepDisable:
       type: object
       additionalProperties: false
-      required: [password]
+      description: Your password; or, if you sign in with Microsoft and have none, the app's current code.
       properties:
         password: {type: string, minLength: 1, maxLength: 200}
+        code: {type: string, minLength: 1, maxLength: 20}
     TwoStepSetup:
       type: object
       required: [secret, uri]
@@ -14875,6 +15127,87 @@ components:
       required: [required]
       properties:
         required: {type: boolean}
+    SignInMethod:
+      type: string
+      description: password, or microsoft (Sign in with Microsoft).
+      enum: [password, microsoft]
+    MicrosoftSignInStart:
+      type: object
+      additionalProperties: false
+      required: [bindingHash]
+      properties:
+        bindingHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.
+        email: {type: string, format: email, maxLength: 254, description: "The email they typed: suggested to Microsoft (it does not choose the company)."}
+        company: {type: string, maxLength: 100, description: "The company's careers page address (slug)."}
+        invite: {type: string, minLength: 20, maxLength: 200, description: "An invitation link's token (accept it with Microsoft instead of choosing a password), or a reconnect link's."}
+    MicrosoftConnectStart:
+      type: object
+      additionalProperties: false
+      required: [bindingHash]
+      properties:
+        password: {type: string, minLength: 1, maxLength: 200, description: "Your current password (needed if you have one)."}
+        code: {type: string, minLength: 1, maxLength: 20, description: "Your authenticator app's current code, or a recovery code (needed if you use two-step sign-in)."}
+        bindingHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.
+    MicrosoftConnectComplete:
+      type: object
+      additionalProperties: false
+      required: [ticket, binding]
+      properties:
+        ticket: {type: string, minLength: 20, maxLength: 200, description: "From the app address Microsoft's sign-in came back to."}
+        binding: {type: string, minLength: 32, maxLength: 200, description: "The value whose SHA-256 the start sent."}
+    MicrosoftSignInRedirect:
+      type: object
+      required: [url]
+      properties:
+        url: {type: string, description: "Microsoft's sign-in page; it comes back to /v1/auth/microsoft/callback."}
+    MicrosoftSignInComplete:
+      type: object
+      additionalProperties: false
+      required: [ticket, binding]
+      properties:
+        ticket: {type: string, minLength: 20, maxLength: 200, description: "From the app address Microsoft's sign-in came back to (or details.ticket of SIGN_IN_CHOOSE_COMPANY)."}
+        binding: {type: string, minLength: 32, maxLength: 200, description: "The value whose SHA-256 the start sent."}
+        company: {type: string, maxLength: 100, description: "The company's careers page address, when the account is at several."}
+    MicrosoftSignInSettings:
+      type: object
+      required: [enabled, organisationId, required, callbackUrl, appSource, clientId, acctClaimMissing]
+      properties:
+        enabled: {type: boolean, description: The team may sign in with Microsoft accounts of the organisation.}
+        organisationId:
+          type: string
+          nullable: true
+          description: "The company's Microsoft organisation (Entra tenant ID, e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47): only its accounts are accepted."
+        required: {type: boolean, description: "Passwords work only for owners: everyone else signs in with Microsoft."}
+        callbackUrl: {type: string, description: "The redirect URI to register with the Microsoft app (Web platform)."}
+        appSource:
+          type: string
+          enum: [agency, server, none]
+          description: "Whose Microsoft app is used: the company's (Settings > Email connection), the server's, or none yet."
+        clientId: {type: string, nullable: true}
+        acctClaimMissing:
+          type: boolean
+          description: "The last Microsoft sign-in came without the optional acct claim: guests cannot be told from members, so no account is linked by its address until it is added in Entra (Token configuration)."
+    MicrosoftReconnectLink:
+      type: object
+      required: [expiresAt, emailed]
+      description: The link is emailed to the person only (it is not shown to whoever sends it).
+      properties:
+        expiresAt: {type: string, format: date-time}
+        emailed: {type: boolean, description: "Whether an email was queued (it fails later if no mail server is set up)."}
+    MicrosoftSignInInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, organisationId, required]
+      properties:
+        enabled: {type: boolean}
+        organisationId: {type: string, nullable: true, maxLength: 64}
+        required: {type: boolean}
     PasswordResetRequest:
       type: object
       additionalProperties: false
@@ -14883,9 +15216,13 @@ components:
         email: {type: string, format: email, maxLength: 254}
     AuthLink:
       type: object
-      required: [kind, email, name, companyName]
+      required: [kind, email, name, companyName, microsoft]
       properties:
-        kind: {type: string, enum: [invite, reset]}
+        microsoft:
+          type: string
+          enum: [none, available, required]
+          description: "Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused). Always required for a reconnect link."
+        kind: {type: string, enum: [invite, reset, reconnect], description: "reconnect: an owner's link to connect a Microsoft account (/v1/auth/microsoft/start with invite); no password is chosen with it."}
         email: {type: string}
         name: {type: string}
         companyName: {type: string}
@@ -14909,8 +15246,12 @@ components:
       enum: [invited, active, deactivated]
     TeamMember:
       type: object
-      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep]
+      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep, signInMethods]
       properties:
+        signInMethods:
+          type: array
+          description: "How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited)."
+          items: {$ref: '#/components/schemas/SignInMethod'}
         twoStep: {type: boolean, description: Signs in with a code from an authenticator app too.}
         id: {$ref: '#/components/schemas/UserId'}
         name: {type: string}

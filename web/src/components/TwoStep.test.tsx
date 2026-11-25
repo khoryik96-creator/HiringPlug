@@ -85,6 +85,37 @@ describe("your two-step sign-in", () => {
     expect(sentBody(post)).toEqual({ password: "purple-gecko-41" });
   });
 
+  it("turns it off with the app's code for someone without a password", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ enabled: true, enabledAt: "2026-11-20T00:00:00Z", recoveryCodesLeft: 3, required: false }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({}));
+    renderWithClient(<MyTwoStep hasPassword={false} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
+    expect(screen.queryByLabelText("Your password")).toBeNull();
+    fill("Code from the app", "287082");
+    fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({ code: "287082" });
+  });
+
+  it("speaks of Microsoft, not a stolen password, to someone without a password", async () => {
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ enabled: false, enabledAt: null, recoveryCodesLeft: 0, required: false }));
+    renderWithClient(<MyTwoStep hasPassword={false} />);
+    const off = await screen.findByText(/You sign in with Microsoft/);
+    expect(off.textContent).toContain("HiringPlug's code is not asked then");
+    expect(screen.queryByText(/stolen password/)).toBeNull();
+    cleanup();
+    get.mockResolvedValue(ok({ enabled: true, enabledAt: "2026-11-20T00:00:00Z", recoveryCodesLeft: 4, required: false }));
+    renderWithClient(<MyTwoStep hasPassword={false} />);
+    const on = await screen.findByText(/You sign in with Microsoft/);
+    expect(on.textContent).toContain("asked only if you ever sign in with a password");
+    expect(on.textContent).toContain("4 recovery codes left");
+    expect(screen.queryByText(/after your password/)).toBeNull();
+    cleanup();
+    get.mockResolvedValue(ok({ enabled: false, enabledAt: null, recoveryCodesLeft: 0, required: false }));
+    renderWithClient(<MyTwoStep />);
+    expect(await screen.findByText(/a stolen password alone cannot sign in as you/)).toBeTruthy();
+  });
+
   it("has no Turn off while the company requires it", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ enabled: true, enabledAt: "2026-11-20T00:00:00Z", recoveryCodesLeft: 10, required: true }));
     renderWithClient(<MyTwoStep />);

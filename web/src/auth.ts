@@ -13,11 +13,11 @@ export function clearToken(): void {
   sessionStorage.removeItem(KEY);
 }
 
-/** The invitation or password reset link in the address (#/invite/<token>, #/reset/<token>), if any. */
-export function authLinkRoute(hash: string): { kind: "invite" | "reset"; token: string } | null {
-  const m = /^#\/(invite|reset)\/([0-9a-f]{64})$/.exec(hash);
+/** The invitation, password reset or Microsoft reconnect link in the address (#/invite/<token>, #/reset/<token>, #/reconnect/<token>), if any. */
+export function authLinkRoute(hash: string): { kind: "invite" | "reset" | "reconnect"; token: string } | null {
+  const m = /^#\/(invite|reset|reconnect)\/([0-9a-f]{64})$/.exec(hash);
   const [, kind, token] = m ?? [];
-  return kind && token ? { kind: kind as "invite" | "reset", token } : null;
+  return kind && token ? { kind: kind as "invite" | "reset" | "reconnect", token } : null;
 }
 
 // A new browser tab of HiringPlug (a record's tab dragged out, a link opened

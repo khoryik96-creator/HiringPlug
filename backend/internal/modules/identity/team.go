@@ -111,6 +111,9 @@ func (m *Module) CancelInvite(ctx context.Context, p authz.Principal, userID str
 		if problem := InviteProblem(string(p.Role), row.Role); problem != "" {
 			return teamProblem(problem)
 		}
+		if _, err := q.HoldUser(ctx, userID); err != nil { // before their link, as a sign-in with it holds them
+			return err
+		}
 		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "invite"}); err != nil {
 			return err
 		}
@@ -143,16 +146,26 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 }
 
 // UpdateMember changes someone's role or team, or deactivates or reactivates
-// them, by the team rules (ChangeProblem). Deactivating signs them out. team
+// them, by the team rules (ChangeProblem). Deactivating signs them out. A
+// change of role, or a deactivation, ends the reconnect link sent them. team
 // is nil to keep their team; a nil *string inside it means no team.
 func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID string, role *string, active *bool, team **string) (TeamMember, error) {
 	var out TeamMember
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		row, err := q.TeamMember(ctx, userID)
+		// First, one change of the team at a time: the active owners counted
+		// below stay so until this one is made (another demotion waits).
+		if err := q.HoldTeamChanges(ctx); err != nil {
+			return err
+		}
+		_, err := q.HoldUser(ctx, userID) // a sign-in of theirs under way finishes first (or waits, and sees the change)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("user")
 		}
+		if err != nil {
+			return err
+		}
+		row, err := q.TeamMember(ctx, userID)
 		if err != nil {
 			return err
 		}
@@ -192,6 +205,16 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 			return err
 		}
 		out = TeamMember(updated)
+		if newRole == string(api.RoleOwner) && row.Role != newRole {
+			if err := m.dropAddressLinkOfNewOwner(ctx, tx, q, userID); err != nil {
+				return err
+			}
+		}
+		if newRole != row.Role || !newActive { // a reconnect link was sent for who they were: whoever holds it no longer signs in as them
+			if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "reconnect"}); err != nil {
+				return err
+			}
+		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.updated", EntityType: "user", EntityID: userID,
 			Changes: audit.Diff(map[string]any{"role": row.Role, "active": row.Active, "teamId": deref(row.TeamID)},
 				map[string]any{"role": newRole, "active": newActive, "teamId": deref(newTeam)})})

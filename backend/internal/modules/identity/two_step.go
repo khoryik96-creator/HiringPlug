@@ -22,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
@@ -99,33 +100,46 @@ func wrongCode() error {
 
 // nextStep is what follows a right password: a session, or a challenge for
 // the code (or to set the app up first, when the company requires it).
-func (m *Module) nextStep(ctx context.Context, q *store.Queries, tenantID, userID string) (*apperr.Error, error) {
-	ts, err := q.GetTwoStep(ctx, userID)
+func (m *Module) nextStep(ctx context.Context, q *store.Queries, u store.UserAuthRow) (*apperr.Error, error) {
+	ts, err := q.GetTwoStep(ctx, u.ID)
 	if err != nil && !database.IsNoRows(err) {
 		return nil, err
 	}
 	if err == nil && ts.EnabledAt != nil {
-		return m.challengeError(api.ErrorCodeTWOSTEPREQUIRED, "Enter the code from your authenticator app.", tenantID, userID, false)
+		return m.challengeError(api.ErrorCodeTWOSTEPREQUIRED, "Enter the code from your authenticator app.", u, false)
 	}
 	required, err := q.TwoStepRequired(ctx)
 	if err != nil || !required {
 		return nil, err
 	}
-	return m.challengeError(api.ErrorCodeTWOSTEPSETUPREQUIRED, "Your company requires two-step sign-in: add an authenticator app.", tenantID, userID, true)
+	return m.challengeError(api.ErrorCodeTWOSTEPSETUPREQUIRED, "Your company requires two-step sign-in: add an authenticator app.", u, true)
 }
 
-func (m *Module) challengeError(code api.ErrorCode, message, tenantID, userID string, setup bool) (*apperr.Error, error) {
+// challengeError is a challenge for u's code. It holds when u's sessions
+// were last ended: a password changed or reset, or a deactivation, since
+// ends it (withChallenge).
+func (m *Module) challengeError(code api.ErrorCode, message string, u store.UserAuthRow, setup bool) (*apperr.Error, error) {
 	if len(m.twoStep.challenge) == 0 {
 		return nil, errTwoStepOff
 	}
-	token := SignChallenge(m.twoStep.challenge, Challenge{TenantID: tenantID, UserID: userID, Setup: setup, Expires: time.Now().Add(challengeLife).Unix()})
+	token := SignChallenge(m.twoStep.challenge, Challenge{TenantID: u.TenantID, UserID: u.ID, Setup: setup,
+		ValidAfter: unixOrZero(u.TokensValidAfter), Expires: m.now().Add(challengeLife).Unix()})
 	return apperr.New(code, message).WithDetail("challenge", token), nil
 }
 
+func unixOrZero(t *time.Time) int64 {
+	if t == nil {
+		return 0
+	}
+	return t.Unix()
+}
+
 // withChallenge runs fn for the person a challenge names, in their company,
-// once the attempt is allowed.
+// once the attempt is allowed: their row held, while they are active and
+// their sessions were not ended since the challenge (their password was
+// changed or reset meanwhile, say).
 func (m *Module) withChallenge(ctx context.Context, clientAddr, token string, setup bool, fn func(tx pgx.Tx, q *store.Queries, u store.UserAuthRow) error) error {
-	c, err := ReadChallenge(m.twoStep.challenge, token, time.Now())
+	c, err := ReadChallenge(m.twoStep.challenge, token, m.now())
 	if err != nil || c.Setup != setup {
 		return signInExpired()
 	}
@@ -134,8 +148,8 @@ func (m *Module) withChallenge(ctx context.Context, clientAddr, token string, se
 	}
 	return database.InTx(ctx, m.pool, authz.System(c.TenantID), func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, c.UserID)
-		if database.IsNoRows(err) || (err == nil && !u.Active) {
+		u, err := holdUser(ctx, q, c.UserID)
+		if database.IsNoRows(err) || (err == nil && (!u.Active || unixOrZero(u.TokensValidAfter) != c.ValidAfter)) {
 			return signInExpired()
 		}
 		if err != nil {
@@ -173,7 +187,7 @@ func (m *Module) checkCode(ctx context.Context, q *store.Queries, tenantID, user
 	if err != nil {
 		return "", err
 	}
-	step, ok := CheckTOTP(secret, code, time.Now(), ts.LastStep)
+	step, ok := CheckTOTP(secret, code, m.now(), ts.LastStep)
 	if !ok {
 		return "", wrongCode()
 	}
@@ -183,20 +197,27 @@ func (m *Module) checkCode(ctx context.Context, q *store.Queries, tenantID, user
 	return "app", nil
 }
 
-// signedIn records the sign-in and mints its session (never before the
-// user's sessions were last ended).
+// signedIn records a password sign-in and mints its session (never before
+// the user's sessions were last ended; refused once the company requires
+// Microsoft, unless they are an owner).
 func (m *Module) signedIn(ctx context.Context, tx pgx.Tx, q *store.Queries, u store.UserAuthRow, how string) (Session, error) {
+	if PasswordRefused(u.MicrosoftRequired, u.Role) {
+		return Session{}, microsoftRequired()
+	}
 	if err := q.SignedIn(ctx, u.ID); err != nil {
 		return Session{}, err
 	}
 	if err := audit.Record(ctx, tx, audit.Entry{Action: "user.signed_in", EntityType: "user", EntityID: u.ID, Changes: map[string]any{"twoStep": how}}); err != nil {
 		return Session{}, err
 	}
-	now := time.Now().Truncate(time.Second)
+	now, err := databaseSecond(ctx, q)
+	if err != nil {
+		return Session{}, err
+	}
 	if u.TokensValidAfter != nil && now.Before(*u.TokensValidAfter) {
 		now = *u.TokensValidAfter
 	}
-	return m.session(u.TenantID, u.ID, now)
+	return m.session(u.TenantID, u.ID, authn.MethodPassword, now)
 }
 
 // SignInTwoStep finishes a sign-in with the app's code or a recovery code.
@@ -245,7 +266,7 @@ func (m *Module) enable(ctx context.Context, tx pgx.Tx, q *store.Queries, tenant
 	if err != nil {
 		return nil, err
 	}
-	step, ok := CheckTOTP(secret, code, time.Now(), 0)
+	step, ok := CheckTOTP(secret, code, m.now(), 0)
 	if !ok {
 		return nil, apperr.Validation(apperr.FieldErrors{{Field: "code", Message: "is not the code the app shows now"}})
 	}
@@ -359,9 +380,10 @@ func (m *Module) NewRecoveryCodes(ctx context.Context, p authz.Principal, code s
 	return codes, err
 }
 
-// DisableMyTwoStep turns it off with the password, unless the company
+// DisableMyTwoStep turns it off with the password (or, for someone who signs
+// in with Microsoft and has none, the app's code), unless the company
 // requires it.
-func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, password string) (TwoStepStatus, error) {
+func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, password, code *string) (TwoStepStatus, error) {
 	if !m.limits.change.Allow(p.UserID) {
 		return TwoStepStatus{}, tooMany()
 	}
@@ -372,8 +394,8 @@ func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, passwo
 		if err != nil {
 			return err
 		}
-		if u.PasswordHash == nil || !CheckPassword(*u.PasswordHash, password) {
-			return apperr.Validation(apperr.FieldErrors{{Field: "password", Message: "is not your current password"}})
+		if err := m.provePerson(ctx, q, u, password, code); err != nil {
+			return err
 		}
 		if required, err := q.TwoStepRequired(ctx); err != nil || required {
 			return firstErr(err, teamProblem("Your company requires two-step sign-in; only an owner can stop requiring it."))
@@ -395,7 +417,9 @@ func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, passwo
 func (m *Module) ResetTwoStep(ctx context.Context, p authz.Principal, userID string) error {
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, userID)
+		// Held first: the end below is cut off once it is theirs (an
+		// UPDATE that waited for the row would be cut off before it waited).
+		u, err := holdUser(ctx, q, userID)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("team member")
 		}
@@ -416,7 +440,9 @@ func (m *Module) ResetTwoStep(ctx context.Context, p authz.Principal, userID str
 }
 
 // SetTwoStepRequired requires two-step sign-in of everyone (signing out those
-// without it), or stops requiring it. The owner needs it first.
+// without it), or stops requiring it. The owner needs it first. Saved as it
+// was, it does nothing: those who signed in with Microsoft since (no code)
+// stay signed in.
 func (m *Module) SetTwoStepRequired(ctx context.Context, p authz.Principal, required bool) error {
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
@@ -429,10 +455,13 @@ func (m *Module) SetTwoStepRequired(ctx context.Context, p authz.Principal, requ
 				return apperr.New(api.ErrorCodeTWOSTEPNOTENABLED, "Set up two-step sign-in for yourself first (Your account).")
 			}
 		}
-		if err := q.SetTwoStepRequired(ctx, required); err != nil {
+		if n, err := q.SetTwoStepRequired(ctx, required); err != nil || n == 0 {
 			return err
 		}
 		if required {
+			if err := q.HoldTeam(ctx); err != nil { // everyone's row first (as in ResetTwoStep)
+				return err
+			}
 			if err := q.EndSessionsWithoutTwoStep(ctx); err != nil {
 				return err
 			}

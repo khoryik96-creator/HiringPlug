@@ -2109,13 +2109,19 @@ password?" emails a reset link; everyone changes their password under their
 name. ✅ **Two-step sign-in**: a code from an authenticator app after the
 password (set up under Your account with a QR code, ten recovery codes);
 owners can require it for everyone, and owners and admins reset it for
-someone who lost their phone. ✅ **Roles and access** (owners): each company chooses what each role may
+someone who lost their phone. 🟡 **Sign in with Microsoft** (1.46.0, the
+API; the sign-in page next): owners let the team sign in with accounts of the
+company's own Microsoft organisation, and can require it (then only owners
+still use a password); only people already on the Team page get in, an
+invitation (or a reconnect link an owner sends from the Team page) links a
+Microsoft account whatever its address, connecting one from Your account asks
+for the password (and two-step code), and Microsoft sign-ins need no
+two-step code. ✅ **Roles and access** (owners): each company chooses what each role may
 do and which candidates it sees (all, its team's or its own, plus those on
 the jobs it owns); teams of people on the Team page; an owner on every
 candidate and job, changeable on their pages; a "Mine" filter on the candidate
 list. A candidate someone may not see is hidden from them everywhere, by the
-database. Later: new named roles, single sign-on, and a "who viewed salary"
-log. Details: [access-control.md](access-control.md).
+database. Later: new named roles, and signing in with Google. Details: [access-control.md](access-control.md).
 
 ## Agency and in-house, own team and SaaS
 

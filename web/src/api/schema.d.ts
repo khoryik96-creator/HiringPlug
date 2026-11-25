@@ -2923,11 +2923,14 @@ export interface paths {
         get?: never;
         /**
          * Save the agency's app details for one provider (the secret is kept when left out)
-         * @description The secret is stored encrypted and never shown again, only its last four characters. Mailboxes connected with other details must connect again.
+         * @description The secret is stored encrypted and never shown again, only its last four characters. Mailboxes connected with other details must connect again. While the company signs in with Microsoft, only an owner may save the Microsoft app (MICROSOFT_APP_OWNERS_ONLY): signing in uses it.
          */
         put: operations["saveMailApp"];
         post?: never;
-        /** Remove the agency's app details for one provider (the server's are used again, if any) */
+        /**
+         * Remove the agency's app details for one provider (the server's are used again, if any)
+         * @description While the company signs in with Microsoft, only an owner may remove the Microsoft app (MICROSOFT_APP_OWNERS_ONLY).
+         */
         delete: operations["deleteMailApp"];
         options?: never;
         head?: never;
@@ -3247,7 +3250,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Turn your two-step sign-in off, with your password (not while your company requires it) */
+        /** Turn your two-step sign-in off, with your password, or the app's code if you have no password (not while your company requires it) */
         post: operations["disableMyTwoStep"];
         delete?: never;
         options?: never;
@@ -3291,6 +3294,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/microsoft/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start signing in with Microsoft (send the browser to the returned address)
+         * @description The company is found from, in order: the invitation, the careers page address (company), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). An invitation or reconnect link (invite) links the Microsoft account to its person, whatever the account's address (an account of the company's organisation, connected to nobody else there). The email is only suggested to Microsoft: it never chooses the company, so the answer never shows where an email is on a team. Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
+         */
+        post: operations["startMicrosoftSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/microsoft/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Microsoft sends the browser back (register this address as the app's redirect URI)
+         * @description Nothing is signed in here: the code is kept for the sign-in that sent the browser, and the browser goes back to the app (/#/sign-in/microsoft) with a one-time ticket, or with error=cancelled or error=failed. Microsoft's own error text is never passed on.
+         */
+        get: operations["microsoftSignInCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/microsoft/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish signing in with Microsoft, in the browser tab that started it
+         * @description Send the ticket from the address Microsoft's sign-in came back to, and the value whose SHA-256 the start sent. A ticket works once. Microsoft sign-ins skip the two-step code.
+         */
+        post: operations["completeMicrosoftSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/microsoft/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect your Microsoft work account, to sign in with it (send the browser to the returned address)
+         * @description Signed in (with a session, not an API key), at a company that signs in with Microsoft, and proving it is you: your current password, and your two-step code (or a recovery code) when you use two-step sign-in (rate limited like changing your password). Microsoft's redirect comes back to /#/sign-in/microsoft as for signing in; finish with /v1/me/microsoft/complete in this browser tab, still signed in. The way owners link a Microsoft account (never linked to them by its address alone); anyone else may use it too. They are emailed.
+         */
+        post: operations["startConnectingMicrosoft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/microsoft/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish connecting your Microsoft account, in the browser tab that started it
+         * @description Signed in with a session (not an API key). The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
+         */
+        post: operations["finishConnectingMicrosoft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/team/{userId}/microsoft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink someone's Microsoft account; their Microsoft sessions end (only owners unlink owners)
+         * @description From then on a Microsoft account is linked to them only on purpose, never by a sign-in's address: they connect one from Your account (with their password), or with a reconnect link an owner sends (POST /v1/team/{userId}/microsoft/reconnect). Audited (user.microsoft_unlinked).
+         */
+        delete: operations["unlinkMicrosoft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/team/{userId}/microsoft/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners; not yourself)
+         * @description For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HiringPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
+         */
+        post: operations["sendMicrosoftReconnectLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agency/microsoft-sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's sign-in with Microsoft settings, and the address to register with the app */
+        get: operations["getMicrosoftSignIn"];
+        /**
+         * Let the team sign in with Microsoft (accounts of the company's own organisation only), and require it
+         * @description Requiring Microsoft refuses passwords to everyone but owners at once: signing in, password resets and links, and sessions signed in with a password. Turning it off ends sessions signed in with Microsoft; changing the organisation ends them too, and removes links to Microsoft accounts of any other organisation (the audit entry counts them: linksRemoved).
+         */
+        put: operations["setMicrosoftSignIn"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/sign-out": {
         parameters: {
             query?: never;
@@ -3317,7 +3485,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Email a password reset link (the answer is the same whether or not the email is known) */
+        /**
+         * Email a password reset link (the answer is the same whether or not the email is known)
+         * @description Someone whose company requires Microsoft (and who is not an owner there) is emailed how to sign in instead of a link.
+         */
         post: operations["requestPasswordReset"];
         delete?: never;
         options?: never;
@@ -3339,7 +3510,7 @@ export interface paths {
         put?: never;
         /**
          * Choose a password with an invitation or reset link, and sign in
-         * @description An invitation activates the account; a reset signs out every other session.
+         * @description An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft). Never with a reconnect link (410).
          */
         post: operations["useAuthLink"];
         delete?: never;
@@ -5844,7 +6015,7 @@ export interface components {
         /** @enum {string} */
         Permission: "aiproviders:manage" | "aiusage:manage" | "aiusage:read" | "assistant:use" | "auditlog.salary_views:read" | "auditlog:read" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "MICROSOFT_APP_OWNERS_ONLY" | "MICROSOFT_CONNECT_FAILED" | "MICROSOFT_REQUIRED" | "MICROSOFT_SIGN_IN_FAILED" | "MICROSOFT_SIGN_IN_UNAVAILABLE" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PASSWORD_NOT_SET" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "meaning.candidates_read" | "meaning.query_read" | "meaning.read_candidates" | "meaning.read_query" | "meaning.sweep" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
@@ -9381,6 +9552,14 @@ export interface components {
          */
         CandidateColumn: "currentRole" | "status" | "noticePeriod" | "currentSalary" | "expectedSalary" | "workAuthorization" | "nationality" | "residence" | "location" | "source" | "industry" | "tags" | "email" | "phone" | "updated";
         Me: {
+            /** @description Your company lets the team sign in with Microsoft. */
+            microsoftSignIn: boolean;
+            /** @description A Microsoft account is linked to you (you can sign in with it). */
+            microsoftLinked: boolean;
+            /** @description How this session was signed in (left out for sessions from before 1.46.0). */
+            signInMethod?: components["schemas"]["SignInMethod"];
+            /** @description False for people who sign in with Microsoft only: there is no password to change. */
+            hasPassword: boolean;
             user: components["schemas"]["User"];
             tenant: components["schemas"]["Tenant"];
             role: components["schemas"]["Role"];
@@ -9427,8 +9606,10 @@ export interface components {
         TwoStepCode: {
             code: string;
         };
+        /** @description Your password; or, if you sign in with Microsoft and have none, the app's current code. */
         TwoStepDisable: {
-            password: string;
+            password?: string;
+            code?: string;
         };
         TwoStepSetup: {
             /** @description The key to type into the app if it cannot scan. */
@@ -9455,13 +9636,95 @@ export interface components {
         TwoStepPolicy: {
             required: boolean;
         };
+        /**
+         * @description password, or microsoft (Sign in with Microsoft).
+         * @enum {string}
+         */
+        SignInMethod: "password" | "microsoft";
+        MicrosoftSignInStart: {
+            /** @description SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes. */
+            bindingHash: string;
+            /**
+             * Format: email
+             * @description The email they typed: suggested to Microsoft (it does not choose the company).
+             */
+            email?: string;
+            /** @description The company's careers page address (slug). */
+            company?: string;
+            /** @description An invitation link's token (accept it with Microsoft instead of choosing a password), or a reconnect link's. */
+            invite?: string;
+        };
+        MicrosoftConnectStart: {
+            /** @description Your current password (needed if you have one). */
+            password?: string;
+            /** @description Your authenticator app's current code, or a recovery code (needed if you use two-step sign-in). */
+            code?: string;
+            /** @description SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes. */
+            bindingHash: string;
+        };
+        MicrosoftConnectComplete: {
+            /** @description From the app address Microsoft's sign-in came back to. */
+            ticket: string;
+            /** @description The value whose SHA-256 the start sent. */
+            binding: string;
+        };
+        MicrosoftSignInRedirect: {
+            /** @description Microsoft's sign-in page; it comes back to /v1/auth/microsoft/callback. */
+            url: string;
+        };
+        MicrosoftSignInComplete: {
+            /** @description From the app address Microsoft's sign-in came back to (or details.ticket of SIGN_IN_CHOOSE_COMPANY). */
+            ticket: string;
+            /** @description The value whose SHA-256 the start sent. */
+            binding: string;
+            /** @description The company's careers page address, when the account is at several. */
+            company?: string;
+        };
+        MicrosoftSignInSettings: {
+            /** @description The team may sign in with Microsoft accounts of the organisation. */
+            enabled: boolean;
+            /** @description The company's Microsoft organisation (Entra tenant ID, e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47): only its accounts are accepted. */
+            organisationId: string | null;
+            /** @description Passwords work only for owners: everyone else signs in with Microsoft. */
+            required: boolean;
+            /** @description The redirect URI to register with the Microsoft app (Web platform). */
+            callbackUrl: string;
+            /**
+             * @description Whose Microsoft app is used: the company's (Settings > Email connection), the server's, or none yet.
+             * @enum {string}
+             */
+            appSource: "agency" | "server" | "none";
+            clientId: string | null;
+            /** @description The last Microsoft sign-in came without the optional acct claim: guests cannot be told from members, so no account is linked by its address until it is added in Entra (Token configuration). */
+            acctClaimMissing: boolean;
+        };
+        /** @description The link is emailed to the person only (it is not shown to whoever sends it). */
+        MicrosoftReconnectLink: {
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Whether an email was queued (it fails later if no mail server is set up). */
+            emailed: boolean;
+        };
+        MicrosoftSignInInput: {
+            enabled: boolean;
+            organisationId: string | null;
+            required: boolean;
+        };
         PasswordResetRequest: {
             /** Format: email */
             email: string;
         };
         AuthLink: {
-            /** @enum {string} */
-            kind: "invite" | "reset";
+            /**
+             * @description Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused). Always required for a reconnect link.
+             * @enum {string}
+             */
+            microsoft: "none" | "available" | "required";
+            /**
+             * @description reconnect: an owner's link to connect a Microsoft account (/v1/auth/microsoft/start with invite); no password is chosen with it.
+             * @enum {string}
+             */
+            kind: "invite" | "reset" | "reconnect";
             email: string;
             name: string;
             companyName: string;
@@ -9482,6 +9745,8 @@ export interface components {
          */
         TeamStatus: "invited" | "active" | "deactivated";
         TeamMember: {
+            /** @description How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited). */
+            signInMethods: components["schemas"]["SignInMethod"][];
             /** @description Signs in with a code from an authenticator app too. */
             twoStep: boolean;
             id: components["schemas"]["UserId"];
@@ -12612,6 +12877,51 @@ export interface components {
         };
         /** @description Not allowed (TEAM_CHANGE_NOT_ALLOWED). */
         TeamChangeNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Signing in with Microsoft did not work (MICROSOFT_SIGN_IN_FAILED; details.reason says why). */
+        MicrosoftSignInFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Connecting your Microsoft account did not work (MICROSOFT_CONNECT_FAILED; details.reason says why). */
+        MicrosoftConnectFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Signing in with Microsoft is not set up (MICROSOFT_SIGN_IN_UNAVAILABLE). */
+        MicrosoftSignInUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The company requires signing in with Microsoft (MICROSOFT_REQUIRED). */
+        MicrosoftRequired: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description You sign in with Microsoft and have no password (PASSWORD_NOT_SET). */
+        PasswordNotSet: {
             headers: {
                 [name: string]: unknown;
             };
@@ -18981,6 +19291,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["SignInFailed"];
+            403: components["responses"]["MicrosoftRequired"];
             409: components["responses"]["ChooseCompany"];
             429: components["responses"]["TooManyAttempts"];
         };
@@ -19009,6 +19320,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["SignInFailed"];
+            403: components["responses"]["MicrosoftRequired"];
             429: components["responses"]["TooManyAttempts"];
         };
     };
@@ -19063,6 +19375,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["SignInFailed"];
+            403: components["responses"]["MicrosoftRequired"];
             429: components["responses"]["TooManyAttempts"];
         };
     };
@@ -19241,6 +19554,242 @@ export interface operations {
             422: components["responses"]["TwoStepNotEnabled"];
         };
     };
+    startMicrosoftSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MicrosoftSignInStart"];
+            };
+        };
+        responses: {
+            /** @description Where to send the browser (Microsoft's sign-in page) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftSignInRedirect"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            410: components["responses"]["LinkNotValid"];
+            422: components["responses"]["MicrosoftSignInUnavailable"];
+            429: components["responses"]["TooManyAttempts"];
+        };
+    };
+    microsoftSignInCallback: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the app's Microsoft sign-in page */
+            303: {
+                headers: {
+                    "Cache-Control"?: string;
+                    "Referrer-Policy"?: string;
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    completeMicrosoftSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MicrosoftSignInComplete"];
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["MicrosoftSignInFailed"];
+            409: components["responses"]["ChooseCompany"];
+            429: components["responses"]["TooManyAttempts"];
+        };
+    };
+    startConnectingMicrosoft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MicrosoftConnectStart"];
+            };
+        };
+        responses: {
+            /** @description Where to send the browser (Microsoft's sign-in page) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftSignInRedirect"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["MicrosoftConnectFailed"];
+            429: components["responses"]["TooManyAttempts"];
+        };
+    };
+    finishConnectingMicrosoft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MicrosoftConnectComplete"];
+            };
+        };
+        responses: {
+            /** @description Connected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["MicrosoftConnectFailed"];
+            429: components["responses"]["TooManyAttempts"];
+        };
+    };
+    unlinkMicrosoft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlinked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["TeamChangeNotAllowed"];
+        };
+    };
+    sendMicrosoftReconnectLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftReconnectLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["TeamChangeNotAllowed"];
+        };
+    };
+    getMicrosoftSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftSignInSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMicrosoftSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MicrosoftSignInInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftSignInSettings"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     signOut: {
         parameters: {
             query?: never;
@@ -19334,6 +19883,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["SignInFailed"];
+            403: components["responses"]["MicrosoftRequired"];
             410: components["responses"]["LinkNotValid"];
             429: components["responses"]["TooManyAttempts"];
         };
@@ -19409,6 +19959,8 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["MicrosoftRequired"];
+            422: components["responses"]["PasswordNotSet"];
             429: components["responses"]["TooManyAttempts"];
         };
     };

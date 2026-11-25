@@ -79,7 +79,11 @@ func New(o Options) (http.Handler, error) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, apperr.New(api.ErrorCodeROUTENOTFOUND, "No such endpoint."))
 	})
-	return observe(o.Logger, o.ClientIPHeader, mux), nil
+	paths := make([]string, 0, spec.Paths.Len())
+	for p := range spec.Paths.Map() {
+		paths = append(paths, p)
+	}
+	return observe(o.Logger, o.ClientIPHeader, secretPathsOf(paths), mux), nil
 }
 
 func serveContract(w http.ResponseWriter, r *http.Request) {

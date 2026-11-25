@@ -144,6 +144,35 @@ func (q *Queries) CareersTenant(ctx context.Context, slug string) (CareersTenant
 	return i, err
 }
 
+const cutOffSecond = `-- name: CutOffSecond :one
+SELECT date_trunc('second', clock_timestamp())::timestamptz AS now
+`
+
+// The database's clock now, to the second (clock_timestamp: not the
+// transaction's start, which may be long before, if it waited for a row):
+// where an end of sessions is cut off (tokens_valid_after,
+// microsoft_sessions_after), so that a session issued before it, even by a
+// sign-in that committed while this transaction waited, is ended.
+func (q *Queries) CutOffSecond(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, cutOffSecond)
+	var now time.Time
+	err := row.Scan(&now)
+	return now, err
+}
+
+const databaseSecond = `-- name: DatabaseSecond :one
+SELECT date_trunc('second', now())::timestamptz AS now
+`
+
+// The database's clock, to the second, as of the transaction's start: when
+// a session is issued.
+func (q *Queries) DatabaseSecond(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, databaseSecond)
+	var now time.Time
+	err := row.Scan(&now)
+	return now, err
+}
+
 const deleteInvited = `-- name: DeleteInvited :execrows
 DELETE FROM app_user WHERE id = $1 AND invited
 `
@@ -192,6 +221,22 @@ func (q *Queries) DisableTwoStep(ctx context.Context, userID string) (int64, err
 	return result.RowsAffected(), nil
 }
 
+const dropStaleMicrosoftLink = `-- name: DropStaleMicrosoftLink :exec
+DELETE FROM user_microsoft WHERE user_id = $1 AND ms_tenant_id <> $2
+`
+
+type DropStaleMicrosoftLinkParams struct {
+	UserID     string
+	MsTenantID string
+}
+
+// A link to another organisation (left from before the company changed it)
+// makes way for a new one.
+func (q *Queries) DropStaleMicrosoftLink(ctx context.Context, arg DropStaleMicrosoftLinkParams) error {
+	_, err := q.db.Exec(ctx, dropStaleMicrosoftLink, arg.UserID, arg.MsTenantID)
+	return err
+}
+
 const enableTwoStep = `-- name: EnableTwoStep :execrows
 UPDATE user_two_step SET secret_sealed = pending_sealed, pending_sealed = NULL, enabled_at = now(), last_step = $1,
   recovery_hashes = $2, updated_at = now()
@@ -227,8 +272,32 @@ func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 	return err
 }
 
+const endLinksOfKind = `-- name: EndLinksOfKind :exec
+UPDATE user_link SET used_at = now() WHERE kind = $1 AND used_at IS NULL
+`
+
+// Everyone's unused links of a kind end (the company's rows are held first).
+func (q *Queries) EndLinksOfKind(ctx context.Context, kind string) error {
+	_, err := q.db.Exec(ctx, endLinksOfKind, kind)
+	return err
+}
+
+const endMicrosoftSessions = `-- name: EndMicrosoftSessions :exec
+UPDATE app_user SET microsoft_sessions_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
+WHERE $1::text IS NULL OR id = $1::text
+`
+
+// Ends sessions signed in with Microsoft until now (the next whole second,
+// by the database's clock): one person's, or (no user) everyone's. Always
+// later than every earlier end, of these or of all their sessions: a session
+// signed in since (dated that end, in the same second) ends too.
+func (q *Queries) EndMicrosoftSessions(ctx context.Context, userID *string) error {
+	_, err := q.db.Exec(ctx, endMicrosoftSessions, userID)
+	return err
+}
+
 const endSessionsWithoutTwoStep = `-- name: EndSessionsWithoutTwoStep :exec
-UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second'
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL)
 `
 
@@ -239,9 +308,11 @@ func (q *Queries) EndSessionsWithoutTwoStep(ctx context.Context) error {
 }
 
 const endUserSessions = `-- name: EndUserSessions :exec
-UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second' WHERE id = $1
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') WHERE id = $1
 `
 
+// Ends every session of theirs: after this second by the database's clock,
+// and after every earlier end (a session issued at one is ended too).
 func (q *Queries) EndUserSessions(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, endUserSessions, id)
 	return err
@@ -378,6 +449,79 @@ func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 	return i, err
 }
 
+const hasPassword = `-- name: HasPassword :one
+SELECT (password_hash IS NOT NULL)::boolean AS has_password FROM app_user WHERE id = $1
+`
+
+func (q *Queries) HasPassword(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, hasPassword, id)
+	var has_password bool
+	err := row.Scan(&has_password)
+	return has_password, err
+}
+
+const holdLink = `-- name: HoldLink :one
+SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = $1 FOR NO KEY UPDATE
+`
+
+type HoldLinkRow struct {
+	UserID string
+	Kind   string
+	Valid  bool
+}
+
+// A link, held until the transaction ends (using it, or seeing it used,
+// waits for whoever holds it): whose, what for, and whether it still works.
+// FOR NO KEY UPDATE, not FOR UPDATE: a sign-in started from the link (its
+// microsoft_sign_in_flow names it) does not wait.
+func (q *Queries) HoldLink(ctx context.Context, id string) (HoldLinkRow, error) {
+	row := q.db.QueryRow(ctx, holdLink, id)
+	var i HoldLinkRow
+	err := row.Scan(&i.UserID, &i.Kind, &i.Valid)
+	return i, err
+}
+
+const holdTeam = `-- name: HoldTeam :exec
+SELECT id FROM app_user ORDER BY id FOR NO KEY UPDATE
+`
+
+// Everyone in the company, held as HoldUser does (in the same order, by
+// id), before links of many people are removed and their sessions ended.
+func (q *Queries) HoldTeam(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, holdTeam)
+	return err
+}
+
+const holdTeamChanges = `-- name: HoldTeamChanges :exec
+SELECT pg_advisory_xact_lock(hashtextextended('team-changes:' || app_current_tenant(), 0))
+`
+
+// Changes of the team's roles and activity, one at a time per company until
+// the transaction ends: taken before anything else is held (nothing else
+// takes it, so it never deadlocks), it keeps two changes from each counting
+// the other's owner (ActiveOwners) and leaving the company with none.
+func (q *Queries) HoldTeamChanges(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, holdTeamChanges)
+	return err
+}
+
+const holdUser = `-- name: HoldUser :one
+SELECT id FROM app_user WHERE id = $1 FOR NO KEY UPDATE
+`
+
+// Holds the person's row (role, password, whether they may be linked by
+// address) until the transaction ends: a change to it waits, and so does
+// another sign-in of theirs. FOR NO KEY UPDATE, not FOR SHARE: the holder
+// updates the row afterwards (last sign-in, sessions ended), and two
+// holders sharing it would wait for each other. No row: no such person
+// here (pgx.ErrNoRows).
+func (q *Queries) HoldUser(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, holdUser, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const insertLink = `-- name: InsertLink :one
 INSERT INTO user_link (tenant_id, user_id, kind, token_hash, expires_at, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
@@ -500,6 +644,16 @@ func (q *Queries) InviteUser(ctx context.Context, arg InviteUserParams) (InviteU
 	return i, err
 }
 
+const joinWithMicrosoft = `-- name: JoinWithMicrosoft :exec
+UPDATE app_user SET active = true, invited = false WHERE id = $1 AND invited
+`
+
+// Accepting an invitation with Microsoft: active, without a password.
+func (q *Queries) JoinWithMicrosoft(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, joinWithMicrosoft, id)
+	return err
+}
+
 const linkByHash = `-- name: LinkByHash :one
 SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS user_id, kind::text AS kind
 FROM app_user_link($1::text)
@@ -522,6 +676,28 @@ func (q *Queries) LinkByHash(ctx context.Context, tokenHash string) (LinkByHashR
 		&i.Kind,
 	)
 	return i, err
+}
+
+const linkMicrosoft = `-- name: LinkMicrosoft :exec
+INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id, linked_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4)
+`
+
+type LinkMicrosoftParams struct {
+	UserID     string
+	MsTenantID string
+	MsObjectID string
+	LinkedBy   string
+}
+
+func (q *Queries) LinkMicrosoft(ctx context.Context, arg LinkMicrosoftParams) error {
+	_, err := q.db.Exec(ctx, linkMicrosoft,
+		arg.UserID,
+		arg.MsTenantID,
+		arg.MsObjectID,
+		arg.LinkedBy,
+	)
+	return err
 }
 
 const listActiveUsers = `-- name: ListActiveUsers :many
@@ -671,6 +847,219 @@ func (q *Queries) ListTeamGroups(ctx context.Context) ([]ListTeamGroupsRow, erro
 	return items, nil
 }
 
+const lockMicrosoftSettings = `-- name: LockMicrosoftSettings :exec
+SELECT id FROM tenant WHERE id = app_current_tenant() FOR NO KEY UPDATE
+`
+
+// The company's settings, kept from changing until the transaction ends:
+// changing them (FOR NO KEY UPDATE), or the Microsoft app they rely on (FOR
+// SHARE, emails module), waits for the other. Not FOR UPDATE: that would
+// also stop every row naming the company being added (an audit entry of a
+// sign-in holding a person's row, which this then waits for: a deadlock).
+func (q *Queries) LockMicrosoftSettings(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockMicrosoftSettings)
+	return err
+}
+
+const microsoftAccountHolder = `-- name: MicrosoftAccountHolder :one
+SELECT user_id FROM user_microsoft WHERE ms_tenant_id = $1 AND ms_object_id = $2
+`
+
+type MicrosoftAccountHolderParams struct {
+	MsTenantID string
+	MsObjectID string
+}
+
+// Who the Microsoft account is linked to here, if anyone.
+func (q *Queries) MicrosoftAccountHolder(ctx context.Context, arg MicrosoftAccountHolderParams) (string, error) {
+	row := q.db.QueryRow(ctx, microsoftAccountHolder, arg.MsTenantID, arg.MsObjectID)
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const microsoftAccounts = `-- name: MicrosoftAccounts :many
+SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
+  user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner, connect_only::boolean AS connect_only
+FROM app_microsoft_accounts($1::text, $2::text, $3::text[])
+`
+
+type MicrosoftAccountsParams struct {
+	MsTenantID string
+	MsObjectID string
+	Addresses  []string
+}
+
+type MicrosoftAccountsRow struct {
+	TenantID    string
+	TenantName  string
+	CareersSlug string
+	UserID      string
+	Linked      bool
+	IsOwner     bool
+	ConnectOnly bool
+}
+
+func (q *Queries) MicrosoftAccounts(ctx context.Context, arg MicrosoftAccountsParams) ([]MicrosoftAccountsRow, error) {
+	rows, err := q.db.Query(ctx, microsoftAccounts, arg.MsTenantID, arg.MsObjectID, arg.Addresses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MicrosoftAccountsRow
+	for rows.Next() {
+		var i MicrosoftAccountsRow
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.TenantName,
+			&i.CareersSlug,
+			&i.UserID,
+			&i.Linked,
+			&i.IsOwner,
+			&i.ConnectOnly,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const microsoftConnectOnly = `-- name: MicrosoftConnectOnly :exec
+UPDATE app_user SET microsoft_connect_only = true WHERE id = $1
+`
+
+// Their account was unlinked, or they were made an owner: one is linked
+// again only on purpose.
+func (q *Queries) MicrosoftConnectOnly(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, microsoftConnectOnly, id)
+	return err
+}
+
+const microsoftSettings = `-- name: MicrosoftSettings :one
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app FROM tenant WHERE id = app_current_tenant()
+`
+
+type MicrosoftSettingsRow struct {
+	MicrosoftSignIn         bool
+	MicrosoftTenantID       *string
+	MicrosoftRequired       bool
+	MicrosoftAcctMissingApp *string
+}
+
+// The company's Microsoft sign-in settings.
+func (q *Queries) MicrosoftSettings(ctx context.Context) (MicrosoftSettingsRow, error) {
+	row := q.db.QueryRow(ctx, microsoftSettings)
+	var i MicrosoftSettingsRow
+	err := row.Scan(
+		&i.MicrosoftSignIn,
+		&i.MicrosoftTenantID,
+		&i.MicrosoftRequired,
+		&i.MicrosoftAcctMissingApp,
+	)
+	return i, err
+}
+
+const microsoftSignInHeld = `-- name: MicrosoftSignInHeld :one
+SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant() FOR SHARE
+`
+
+func (q *Queries) MicrosoftSignInHeld(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, microsoftSignInHeld)
+	var microsoft_sign_in bool
+	err := row.Scan(&microsoft_sign_in)
+	return microsoft_sign_in, err
+}
+
+const microsoftSignInTenants = `-- name: MicrosoftSignInTenants :many
+SELECT tenant_id::text AS tenant_id, microsoft_tenant_id::text AS microsoft_tenant_id
+FROM app_microsoft_sign_in_tenants($1::text)
+`
+
+type MicrosoftSignInTenantsRow struct {
+	TenantID          string
+	MicrosoftTenantID string
+}
+
+func (q *Queries) MicrosoftSignInTenants(ctx context.Context, slug *string) ([]MicrosoftSignInTenantsRow, error) {
+	rows, err := q.db.Query(ctx, microsoftSignInTenants, slug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MicrosoftSignInTenantsRow
+	for rows.Next() {
+		var i MicrosoftSignInTenantsRow
+		if err := rows.Scan(&i.TenantID, &i.MicrosoftTenantID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const myMicrosoft = `-- name: MyMicrosoft :one
+SELECT coalesce((SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant()), false)::boolean AS sign_in,
+  EXISTS (SELECT 1 FROM user_microsoft WHERE user_id = $1)::boolean AS linked
+`
+
+type MyMicrosoftRow struct {
+	SignIn bool
+	Linked bool
+}
+
+// Whether the company signs in with Microsoft, and whether a Microsoft account is linked to them.
+func (q *Queries) MyMicrosoft(ctx context.Context, userID string) (MyMicrosoftRow, error) {
+	row := q.db.QueryRow(ctx, myMicrosoft, userID)
+	var i MyMicrosoftRow
+	err := row.Scan(&i.SignIn, &i.Linked)
+	return i, err
+}
+
+const noteMicrosoftClaims = `-- name: NoteMicrosoftClaims :exec
+UPDATE tenant SET microsoft_acct_missing_app = CASE WHEN $1::boolean THEN NULL ELSE $2::text END
+WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = $3
+  AND microsoft_acct_missing_app IS DISTINCT FROM (CASE WHEN $1::boolean THEN NULL ELSE $2::text END)
+`
+
+type NoteMicrosoftClaimsParams struct {
+	Acct       bool
+	ClientID   string
+	MsTenantID *string
+}
+
+// Microsoft vouched, through the company's own app (client_id), for an
+// account of its organisation: whether the token said member or guest
+// (acct), which that app's settings in Entra decide. Without it, the app is
+// kept (Settings warns while sign-in uses that very app).
+func (q *Queries) NoteMicrosoftClaims(ctx context.Context, arg NoteMicrosoftClaimsParams) error {
+	_, err := q.db.Exec(ctx, noteMicrosoftClaims, arg.Acct, arg.ClientID, arg.MsTenantID)
+	return err
+}
+
+const parkMicrosoftFlow = `-- name: ParkMicrosoftFlow :one
+SELECT app_microsoft_flow_park($1::text, $2::text, $3::text)::integer AS parked
+`
+
+type ParkMicrosoftFlowParams struct {
+	KeyHash    string
+	SealedCode string
+	TicketHash string
+}
+
+func (q *Queries) ParkMicrosoftFlow(ctx context.Context, arg ParkMicrosoftFlowParams) (int32, error) {
+	row := q.db.QueryRow(ctx, parkMicrosoftFlow, arg.KeyHash, arg.SealedCode, arg.TicketHash)
+	var parked int32
+	err := row.Scan(&parked)
+	return parked, err
+}
+
 const pruneRevokedSessions = `-- name: PruneRevokedSessions :exec
 DELETE FROM revoked_session WHERE expires_at < now()
 `
@@ -749,6 +1138,52 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) er
 	return err
 }
 
+const saveMicrosoftFlow = `-- name: SaveMicrosoftFlow :exec
+
+
+SELECT app_microsoft_flow_save($1::text, $2::text, $3::text, $4::text, $5::text,
+  $6::text, $7::text, $8::text, $9::text, $10::text, $11::boolean,
+  $12::text, $13::integer)
+`
+
+type SaveMicrosoftFlowParams struct {
+	KeyHash     string
+	BindingHash string
+	TenantID    *string
+	Purpose     string
+	UserID      *string
+	LinkID      *string
+	LinkKind    *string
+	ClientID    string
+	Authority   string
+	Sealed      string
+	Verified    bool
+	TicketHash  *string
+	Seconds     int32
+}
+
+// Sign in with Microsoft ------------------------------------------------------
+// Before anyone is signed in (no company scope yet): app_microsoft_* return
+// only what routing and finishing a sign-in need (migration 00198).
+func (q *Queries) SaveMicrosoftFlow(ctx context.Context, arg SaveMicrosoftFlowParams) error {
+	_, err := q.db.Exec(ctx, saveMicrosoftFlow,
+		arg.KeyHash,
+		arg.BindingHash,
+		arg.TenantID,
+		arg.Purpose,
+		arg.UserID,
+		arg.LinkID,
+		arg.LinkKind,
+		arg.ClientID,
+		arg.Authority,
+		arg.Sealed,
+		arg.Verified,
+		arg.TicketHash,
+		arg.Seconds,
+	)
+	return err
+}
+
 const sessionRevoked = `-- name: SessionRevoked :one
 SELECT EXISTS (SELECT 1 FROM revoked_session WHERE id = $1)
 `
@@ -806,8 +1241,34 @@ func (q *Queries) SetGuideDismissed(ctx context.Context, guideDismissed bool) er
 	return err
 }
 
+const setMicrosoftSettings = `-- name: SetMicrosoftSettings :one
+UPDATE tenant SET microsoft_sign_in = $1, microsoft_tenant_id = $2, microsoft_required = $3,
+  microsoft_acct_missing_app = CASE WHEN microsoft_tenant_id IS NOT DISTINCT FROM $2 THEN microsoft_acct_missing_app END
+WHERE id = app_current_tenant()
+RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required
+`
+
+type SetMicrosoftSettingsParams struct {
+	Enabled           bool
+	MicrosoftTenantID *string
+	Required          bool
+}
+
+type SetMicrosoftSettingsRow struct {
+	MicrosoftSignIn   bool
+	MicrosoftTenantID *string
+	MicrosoftRequired bool
+}
+
+func (q *Queries) SetMicrosoftSettings(ctx context.Context, arg SetMicrosoftSettingsParams) (SetMicrosoftSettingsRow, error) {
+	row := q.db.QueryRow(ctx, setMicrosoftSettings, arg.Enabled, arg.MicrosoftTenantID, arg.Required)
+	var i SetMicrosoftSettingsRow
+	err := row.Scan(&i.MicrosoftSignIn, &i.MicrosoftTenantID, &i.MicrosoftRequired)
+	return i, err
+}
+
 const setPassword = `-- name: SetPassword :exec
-UPDATE app_user SET password_hash = $1, tokens_valid_after = $2,
+UPDATE app_user SET password_hash = $1, tokens_valid_after = greatest($2::timestamptz, tokens_valid_after),
   active = CASE WHEN invited THEN true ELSE active END, invited = false,
   name = coalesce($3, name)
 WHERE id = $4
@@ -820,7 +1281,8 @@ type SetPasswordParams struct {
 	ID           string
 }
 
-// A new password; sessions from before it are signed out.
+// A new password; sessions from before it are signed out (never moving an
+// end already later back).
 func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error {
 	_, err := q.db.Exec(ctx, setPassword,
 		arg.PasswordHash,
@@ -861,13 +1323,50 @@ func (q *Queries) SetTwoStepPending(ctx context.Context, arg SetTwoStepPendingPa
 	return err
 }
 
-const setTwoStepRequired = `-- name: SetTwoStepRequired :exec
-UPDATE tenant SET two_step_required = $1 WHERE id = app_current_tenant()
+const setTwoStepRequired = `-- name: SetTwoStepRequired :execrows
+UPDATE tenant SET two_step_required = $1 WHERE id = app_current_tenant() AND two_step_required <> $1
 `
 
-func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) error {
-	_, err := q.db.Exec(ctx, setTwoStepRequired, required)
-	return err
+// Rows changed: 0 when it was so already.
+func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) (int64, error) {
+	result, err := q.db.Exec(ctx, setTwoStepRequired, required)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const signInMethods = `-- name: SignInMethods :many
+SELECT u.id, (u.password_hash IS NOT NULL)::boolean AS has_password,
+  EXISTS (SELECT 1 FROM user_microsoft m WHERE m.user_id = u.id)::boolean AS microsoft
+FROM app_user u
+`
+
+type SignInMethodsRow struct {
+	ID          string
+	HasPassword bool
+	Microsoft   bool
+}
+
+// How each person can sign in (for the team list).
+func (q *Queries) SignInMethods(ctx context.Context) ([]SignInMethodsRow, error) {
+	rows, err := q.db.Query(ctx, signInMethods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SignInMethodsRow
+	for rows.Next() {
+		var i SignInMethodsRow
+		if err := rows.Scan(&i.ID, &i.HasPassword, &i.Microsoft); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const signedIn = `-- name: SignedIn :exec
@@ -877,6 +1376,49 @@ UPDATE app_user SET last_sign_in_at = now() WHERE id = $1
 func (q *Queries) SignedIn(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, signedIn, id)
 	return err
+}
+
+const takeMicrosoftFlow = `-- name: TakeMicrosoftFlow :one
+SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id,
+  purpose::text AS purpose, coalesce(user_id, '')::text AS user_id, coalesce(link_id, '')::text AS link_id,
+  coalesce(link_kind, '')::text AS link_kind, client_id::text AS client_id, authority::text AS authority,
+  sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
+FROM app_microsoft_flow_take($1::text)
+`
+
+type TakeMicrosoftFlowRow struct {
+	KeyHash     string
+	BindingHash string
+	TenantID    string
+	Purpose     string
+	UserID      string
+	LinkID      string
+	LinkKind    string
+	ClientID    string
+	Authority   string
+	Sealed      string
+	Verified    bool
+	SealedCode  string
+}
+
+func (q *Queries) TakeMicrosoftFlow(ctx context.Context, ticketHash string) (TakeMicrosoftFlowRow, error) {
+	row := q.db.QueryRow(ctx, takeMicrosoftFlow, ticketHash)
+	var i TakeMicrosoftFlowRow
+	err := row.Scan(
+		&i.KeyHash,
+		&i.BindingHash,
+		&i.TenantID,
+		&i.Purpose,
+		&i.UserID,
+		&i.LinkID,
+		&i.LinkKind,
+		&i.ClientID,
+		&i.Authority,
+		&i.Sealed,
+		&i.Verified,
+		&i.SealedCode,
+	)
+	return i, err
 }
 
 const teamMember = `-- name: TeamMember :one
@@ -972,9 +1514,58 @@ func (q *Queries) TwoStepUsers(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const unlinkMicrosoft = `-- name: UnlinkMicrosoft :one
+DELETE FROM user_microsoft WHERE user_id = $1 RETURNING ms_tenant_id
+`
+
+func (q *Queries) UnlinkMicrosoft(ctx context.Context, userID string) (string, error) {
+	row := q.db.QueryRow(ctx, unlinkMicrosoft, userID)
+	var ms_tenant_id string
+	err := row.Scan(&ms_tenant_id)
+	return ms_tenant_id, err
+}
+
+const unlinkOtherOrganisations = `-- name: UnlinkOtherOrganisations :execrows
+DELETE FROM user_microsoft WHERE ms_tenant_id <> coalesce($1::text, '')
+`
+
+// The company changed its organisation: links to any other go.
+func (q *Queries) UnlinkOtherOrganisations(ctx context.Context, microsoftTenantID *string) (int64, error) {
+	result, err := q.db.Exec(ctx, unlinkOtherOrganisations, microsoftTenantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unlinkSignInLink = `-- name: UnlinkSignInLink :many
+DELETE FROM user_microsoft WHERE user_id = $1 AND linked_by = 'sign_in' RETURNING ms_tenant_id
+`
+
+// Someone made an owner keeps no account linked by a sign-in's address.
+func (q *Queries) UnlinkSignInLink(ctx context.Context, userID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, unlinkSignInLink, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var ms_tenant_id string
+		if err := rows.Scan(&ms_tenant_id); err != nil {
+			return nil, err
+		}
+		items = append(items, ms_tenant_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateMember = `-- name: UpdateMember :one
 UPDATE app_user SET role = $1, active = $2, team_id = $3,
-  tokens_valid_after = CASE WHEN active AND NOT $2 THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
+  tokens_valid_after = CASE WHEN active AND NOT $2 THEN greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
 WHERE id = $4
 RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at
 `
@@ -999,7 +1590,12 @@ type UpdateMemberRow struct {
 }
 
 // Deactivating signs the user out: tokens issued up to the end of this second
-// stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
+// stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go),
+// and any issued at an earlier end (a session is never issued before one).
+// This second is the clock's now (clock_timestamp), not the transaction's
+// start: a sign-in that committed while this waited for the row is ended
+// too. The row is held first (HoldUser): an UPDATE that waits for a row
+// computes the new values before it waits.
 func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (UpdateMemberRow, error) {
 	row := q.db.QueryRow(ctx, updateMember,
 		arg.Role,
@@ -1100,23 +1696,53 @@ func (q *Queries) UseTwoStepStep(ctx context.Context, arg UseTwoStepStepParams) 
 	return result.RowsAffected(), nil
 }
 
+const usedMicrosoft = `-- name: UsedMicrosoft :execrows
+UPDATE user_microsoft SET last_used_at = now() WHERE user_id = $1 AND ms_tenant_id = $2 AND ms_object_id = $3
+`
+
+type UsedMicrosoftParams struct {
+	UserID     string
+	MsTenantID string
+	MsObjectID string
+}
+
+// The account linked to them is still this one (it may have been unlinked
+// meanwhile: 0 rows).
+func (q *Queries) UsedMicrosoft(ctx context.Context, arg UsedMicrosoftParams) (int64, error) {
+	result, err := q.db.Exec(ctx, usedMicrosoft, arg.UserID, arg.MsTenantID, arg.MsObjectID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const userAuth = `-- name: UserAuth :one
-SELECT id, tenant_id, email, name, role, team_id, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = $1
+SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
+  u.microsoft_sessions_after, u.microsoft_connect_only,
+  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
+  coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
+FROM app_user u WHERE u.id = $1
 `
 
 type UserAuthRow struct {
-	ID               string
-	TenantID         string
-	Email            string
-	Name             string
-	Role             string
-	TeamID           *string
-	Active           bool
-	Invited          bool
-	PasswordHash     *string
-	TokensValidAfter *time.Time
+	ID                     string
+	TenantID               string
+	Email                  string
+	Name                   string
+	Role                   string
+	TeamID                 *string
+	Active                 bool
+	Invited                bool
+	PasswordHash           *string
+	TokensValidAfter       *time.Time
+	MicrosoftSessionsAfter *time.Time
+	MicrosoftConnectOnly   bool
+	MicrosoftRequired      bool
+	MicrosoftSignIn        bool
 }
 
+// microsoft_required: the company requires Microsoft (passwords only for owners);
+// microsoft_sign_in: it signs in with Microsoft at all (else Microsoft sessions stop).
 func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) {
 	row := q.db.QueryRow(ctx, userAuth, id)
 	var i UserAuthRow
@@ -1131,6 +1757,10 @@ func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) 
 		&i.Invited,
 		&i.PasswordHash,
 		&i.TokensValidAfter,
+		&i.MicrosoftSessionsAfter,
+		&i.MicrosoftConnectOnly,
+		&i.MicrosoftRequired,
+		&i.MicrosoftSignIn,
 	)
 	return i, err
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
@@ -25,12 +26,32 @@ func (h *HTTP) GetMe(ctx context.Context, _ api.GetMeRequestObject) (api.GetMeRe
 	if err != nil {
 		return nil, err
 	}
-	return api.GetMe200JSONResponse{
-		User:        api.User{Id: p.UserID, Email: openapi_types.Email(p.Email), Name: p.Name},
-		Tenant:      api.Tenant{Id: p.TenantID, Name: tenant.Name, CareersSlug: tenant.CareersSlug},
-		Role:        p.Role,
-		Permissions: p.Permissions(),
-	}, nil
+	hasPassword, err := h.m.hasPassword(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	msSignIn, msLinked, err := h.m.MyMicrosoft(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := api.GetMe200JSONResponse{
+		User:            api.User{Id: p.UserID, Email: openapi_types.Email(p.Email), Name: p.Name},
+		Tenant:          api.Tenant{Id: p.TenantID, Name: tenant.Name, CareersSlug: tenant.CareersSlug},
+		Role:            p.Role,
+		Permissions:     p.Permissions(),
+		HasPassword:     hasPassword,
+		MicrosoftSignIn: msSignIn,
+		MicrosoftLinked: msLinked,
+	}
+	switch p.Session().Method {
+	case authn.MethodPassword:
+		method := api.SignInMethodPassword
+		out.SignInMethod = &method
+	case authn.MethodMicrosoft:
+		method := api.SignInMethodMicrosoft
+		out.SignInMethod = &method
+	}
+	return out, nil
 }
 
 // ListUsers handles GET /v1/users: the company's active users.
@@ -70,4 +91,19 @@ func (h *HTTP) SignOut(ctx context.Context, _ api.SignOutRequestObject) (api.Sig
 		return nil, err
 	}
 	return api.SignOut204Response{}, nil
+}
+
+// hasPassword reports whether the signed-in user chose a password (people
+// who sign in with Microsoft may have none; API keys never do).
+func (m *Module) hasPassword(ctx context.Context, p authz.Principal) (bool, error) {
+	var out bool
+	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
+		var err error
+		out, err = store.New(tx).HasPassword(ctx, p.UserID)
+		if database.IsNoRows(err) {
+			return nil
+		}
+		return err
+	})
+	return out, err
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -18,8 +19,9 @@ import (
 //   - assigns a request ID (or keeps a valid incoming X-Request-Id) and returns it;
 //   - puts a logger carrying that ID into the context;
 //   - turns a panic into a 500 response with the ID, logging the stack;
-//   - writes one access-log line with status, duration, tenant and user.
-func observe(logger *slog.Logger, clientIPHeader string, next http.Handler) http.Handler {
+//   - writes one access-log line with status, duration, tenant and user,
+//     and the path with any secret in it left out (secretPaths).
+func observe(logger *slog.Logger, clientIPHeader string, secrets secretPaths, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := requestid.Sanitize(r.Header.Get(requestid.Header))
@@ -47,7 +49,7 @@ func observe(logger *slog.Logger, clientIPHeader string, next http.Handler) http
 				return // load balancer probes would drown the log
 			}
 			attrs := []any{
-				"method", r.Method, "path", r.URL.Path, "status", rec.status,
+				"method", r.Method, "path", secrets.redact(r.URL.Path), "status", rec.status,
 				"duration_ms", time.Since(start).Milliseconds(), "bytes", rec.bytes,
 			}
 			if info.tenantID != "" {
@@ -98,3 +100,59 @@ func (r *recorder) Write(b []byte) (int, error) {
 
 // Unwrap lets http.ResponseController reach the real writer.
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
+// secretPaths are the contract's paths that carry a secret (a parameter
+// named ...Token: an invitation or reset link, a booking or shortlist
+// link), each up to its last secret: whoever reads the logs must not be able
+// to use them. Any path starting like one (whatever method, or even no
+// route; written with empty segments, dots or other letter case too) is
+// logged, cleaned, with the secret replaced by the parameter's name.
+type secretPaths [][]string
+
+func secretPathsOf(paths []string) secretPaths {
+	var out secretPaths
+	for _, p := range paths {
+		segments := strings.Split(p, "/")
+		last := -1
+		for i, s := range segments {
+			if isSecretParam(s) {
+				last = i
+			}
+		}
+		if last >= 0 {
+			out = append(out, segments[:last+1])
+		}
+	}
+	return out
+}
+
+func isSecretParam(segment string) bool {
+	return strings.HasPrefix(segment, "{") && strings.HasSuffix(strings.ToLower(segment), "token}")
+}
+
+func (s secretPaths) redact(raw string) string {
+	segments := strings.Split(path.Clean("/"+raw), "/")
+	for _, route := range s {
+		if len(segments) < len(route) {
+			continue
+		}
+		matches := true
+		for i, r := range route {
+			if !strings.HasPrefix(r, "{") && !strings.EqualFold(r, segments[i]) {
+				matches = false
+				break
+			}
+		}
+		if !matches {
+			continue
+		}
+		out := append([]string(nil), segments...)
+		for i, r := range route {
+			if isSecretParam(r) {
+				out[i] = r
+			}
+		}
+		return strings.Join(out, "/")
+	}
+	return raw
+}

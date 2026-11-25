@@ -128,7 +128,7 @@ test("signing out ends the session on the server", async ({ page, request }) => 
   const { token } = (await res.json()) as { token: string };
   const errors = await signIn(page, "viewer", token);
   await page.getByRole("button", { name: "Sign out" }).click();
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   const after = await request.get("/v1/me", { headers: { Authorization: `Bearer ${token}` } });
   expect(after.status(), "a copied token stops working at sign-out").toBe(401);
   expect(errors).toEqual([]);

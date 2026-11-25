@@ -45,7 +45,8 @@ For the default local Docker setup that is
 return to `/#/email-connection` with only a success/failure indicator; tokens,
 provider errors and authorization codes never enter the frontend. Callback
 responses are not cached or used as referrers, and the bundled nginx proxy does
-not access-log the callback query.
+not access-log the callback query (nor that of any other callback: a test checks
+every `/callback` address in the contract).
 
 ### Microsoft
 
@@ -124,6 +125,12 @@ else cannot connect that person's mailbox to another account. A later disconnect
 in-flight callback before it can save credentials. An advisory lock serializes
 connection changes for one tenant/user, including initial concurrent creates.
 
+Emails about someone's account (invitations, password resets, reconnect
+links, "Microsoft sign-in connected") never use a connected mailbox: they are
+sent by nobody (`sent_by` `system`) from the server's mail, so no copy of a
+link lands in the Sent Items of whoever caused the email, and they show in no
+one's sent mail.
+
 Each queued message records its selected mailbox identity and test/live mode.
 Disconnecting/replacing the mailbox fails pending mail for that identity; it
 never silently switches sender or falls back to a local catcher. A message
@@ -149,6 +156,43 @@ HTTP provider overrides exist only for in-process tests, never as user input.
 Calendar uses the same Microsoft app registration with a separate consent flow
 and `/v1/calendar/callback` Web redirect. See [calendar.md](calendar.md) before
 adding `Calendars.ReadWrite`; existing mailbox tokens/scopes remain separate.
+
+**Sign in with Microsoft** (1.46.0) uses the same Microsoft app too (the
+agency's, or else the server's) and needs one more Web redirect URI on it:
+
+```
+<HP_PUBLIC_URL>/v1/auth/microsoft/callback
+```
+
+(locally `http://localhost:3000/v1/auth/microsoft/callback`). It asks only
+`openid profile email`, and it needs no new setting. In Microsoft Entra ›
+**Token configuration**, add the optional claims **`xms_edov`** and **`acct`**
+to the ID token (and, if you like, `upn`). **`acct` is needed for a first
+sign-in to find its team member by address**: it marks guests, who are
+refused, and without it a guest (whose sign-in name is its home address)
+cannot be told from a member, so no account is linked by its address and
+Roles and access warns (when the sign-in went through the company's own app:
+the claim is that app's setting); people then connect from Your account or with an
+invitation or reconnect link. With `xms_edov` an account's email counts too
+when Microsoft has verified its domain (otherwise only the sign-in name, the
+UPN, does). A `#EXT#` UPN is refused too. An owner turns it on in
+Settings › Roles and access with the organisation's *Directory (tenant) ID*,
+shown on the app's overview page in Microsoft Entra (only that organisation's
+accounts are accepted; personal accounts never are), and the same box shows
+the redirect URI to copy. The server's app should allow accounts in any
+organizational directory (multi-tenant): sign-ins that name no company go
+through it, and the account's organisation then finds the company. An agency's
+own single-tenant app is used whenever the sign-in names its company (its
+careers page address, or an invitation), or is the only company on the server
+that signs in with Microsoft. While Microsoft sign-in is on, only owners can
+change or remove the company's Microsoft app here (and turning sign-in on
+waits for a change of the app under way). The nginx proxy keeps this callback
+out of its access log too. Single sign-on trusts the organisation's
+administrators: whoever can reset an Entra account's password, or read a
+mailbox (Exchange administrators), can sign in to HiringPlug as the person
+it is linked to, or use the links emailed to them (see
+[access-control.md](access-control.md#who-is-calling)). See
+[access-control.md](access-control.md#who-is-calling) for how it is checked.
 
 ## Outlook Mail
 

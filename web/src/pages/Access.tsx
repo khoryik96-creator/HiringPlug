@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { accessKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { MicrosoftSignInSettings } from "../components/MicrosoftSignInSettings";
 import { RequireTwoStep } from "../components/TwoStep";
 import { CANDIDATE_SCOPE, keysOf, MODULE, ROLE } from "../labels";
 
@@ -20,15 +21,17 @@ export function scopeText(a: Pick<RoleAccess, "candidateScope" | "jobCandidates"
 /**
  * Roles and access (owners): for each role, what it may do and which
  * candidates it sees. The database enforces both. Changes apply on each
- * person's next click.
+ * person's next click. Owners also choose how the team signs in (two-step,
+ * Microsoft).
  */
-export function Access() {
+export function Access({ owner = false }: { owner?: boolean }) {
   const settings = useQuery({ queryKey: accessKey, queryFn: async () => unwrap(await api.GET("/v1/access")) });
   const s = settings.data;
   return (
     <main>
       <h2>Roles and access</h2>
       <RequireTwoStep />
+      {owner && <MicrosoftSignInSettings />}
       <ErrorMessage error={settings.error} />
       {s?.roles.map((r) => <RoleCard key={`${r.role}-${String(r.version)}`} access={r} catalog={s.permissions} />)}
     </main>

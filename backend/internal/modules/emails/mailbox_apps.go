@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
@@ -107,6 +108,20 @@ func (s *Service) mailAppsIn(ctx context.Context, tx pgx.Tx) (MailApps, error) {
 	return out, nil
 }
 
+// mayChangeApp: the Microsoft app signs the team in while the company signs
+// in with Microsoft, which only owners control; so only owners change it then.
+func (s *Service) mayChangeApp(ctx context.Context, tx pgx.Tx, p authz.Principal, provider string) error {
+	if provider != ProviderMicrosoft || s.deps.SignIn == nil || p.Role == api.RoleOwner {
+		return nil
+	}
+	on, err := s.deps.SignIn.MicrosoftSignInOn(ctx, tx)
+	if err != nil || !on {
+		return err
+	}
+	return apperr.New(api.ErrorCodeMICROSOFTAPPOWNERSONLY,
+		"Your company signs in with Microsoft through this app, so only an owner can change or remove it (or turn Microsoft sign-in off first, in Roles and access).")
+}
+
 // SaveMailApp saves the agency's app for a provider; a secret left out keeps
 // the saved one.
 func (s *Service) SaveMailApp(ctx context.Context, p authz.Principal, provider, clientID string, clientSecret *string) (MailApps, error) {
@@ -123,6 +138,9 @@ func (s *Service) SaveMailApp(ctx context.Context, p authz.Principal, provider, 
 	}
 	var out MailApps
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if err := s.mayChangeApp(ctx, tx, p, provider); err != nil {
+			return err
+		}
 		q := store.New(tx)
 		secret := ""
 		if clientSecret != nil {
@@ -164,6 +182,9 @@ func (s *Service) SaveMailApp(ctx context.Context, p authz.Principal, provider, 
 func (s *Service) DeleteMailApp(ctx context.Context, p authz.Principal, provider string) (MailApps, error) {
 	var out MailApps
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if err := s.mayChangeApp(ctx, tx, p, provider); err != nil {
+			return err
+		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "mailbox.app_removed", EntityType: "mail_app", EntityID: provider}); err != nil {
 			return err
 		}

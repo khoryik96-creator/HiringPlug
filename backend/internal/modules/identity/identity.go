@@ -4,14 +4,16 @@
 // turning a bearer token into a Principal (tenant, user, role, permissions),
 // and the team admin rules (nobody locks themselves out; the last owner
 // stays). Changing a password or deactivating someone signs out their
-// sessions.
+// sessions. People can also sign in with Microsoft (microsoft*.go).
 //
 // Layout (the same in every module):
 //
 //	identity.go        the module's public API, used by internal/app and other modules
 //	domain.go          password and team rules, as pure functions (unit tested)
-//	auth.go            signing in, links (invitations, resets), changing a password
+//	auth.go            signing in, changing a password
+//	links.go           links emailed to people (invitations, resets)
 //	team.go            team admin: invitations, roles, deactivating
+//	microsoft*.go      signing in with Microsoft, and the company's settings for it
 //	http.go, team_http.go  HTTP handlers: contract types <-> service calls
 //	internal/store     generated SQL (db/queries/identity.sql); private to this module
 package identity
@@ -45,15 +47,23 @@ type Module struct {
 	publicURL string
 	limits    limits
 	twoStep   twoStepKeys
-	HTTP      *HTTP
+	ms        *microsoftSignIn // nil until UseMicrosoft
+	// now is the app server's clock (links, two-step codes). Sessions are
+	// issued and ended by the database's clock instead (databaseSecond).
+	now  func() time.Time
+	HTTP *HTTP
 }
 
 // New wires the module. Links in emails point to publicURL (the web app).
 func New(pool *pgxpool.Pool, verifier *authn.Verifier, mailer Mailer, publicURL string) *Module {
-	m := &Module{pool: pool, verifier: verifier, mailer: mailer, publicURL: publicURL, limits: newLimits(time.Now)}
+	m := &Module{pool: pool, verifier: verifier, mailer: mailer, publicURL: publicURL, limits: newLimits(time.Now), now: time.Now}
 	m.HTTP = &HTTP{m: m}
 	return m
 }
+
+// UseClock sets the app server's clock: tests only, to show that a server
+// whose clock is off ends no session too late.
+func (m *Module) UseClock(now func() time.Time) { m.now = now }
 
 // Authenticate verifies a bearer token and loads the user it names. Inactive
 // or unknown users are rejected even if the token is otherwise valid.
@@ -78,6 +88,20 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 		if u.TokensValidAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.TokensValidAfter) {
 			return fmt.Errorf("%w: token issued before the user's sessions were ended", authn.ErrInvalidToken)
 		}
+		// The company requires Microsoft: password sessions work only for owners.
+		if PasswordRefused(u.MicrosoftRequired, u.Role) && claims.Method() != authn.MethodMicrosoft {
+			return fmt.Errorf("%w: the company requires signing in with Microsoft", authn.ErrInvalidToken)
+		}
+		// Microsoft sessions stop when the company stops signing in with
+		// Microsoft, and when the link (or the organisation) changed since.
+		if claims.Method() == authn.MethodMicrosoft {
+			if !u.MicrosoftSignIn {
+				return fmt.Errorf("%w: the company no longer signs in with Microsoft", authn.ErrInvalidToken)
+			}
+			if u.MicrosoftSessionsAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.MicrosoftSessionsAfter) {
+				return fmt.Errorf("%w: Microsoft session from before the account was unlinked", authn.ErrInvalidToken)
+			}
+		}
 		// Signed out on the server (this token only).
 		if claims.ID != "" {
 			revoked, err := store.New(tx).SessionRevoked(ctx, claims.ID)
@@ -93,7 +117,7 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 			return err
 		}
 		if claims.ID != "" && claims.ExpiresAt != nil {
-			principal = principal.WithSession(authz.Session{ID: claims.ID, Expires: claims.ExpiresAt.Time})
+			principal = principal.WithSession(authz.Session{ID: claims.ID, Expires: claims.ExpiresAt.Time, Method: claims.Method()})
 		}
 		return nil
 	})

@@ -82,7 +82,7 @@ func (h *HTTP) NewRecoveryCodes(ctx context.Context, req api.NewRecoveryCodesReq
 
 // DisableMyTwoStep handles POST /v1/me/two-step/disable.
 func (h *HTTP) DisableMyTwoStep(ctx context.Context, req api.DisableMyTwoStepRequestObject) (api.DisableMyTwoStepResponseObject, error) {
-	s, err := h.m.DisableMyTwoStep(ctx, authz.MustFromContext(ctx), req.Body.Password)
+	s, err := h.m.DisableMyTwoStep(ctx, authz.MustFromContext(ctx), req.Body.Password, req.Body.Code)
 	if err != nil {
 		return nil, err
 	}

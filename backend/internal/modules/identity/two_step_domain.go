@@ -122,11 +122,15 @@ func LooksLikeRecoveryCode(code string) bool {
 
 // Challenge is a signed, short-lived note that a person gave the right
 // password: Setup when they must first add an authenticator app.
+// ValidAfter is when their sessions had last been ended (Unix seconds, 0
+// for never): a challenge from before a later end (a password change or
+// reset) no longer works.
 type Challenge struct {
-	TenantID string `json:"t"`
-	UserID   string `json:"u"`
-	Setup    bool   `json:"s,omitempty"`
-	Expires  int64  `json:"e"`
+	TenantID   string `json:"t"`
+	UserID     string `json:"u"`
+	Setup      bool   `json:"s,omitempty"`
+	ValidAfter int64  `json:"v,omitempty"`
+	Expires    int64  `json:"e"`
 }
 
 var errChallenge = errors.New("two-step challenge not valid")

@@ -2,9 +2,6 @@ package identity
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"time"
 
@@ -14,6 +11,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ratelimit"
@@ -32,6 +30,9 @@ const (
 type limits struct {
 	signInAddr, signInPair, signInEmail, resetAddr, resetEmail, links, change *ratelimit.Limiter
 	twoStep, twoStepUser                                                      *ratelimit.Limiter // codes, per address and per person
+	// Signing in with Microsoft, per address: its own limits, not the
+	// password's (no password is guessed; Microsoft checks the person).
+	msStart, msCallback, msComplete *ratelimit.Limiter
 }
 
 // signIn reports whether another sign-in attempt for email from addr is
@@ -52,6 +53,7 @@ func newLimits(now func() time.Time) limits {
 		resetAddr: l(10, 15*time.Minute, 50), resetEmail: l(3, time.Hour, 10),
 		links: l(30, 15*time.Minute, 200), change: l(10, 15*time.Minute, 50),
 		twoStep: l(30, 15*time.Minute, 300), twoStepUser: l(10, 15*time.Minute, 50),
+		msStart: l(120, 15*time.Minute, 1000), msCallback: l(300, 15*time.Minute, 3000), msComplete: l(300, 15*time.Minute, 3000),
 	}
 }
 
@@ -65,18 +67,58 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-// sessionsEndedAt is when a password change ends the user's sessions: the
-// next whole second, so every token issued until now (tokens carry whole
-// seconds) is before it, and the new session, issued at it, is not.
-func sessionsEndedAt() time.Time { return time.Now().Truncate(time.Second).Add(time.Second) }
+// databaseSecond is the database's clock, to the second (tokens carry whole
+// seconds), as of the transaction's start: when a session is issued.
+// Sessions are issued, and ended (tokens_valid_after,
+// microsoft_sessions_after, some of them set in SQL), by the database's
+// clock alone: by two clocks a little apart, a session issued just before an
+// end could outlive it. An end is cut off by its clock now (CutOffSecond),
+// not at its transaction's start: a sign-in may have committed while it
+// waited for the person's row. A session's issue time is never before the
+// last end (the row, held, read after it).
+func databaseSecond(ctx context.Context, q *store.Queries) (time.Time, error) {
+	return q.DatabaseSecond(ctx)
+}
 
-// session mints a token issued at now.
-func (m *Module) session(tenantID, userID string, now time.Time) (Session, error) {
-	token, err := m.verifier.MintAt(tenantID, userID, now, SessionLength)
+// sessionsEndedAt is when a password change ends u's sessions: the next
+// whole second by the database's clock now, so every token issued until now
+// is before it, and the new session, issued at it, is not; and after every
+// earlier end (a session may have been issued at one, in this second). u is
+// held (holdUser).
+func sessionsEndedAt(ctx context.Context, q *store.Queries, u store.UserAuthRow) (time.Time, error) {
+	now, err := q.CutOffSecond(ctx)
+	end := now.Add(time.Second)
+	for _, after := range []*time.Time{u.TokensValidAfter, u.MicrosoftSessionsAfter} {
+		if after != nil && !end.After(*after) {
+			end = after.Add(time.Second)
+		}
+	}
+	return end, err
+}
+
+// session mints a token issued at now, saying how the person signed in
+// (authn.MethodPassword or authn.MethodMicrosoft).
+func (m *Module) session(tenantID, userID, method string, now time.Time) (Session, error) {
+	token, err := m.verifier.MintSession(tenantID, userID, method, now, SessionLength)
 	return Session{Token: token, ExpiresAt: now.Add(SessionLength)}, err
 }
 
+func microsoftRequired() error {
+	return apperr.New(api.ErrorCodeMICROSOFTREQUIRED, "Your company signs in with Microsoft: use Sign in with Microsoft.")
+}
+
 func normEmail(email string) string { return strings.ToLower(strings.TrimSpace(email)) }
+
+// holdUser holds the person's row until the transaction ends (a password
+// change, a deactivation or an end of their sessions waits, or was made
+// before) and reads it: what was checked before the transaction is checked
+// again on what it reads.
+func holdUser(ctx context.Context, q *store.Queries, userID string) (store.UserAuthRow, error) {
+	if _, err := q.HoldUser(ctx, userID); err != nil {
+		return store.UserAuthRow{}, err
+	}
+	return q.UserAuth(ctx, userID)
+}
 
 // SignIn checks an email and password. When they match accounts at several
 // companies, company (the careers page slug) chooses one.
@@ -103,8 +145,15 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 	if !checked {
 		CheckPassword(dummyHash(), password) // as slow as a real check
 	}
+	matches, refused, err := m.passwordAllowed(ctx, matches)
+	if err != nil {
+		return Session{}, err
+	}
 	switch len(matches) {
 	case 0:
+		if refused { // the password was right: say what to do instead
+			return Session{}, microsoftRequired()
+		}
 		return Session{}, apperr.New(api.ErrorCodeSIGNINFAILED, "The email or password is wrong.")
 	case 1:
 	default:
@@ -115,13 +164,31 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 		return Session{}, apperr.New(api.ErrorCodeSIGNINCHOOSECOMPANY, "Your account is at several companies: choose one.").WithDetail("companies", companies)
 	}
 	a := matches[0]
-	now := time.Now().Truncate(time.Second)
+	var now time.Time
 	var next *apperr.Error // a code is needed first
 	err = database.InTx(ctx, m.pool, authz.NewPrincipal(a.TenantID, a.UserID, email, a.UserName, ""), func(tx pgx.Tx) error {
 		q := store.New(tx)
-		var err error
-		if next, err = m.nextStep(ctx, q, a.TenantID, a.UserID); err != nil || next != nil {
+		// The password was checked before: it is still theirs, and they are
+		// still active, now that their row is held (a password changed, or
+		// they deactivated, meanwhile signs nobody in).
+		u, err := holdUser(ctx, q, a.UserID)
+		if database.IsNoRows(err) || (err == nil && (!u.Active || u.PasswordHash == nil || *u.PasswordHash != a.PasswordHash)) {
+			return apperr.New(api.ErrorCodeSIGNINFAILED, "The email or password is wrong.")
+		}
+		if err != nil {
 			return err
+		}
+		if PasswordRefused(u.MicrosoftRequired, u.Role) {
+			return microsoftRequired()
+		}
+		if next, err = m.nextStep(ctx, q, u); err != nil || next != nil {
+			return err
+		}
+		if now, err = databaseSecond(ctx, q); err != nil {
+			return err
+		}
+		if u.TokensValidAfter != nil && now.Before(*u.TokensValidAfter) { // never before their sessions were last ended
+			now = *u.TokensValidAfter
 		}
 		if err := q.SignedIn(ctx, a.UserID); err != nil {
 			return err
@@ -134,169 +201,29 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 	if next != nil {
 		return Session{}, next
 	}
-	return m.session(a.TenantID, a.UserID, now)
+	return m.session(a.TenantID, a.UserID, authn.MethodPassword, now)
 }
 
-// newLinkToken returns a random link token and the hash that is stored.
-func newLinkToken() (string, string) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		panic(err) // the system's random source failing is not recoverable
-	}
-	token := hex.EncodeToString(b)
-	return token, hashLink(token)
-}
-
-func hashLink(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(sum[:])
-}
-
-// link makes a new invitation or reset link for a user (ending older ones of
-// that kind), in the caller's transaction.
-func (m *Module) link(ctx context.Context, q *store.Queries, userID, kind string, valid time.Duration) (string, time.Time, error) {
-	if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: kind}); err != nil {
-		return "", time.Time{}, err
-	}
-	token, hash := newLinkToken()
-	expires := time.Now().Add(valid)
-	if _, err := q.InsertLink(ctx, store.InsertLinkParams{UserID: userID, Kind: kind, TokenHash: hash, ExpiresAt: expires}); err != nil {
-		return "", time.Time{}, err
-	}
-	path := "/#/reset/"
-	if kind == "invite" {
-		path = "/#/invite/"
-	}
-	return m.publicURL + path + token, expires, nil
-}
-
-// RequestReset emails a reset link to every active account with the email.
-// It answers the same whether or not there is one.
-func (m *Module) RequestReset(ctx context.Context, clientAddr, email string) error {
-	email = normEmail(email)
-	if !m.limits.resetAddr.Allow(clientAddr) || !m.limits.resetEmail.Allow(email) {
-		return tooMany()
-	}
-	accounts, err := store.New(m.pool).AccountsByEmail(ctx, email)
-	if err != nil {
-		return err
-	}
+// passwordAllowed leaves out the accounts whose company requires Microsoft
+// (unless they are its owners); refused says whether any was.
+func (m *Module) passwordAllowed(ctx context.Context, accounts []store.AccountsByEmailRow) ([]store.AccountsByEmailRow, bool, error) {
+	var out []store.AccountsByEmailRow
+	refused := false
 	for _, a := range accounts {
-		if !a.Active {
-			continue
-		}
-		err := database.InTx(ctx, m.pool, authz.System(a.TenantID), func(tx pgx.Tx) error {
-			link, _, err := m.link(ctx, store.New(tx), a.UserID, "reset", ResetValid)
-			if err != nil {
-				return err
+		err := database.InTx(ctx, m.pool, authz.TenantOnly(a.TenantID), func(tx pgx.Tx) error {
+			u, err := store.New(tx).UserAuth(ctx, a.UserID)
+			if err == nil && PasswordRefused(u.MicrosoftRequired, u.Role) {
+				refused = true
+			} else if err == nil {
+				out = append(out, a)
 			}
-			body := "Hello " + a.UserName + ",\n\nSomeone (hopefully you) asked to reset your HiringPlug password at " + a.TenantName +
-				".\n\nChoose a new password here (the link works for one hour):\n" + link +
-				"\n\nIf it was not you, ignore this email: your password stays as it is.\n\nHiringPlug"
-			if err := m.mailer.Notify(ctx, tx, a.TenantID, []string{email}, "Reset your HiringPlug password", body); err != nil {
-				return err
-			}
-			return audit.Record(ctx, tx, audit.Entry{Action: "user.reset_requested", EntityType: "user", EntityID: a.UserID})
+			return err
 		})
 		if err != nil {
-			return err
+			return nil, false, err
 		}
 	}
-	return nil
-}
-
-// LinkInfo is what a link is for.
-type LinkInfo struct {
-	Kind, Email, Name, CompanyName string
-}
-
-func linkGone() error {
-	return apperr.New(api.ErrorCodeLINKNOTVALID, "This link was used, replaced by a newer one, or has expired. Ask for a new one.")
-}
-
-// lookupLink finds a valid link's company and user, and loads the user.
-func (m *Module) lookupLink(ctx context.Context, clientAddr, token string, fn func(tx pgx.Tx, q *store.Queries, l store.LinkByHashRow, u store.UserAuthRow) error) error {
-	if !m.limits.links.Allow(clientAddr) {
-		return tooMany()
-	}
-	l, err := store.New(m.pool).LinkByHash(ctx, hashLink(token))
-	if database.IsNoRows(err) {
-		return linkGone()
-	}
-	if err != nil {
-		return err
-	}
-	return database.InTx(ctx, m.pool, authz.System(l.TenantID), func(tx pgx.Tx) error {
-		q := store.New(tx)
-		u, err := q.UserAuth(ctx, l.UserID)
-		if err != nil {
-			return err
-		}
-		if l.Kind == "reset" && !u.Active { // deactivated since
-			return linkGone()
-		}
-		return fn(tx, q, l, u)
-	})
-}
-
-// Link says what a link is for.
-func (m *Module) Link(ctx context.Context, clientAddr, token string) (LinkInfo, error) {
-	var out LinkInfo
-	err := m.lookupLink(ctx, clientAddr, token, func(tx pgx.Tx, q *store.Queries, l store.LinkByHashRow, u store.UserAuthRow) error {
-		t, err := q.GetTenant(ctx, l.TenantID)
-		out = LinkInfo{Kind: l.Kind, Email: u.Email, Name: u.Name, CompanyName: t.Name}
-		return err
-	})
-	return out, err
-}
-
-// UseLink sets the password chosen with a link (an invitation also activates
-// the account, and may correct the name), ends the link and the user's other
-// sessions, and signs them in.
-func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string, name *string) (Session, error) {
-	var out Session
-	var next *apperr.Error // the password is saved; two-step sign-in still asks for its code
-	err := m.lookupLink(ctx, clientAddr, token, func(tx pgx.Tx, q *store.Queries, l store.LinkByHashRow, u store.UserAuthRow) error {
-		if l.Kind != "invite" {
-			name = nil
-		} else if name != nil {
-			n := strings.Join(strings.Fields(*name), " ")
-			name = &n
-			if n == "" {
-				name = nil
-			}
-		}
-		if problem := PasswordProblem(password, u.Email, u.Name); problem != "" {
-			return apperr.Validation(apperr.FieldErrors{{Field: "password", Message: problem}})
-		}
-		hash, err := HashPassword(password)
-		if err != nil {
-			return err
-		}
-		now := sessionsEndedAt()
-		if err := q.SetPassword(ctx, store.SetPasswordParams{ID: u.ID, PasswordHash: &hash, ValidAfter: &now, Name: name}); err != nil {
-			return err
-		}
-		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: u.ID, Kind: l.Kind}); err != nil {
-			return err
-		}
-		action := "user.password_reset"
-		if l.Kind == "invite" {
-			action = "user.joined"
-		}
-		if err := audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "user", EntityID: u.ID}); err != nil {
-			return err
-		}
-		if next, err = m.nextStep(ctx, q, l.TenantID, u.ID); err != nil || next != nil {
-			return err
-		}
-		out, err = m.session(l.TenantID, u.ID, now)
-		return err
-	})
-	if err == nil && next != nil {
-		return Session{}, next
-	}
-	return out, err
+	return out, refused, nil
 }
 
 // ChangePassword changes the signed-in user's password, signs out their
@@ -308,11 +235,17 @@ func (m *Module) ChangePassword(ctx context.Context, p authz.Principal, current,
 	var out Session
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, p.UserID)
+		u, err := holdUser(ctx, q, p.UserID) // a sign-in under way finishes first, or after the change (and fails)
 		if err != nil {
 			return err
 		}
-		if u.PasswordHash == nil || !CheckPassword(*u.PasswordHash, current) {
+		if PasswordRefused(u.MicrosoftRequired, u.Role) {
+			return microsoftRequired()
+		}
+		if u.PasswordHash == nil {
+			return passwordNotSet()
+		}
+		if !CheckPassword(*u.PasswordHash, current) {
 			return apperr.Validation(apperr.FieldErrors{{Field: "currentPassword", Message: "is not your current password"}})
 		}
 		if problem := PasswordProblem(next, u.Email, u.Name); problem != "" {
@@ -322,17 +255,24 @@ func (m *Module) ChangePassword(ctx context.Context, p authz.Principal, current,
 		if err != nil {
 			return err
 		}
-		now := sessionsEndedAt()
+		now, err := sessionsEndedAt(ctx, q, u)
+		if err != nil {
+			return err
+		}
 		if err := q.SetPassword(ctx, store.SetPasswordParams{ID: u.ID, PasswordHash: &hash, ValidAfter: &now}); err != nil {
 			return err
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "user.password_changed", EntityType: "user", EntityID: u.ID}); err != nil {
 			return err
 		}
-		out, err = m.session(p.TenantID, p.UserID, now)
+		out, err = m.session(p.TenantID, p.UserID, authn.MethodPassword, now)
 		return err
 	})
 	return out, err
+}
+
+func passwordNotSet() error {
+	return apperr.New(api.ErrorCodePASSWORDNOTSET, "You sign in with Microsoft and have no HiringPlug password. To add one, use Forgot password on the sign-in page.")
 }
 
 // PasswordLink makes a link for a user to choose a password, valid for
