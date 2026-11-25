@@ -37,24 +37,45 @@ company's Microsoft organisation (the Entra *Directory (tenant) ID*;
 `agency.microsoft_sign_in_changed`). Only people already on the Team page
 (active, or invited: signing in accepts the invitation, without a password)
 with an account of that organisation can sign in; personal Microsoft accounts
-and other organisations, and guests in the company's (`acct` 1, or a `#EXT#`
-sign-in name), are refused. The first sign-in links the account
+and other organisations, and guests in the company's (`acct` 1, or `#EXT#` in
+the `upn`), are refused. The first sign-in links the account
 (organisation + object ID) to the team member with its sign-in name
 (`preferred_username`, the UPN: a domain the organisation verified), or with
 its email only when Microsoft says the email's domain is verified
 (`xms_edov`): anyone's address can be typed as an account's mail, so it proves
-nothing by itself. Later sign-ins match the linked account, whatever its
-address has become. An account is **never linked to an owner by its address**:
-owners connect theirs from Your account › Connect Microsoft sign-in while
-signed in (`POST /v1/me/microsoft/start` and `/complete`, the same tab; an
-account of the company's organisation, linked to nobody else there), or accept
-their own invitation with it. Every link is audited (`user.microsoft_linked`,
-`by`: `sign_in`, `invitation` or `self`) and the person is emailed ("not you?
-tell an owner"). Owners (and admins, for everyone but owners) **unlink** an
-account on the Team page (`DELETE /v1/team/{userId}/microsoft`,
-`identity.team:manage`, `user.microsoft_unlinked`), which ends that person's
-Microsoft sessions; they link one again at their next sign-in (owners from
-Your account). It goes through the company's own Microsoft app (Settings >
+nothing by itself. **Without the `acct` claim no account is linked by its
+address at all**: a guest's `preferred_username` is its home address, which
+may be a team member's, and only `acct` (or the optional `upn`) tells a guest
+apart. The last sign-in's claims are noted for the company, and Roles and
+access warns until `acct` is added in Entra (`acctClaimMissing`). Later
+sign-ins match the linked account, whatever its address has become. An
+account is **never linked by its address to an owner, nor to someone whose
+account was unlinked** (`app_user.microsoft_connect_only`): they link one on
+purpose. From Your account › Connect Microsoft sign-in while signed in
+(`POST /v1/me/microsoft/start` and `/complete`, the same tab, a session not an
+API key; starting asks for the current password and, with two-step sign-in
+on, its code or a recovery code, limited like changing the password; an
+account of the company's organisation, linked to nobody else there). Or from
+an invitation or a **reconnect link**: an owner or admin (only owners, for
+owners; nobody for themselves) sends one from the Team page
+(`POST /v1/team/{userId}/microsoft/reconnect`, `identity.team:manage`,
+audited `user.microsoft_reconnect_sent`); it is emailed to the person's
+HiringPlug address only, never shown to whoever sent it, works once for 7
+days, and signing in with Microsoft from it (or from an invitation) links the
+account to that person **whatever its address**: for someone whose UPN is not
+their HiringPlug email, who would otherwise be locked out once Microsoft is
+required. Every link is audited (`user.microsoft_linked`, `by`: `sign_in`,
+`invitation`, `self` or `reconnect_link`, kept as `user_microsoft.linked_by`)
+and the person is emailed ("not you? tell an owner"). Someone made an owner
+loses a link made by a sign-in's address (`user.microsoft_unlinked`, reason
+`made_owner`) and their Microsoft sessions end: owners hold only links made on
+purpose. Owners (and admins, for everyone but owners) **unlink** an account on
+the Team page (`DELETE /v1/team/{userId}/microsoft`, `identity.team:manage`,
+`user.microsoft_unlinked`), which ends that person's Microsoft sessions; from
+then on one is linked to them only on purpose (Your account, or a reconnect
+link). A sign-in checks again, inside its transaction and with the person's
+row held, what it found before: that the account is still linked to them, or
+that they may still be linked by address. It goes through the company's own Microsoft app (Settings >
 Email connection) or the server's (`HP_MAIL_MICROSOFT_*`); while Microsoft
 sign-in is on, only owners may change or remove the company's Microsoft app
 (`MICROSOFT_APP_OWNERS_ONLY`).
@@ -84,17 +105,21 @@ sign-in is on, only owners may change or remove the company's Microsoft app
 - *Answers.* Refusals are `MICROSOFT_SIGN_IN_FAILED` with a reason:
   `not_on_team` (also for deactivated members, and invitations older than
   their 7 days: the same words), `other_organisation` (guests too),
-  `personal_account`, `connect_first` (an owner's address: connect from Your
-  account) or `failed`; connecting from Your account answers
+  `personal_account`, `connect_first` (an owner's address, or someone's whose
+  account was unlinked: connect from Your account or with a reconnect link),
+  `linked_elsewhere` / `already_connected` (an invitation or reconnect link
+  used with an account linked to someone else, or by someone with another
+  one) or `failed`; connecting from Your account answers
   `MICROSOFT_CONNECT_FAILED` (`already_connected`, `linked_elsewhere`, or as
   above). They come only after
   Microsoft has vouched for the account, and only about it: the redirect is the
   same for anyone. The pre-tenant lookups are `SECURITY DEFINER` functions
   (`app_microsoft_*`, migration 00198); the app cannot read the sign-ins table
   directly. Microsoft has its own limits per address, apart from passwords'
-  (start 120 per 15 minutes, also per email; the redirect and finishing 300
-  each), so a busy office signs in all morning and neither way uses up the
-  other's.
+  (start 120 per 15 minutes; the redirect and finishing 300 each), so a busy
+  office signs in all morning and neither way uses up the other's. The email
+  typed when starting is only a hint, so it counts against no limit of the
+  email's (it would use up password sign-in's for that address).
 - *Sessions.* HiringPlug's own token says how it was signed in (`amr`: `pwd`
   or `microsoft`). Microsoft sign-ins skip the two-step code (password sign-ins
   still need it). An owner can **require** Microsoft: then signing in with a
@@ -111,7 +136,22 @@ sign-in is on, only owners may change or remove the company's Microsoft app
   unlinked, and when the company changes its organisation: that also removes
   the links to the old organisation's accounts (`linksRemoved` in the audit
   entry), and everyone links again at their next sign-in
-  (`app_user.microsoft_sessions_after`; password sessions go on).
+  (`app_user.microsoft_sessions_after`; password sessions go on). Sessions are
+  issued, and ended (`tokens_valid_after`, `microsoft_sessions_after`), by the
+  database's clock only, so an app server whose clock is off ends none too
+  late; each end is after every earlier one, so a session dated the last end
+  (issued in the same second) is ended by the next.
+- *Who can always get in: Entra and Exchange administrators.* Single sign-on
+  trusts the company's Microsoft organisation. Whoever administers it can
+  reset the password of the Entra account linked to anyone (an owner too) and
+  sign in to HiringPlug as them, and whoever can read a team member's mailbox
+  (an Exchange administrator, or a mail rule) can use the invitation, reset
+  and reconnect links emailed to them. HiringPlug cannot tell these from the
+  person: give those roles only to people the company would trust with every
+  HiringPlug account, keep owners' two-step sign-in on (it guards their
+  password, Your account › Connect, and resets), and watch the audit log
+  (`user.microsoft_linked`, `user.microsoft_reconnect_sent`) and the emails it
+  sends for links nobody asked for.
 
 **Invitations and resets.** Owners and admins invite people (email, name,
 role); the invitation is emailed and its link is also shown, to pass on if

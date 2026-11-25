@@ -2113,7 +2113,9 @@ someone who lost their phone. 🟡 **Sign in with Microsoft** (1.46.0, the
 API; the sign-in page next): owners let the team sign in with accounts of the
 company's own Microsoft organisation, and can require it (then only owners
 still use a password); only people already on the Team page get in, an
-invitation can be accepted with Microsoft, and Microsoft sign-ins need no
+invitation (or a reconnect link an owner sends from the Team page) links a
+Microsoft account whatever its address, connecting one from Your account asks
+for the password (and two-step code), and Microsoft sign-ins need no
 two-step code. ✅ **Roles and access** (owners): each company chooses what each role may
 do and which candidates it sees (all, its team's or its own, plus those on
 the jobs it owns); teams of people on the Team page; an owner on every
