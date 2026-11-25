@@ -233,8 +233,9 @@ SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL;
 -- name: TwoStepRequired :one
 SELECT two_step_required FROM tenant WHERE id = app_current_tenant();
 
--- name: SetTwoStepRequired :exec
-UPDATE tenant SET two_step_required = @required WHERE id = app_current_tenant();
+-- Rows changed: 0 when it was so already.
+-- name: SetTwoStepRequired :execrows
+UPDATE tenant SET two_step_required = @required WHERE id = app_current_tenant() AND two_step_required <> @required;
 
 -- Requiring two-step sign-in signs out everyone who has not set it up.
 -- name: EndSessionsWithoutTwoStep :exec

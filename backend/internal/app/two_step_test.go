@@ -135,3 +135,29 @@ func TestTwoStepSignIn(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, a.request(http.MethodGet, "/v1/me", enabled.Session.Token, nil).Status, "a reset signs them out")
 	challengeOf(t, a.request(http.MethodPost, "/v1/auth/sign-in", "", map[string]any{"email": recruiterEmail, "password": testPassword}), api.ErrorCodeTWOSTEPSETUPREQUIRED)
 }
+
+// Saving the requirement unchanged (the settings form saved again) changes
+// nothing: nobody who signed in since without a code (with Microsoft) is
+// signed out, and nothing is audited.
+func TestRequiringTwoStepAgainSignsNobodyOut(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	a := f.a
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner := tenant.Users[api.RoleOwner]
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	var setup api.TwoStepSetup
+	a.request(http.MethodPost, "/v1/me/two-step/setup", owner.Token, nil).JSON(&setup)
+	res := a.request(http.MethodPost, "/v1/me/two-step/confirm", owner.Token, map[string]any{"code": nextCode(t, setup.Secret, 0)})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/agency/two-step", owner.Token, map[string]any{"required": true}).Status)
+	time.Sleep(1100 * time.Millisecond) // sessions end at the next whole second
+
+	flow, _ := f.start(map[string]any{"company": f.me(owner.Token).Tenant.CareersSlug})
+	sam := session(t, f.signInAs(flow, newAccount(org, emailOf(api.RoleRecruiter, tenant.ID)).claims(flow)))
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/agency/two-step", owner.Token, map[string]any{"required": true}).Status)
+	time.Sleep(1100 * time.Millisecond)
+	assert.Equal(t, http.StatusOK, a.request(http.MethodGet, "/v1/me", sam, nil).Status, "still signed in")
+	assert.Len(t, audited(t, tenant.ID, "agency.two_step_required"), 1, "changed once")
+}

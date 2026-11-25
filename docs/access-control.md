@@ -35,7 +35,9 @@ as SHA-256 hashes. Codes are rate-limited per address and per person. A reset
 or invitation link sets the password but still asks for the code. Turning it
 off needs the password. Owners can **require** it for everyone (Roles and
 access, once their own is on): people without it are signed out and set it up
-at their next sign-in, before any token is issued. Owners and admins can reset
+at their next sign-in, before any token is issued (saving it when it is
+required already signs nobody out: Microsoft sign-ins, which skip the code,
+go on). Owners and admins can reset
 someone's two-step (a lost phone; only owners reset owners), which signs them
 out; the Team page shows who has it on.
 

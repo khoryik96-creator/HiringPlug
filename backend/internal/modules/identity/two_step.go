@@ -440,7 +440,9 @@ func (m *Module) ResetTwoStep(ctx context.Context, p authz.Principal, userID str
 }
 
 // SetTwoStepRequired requires two-step sign-in of everyone (signing out those
-// without it), or stops requiring it. The owner needs it first.
+// without it), or stops requiring it. The owner needs it first. Saved as it
+// was, it does nothing: those who signed in with Microsoft since (no code)
+// stay signed in.
 func (m *Module) SetTwoStepRequired(ctx context.Context, p authz.Principal, required bool) error {
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
@@ -453,7 +455,7 @@ func (m *Module) SetTwoStepRequired(ctx context.Context, p authz.Principal, requ
 				return apperr.New(api.ErrorCodeTWOSTEPNOTENABLED, "Set up two-step sign-in for yourself first (Your account).")
 			}
 		}
-		if err := q.SetTwoStepRequired(ctx, required); err != nil {
+		if n, err := q.SetTwoStepRequired(ctx, required); err != nil || n == 0 {
 			return err
 		}
 		if required {

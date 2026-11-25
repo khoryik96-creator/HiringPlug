@@ -1323,13 +1323,17 @@ func (q *Queries) SetTwoStepPending(ctx context.Context, arg SetTwoStepPendingPa
 	return err
 }
 
-const setTwoStepRequired = `-- name: SetTwoStepRequired :exec
-UPDATE tenant SET two_step_required = $1 WHERE id = app_current_tenant()
+const setTwoStepRequired = `-- name: SetTwoStepRequired :execrows
+UPDATE tenant SET two_step_required = $1 WHERE id = app_current_tenant() AND two_step_required <> $1
 `
 
-func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) error {
-	_, err := q.db.Exec(ctx, setTwoStepRequired, required)
-	return err
+// Rows changed: 0 when it was so already.
+func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) (int64, error) {
+	result, err := q.db.Exec(ctx, setTwoStepRequired, required)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const signInMethods = `-- name: SignInMethods :many
