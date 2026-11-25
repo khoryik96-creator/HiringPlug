@@ -66,7 +66,8 @@ func TestHpRestoreHoldsWhatActsOutsideHiringPlug(t *testing.T) {
 	_, err = admin.Exec(ctx, `DELETE FROM job WHERE tenant_id = $1`, tenant.ID)
 	require.NoError(t, err)
 
-	require.NoError(t, run(ctx, "restore", []string{"-yes", filepath.Base(made)}))
+	// The order the guides gave, which failed before (BUG-001).
+	require.NoError(t, run(ctx, "restore", []string{filepath.Base(made), "-yes"}))
 
 	pool, err := database.Connect(ctx, target)
 	require.NoError(t, err)

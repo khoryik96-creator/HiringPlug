@@ -8,9 +8,12 @@
 //	hp password-link -user usr_...   (a link to choose a password)
 //	hp token -user usr_... [-ttl 12h]  print a sign-in token for a user (development)
 //	hp backup [-every 24h]             back up the database and files into HP_BACKUP_DIR
-//	hp restore NAME -yes               put a backup back (stop the API and workers first)
-//	hp fetch [NAME]                    bring a backup back from off the server (the newest unless named), then restore it
+//	hp restore -yes NAME               put a backup back (stop the API and workers first); -resume-outbound lets held jobs run
+//	hp fetch [NAME]                    copy a backup from off the server into HP_BACKUP_DIR (the newest unless named); then hp restore it
 //	hp repair-files [-apply]           check (and fix) that the API's user owns the uploaded files (HP_FILES_OWNER)
+//
+// Flags go before or after the names (hp restore NAME -yes works too); -h
+// prints a command's usage.
 package main
 
 import (
@@ -18,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -37,26 +41,53 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if len(os.Args) < 2 {
-		usage()
+		usage(os.Stderr)
 		os.Exit(2)
 	}
-	if err := run(ctx, os.Args[1], os.Args[2:]); err != nil {
-		fmt.Fprintln(os.Stderr, "hp:", err)
-		os.Exit(1)
+	os.Exit(exitCode(run(ctx, os.Args[1], os.Args[2:]), os.Stderr))
+}
+
+// exitCode is 0 for success and for -h, 1 for any failure (said on w), so a
+// script stops at a failed restore.
+func exitCode(err error, w io.Writer) int {
+	switch {
+	case err == nil, isHelp(err):
+		return 0
+	default:
+		_, _ = fmt.Fprintln(w, "hp:", err)
+		return 1
 	}
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch|repair-files> [flags]")
+const commands = "migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch|repair-files"
+
+func usage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "usage: hp <"+commands+"> [flags] (hp <command> -h for its flags)")
+}
+
+// noArgs is a command that takes neither flags nor names.
+func noArgs(name string, args []string) error {
+	c := command{name: name, synopsis: ""}
+	_, err := c.parse(c.flags(), args)
+	return err
 }
 
 func run(ctx context.Context, cmd string, args []string) error {
 	switch cmd {
 	case "migrate":
+		if err := noArgs(cmd, args); err != nil {
+			return err
+		}
 		return database.Migrate(ctx, adminURL(), db.Migrations())
 	case "bootstrap":
+		if err := noArgs(cmd, args); err != nil {
+			return err
+		}
 		return bootstrap(ctx)
 	case "dev-setup":
+		if err := noArgs(cmd, args); err != nil {
+			return err
+		}
 		return devSetup(ctx)
 	case "tenant":
 		return createTenant(ctx, args)
@@ -74,8 +105,11 @@ func run(ctx context.Context, cmd string, args []string) error {
 		return runRestore(ctx, args)
 	case "repair-files":
 		return runRepairFiles(ctx, args)
+	case "-h", "-help", "--help", "help":
+		usage(os.Stdout)
+		return flag.ErrHelp
 	default:
-		usage()
+		usage(os.Stderr)
 		return fmt.Errorf("unknown command %q", cmd)
 	}
 }
@@ -172,11 +206,12 @@ func devSetup(ctx context.Context) error {
 const devPassword = "demo-password-2026"
 
 func createTenant(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("tenant", flag.ContinueOnError)
+	c := command{name: "tenant", synopsis: "-name NAME -owner-email EMAIL -owner-name NAME", min: 0, max: 0}
+	fs := c.flags()
 	name := fs.String("name", "", "tenant (company) name")
 	ownerEmail := fs.String("owner-email", "", "first user's email")
 	ownerName := fs.String("owner-name", "", "first user's name")
-	if err := fs.Parse(args); err != nil {
+	if _, err := c.parse(fs, args); err != nil {
 		return err
 	}
 	if *name == "" || *ownerEmail == "" || *ownerName == "" {
@@ -209,12 +244,13 @@ func createTenant(ctx context.Context, args []string) error {
 }
 
 func createUser(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("user", flag.ContinueOnError)
+	c := command{name: "user", synopsis: "-tenant tnt_... -email EMAIL -name NAME [-role recruiter]", min: 0, max: 0}
+	fs := c.flags()
 	tenant := fs.String("tenant", "", "tenant ID (tnt_...)")
 	email := fs.String("email", "", "email")
 	name := fs.String("name", "", "name")
 	role := fs.String("role", "recruiter", "owner | admin | recruiter | sourcer | hiring_manager | viewer")
-	if err := fs.Parse(args); err != nil {
+	if _, err := c.parse(fs, args); err != nil {
 		return err
 	}
 	admin, err := adminPool(ctx)
@@ -231,10 +267,11 @@ func createUser(ctx context.Context, args []string) error {
 }
 
 func printToken(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("token", flag.ContinueOnError)
+	c := command{name: "token", synopsis: "-user usr_... [-ttl 12h]", min: 0, max: 0}
+	fs := c.flags()
 	user := fs.String("user", "", "user ID (usr_...)")
 	ttl := fs.Duration("ttl", 12*time.Hour, "how long the token is valid")
-	if err := fs.Parse(args); err != nil {
+	if _, err := c.parse(fs, args); err != nil {
 		return err
 	}
 	cfg, err := config.Load(os.Getenv)
@@ -262,10 +299,11 @@ func printToken(ctx context.Context, args []string) error {
 // first owner, someone the app cannot email, or a forgotten password when
 // email is not set up.
 func printPasswordLink(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("password-link", flag.ContinueOnError)
+	c := command{name: "password-link", synopsis: "-user usr_... [-valid 24h]", min: 0, max: 0}
+	fs := c.flags()
 	user := fs.String("user", "", "user ID (usr_...)")
 	valid := fs.Duration("valid", 24*time.Hour, "how long the link works")
-	if err := fs.Parse(args); err != nil {
+	if _, err := c.parse(fs, args); err != nil {
 		return err
 	}
 	cfg, err := config.Load(os.Getenv)

@@ -201,7 +201,7 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 	manifest, _ := json.MarshalIndent(map[string]any{
 		"name": name, "server": o.Server, "createdAt": o.Now().UTC(), "files": files, "sizeBytes": size,
 		"newFileBytes": copied, "filesTarBytes": filesTar,
-		"restore": "hp restore " + name + " --yes (stop the API and workers first)",
+		"restore": "hp restore -yes " + name + " (stop the API and workers first)",
 	}, "", "  ")
 	if err := os.WriteFile(filepath.Join(tmp, "manifest.json"), manifest, 0o600); err != nil {
 		return "", 0, err

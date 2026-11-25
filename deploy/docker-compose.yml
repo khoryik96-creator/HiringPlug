@@ -131,7 +131,7 @@ services:
   # off this server when HP_OFFSITE_S3_* or HP_OFFSITE_DIR are set (deploy/.env). Settings > Backups turns the nightly
   # backup off or on, makes one now, and downloads one. Restore one with:
   #   docker compose -f deploy/docker-compose.yml stop api worker ai-worker
-  #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
+  #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore -yes hiringplug-YYYYMMDD-HHMMSS
   #   docker compose -f deploy/docker-compose.yml up -d
   # On a new server, bring the newest back from off the server first:
   #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp fetch

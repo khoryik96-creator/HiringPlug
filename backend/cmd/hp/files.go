@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -40,9 +39,10 @@ func verifyRestoredFiles(ctx context.Context, o backup.Options) error {
 // them to HP_FILES_OWNER, private to that user: for a server restored before
 // restores did this (CV previews failing with "permission denied").
 func runRepairFiles(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("repair-files", flag.ContinueOnError)
+	c := command{name: "repair-files", synopsis: "[-apply]"}
+	fs := c.flags()
 	apply := fs.Bool("apply", false, "change the owners and permissions (without it, only report)")
-	if err := fs.Parse(args); err != nil {
+	if _, err := c.parse(fs, args); err != nil {
 		return err
 	}
 	dir := os.Getenv("HP_FILES_DIR")
