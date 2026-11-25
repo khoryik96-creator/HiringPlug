@@ -925,14 +925,14 @@ func (q *Queries) MicrosoftConnectOnly(ctx context.Context, id string) error {
 }
 
 const microsoftSettings = `-- name: MicrosoftSettings :one
-SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing FROM tenant WHERE id = app_current_tenant()
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app FROM tenant WHERE id = app_current_tenant()
 `
 
 type MicrosoftSettingsRow struct {
-	MicrosoftSignIn      bool
-	MicrosoftTenantID    *string
-	MicrosoftRequired    bool
-	MicrosoftAcctMissing bool
+	MicrosoftSignIn         bool
+	MicrosoftTenantID       *string
+	MicrosoftRequired       bool
+	MicrosoftAcctMissingApp *string
 }
 
 // The company's Microsoft sign-in settings.
@@ -943,7 +943,7 @@ func (q *Queries) MicrosoftSettings(ctx context.Context) (MicrosoftSettingsRow, 
 		&i.MicrosoftSignIn,
 		&i.MicrosoftTenantID,
 		&i.MicrosoftRequired,
-		&i.MicrosoftAcctMissing,
+		&i.MicrosoftAcctMissingApp,
 	)
 	return i, err
 }
@@ -1008,20 +1008,23 @@ func (q *Queries) MyMicrosoft(ctx context.Context, userID string) (MyMicrosoftRo
 }
 
 const noteMicrosoftClaims = `-- name: NoteMicrosoftClaims :exec
-UPDATE tenant SET microsoft_acct_missing = NOT $1::boolean
-WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = $2 AND microsoft_acct_missing <> NOT $1::boolean
+UPDATE tenant SET microsoft_acct_missing_app = CASE WHEN $1::boolean THEN NULL ELSE $2::text END
+WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = $3
+  AND microsoft_acct_missing_app IS DISTINCT FROM (CASE WHEN $1::boolean THEN NULL ELSE $2::text END)
 `
 
 type NoteMicrosoftClaimsParams struct {
 	Acct       bool
+	ClientID   string
 	MsTenantID *string
 }
 
-// Microsoft vouched, through the company's own app, for an account of its
-// organisation: whether the token said member or guest (acct), which that
-// app's settings in Entra decide.
+// Microsoft vouched, through the company's own app (client_id), for an
+// account of its organisation: whether the token said member or guest
+// (acct), which that app's settings in Entra decide. Without it, the app is
+// kept (Settings warns while sign-in uses that very app).
 func (q *Queries) NoteMicrosoftClaims(ctx context.Context, arg NoteMicrosoftClaimsParams) error {
-	_, err := q.db.Exec(ctx, noteMicrosoftClaims, arg.Acct, arg.MsTenantID)
+	_, err := q.db.Exec(ctx, noteMicrosoftClaims, arg.Acct, arg.ClientID, arg.MsTenantID)
 	return err
 }
 
@@ -1225,7 +1228,7 @@ func (q *Queries) SetGuideDismissed(ctx context.Context, guideDismissed bool) er
 
 const setMicrosoftSettings = `-- name: SetMicrosoftSettings :one
 UPDATE tenant SET microsoft_sign_in = $1, microsoft_tenant_id = $2, microsoft_required = $3,
-  microsoft_acct_missing = microsoft_acct_missing AND microsoft_tenant_id IS NOT DISTINCT FROM $2
+  microsoft_acct_missing_app = CASE WHEN microsoft_tenant_id IS NOT DISTINCT FROM $2 THEN microsoft_acct_missing_app END
 WHERE id = app_current_tenant()
 RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required
 `

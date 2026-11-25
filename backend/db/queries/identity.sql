@@ -268,16 +268,18 @@ SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_s
   user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner, connect_only::boolean AS connect_only
 FROM app_microsoft_accounts(@ms_tenant_id::text, @ms_object_id::text, @addresses::text[]);
 
--- Microsoft vouched, through the company's own app, for an account of its
--- organisation: whether the token said member or guest (acct), which that
--- app's settings in Entra decide.
+-- Microsoft vouched, through the company's own app (client_id), for an
+-- account of its organisation: whether the token said member or guest
+-- (acct), which that app's settings in Entra decide. Without it, the app is
+-- kept (Settings warns while sign-in uses that very app).
 -- name: NoteMicrosoftClaims :exec
-UPDATE tenant SET microsoft_acct_missing = NOT @acct::boolean
-WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = @ms_tenant_id AND microsoft_acct_missing <> NOT @acct::boolean;
+UPDATE tenant SET microsoft_acct_missing_app = CASE WHEN @acct::boolean THEN NULL ELSE @client_id::text END
+WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = @ms_tenant_id
+  AND microsoft_acct_missing_app IS DISTINCT FROM (CASE WHEN @acct::boolean THEN NULL ELSE @client_id::text END);
 
 -- The company's Microsoft sign-in settings.
 -- name: MicrosoftSettings :one
-SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing FROM tenant WHERE id = app_current_tenant();
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app FROM tenant WHERE id = app_current_tenant();
 
 -- The company's settings, kept from changing until the transaction ends:
 -- changing them (FOR NO KEY UPDATE), or the Microsoft app they rely on (FOR
@@ -292,7 +294,7 @@ SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant() FOR SHARE;
 
 -- name: SetMicrosoftSettings :one
 UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(microsoft_tenant_id), microsoft_required = @required,
-  microsoft_acct_missing = microsoft_acct_missing AND microsoft_tenant_id IS NOT DISTINCT FROM sqlc.narg(microsoft_tenant_id)
+  microsoft_acct_missing_app = CASE WHEN microsoft_tenant_id IS NOT DISTINCT FROM sqlc.narg(microsoft_tenant_id) THEN microsoft_acct_missing_app END
 WHERE id = app_current_tenant()
 RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
 

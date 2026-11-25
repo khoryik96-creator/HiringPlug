@@ -21,8 +21,10 @@ type MicrosoftSignIn struct {
 	CallbackURL    string
 	AppSource      string // agency, server or none
 	ClientID       *string
-	// AcctMissing: the last Microsoft sign-in came without the optional acct
-	// claim, so no account was linked by its address (Settings warns).
+	// AcctMissing: the last Microsoft sign-in through the company's own app,
+	// the one sign-in uses now, came without the optional acct claim, so no
+	// account was linked by its address (Settings warns: the claim is set on
+	// that app, so not for the server's app, nor another of the company's).
 	AcctMissing bool
 }
 
@@ -43,7 +45,7 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 		return MicrosoftSignIn{}, err
 	}
 	out := MicrosoftSignIn{Enabled: s.MicrosoftSignIn, OrganisationID: s.MicrosoftTenantID, Required: s.MicrosoftRequired,
-		CallbackURL: m.microsoftCallback(), AppSource: "none", AcctMissing: s.MicrosoftSignIn && s.MicrosoftAcctMissing}
+		CallbackURL: m.microsoftCallback(), AppSource: "none"}
 	if m.ms == nil {
 		return out, nil
 	}
@@ -55,6 +57,7 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 		out.AppSource, out.ClientID = "server", &app.ClientID
 		if app.Agency {
 			out.AppSource = "agency"
+			out.AcctMissing = s.MicrosoftSignIn && deref(s.MicrosoftAcctMissingApp) == app.ClientID
 		}
 	}
 	return out, nil

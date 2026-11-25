@@ -261,3 +261,48 @@ func TestOnlyTheCompanysOwnAppWarnsOfTheAcctClaim(t *testing.T) {
 	f.a.request(http.MethodGet, "/v1/agency/microsoft-sign-in", owner.Token, nil).JSON(&got)
 	assert.False(t, got.AcctClaimMissing, "through the server's app: not the company's to fix")
 }
+
+// The acct warning is about the company's own app, the one a sign-in
+// without the claim went through: once sign-in uses another app (the
+// server's, or a new one of the company's) or another organisation, it
+// goes until a sign-in through that one comes without the claim too.
+func TestTheAcctWarningGoesWithTheApp(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	owner := tenant.Users[api.RoleOwner]
+	org := newGUID()
+	setApp := func(client string) {
+		t.Helper()
+		res := f.a.request(http.MethodPut, "/v1/settings/email-apps/microsoft", owner.Token, map[string]any{"clientId": client, "clientSecret": "agency-secret-value"})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+	settings := func() api.MicrosoftSignInSettings {
+		var s api.MicrosoftSignInSettings
+		f.a.request(http.MethodGet, "/v1/agency/microsoft-sign-in", owner.Token, nil).JSON(&s)
+		return s
+	}
+	withoutAcct := func() {
+		t.Helper()
+		flow, _ := f.start(map[string]any{"company": f.me(owner.Token).Tenant.CareersSlug})
+		guest := newAccount(org, emailOf(api.RoleAdmin, tenant.ID))
+		msRefused(t, f.signInAs(flow, entratest.Guest(guest.claims(flow), false, false)), "not_on_team")
+		require.True(t, settings().AcctClaimMissing)
+	}
+	setApp("agency-client")
+	f.enable(owner.Token, org, false)
+	withoutAcct()
+
+	res := f.a.request(http.MethodDelete, "/v1/settings/email-apps/microsoft", owner.Token, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	s := settings()
+	require.Equal(t, api.MicrosoftSignInSettingsAppSourceServer, s.AppSource)
+	assert.False(t, s.AcctClaimMissing, "the server's app: not the company's to fix")
+	setApp("another-client")
+	assert.False(t, settings().AcctClaimMissing, "a new app of the company's: not seen without the claim yet")
+
+	withoutAcct()
+	org = newGUID()
+	f.enable(owner.Token, org, false)
+	assert.False(t, settings().AcctClaimMissing, "another organisation")
+}

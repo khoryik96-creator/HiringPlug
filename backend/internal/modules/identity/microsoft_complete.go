@@ -113,7 +113,7 @@ func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoft
 		id, err = m.ms.entra.Validate(ctx, raw, entra.Expect{ClientID: flow.ClientID, Nonce: secret.Nonce, Organisation: organisation})
 	}
 	if err == nil && app.Agency { // Settings warns while the company's app leaves out acct (no account is linked by address then)
-		if err := m.noteClaims(ctx, flow.TenantID, id); err != nil {
+		if err := m.noteClaims(ctx, flow.TenantID, app.ClientID, id); err != nil {
 			return id, err
 		}
 	}
@@ -134,9 +134,10 @@ func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoft
 // whether Microsoft said member or guest (acct): the claim is set on that
 // app in Entra, so only a sign-in through it says whether the company's
 // setting is missing (not one through the server's app, set up elsewhere).
-func (m *Module) noteClaims(ctx context.Context, tenantID string, id entra.Identity) error {
+// The app (clientID) is kept with it: another app says nothing yet.
+func (m *Module) noteClaims(ctx context.Context, tenantID, clientID string, id entra.Identity) error {
 	return database.InTx(ctx, m.pool, authz.System(tenantID), func(tx pgx.Tx) error {
-		return store.New(tx).NoteMicrosoftClaims(ctx, store.NoteMicrosoftClaimsParams{MsTenantID: &id.TenantID, Acct: id.Member})
+		return store.New(tx).NoteMicrosoftClaims(ctx, store.NoteMicrosoftClaimsParams{MsTenantID: &id.TenantID, Acct: id.Member, ClientID: clientID})
 	})
 }
 

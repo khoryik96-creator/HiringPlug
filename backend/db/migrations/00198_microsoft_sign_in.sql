@@ -2,10 +2,11 @@
 -- tenant: whether the company signs in with Microsoft, its own Microsoft
 --   organisation (Entra tenant ID; never personal accounts), and whether it
 --   requires Microsoft (password sign-in and resets then only for owners).
---   microsoft_acct_missing: the last Microsoft sign-in through the company's
---   own app came without the optional acct claim (member or guest), so no
---   account was linked by its address (Settings warns: the claim is set on
---   that app).
+--   microsoft_acct_missing_app: the client ID of the company's own app when
+--   the last Microsoft sign-in through it came without the optional acct
+--   claim (member or guest), so no account was linked by its address
+--   (Settings warns while sign-in uses that very app: the claim is set on
+--   it). NULL: the claim came, or no sign-in went through the company's app.
 -- user_microsoft: the Microsoft account (organisation + object ID) linked to
 --   a person, and how (linked_by): by their first sign-in (never for owners),
 --   their invitation, from Your account, or a reconnect link an owner sent;
@@ -32,7 +33,7 @@ ALTER TABLE tenant
     CHECK (microsoft_tenant_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
            AND microsoft_tenant_id <> '9188040d-6c67-4c5b-b112-36a304b66dad'),
   ADD COLUMN microsoft_required boolean NOT NULL DEFAULT false,
-  ADD COLUMN microsoft_acct_missing boolean NOT NULL DEFAULT false,
+  ADD COLUMN microsoft_acct_missing_app text,
   ADD CONSTRAINT tenant_microsoft_sign_in_check
     CHECK ((NOT microsoft_sign_in OR microsoft_tenant_id IS NOT NULL) AND (NOT microsoft_required OR microsoft_sign_in));
 
@@ -217,5 +218,5 @@ ALTER TABLE user_link DROP CONSTRAINT user_link_kind_check,
   ADD CONSTRAINT user_link_kind_check CHECK (kind IN ('invite', 'reset'));
 ALTER TABLE app_user DROP COLUMN IF EXISTS microsoft_connect_only, DROP COLUMN IF EXISTS microsoft_sessions_after;
 ALTER TABLE tenant DROP CONSTRAINT IF EXISTS tenant_microsoft_sign_in_check,
-  DROP COLUMN IF EXISTS microsoft_acct_missing,
+  DROP COLUMN IF EXISTS microsoft_acct_missing_app,
   DROP COLUMN IF EXISTS microsoft_required, DROP COLUMN IF EXISTS microsoft_tenant_id, DROP COLUMN IF EXISTS microsoft_sign_in;

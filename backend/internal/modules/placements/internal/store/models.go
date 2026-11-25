@@ -1879,15 +1879,15 @@ type TeamGroup struct {
 }
 
 type Tenant struct {
-	ID                   string
-	Name                 string
-	CreatedAt            time.Time
-	CareersSlug          *string
-	TwoStepRequired      bool
-	MicrosoftSignIn      bool
-	MicrosoftTenantID    *string
-	MicrosoftRequired    bool
-	MicrosoftAcctMissing bool
+	ID                      string
+	Name                    string
+	CreatedAt               time.Time
+	CareersSlug             *string
+	TwoStepRequired         bool
+	MicrosoftSignIn         bool
+	MicrosoftTenantID       *string
+	MicrosoftRequired       bool
+	MicrosoftAcctMissingApp *string
 }
 
 type TenantPolicy struct {

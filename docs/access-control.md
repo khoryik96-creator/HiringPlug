@@ -57,7 +57,9 @@ may be a team member's, and only `acct` (or the optional `upn`) tells a guest
 apart. The claims of the last sign-in through the company's own Microsoft
 app are noted for the company (the claim is set on that app; sign-ins through
 the server's app say nothing about it), and Roles and access warns until
-`acct` is added in Entra (`acctClaimMissing`). Later
+`acct` is added in Entra (`acctClaimMissing`), only while sign-in goes through
+that very app and organisation: moving to the server's app, to another app of
+the company's or to another organisation clears it. Later
 sign-ins match the linked account, whatever its address has become. An
 account is **never linked by its address to an owner, nor to someone whose
 account was unlinked** (`app_user.microsoft_connect_only`): they link one on
