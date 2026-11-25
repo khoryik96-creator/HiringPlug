@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/backup"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 )
 
@@ -166,6 +167,15 @@ func (w *Watcher) Check(ctx context.Context) error {
 	}
 	for _, p := range due {
 		w.Log.Warn("server problem", "problem", p.Key, "text", p.Text)
+	}
+	// Restored, with jobs held until someone releases them: a copy of
+	// another server (staging) must not email its people either. The
+	// problems are emailed once the restore is settled.
+	if r, ok, err := jobqueue.LastRestore(ctx, w.Checks.DB); err != nil {
+		return err
+	} else if ok && r.Holding() {
+		w.Log.Info("alert email waits: the server was restored and its held jobs are not released yet (Settings > System)")
+		return nil
 	}
 	if len(w.To) > 0 {
 		if err := w.Mail.Send(ctx, w.message(problems, due, over)); err != nil {

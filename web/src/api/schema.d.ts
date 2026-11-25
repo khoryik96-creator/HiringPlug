@@ -5785,6 +5785,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/settings/system/jobs/{jobId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Let a job held after a restore run (it may have happened already, before the backup was restored) */
+        post: operations["releaseHeldJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system/jobs/{jobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a job held after a restore (it never runs; it shows as failed) */
+        post: operations["cancelHeldJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system/held": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release, or cancel, every job of the company held after a restore */
+        post: operations["settleHeldJobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings/backups": {
         parameters: {
             query?: never;
@@ -12368,6 +12423,10 @@ export interface components {
             userId: string;
         };
         SystemStatus: {
+            /** @description Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...): they run only once released (oldest first, at most 200). */
+            held: components["schemas"]["HeldJob"][];
+            /** @description The server's last restore; null when it was never restored. */
+            restore: components["schemas"]["RestoreInfo"] | null;
             /** @description The nightly backup is on (Settings > Backups): off, an old last backup is expected. */
             backupAuto: boolean;
             /** @description The company's background jobs by kind, kinds with none left out. */
@@ -12376,6 +12435,41 @@ export interface components {
             failed: components["schemas"]["FailedJob"][];
             /** @description The server's last backup; null when none was ever made. */
             backup: components["schemas"]["BackupStatus"] | null;
+        };
+        HeldJob: {
+            id: string;
+            /** @description e.g. email.send */
+            kind: string;
+            /** @description Tries before it was held. */
+            attempts: number;
+            /**
+             * Format: date-time
+             * @description When it was queued (before the backup was made).
+             */
+            createdAt: string;
+            /** Format: date-time */
+            heldAt: string | null;
+            /**
+             * Format: date-time
+             * @description When it was due; released, one due later still waits for its time.
+             */
+            runAfter: string;
+        };
+        RestoreInfo: {
+            backupName: string;
+            /** Format: date-time */
+            restoredAt: string;
+            /** @description The backup was made on another database server (or is too old to say). */
+            fromAnotherServer: boolean;
+            /** @description Jobs the restore held, in every company. */
+            held: number;
+            /** @description Restored with -resume-outbound (nothing held). */
+            resumed: boolean;
+            /**
+             * Format: date-time
+             * @description When the last held job was released or cancelled; null while some wait (the server's alert email waits too).
+             */
+            releasedAt: string | null;
         };
         JobKindStatus: {
             /** @description e.g. email.send */
@@ -24280,6 +24374,86 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    releaseHeldJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Released; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    cancelHeldJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    settleHeldJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "release" | "cancel";
+                };
+            };
+        };
+        responses: {
+            /** @description Done; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getBackups: {

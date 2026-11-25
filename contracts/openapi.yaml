@@ -9113,6 +9113,71 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/settings/system/jobs/{jobId}/release:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^job_[0-9a-hjkmnp-tv-z]{26}$'}
+    post:
+      operationId: releaseHeldJob
+      tags: [settings]
+      summary: Let a job held after a restore run (it may have happened already, before the backup was restored)
+      x-permission: settings:manage
+      responses:
+        '200':
+          description: Released; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/settings/system/jobs/{jobId}/cancel:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^job_[0-9a-hjkmnp-tv-z]{26}$'}
+    post:
+      operationId: cancelHeldJob
+      tags: [settings]
+      summary: Cancel a job held after a restore (it never runs; it shows as failed)
+      x-permission: settings:manage
+      responses:
+        '200':
+          description: Cancelled; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/settings/system/held:
+    post:
+      operationId: settleHeldJobs
+      tags: [settings]
+      summary: Release, or cancel, every job of the company held after a restore
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: {type: string, enum: [release, cancel]}
+      responses:
+        '200':
+          description: Done; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/settings/backups:
     get:
       operationId: getBackups
@@ -18540,8 +18605,17 @@ components:
         userId: {type: string}
     SystemStatus:
       type: object
-      required: [jobs, failed, backup, backupAuto]
+      required: [jobs, failed, backup, backupAuto, held, restore]
       properties:
+        held:
+          type: array
+          description: >-
+            Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...): they run only once released (oldest first, at most 200).
+          items: {$ref: '#/components/schemas/HeldJob'}
+        restore:
+          description: The server's last restore; null when it was never restored.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/RestoreInfo'}]
         backupAuto: {type: boolean, description: "The nightly backup is on (Settings > Backups): off, an old last backup is expected."}
         jobs:
           type: array
@@ -18555,6 +18629,30 @@ components:
           description: The server's last backup; null when none was ever made.
           nullable: true
           allOf: [{$ref: '#/components/schemas/BackupStatus'}]
+    HeldJob:
+      type: object
+      required: [id, kind, attempts, createdAt, heldAt, runAfter]
+      properties:
+        id: {type: string}
+        kind: {type: string, description: "e.g. email.send"}
+        attempts: {type: integer, description: "Tries before it was held."}
+        createdAt: {type: string, format: date-time, description: "When it was queued (before the backup was made)."}
+        heldAt: {type: string, format: date-time, nullable: true}
+        runAfter: {type: string, format: date-time, description: "When it was due; released, one due later still waits for its time."}
+    RestoreInfo:
+      type: object
+      required: [backupName, restoredAt, fromAnotherServer, held, resumed, releasedAt]
+      properties:
+        backupName: {type: string}
+        restoredAt: {type: string, format: date-time}
+        fromAnotherServer: {type: boolean, description: "The backup was made on another database server (or is too old to say)."}
+        held: {type: integer, description: "Jobs the restore held, in every company."}
+        resumed: {type: boolean, description: "Restored with -resume-outbound (nothing held)."}
+        releasedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the last held job was released or cancelled; null while some wait (the server's alert email waits too).
     JobKindStatus:
       type: object
       required: [kind, waiting, running, retrying, failed, oldestWaitingSince]

@@ -7247,6 +7247,33 @@ class SchedulingRefreshCalendarJob(BaseModel):
     userId: str
 
 
+class HeldJob(BaseModel):
+    id: str
+    kind: Annotated[str, Field(description="e.g. email.send")]
+    attempts: Annotated[int, Field(description="Tries before it was held.")]
+    createdAt: Annotated[AwareDatetime, Field(description="When it was queued (before the backup was made).")]
+    heldAt: Annotated[AwareDatetime | None, Field(...)]
+    runAfter: Annotated[
+        AwareDatetime, Field(description="When it was due; released, one due later still waits for its time.")
+    ]
+
+
+class RestoreInfo(BaseModel):
+    backupName: str
+    restoredAt: AwareDatetime
+    fromAnotherServer: Annotated[
+        bool, Field(description="The backup was made on another database server (or is too old to say).")
+    ]
+    held: Annotated[int, Field(description="Jobs the restore held, in every company.")]
+    resumed: Annotated[bool, Field(description="Restored with -resume-outbound (nothing held).")]
+    releasedAt: Annotated[
+        AwareDatetime | None,
+        Field(
+            description="When the last held job was released or cancelled; null while some wait (the server's alert email waits too)."
+        ),
+    ]
+
+
 class JobKindStatus(BaseModel):
     kind: Annotated[str, Field(description="e.g. email.send")]
     waiting: Annotated[int, Field(description="Not started yet.")]
@@ -9685,6 +9712,15 @@ class BookingLink(BaseModel):
 
 
 class SystemStatus(BaseModel):
+    held: Annotated[
+        list[HeldJob],
+        Field(
+            description="Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...): they run only once released (oldest first, at most 200)."
+        ),
+    ]
+    restore: Annotated[
+        RestoreInfo | None, Field(description="The server's last restore; null when it was never restored.")
+    ]
     backupAuto: Annotated[
         bool,
         Field(

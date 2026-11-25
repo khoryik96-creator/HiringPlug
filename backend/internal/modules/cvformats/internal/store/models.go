@@ -1254,6 +1254,7 @@ type Job struct {
 	UpdatedAt   time.Time
 	FinishedAt  *time.Time
 	Priority    int16
+	HeldAt      *time.Time
 }
 
 type JobAd struct {
@@ -1736,6 +1737,17 @@ type RecruiterTask struct {
 	AutomationName *string
 	DoneAt         *time.Time
 	CreatedAt      time.Time
+}
+
+type RestoreMarker struct {
+	ID                bool
+	BackupName        string
+	SourceServer      *string
+	DestinationServer string
+	RestoredAt        time.Time
+	Held              int32
+	Resumed           bool
+	ReleasedAt        *time.Time
 }
 
 type RevokedSession struct {

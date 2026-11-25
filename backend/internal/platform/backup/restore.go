@@ -245,3 +245,22 @@ func untar(path, dir string) error {
 		}
 	}
 }
+
+// ManifestServer is the database server a backup was made on (its
+// manifest's server, see ServerID); "" for a backup too old to say.
+func ManifestServer(dir, name string) (string, error) {
+	if !nameRe.MatchString(name) {
+		return "", ErrNotFound
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, name, "manifest.json")) //nolint:gosec // a backup named by nameRe
+	if err != nil {
+		return "", err
+	}
+	var m struct {
+		Server string `json:"server"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return "", fmt.Errorf("backup %s: its manifest is not readable: %w", name, err)
+	}
+	return m.Server, nil
+}

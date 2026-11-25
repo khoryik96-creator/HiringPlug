@@ -186,6 +186,7 @@ func backupTurn(ctx context.Context, pool *pgxpool.Pool, o backup.Options, every
 func runRestore(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("restore", flag.ContinueOnError)
 	yes := fs.Bool("yes", false, "replace the database and files with the backup's")
+	resume := fs.Bool("resume-outbound", false, "let the emails, calendar updates, webhooks and automations waiting in the backup run (they may have happened already); without it they are held until released in Settings > System")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -212,10 +213,13 @@ func runRestore(ctx context.Context, args []string) error {
 	if err := database.AllowSearchIndexes(ctx, o.AdminURL, os.Stderr); err != nil {
 		return err
 	}
+	if err := settleJobs(ctx, o, fs.Arg(0), *resume); err != nil {
+		return err
+	}
 	if err := verifyRestoredFiles(ctx, o); err != nil {
 		return err
 	}
-	fmt.Println("restored", fs.Arg(0), "- run `hp bootstrap` if this backup is from an older version, then start the API and workers")
+	fmt.Println("restored", fs.Arg(0), "- start the API and workers")
 	return nil
 }
 

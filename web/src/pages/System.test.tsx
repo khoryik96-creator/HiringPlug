@@ -18,7 +18,7 @@ const lastBackup: NonNullable<Schemas["SystemStatus"]["backup"]> = {
 const status = (over: Partial<Schemas["SystemStatus"]> = {}): Schemas["SystemStatus"] => ({
   jobs: [{ kind: "email.send", waiting: 2, running: 1, retrying: 0, failed: 1, oldestWaitingSince: "2026-11-07T06:00:00Z" }],
   failed: [{ id: "job_1", kind: "email.send", attempts: 5, error: "smtp: 550 mailbox unavailable", failedAt: "2026-11-07T05:00:00Z" }],
-  backup: lastBackup, backupAuto: true,
+  backup: lastBackup, backupAuto: true, held: [], restore: null,
   ...over,
 });
 
@@ -75,6 +75,29 @@ describe("System", () => {
     get.mockResolvedValue(ok(status({ backup: { ...lastBackup, offsiteStatus: "off", offsiteAt: null } })));
     renderWithClient(<System />);
     expect(await screen.findByText(/no off-site storage is set up/)).toBeTruthy();
+  });
+
+  // IMP-002: after a restore, what reaches people waits for someone.
+  it("lists the jobs a restore held, to release or cancel, and says the alert emails wait", async () => {
+    const held: Schemas["SystemStatus"]["held"] = [
+      { id: "job_h1", kind: "email.send", attempts: 0, createdAt: "2026-11-24T23:50:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:50:00Z" },
+      { id: "job_h2", kind: "webhook.deliver", attempts: 1, createdAt: "2026-11-24T23:55:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:56:00Z" },
+    ];
+    const restore = { backupName: "hiringplug-20261125-023050", restoredAt: "2026-11-25T03:00:00Z", fromAnotherServer: true, held: 2, resumed: false, releasedAt: null };
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ held, restore })));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(status({ held: held.slice(1), restore })));
+    renderWithClient(<System />);
+    const section = await screen.findByRole("region", { name: "Held after the restore" });
+    expect(section.textContent).toContain("Sending webhooks to your other systems");
+    expect(screen.getByRole("status").textContent).toContain("from a backup from another server");
+    expect(screen.getByRole("status").textContent).toContain("alert emails wait");
+    const [first] = screen.getAllByRole("button", { name: "Release" });
+    if (first) fireEvent.click(first);
+    await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/jobs/{jobId}/release", { params: { path: { jobId: "job_h1" } } }); });
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/jobs/{jobId}/cancel", { params: { path: { jobId: "job_h2" } } }); });
+    fireEvent.click(screen.getByRole("button", { name: /^Release all/ }));
+    await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/held", { body: { action: "release" } }); });
   });
 
   it("writes sizes people read", () => {
