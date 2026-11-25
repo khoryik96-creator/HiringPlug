@@ -100,8 +100,10 @@ link). A sign-in checks again, inside its transaction and with the person's
 row held, what it found before: that the account is still linked to them, or
 that they may still be linked by address. The row is held FOR NO KEY UPDATE,
 and everything that changes a person's row and their Microsoft link (a
-sign-in, an unlink, a promotion, a change of organisation) holds the row
-first: they wait for each other and never deadlock. It goes through the company's own Microsoft app (Settings >
+sign-in, connecting from Your account, sending a reconnect link, an unlink, a
+promotion or deactivation, a change of organisation) holds the row first:
+they wait for each other and never deadlock, and each checks the person as
+they are once held. It goes through the company's own Microsoft app (Settings >
 Email connection) or the server's (`HP_MAIL_MICROSOFT_*`); while Microsoft
 sign-in is on, only owners may change or remove the company's Microsoft app
 (`MICROSOFT_APP_OWNERS_ONLY`).

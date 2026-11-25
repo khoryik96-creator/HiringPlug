@@ -266,3 +266,24 @@ func TestConnectingMicrosoftChecksTheOrganisationOnceHeld(t *testing.T) {
 	connectRefused(t, res, "failed")
 	assert.NotContains(t, f.methodsOf(owner.Token, admin.ID), api.SignInMethodMicrosoft, "nothing linked")
 }
+
+// Sending a reconnect link holds the person's row, as every change of
+// their link does: one sent as they are deactivated (or their role changes)
+// waits, and is checked against who they are then.
+func TestAReconnectLinkWaitsForAChangeOfThePerson(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
+	f.enable(owner.Token, newGUID(), false)
+
+	res := meanwhile(t, `SELECT 1 FROM app_user WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE`, []any{tenant.ID, recruiter.ID},
+		func() *response { return f.sendReconnect(owner.Token, recruiter.ID) },
+		func(tx pgx.Tx) {
+			_, err := tx.Exec(context.Background(), `UPDATE app_user SET active = false WHERE tenant_id = $1 AND id = $2`, tenant.ID, recruiter.ID)
+			require.NoError(t, err)
+		})
+	require.Equal(t, http.StatusUnprocessableEntity, res.Status, "%s", res.Body)
+	assert.Contains(t, res.Error().Error.Message, "deactivated")
+	assert.Empty(t, audited(t, tenant.ID, "user.microsoft_reconnect_sent"))
+}

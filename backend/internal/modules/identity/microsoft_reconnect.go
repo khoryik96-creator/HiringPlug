@@ -86,13 +86,15 @@ type ReconnectLink struct {
 // Only to their email: whoever held the link could link an account of
 // theirs to that person, and sign in as them. Only owners send one to an
 // owner, and nobody to someone whose role is above their own (a teammate let
-// to manage the team, to an admin); nobody to themselves (they connect from Your account, with their
-// password).
+// to manage the team, to an admin); nobody to themselves (they connect from
+// Your account, with their password). Their row is held first, so a
+// deactivation or a change of role under way finishes before they are
+// checked (and ends the links sent before it).
 func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Principal, userID string) (ReconnectLink, error) {
 	var out ReconnectLink
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, userID)
+		u, err := holdUser(ctx, q, userID) // as every change of their link: a change of them under way finishes first
 		if database.IsNoRows(err) {
 			return apperr.NotFound("team member")
 		}
