@@ -74,7 +74,7 @@ func TestValidTokensGiveTheAccount(t *testing.T) {
 	id, err := validate(t, c, raw, entra.Expect{ClientID: client, Nonce: nonce, Organisation: org})
 	require.NoError(t, err)
 	assert.Equal(t, entra.Identity{TenantID: org, ObjectID: oid, Email: "sam@contoso.test", Username: "sam.upn@contoso.test", Name: "Test Person"}, id)
-	assert.Equal(t, []string{"sam@contoso.test", "sam.upn@contoso.test"}, id.Emails())
+	assert.Equal(t, []string{"sam.upn@contoso.test"}, id.Addresses(), "the email is not vouched for: the sign-in name only")
 
 	_, err = validate(t, c, raw, entra.Expect{ClientID: client, Nonce: nonce}) // any organisation
 	require.NoError(t, err)
@@ -178,5 +178,132 @@ func TestIDsAndAddresses(t *testing.T) {
 	assert.False(t, entra.IsOrganisation(strings.ToUpper(oid)), "normal form only")
 	assert.Equal(t, oid, entra.NormalizeID(" "+strings.ToUpper(oid)+" "))
 	assert.Equal(t, "https://login.microsoftonline.com/"+org+"/v2.0", entra.Issuer(org))
-	assert.Empty(t, entra.Identity{Email: "", Username: "not-an-address"}.Emails())
+	assert.Empty(t, entra.Identity{Email: "", Username: "not-an-address"}.Addresses())
+}
+
+func TestTheEmailCountsOnlyWhenMicrosoftVouchesForIt(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	want := entra.Expect{ClientID: client, Nonce: nonce, Organisation: org}
+	for _, tc := range []struct {
+		name  string
+		edov  any // the xms_edov claim; nil: not sent
+		addrs []string
+	}{
+		{"not sent", nil, []string{"sam.upn@contoso.test"}},
+		{"false", false, []string{"sam.upn@contoso.test"}},
+		{"true", true, []string{"sam.upn@contoso.test", "sam@contoso.test"}},
+		{"\"1\"", "1", []string{"sam.upn@contoso.test", "sam@contoso.test"}},
+		{"1", 1, []string{"sam.upn@contoso.test", "sam@contoso.test"}},
+	} {
+		claims := entratest.Claims(org, oid, "Sam@Contoso.test", client, nonce)
+		claims["preferred_username"] = "sam.upn@contoso.test"
+		if tc.edov != nil {
+			claims["xms_edov"] = tc.edov
+		}
+		id, err := validate(t, c, entratest.Sign(t, ms.SigningKey(), claims), want)
+		require.NoError(t, err, tc.name)
+		assert.Equal(t, tc.addrs, id.Addresses(), tc.name)
+	}
+	same := entra.Identity{Email: "sam@contoso.test", Username: "sam@contoso.test", EmailVerified: true}
+	assert.Equal(t, []string{"sam@contoso.test"}, same.Addresses(), "each once")
+}
+
+func TestGuestsAreRefused(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	want := entra.Expect{ClientID: client, Nonce: nonce, Organisation: org}
+	sign := func(claims jwt.MapClaims) string { return entratest.Sign(t, ms.SigningKey(), claims) }
+	member := entratest.Claims(org, oid, "sam@contoso.test", client, nonce)
+	_, err := validate(t, c, sign(member), want)
+	require.NoError(t, err, "acct 0: a member")
+
+	cases := map[string]jwt.MapClaims{
+		"acct 1": entratest.Guest(entratest.Claims(org, oid, "sam@contoso.test", client, nonce), true),
+		"acct \"1\"": func() jwt.MapClaims {
+			cl := entratest.Claims(org, oid, "sam@contoso.test", client, nonce)
+			cl["acct"] = "1"
+			return cl
+		}(),
+		"a guest's sign-in name, no acct": entratest.Guest(entratest.Claims(org, oid, "sam@contoso.test", client, nonce), false),
+		"a guest's name as email": func() jwt.MapClaims {
+			cl := entratest.Claims(org, oid, "sam@contoso.test", client, nonce)
+			cl["email"] = entratest.GuestUPN("sam@contoso.test", "Fabrikam.onmicrosoft.com")
+			return cl
+		}(),
+	}
+	for name, claims := range cases {
+		_, err := validate(t, c, sign(claims), want)
+		assert.ErrorIs(t, err, entra.ErrGuestAccount, name)
+	}
+	assert.Empty(t, entra.Identity{Username: entratest.GuestUPN("sam@contoso.test", "f.onmicrosoft.com")}.Addresses())
+}
+
+
+func TestMadeUpKeyIDsFetchTheKeysOnlyAFewTimes(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	want := entra.Expect{ClientID: client, Nonce: nonce, Organisation: org}
+	stranger := entratest.NewKey(t, "")
+	for i := range 20 {
+		made := entratest.Key{ID: "made-up-" + string(rune('a'+i)), Private: stranger.Private} // never published
+		_, err := validate(t, c, entratest.Sign(t, made, entratest.Claims(org, oid, "sam@contoso.test", client, nonce)), want)
+		assert.ErrorIs(t, err, entra.ErrInvalid)
+	}
+	assert.LessOrEqual(t, ms.KeyFetches(), 6, "a few fetches, not one per made-up key ID")
+	_, err := validate(t, c, entratest.Sign(t, ms.SigningKey(), entratest.Claims(org, oid, "sam@contoso.test", client, nonce)), want)
+	require.NoError(t, err, "the published key still works")
+}
+
+func TestFetchingOneOrganisationsKeysKeepsNoOtherWaiting(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	release := ms.HoldKeys(org)
+	defer release()
+	first := entratest.Sign(t, ms.SigningKey(), entratest.Claims(org, oid, "sam@contoso.test", client, nonce))
+	second := entratest.Sign(t, ms.SigningKey(), entratest.Claims(otherOrg, oid, "sam@contoso.test", client, nonce))
+	slow := make(chan error, 1)
+	go func() {
+		_, err := c.Validate(context.Background(), first, entra.Expect{ClientID: client, Nonce: nonce, Organisation: org})
+		slow <- err
+	}()
+	for ms.KeyFetchesWaiting() == 0 { // the first organisation's fetch is under way
+		time.Sleep(time.Millisecond)
+	}
+	other := make(chan error, 1)
+	go func() {
+		_, err := c.Validate(context.Background(), second, entra.Expect{ClientID: client, Nonce: nonce, Organisation: otherOrg})
+		other <- err
+	}()
+	select {
+	case err := <-other:
+		require.NoError(t, err, "another organisation's keys")
+	case <-time.After(5 * time.Second):
+		t.Fatal("another organisation waited for the first one's keys")
+	}
+	release()
+	require.NoError(t, <-slow)
+}
+
+func TestManyAtOnceFetchAnOrganisationsKeysOnce(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	release := ms.HoldKeys(org)
+	raw := entratest.Sign(t, ms.SigningKey(), entratest.Claims(org, oid, "sam@contoso.test", client, nonce))
+	errs := make(chan error, 8)
+	for range 8 {
+		go func() {
+			_, err := c.Validate(context.Background(), raw, entra.Expect{ClientID: client, Nonce: nonce, Organisation: org})
+			errs <- err
+		}()
+	}
+	for ms.KeyFetchesWaiting() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond) // the others ask meanwhile
+	release()
+	for range 8 {
+		require.NoError(t, <-errs)
+	}
+	assert.Equal(t, 1, ms.KeyFetches())
 }

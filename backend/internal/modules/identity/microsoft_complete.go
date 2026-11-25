@@ -58,7 +58,7 @@ func (m *Module) CompleteMicrosoft(ctx context.Context, clientAddr string, in Mi
 	if err != nil {
 		return Session{}, err
 	}
-	rows, err := store.New(m.pool).MicrosoftAccounts(ctx, store.MicrosoftAccountsParams{MsTenantID: id.TenantID, MsObjectID: id.ObjectID, Emails: id.Emails()})
+	rows, err := store.New(m.pool).MicrosoftAccounts(ctx, store.MicrosoftAccountsParams{MsTenantID: id.TenantID, MsObjectID: id.ObjectID, Emails: id.Addresses()})
 	if err != nil {
 		return Session{}, err
 	}
@@ -106,7 +106,7 @@ func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoft
 		switch {
 		case errors.Is(err, entra.ErrPersonalAccount):
 			return id, microsoftFailed(ReasonPersonalAccount)
-		case errors.Is(err, entra.ErrOtherOrganisation):
+		case errors.Is(err, entra.ErrOtherOrganisation), errors.Is(err, entra.ErrGuestAccount): // a guest's home is another organisation
 			return id, microsoftFailed(ReasonOtherOrganisation)
 		}
 		return id, microsoftFailed(ReasonFailed)

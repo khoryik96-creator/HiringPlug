@@ -23,6 +23,9 @@ var (
 	ErrInvalid           = errors.New("entra: the ID token is not valid")
 	ErrPersonalAccount   = errors.New("entra: a personal Microsoft account")
 	ErrOtherOrganisation = errors.New("entra: an account of another organisation")
+	// ErrGuestAccount: a guest in the organisation (acct 1, or a guest's
+	// sign-in name): an account of another organisation, invited in.
+	ErrGuestAccount = errors.New("entra: a guest account")
 )
 
 const (
@@ -49,19 +52,46 @@ type Expect struct {
 type Identity struct {
 	TenantID, ObjectID string // organisation and object ID (GUIDs, lower case)
 	Email, Username    string // lower case; either may be empty
-	Name               string
+	// EmailVerified: Microsoft says the email's domain is one the
+	// organisation verified (the optional claim xms_edov). Without it the
+	// email is whatever an administrator typed, and proves nothing.
+	EmailVerified bool
+	Name          string
 }
 
-// Emails are the account's addresses (email, and the sign-in name when it
-// is one), each once.
-func (i Identity) Emails() []string {
+// Addresses are the addresses a team member may be recognised by: the
+// sign-in name (preferred_username: the UPN, in a domain the organisation
+// verified), and the email only when its domain is verified too. Lower
+// case, each once.
+func (i Identity) Addresses() []string {
 	var out []string
-	for _, e := range []string{i.Email, i.Username} {
-		if strings.Contains(e, "@") && (len(out) == 0 || out[0] != e) {
+	add := func(e string) {
+		if strings.Contains(e, "@") && !isGuestName(e) && (len(out) == 0 || out[0] != e) {
 			out = append(out, e)
 		}
 	}
+	add(i.Username)
+	if i.EmailVerified {
+		add(i.Email)
+	}
 	return out
+}
+
+// isGuestName reports whether a sign-in name is a guest's (an account of
+// another organisation invited in: name_home.domain#EXT#@org.onmicrosoft.com).
+func isGuestName(name string) bool { return strings.Contains(strings.ToLower(name), "#ext#") }
+
+// flag reads a claim Microsoft may send as true, "true", 1 or "1".
+type flag bool
+
+func (f *flag) UnmarshalJSON(b []byte) error {
+	switch strings.Trim(strings.ToLower(string(b)), `"`) {
+	case "true", "1":
+		*f = true
+	default:
+		*f = false
+	}
+	return nil
 }
 
 type idClaims struct {
@@ -71,6 +101,10 @@ type idClaims struct {
 	Email    string `json:"email"`
 	Username string `json:"preferred_username"`
 	Name     string `json:"name"`
+	// Optional claims (Entra › Token configuration): the email's domain is
+	// verified, and the account is a member (0) or a guest (1).
+	EmailVerified flag `json:"xms_edov"`
+	Account       flag `json:"acct"`
 	jwt.RegisteredClaims
 }
 
@@ -123,50 +157,81 @@ func (c *Client) Validate(ctx context.Context, raw string, want Expect) (Identit
 		return Identity{}, fmt.Errorf("%w: no object ID", ErrInvalid)
 	case len(claims.Audience) != 1:
 		return Identity{}, fmt.Errorf("%w: several audiences", ErrInvalid)
+	case bool(claims.Account) || isGuestName(claims.Username) || isGuestName(claims.Email):
+		return Identity{}, ErrGuestAccount
 	}
 	return Identity{
 		TenantID: tid, ObjectID: oid, Name: strings.TrimSpace(claims.Name),
 		Email: strings.ToLower(strings.TrimSpace(claims.Email)), Username: strings.ToLower(strings.TrimSpace(claims.Username)),
+		EmailVerified: bool(claims.EmailVerified),
 	}, nil
 }
 
 type keySet struct {
 	keys    map[string]*rsa.PublicKey
 	fetched time.Time
-	missed  map[string]bool // unknown key IDs looked for since
+	// missed are the unknown key IDs looked for in a run of fetches less
+	// than refetchAfter apart: kept across those fetches, so key IDs made up
+	// one after another cannot make every token fetch the keys again.
+	missed map[string]bool
 }
+
+var errUnknownKey = errors.New("unknown key")
 
 // key returns an organisation's signing key kid: from the cache, or fetched
 // again when the keys are a day old, or kid is new to them (Microsoft
-// rotates its keys). A key ID still unknown after that fetches the keys
-// again at most once a minute.
+// rotates its keys). Unknown key IDs fetch the keys again at most maxMissed
+// times in a row, then once refetchAfter has passed. The keys are fetched
+// without holding the lock (other organisations are never kept waiting),
+// once at a time per organisation.
 func (c *Client) key(ctx context.Context, tid, kid string) (*rsa.PublicKey, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	now := c.now()
 	set, ok := c.keys[tid]
 	if ok && now.Sub(set.fetched) < keysFor {
 		if k := set.keys[kid]; k != nil {
+			c.mu.Unlock()
 			return k, nil
 		}
 		if now.Sub(set.fetched) < refetchAfter && (set.missed[kid] || len(set.missed) >= maxMissed) {
-			return nil, errors.New("unknown key")
+			c.mu.Unlock()
+			return nil, errUnknownKey
 		}
 	}
-	keys, err := c.fetchKeys(ctx, tid)
+	c.mu.Unlock()
+	// Whoever asks first fetches; the others wait for that answer. The
+	// fetch is not cancelled with the first asker (the HTTP client's timeout
+	// bounds it).
+	got, err, _ := c.fetching.Do(tid, func() (any, error) {
+		keys, err := c.fetchKeys(context.WithoutCancel(ctx), tid)
+		if err != nil {
+			return nil, err
+		}
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		at := c.now()
+		missed := map[string]bool{}
+		if old, had := c.keys[tid]; had && at.Sub(old.fetched) < refetchAfter {
+			missed = old.missed
+		}
+		if len(c.keys) >= maxOrganisations {
+			c.keys = map[string]keySet{}
+		}
+		c.keys[tid] = keySet{keys: keys, fetched: at, missed: missed}
+		return keys, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if len(c.keys) >= maxOrganisations {
-		c.keys = map[string]keySet{}
-	}
-	set = keySet{keys: keys, fetched: now, missed: map[string]bool{}}
-	c.keys[tid] = set
-	if k := keys[kid]; k != nil {
+	if k := got.(map[string]*rsa.PublicKey)[kid]; k != nil {
 		return k, nil
 	}
-	set.missed[kid] = true
-	return nil, errors.New("unknown key")
+	c.mu.Lock()
+	if set, ok := c.keys[tid]; ok {
+		set.missed[kid] = true
+	}
+	c.mu.Unlock()
+	return nil, errUnknownKey
 }
 
 type jwk struct {

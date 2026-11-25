@@ -62,6 +62,8 @@ type Server struct {
 	grants    map[string]Grant
 	exchanges []Exchange
 	keyFetch  int
+	held      map[string]chan struct{} // organisations whose keys are held back
+	waiting   int
 }
 
 // New starts a fake sign-in service publishing one key.
@@ -99,6 +101,20 @@ func (s *Server) Exchanges() []Exchange {
 	return append([]Exchange(nil), s.exchanges...)
 }
 
+// SigningKey is the key tokens are signed with now (published).
+func (s *Server) SigningKey() Key {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.signWith
+}
+
+// KeyFetchesWaiting is how many key fetches are held back (HoldKeys) now.
+func (s *Server) KeyFetchesWaiting() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.waiting
+}
+
 // KeyFetches is how often the keys were fetched.
 func (s *Server) KeyFetches() int {
 	s.mu.Lock()
@@ -106,15 +122,59 @@ func (s *Server) KeyFetches() int {
 	return s.keyFetch
 }
 
+// HoldKeys makes fetching an organisation's keys wait until release is
+// called (to see who else is kept waiting meanwhile).
+func (s *Server) HoldKeys(tenantID string) (release func()) {
+	gate := make(chan struct{})
+	s.mu.Lock()
+	if s.held == nil {
+		s.held = map[string]chan struct{}{}
+	}
+	s.held[tenantID] = gate
+	s.mu.Unlock()
+	var once sync.Once
+	return func() { once.Do(func() { close(gate) }) }
+}
+
 // Claims are a valid token's claims for an account, to change as a test
-// needs: issued now, for an hour.
+// needs: issued now, for an hour; a member of the organisation (acct 0)
+// whose sign-in name is email, and whose email Microsoft does not vouch for
+// (no xms_edov: see VerifiedEmail).
 func Claims(tenantID, objectID, email, clientID, nonce string) jwt.MapClaims {
 	now := time.Now()
 	return jwt.MapClaims{
 		"iss": entra.Issuer(tenantID), "aud": clientID, "tid": tenantID, "oid": objectID,
-		"email": email, "preferred_username": email, "name": "Test Person", "nonce": nonce, "ver": "2.0",
+		"email": email, "preferred_username": email, "name": "Test Person", "nonce": nonce, "ver": "2.0", "acct": 0,
 		"iat": now.Unix(), "nbf": now.Unix(), "exp": now.Add(time.Hour).Unix(),
 	}
+}
+
+// VerifiedEmail is what Microsoft adds when the app asks for the optional
+// claim xms_edov (Entra › Token configuration): whether the email's domain
+// is one the organisation verified.
+func VerifiedEmail(c jwt.MapClaims, verified bool) jwt.MapClaims {
+	c["xms_edov"] = verified
+	return c
+}
+
+// Guest makes claims a guest's: an account of another organisation invited
+// in. acct is the optional claim (1: guest); without it, the guest's
+// sign-in name (name_home.domain#EXT#@...) says so too.
+func Guest(c jwt.MapClaims, withAcct bool) jwt.MapClaims {
+	if withAcct {
+		c["acct"] = 1
+	} else {
+		delete(c, "acct")
+	}
+	if email, _ := c["email"].(string); email != "" {
+		c["preferred_username"] = GuestUPN(email, "fabrikam.onmicrosoft.com")
+	}
+	return c
+}
+
+// GuestUPN is the sign-in name an organisation gives a guest with email.
+func GuestUPN(email, orgDomain string) string {
+	return strings.ReplaceAll(email, "@", "_") + "#EXT#@" + orgDomain
 }
 
 // Sign signs claims with key.
@@ -133,6 +193,18 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	switch {
 	case strings.HasSuffix(r.URL.Path, "/discovery/v2.0/keys"):
+		s.mu.Lock()
+		gate := s.held[strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")[0]]
+		if gate != nil {
+			s.waiting++
+		}
+		s.mu.Unlock()
+		if gate != nil {
+			<-gate
+			s.mu.Lock()
+			s.waiting--
+			s.mu.Unlock()
+		}
 		s.mu.Lock()
 		s.keyFetch++
 		keys := make([]map[string]string, 0, len(s.published))

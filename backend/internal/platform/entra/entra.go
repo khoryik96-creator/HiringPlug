@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -59,8 +61,9 @@ type Client struct {
 	http  *http.Client
 	now   func() time.Time
 
-	mu   sync.Mutex
-	keys map[string]keySet // by organisation
+	mu       sync.Mutex
+	keys     map[string]keySet // by organisation
+	fetching singleflight.Group
 }
 
 // New returns a client for the sign-in service at login (DefaultLogin when
