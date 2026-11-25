@@ -49,6 +49,31 @@ func (h *HTTP) CompleteMicrosoftSignIn(ctx context.Context, req api.CompleteMicr
 	return api.CompleteMicrosoftSignIn200JSONResponse{Token: s.Token, ExpiresAt: s.ExpiresAt}, nil
 }
 
+// StartConnectingMicrosoft handles POST /v1/me/microsoft/start.
+func (h *HTTP) StartConnectingMicrosoft(ctx context.Context, req api.StartConnectingMicrosoftRequestObject) (api.StartConnectingMicrosoftResponseObject, error) {
+	target, err := h.m.StartConnectingMicrosoft(ctx, authz.MustFromContext(ctx), clientip.From(ctx), req.Body.BindingHash)
+	if err != nil {
+		return nil, err
+	}
+	return api.StartConnectingMicrosoft200JSONResponse{Url: target}, nil
+}
+
+// FinishConnectingMicrosoft handles POST /v1/me/microsoft/complete.
+func (h *HTTP) FinishConnectingMicrosoft(ctx context.Context, req api.FinishConnectingMicrosoftRequestObject) (api.FinishConnectingMicrosoftResponseObject, error) {
+	if err := h.m.FinishConnectingMicrosoft(ctx, authz.MustFromContext(ctx), clientip.From(ctx), req.Body.Ticket, req.Body.Binding); err != nil {
+		return nil, err
+	}
+	return api.FinishConnectingMicrosoft204Response{}, nil
+}
+
+// UnlinkMicrosoft handles DELETE /v1/team/{userId}/microsoft.
+func (h *HTTP) UnlinkMicrosoft(ctx context.Context, req api.UnlinkMicrosoftRequestObject) (api.UnlinkMicrosoftResponseObject, error) {
+	if err := h.m.UnlinkMicrosoft(ctx, authz.MustFromContext(ctx), req.UserId); err != nil {
+		return nil, err
+	}
+	return api.UnlinkMicrosoft204Response{}, nil
+}
+
 func microsoftSignInToAPI(s MicrosoftSignIn) api.MicrosoftSignInSettings {
 	return api.MicrosoftSignInSettings{Enabled: s.Enabled, OrganisationId: c.OrNull(s.OrganisationID), Required: s.Required,
 		CallbackUrl: s.CallbackURL, AppSource: api.MicrosoftSignInSettingsAppSource(s.AppSource), ClientId: c.OrNull(s.ClientID)}

@@ -25,9 +25,17 @@ x-module:
       description: >-
         Signing in with Microsoft did not work. `details.reason` says why:
         `not_on_team` (the Microsoft account is not on the team of a company that signs in with Microsoft, or was deactivated: an owner invites them),
-        `other_organisation` (an account of another Microsoft organisation than the company's),
+        `other_organisation` (an account of another Microsoft organisation than the company's, or a guest in it),
         `personal_account` (a personal Microsoft account: use the work account),
+        `connect_first` (the account's address is an owner's: an account is never linked to an owner by its address; the owner connects it from Your account, signed in, or accepts their invitation with it),
         `failed` (the sign-in expired, was used already or finished in another browser, or Microsoft's answer could not be checked: start again).
+    MICROSOFT_CONNECT_FAILED:
+      status: 422
+      description: >-
+        Connecting your Microsoft account (Your account) did not work. `details.reason` says why:
+        `already_connected` (one is connected to you already: an owner unlinks it on the Team page first),
+        `linked_elsewhere` (that Microsoft account is connected to someone else on the team),
+        `other_organisation`, `personal_account` or `failed` (as for signing in).
     MICROSOFT_SIGN_IN_UNAVAILABLE:
       status: 422
       description: Signing in with Microsoft is not set up for this company (or, when no company is named, on this server).
@@ -410,6 +418,75 @@ paths:
         '409': { $ref: '#/components/responses/ChooseCompany' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
+  /v1/me/microsoft/start:
+    post:
+      operationId: startConnectingMicrosoft
+      tags: [identity]
+      summary: Connect your Microsoft work account, to sign in with it (send the browser to the returned address)
+      description: >-
+        Signed in (with a session, not an API key), at a company that signs in
+        with Microsoft. Microsoft's redirect comes back to
+        /#/sign-in/microsoft as for signing in; finish with
+        /v1/me/microsoft/complete in this browser tab, still signed in. The
+        way owners link a Microsoft account (never linked to them by its
+        address alone); anyone else may use it too. They are emailed.
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MicrosoftConnectStart' }
+      responses:
+        '200':
+          description: Where to send the browser (Microsoft's sign-in page)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicrosoftSignInRedirect' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/MicrosoftConnectFailed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/me/microsoft/complete:
+    post:
+      operationId: finishConnectingMicrosoft
+      tags: [identity]
+      summary: Finish connecting your Microsoft account, in the browser tab that started it
+      description: The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MicrosoftConnectComplete' }
+      responses:
+        '204': { description: Connected }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/MicrosoftConnectFailed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/team/{userId}/microsoft:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: '#/components/schemas/UserId' } }
+    delete:
+      operationId: unlinkMicrosoft
+      tags: [identity]
+      summary: Unlink someone's Microsoft account; their Microsoft sessions end (only owners unlink owners)
+      description: >-
+        They can link one again by signing in with Microsoft (with an address
+        of theirs), or, owners, from Your account. Audited
+        (user.microsoft_unlinked).
+      x-permission: identity.team:manage
+      responses:
+        '204': { description: Unlinked }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+
   /v1/agency/microsoft-sign-in:
     get:
       operationId: getMicrosoftSignIn
@@ -431,7 +508,10 @@ paths:
       description: >-
         Requiring Microsoft refuses passwords to everyone but owners at once:
         signing in, password resets and links, and sessions signed in with a
-        password.
+        password. Turning it off ends sessions signed in with Microsoft;
+        changing the organisation ends them too, and removes links to
+        Microsoft accounts of any other organisation (the audit entry counts
+        them: linksRemoved).
       x-permission: identity.roles:manage
       requestBody:
         required: true
@@ -829,6 +909,11 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    MicrosoftConnectFailed:
+      description: Connecting your Microsoft account did not work (MICROSOFT_CONNECT_FAILED; details.reason says why).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     MicrosoftSignInUnavailable:
       description: Signing in with Microsoft is not set up (MICROSOFT_SIGN_IN_UNAVAILABLE).
       content:
@@ -1008,8 +1093,10 @@ components:
       enum: [currentRole, status, noticePeriod, currentSalary, expectedSalary, workAuthorization, nationality, residence, location, source, industry, tags, email, phone, updated]
     Me:
       type: object
-      required: [user, tenant, role, permissions, hasPassword]
+      required: [user, tenant, role, permissions, hasPassword, microsoftSignIn, microsoftLinked]
       properties:
+        microsoftSignIn: { type: boolean, description: "Your company lets the team sign in with Microsoft." }
+        microsoftLinked: { type: boolean, description: "A Microsoft account is linked to you (you can sign in with it)." }
         signInMethod:
           description: How this session was signed in (left out for sessions from before 1.46.0).
           allOf: [{ $ref: '#/components/schemas/SignInMethod' }]
@@ -1134,6 +1221,22 @@ components:
         email: { type: string, format: email, maxLength: 254, description: "The email they typed: suggested to Microsoft (it does not choose the company)." }
         company: { type: string, maxLength: 100, description: "The company's careers page address (slug)." }
         invite: { type: string, minLength: 20, maxLength: 200, description: "An invitation link's token: accept it with Microsoft instead of choosing a password." }
+    MicrosoftConnectStart:
+      type: object
+      additionalProperties: false
+      required: [bindingHash]
+      properties:
+        bindingHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.
+    MicrosoftConnectComplete:
+      type: object
+      additionalProperties: false
+      required: [ticket, binding]
+      properties:
+        ticket: { type: string, minLength: 20, maxLength: 200, description: "From the app address Microsoft's sign-in came back to." }
+        binding: { type: string, minLength: 32, maxLength: 200, description: "The value whose SHA-256 the start sent." }
     MicrosoftSignInRedirect:
       type: object
       required: [url]

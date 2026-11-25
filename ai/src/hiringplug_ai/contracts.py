@@ -174,6 +174,7 @@ class ErrorCode(StrEnum):
     MEANING_READING = "MEANING_READING"
     MEANING_UNAVAILABLE = "MEANING_UNAVAILABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+    MICROSOFT_CONNECT_FAILED = "MICROSOFT_CONNECT_FAILED"
     MICROSOFT_REQUIRED = "MICROSOFT_REQUIRED"
     MICROSOFT_SIGN_IN_FAILED = "MICROSOFT_SIGN_IN_FAILED"
     MICROSOFT_SIGN_IN_UNAVAILABLE = "MICROSOFT_SIGN_IN_UNAVAILABLE"
@@ -4143,6 +4144,36 @@ class MicrosoftSignInStart(BaseModel):
             min_length=20,
         ),
     ] = None
+
+
+class MicrosoftConnectStart(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    bindingHash: Annotated[
+        str,
+        Field(
+            description="SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.",
+            pattern="^[0-9a-f]{64}$",
+        ),
+    ]
+
+
+class MicrosoftConnectComplete(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ticket: Annotated[
+        str,
+        Field(
+            description="From the app address Microsoft's sign-in came back to.",
+            max_length=200,
+            min_length=20,
+        ),
+    ]
+    binding: Annotated[
+        str, Field(description="The value whose SHA-256 the start sent.", max_length=200, min_length=32)
+    ]
 
 
 class MicrosoftSignInRedirect(BaseModel):
@@ -8891,6 +8922,10 @@ class Favourites(BaseModel):
 
 
 class Me(BaseModel):
+    microsoftSignIn: Annotated[bool, Field(description="Your company lets the team sign in with Microsoft.")]
+    microsoftLinked: Annotated[
+        bool, Field(description="A Microsoft account is linked to you (you can sign in with it).")
+    ]
     signInMethod: Annotated[
         SignInMethod | None,
         Field(description="How this session was signed in (left out for sessions from before 1.46.0)."),

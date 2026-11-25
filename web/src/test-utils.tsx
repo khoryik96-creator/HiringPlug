@@ -26,6 +26,8 @@ export function testMe(permissions: Permission[]): Me {
     role: "recruiter",
     permissions,
     hasPassword: true,
+    microsoftSignIn: false,
+    microsoftLinked: false,
   };
 }
 

@@ -34,10 +34,13 @@ FROM app_accounts_by_email(sqlc.arg(email)::text);
 SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS user_id, kind::text AS kind
 FROM app_user_link(sqlc.arg(token_hash)::text);
 
--- microsoft_required: the company requires Microsoft (passwords only for owners).
+-- microsoft_required: the company requires Microsoft (passwords only for owners);
+-- microsoft_sign_in: it signs in with Microsoft at all (else Microsoft sessions stop).
 -- name: UserAuth :one
 SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
-  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required
+  u.microsoft_sessions_after,
+  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
+  coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
 FROM app_user u WHERE u.id = @id;
 
 -- name: SignedIn :exec
@@ -230,14 +233,15 @@ UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval 
 -- only what routing and finishing a sign-in need (migration 00198).
 
 -- name: SaveMicrosoftFlow :exec
-SELECT app_microsoft_flow_save(@key_hash::text, @binding_hash::text, sqlc.narg(tenant_id)::text, @client_id::text,
-  @authority::text, @sealed::text, @verified::boolean, sqlc.narg(ticket_hash)::text, @expires_at::timestamptz);
+SELECT app_microsoft_flow_save(@key_hash::text, @binding_hash::text, sqlc.narg(tenant_id)::text, @purpose::text, sqlc.narg(user_id)::text,
+  @client_id::text, @authority::text, @sealed::text, @verified::boolean, sqlc.narg(ticket_hash)::text, @expires_at::timestamptz);
 
 -- name: ParkMicrosoftFlow :one
 SELECT app_microsoft_flow_park(@key_hash::text, @sealed_code::text, @ticket_hash::text)::integer AS parked;
 
 -- name: TakeMicrosoftFlow :one
-SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id, client_id::text AS client_id, authority::text AS authority,
+SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id,
+  purpose::text AS purpose, coalesce(user_id, '')::text AS user_id, client_id::text AS client_id, authority::text AS authority,
   sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
 FROM app_microsoft_flow_take(@ticket_hash::text);
 
@@ -247,8 +251,8 @@ FROM app_microsoft_sign_in_tenants(sqlc.narg(slug)::text);
 
 -- name: MicrosoftAccounts :many
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
-  user_id::text AS user_id, linked::boolean AS linked
-FROM app_microsoft_accounts(@ms_tenant_id::text, @ms_object_id::text, @emails::text[]);
+  user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner
+FROM app_microsoft_accounts(@ms_tenant_id::text, @ms_object_id::text, @addresses::text[]);
 
 -- The company's Microsoft sign-in settings.
 -- name: MicrosoftSettings :one
@@ -259,12 +263,33 @@ UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(
 WHERE id = app_current_tenant()
 RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
 
+-- A link to another organisation (left from before the company changed it)
+-- makes way for a new one.
+-- name: DropStaleMicrosoftLink :exec
+DELETE FROM user_microsoft WHERE user_id = @user_id AND ms_tenant_id <> @ms_tenant_id;
+
 -- name: LinkMicrosoft :exec
 INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id)
 VALUES (app_current_tenant(), @user_id, @ms_tenant_id, @ms_object_id);
 
--- name: MicrosoftLink :one
-SELECT ms_tenant_id, ms_object_id FROM user_microsoft WHERE user_id = @user_id;
+-- name: UnlinkMicrosoft :one
+DELETE FROM user_microsoft WHERE user_id = @user_id RETURNING ms_tenant_id;
+
+-- The company changed its organisation: links to any other go.
+-- name: UnlinkOtherOrganisations :execrows
+DELETE FROM user_microsoft WHERE ms_tenant_id <> coalesce(sqlc.narg(microsoft_tenant_id)::text, '');
+
+-- Ends sessions signed in with Microsoft before at: one person's, or (no user)
+-- everyone's. Always later than before: a session signed in since the last
+-- end (dated that end, in the same second) ends too.
+-- name: EndMicrosoftSessions :exec
+UPDATE app_user SET microsoft_sessions_after = greatest(@at::timestamptz, microsoft_sessions_after + interval '1 second')
+WHERE sqlc.narg(user_id)::text IS NULL OR id = sqlc.narg(user_id)::text;
+
+-- Whether the company signs in with Microsoft, and whether a Microsoft account is linked to them.
+-- name: MyMicrosoft :one
+SELECT coalesce((SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant()), false)::boolean AS sign_in,
+  EXISTS (SELECT 1 FROM user_microsoft WHERE user_id = @user_id)::boolean AS linked;
 
 -- name: UsedMicrosoft :exec
 UPDATE user_microsoft SET last_used_at = now() WHERE user_id = @user_id;

@@ -30,12 +30,18 @@ func (h *HTTP) GetMe(ctx context.Context, _ api.GetMeRequestObject) (api.GetMeRe
 	if err != nil {
 		return nil, err
 	}
+	msSignIn, msLinked, err := h.m.MyMicrosoft(ctx, p)
+	if err != nil {
+		return nil, err
+	}
 	out := api.GetMe200JSONResponse{
-		User:        api.User{Id: p.UserID, Email: openapi_types.Email(p.Email), Name: p.Name},
-		Tenant:      api.Tenant{Id: p.TenantID, Name: tenant.Name, CareersSlug: tenant.CareersSlug},
-		Role:        p.Role,
-		Permissions: p.Permissions(),
-		HasPassword: hasPassword,
+		User:            api.User{Id: p.UserID, Email: openapi_types.Email(p.Email), Name: p.Name},
+		Tenant:          api.Tenant{Id: p.TenantID, Name: tenant.Name, CareersSlug: tenant.CareersSlug},
+		Role:            p.Role,
+		Permissions:     p.Permissions(),
+		HasPassword:     hasPassword,
+		MicrosoftSignIn: msSignIn,
+		MicrosoftLinked: msLinked,
 	}
 	switch p.Session().Method {
 	case authn.MethodPassword:

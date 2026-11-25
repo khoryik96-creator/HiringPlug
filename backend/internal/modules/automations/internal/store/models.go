@@ -99,18 +99,19 @@ type ApiKey struct {
 }
 
 type AppUser struct {
-	ID               string
-	TenantID         string
-	Email            string
-	Name             string
-	Role             string
-	Active           bool
-	CreatedAt        time.Time
-	PasswordHash     *string
-	Invited          bool
-	TokensValidAfter *time.Time
-	LastSignInAt     *time.Time
-	TeamID           *string
+	ID                     string
+	TenantID               string
+	Email                  string
+	Name                   string
+	Role                   string
+	Active                 bool
+	CreatedAt              time.Time
+	PasswordHash           *string
+	Invited                bool
+	TokensValidAfter       *time.Time
+	LastSignInAt           *time.Time
+	TeamID                 *string
+	MicrosoftSessionsAfter *time.Time
 }
 
 type Application struct {
@@ -1553,6 +1554,8 @@ type MicrosoftSignInFlow struct {
 	KeyHash     string
 	BindingHash string
 	TenantID    *string
+	Purpose     string
+	UserID      *string
 	ClientID    string
 	Authority   string
 	Sealed      string

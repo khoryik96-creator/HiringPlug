@@ -60,7 +60,10 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 // SetMicrosoftSignIn lets the team sign in with Microsoft accounts of the
 // company's organisation (or stops it), and requires it of everyone but
 // owners (password sessions of the others stop working at once: see
-// Authenticate).
+// Authenticate). Turning it off ends the sessions signed in with Microsoft;
+// changing the organisation ends them too and removes the links to the old
+// organisation's accounts (counted in the audit entry): everyone links an
+// account of the new one at their next sign-in (owners from Your account).
 func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enabled bool, organisation *string, required bool) (MicrosoftSignIn, error) {
 	var org *string
 	if organisation != nil && *organisation != "" {
@@ -99,12 +102,27 @@ func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enab
 		if out, err = m.microsoftSignIn(ctx, tx, q, p.TenantID); err != nil {
 			return err
 		}
-		if before.Enabled == out.Enabled && before.Required == out.Required && deref(before.OrganisationID) == deref(out.OrganisationID) {
+		orgChanged := deref(before.OrganisationID) != deref(out.OrganisationID)
+		if before.Enabled == out.Enabled && before.Required == out.Required && !orgChanged {
 			return nil
 		}
-		return audit.Record(ctx, tx, audit.Entry{Action: "agency.microsoft_sign_in_changed", EntityType: "tenant", EntityID: p.TenantID,
-			Changes: map[string]any{"enabled": enabled, "organisationId": org, "required": required,
-				"before": map[string]any{"enabled": before.Enabled, "organisationId": before.OrganisationID, "required": before.Required}}})
+		changes := map[string]any{"enabled": enabled, "organisationId": org, "required": required,
+			"before": map[string]any{"enabled": before.Enabled, "organisationId": before.OrganisationID, "required": before.Required}}
+		if orgChanged && before.OrganisationID != nil {
+			// Accounts of the old organisation no longer sign anyone in:
+			// their links go, and everyone links again at their next sign-in.
+			removed, err := q.UnlinkOtherOrganisations(ctx, org)
+			if err != nil {
+				return err
+			}
+			changes["linksRemoved"] = removed
+		}
+		if (before.Enabled && !out.Enabled) || (orgChanged && before.OrganisationID != nil) {
+			if err := q.EndMicrosoftSessions(ctx, store.EndMicrosoftSessionsParams{At: sessionsEndedAt()}); err != nil {
+				return err
+			}
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "agency.microsoft_sign_in_changed", EntityType: "tenant", EntityID: p.TenantID, Changes: changes})
 	})
 	return out, err
 }

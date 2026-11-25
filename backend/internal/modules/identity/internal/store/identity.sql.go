@@ -192,6 +192,22 @@ func (q *Queries) DisableTwoStep(ctx context.Context, userID string) (int64, err
 	return result.RowsAffected(), nil
 }
 
+const dropStaleMicrosoftLink = `-- name: DropStaleMicrosoftLink :exec
+DELETE FROM user_microsoft WHERE user_id = $1 AND ms_tenant_id <> $2
+`
+
+type DropStaleMicrosoftLinkParams struct {
+	UserID     string
+	MsTenantID string
+}
+
+// A link to another organisation (left from before the company changed it)
+// makes way for a new one.
+func (q *Queries) DropStaleMicrosoftLink(ctx context.Context, arg DropStaleMicrosoftLinkParams) error {
+	_, err := q.db.Exec(ctx, dropStaleMicrosoftLink, arg.UserID, arg.MsTenantID)
+	return err
+}
+
 const enableTwoStep = `-- name: EnableTwoStep :execrows
 UPDATE user_two_step SET secret_sealed = pending_sealed, pending_sealed = NULL, enabled_at = now(), last_step = $1,
   recovery_hashes = $2, updated_at = now()
@@ -224,6 +240,24 @@ type EndLinksParams struct {
 // Using a link, or replacing it with a new one, ends it.
 func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 	_, err := q.db.Exec(ctx, endLinks, arg.UserID, arg.Kind)
+	return err
+}
+
+const endMicrosoftSessions = `-- name: EndMicrosoftSessions :exec
+UPDATE app_user SET microsoft_sessions_after = greatest($1::timestamptz, microsoft_sessions_after + interval '1 second')
+WHERE $2::text IS NULL OR id = $2::text
+`
+
+type EndMicrosoftSessionsParams struct {
+	At     time.Time
+	UserID *string
+}
+
+// Ends sessions signed in with Microsoft before at: one person's, or (no user)
+// everyone's. Always later than before: a session signed in since the last
+// end (dated that end, in the same second) ends too.
+func (q *Queries) EndMicrosoftSessions(ctx context.Context, arg EndMicrosoftSessionsParams) error {
+	_, err := q.db.Exec(ctx, endMicrosoftSessions, arg.At, arg.UserID)
 	return err
 }
 
@@ -710,14 +744,14 @@ func (q *Queries) ListTeamGroups(ctx context.Context) ([]ListTeamGroupsRow, erro
 
 const microsoftAccounts = `-- name: MicrosoftAccounts :many
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
-  user_id::text AS user_id, linked::boolean AS linked
+  user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner
 FROM app_microsoft_accounts($1::text, $2::text, $3::text[])
 `
 
 type MicrosoftAccountsParams struct {
 	MsTenantID string
 	MsObjectID string
-	Emails     []string
+	Addresses  []string
 }
 
 type MicrosoftAccountsRow struct {
@@ -726,10 +760,11 @@ type MicrosoftAccountsRow struct {
 	CareersSlug string
 	UserID      string
 	Linked      bool
+	IsOwner     bool
 }
 
 func (q *Queries) MicrosoftAccounts(ctx context.Context, arg MicrosoftAccountsParams) ([]MicrosoftAccountsRow, error) {
-	rows, err := q.db.Query(ctx, microsoftAccounts, arg.MsTenantID, arg.MsObjectID, arg.Emails)
+	rows, err := q.db.Query(ctx, microsoftAccounts, arg.MsTenantID, arg.MsObjectID, arg.Addresses)
 	if err != nil {
 		return nil, err
 	}
@@ -743,6 +778,7 @@ func (q *Queries) MicrosoftAccounts(ctx context.Context, arg MicrosoftAccountsPa
 			&i.CareersSlug,
 			&i.UserID,
 			&i.Linked,
+			&i.IsOwner,
 		); err != nil {
 			return nil, err
 		}
@@ -752,22 +788,6 @@ func (q *Queries) MicrosoftAccounts(ctx context.Context, arg MicrosoftAccountsPa
 		return nil, err
 	}
 	return items, nil
-}
-
-const microsoftLink = `-- name: MicrosoftLink :one
-SELECT ms_tenant_id, ms_object_id FROM user_microsoft WHERE user_id = $1
-`
-
-type MicrosoftLinkRow struct {
-	MsTenantID string
-	MsObjectID string
-}
-
-func (q *Queries) MicrosoftLink(ctx context.Context, userID string) (MicrosoftLinkRow, error) {
-	row := q.db.QueryRow(ctx, microsoftLink, userID)
-	var i MicrosoftLinkRow
-	err := row.Scan(&i.MsTenantID, &i.MsObjectID)
-	return i, err
 }
 
 const microsoftSettings = `-- name: MicrosoftSettings :one
@@ -816,6 +836,24 @@ func (q *Queries) MicrosoftSignInTenants(ctx context.Context, slug *string) ([]M
 		return nil, err
 	}
 	return items, nil
+}
+
+const myMicrosoft = `-- name: MyMicrosoft :one
+SELECT coalesce((SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant()), false)::boolean AS sign_in,
+  EXISTS (SELECT 1 FROM user_microsoft WHERE user_id = $1)::boolean AS linked
+`
+
+type MyMicrosoftRow struct {
+	SignIn bool
+	Linked bool
+}
+
+// Whether the company signs in with Microsoft, and whether a Microsoft account is linked to them.
+func (q *Queries) MyMicrosoft(ctx context.Context, userID string) (MyMicrosoftRow, error) {
+	row := q.db.QueryRow(ctx, myMicrosoft, userID)
+	var i MyMicrosoftRow
+	err := row.Scan(&i.SignIn, &i.Linked)
+	return i, err
 }
 
 const parkMicrosoftFlow = `-- name: ParkMicrosoftFlow :one
@@ -916,14 +954,16 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) er
 const saveMicrosoftFlow = `-- name: SaveMicrosoftFlow :exec
 
 
-SELECT app_microsoft_flow_save($1::text, $2::text, $3::text, $4::text,
-  $5::text, $6::text, $7::boolean, $8::text, $9::timestamptz)
+SELECT app_microsoft_flow_save($1::text, $2::text, $3::text, $4::text, $5::text,
+  $6::text, $7::text, $8::text, $9::boolean, $10::text, $11::timestamptz)
 `
 
 type SaveMicrosoftFlowParams struct {
 	KeyHash     string
 	BindingHash string
 	TenantID    *string
+	Purpose     string
+	UserID      *string
 	ClientID    string
 	Authority   string
 	Sealed      string
@@ -940,6 +980,8 @@ func (q *Queries) SaveMicrosoftFlow(ctx context.Context, arg SaveMicrosoftFlowPa
 		arg.KeyHash,
 		arg.BindingHash,
 		arg.TenantID,
+		arg.Purpose,
+		arg.UserID,
 		arg.ClientID,
 		arg.Authority,
 		arg.Sealed,
@@ -1139,7 +1181,8 @@ func (q *Queries) SignedIn(ctx context.Context, id string) error {
 }
 
 const takeMicrosoftFlow = `-- name: TakeMicrosoftFlow :one
-SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id, client_id::text AS client_id, authority::text AS authority,
+SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id,
+  purpose::text AS purpose, coalesce(user_id, '')::text AS user_id, client_id::text AS client_id, authority::text AS authority,
   sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
 FROM app_microsoft_flow_take($1::text)
 `
@@ -1148,6 +1191,8 @@ type TakeMicrosoftFlowRow struct {
 	KeyHash     string
 	BindingHash string
 	TenantID    string
+	Purpose     string
+	UserID      string
 	ClientID    string
 	Authority   string
 	Sealed      string
@@ -1162,6 +1207,8 @@ func (q *Queries) TakeMicrosoftFlow(ctx context.Context, ticketHash string) (Tak
 		&i.KeyHash,
 		&i.BindingHash,
 		&i.TenantID,
+		&i.Purpose,
+		&i.UserID,
 		&i.ClientID,
 		&i.Authority,
 		&i.Sealed,
@@ -1262,6 +1309,30 @@ func (q *Queries) TwoStepUsers(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const unlinkMicrosoft = `-- name: UnlinkMicrosoft :one
+DELETE FROM user_microsoft WHERE user_id = $1 RETURNING ms_tenant_id
+`
+
+func (q *Queries) UnlinkMicrosoft(ctx context.Context, userID string) (string, error) {
+	row := q.db.QueryRow(ctx, unlinkMicrosoft, userID)
+	var ms_tenant_id string
+	err := row.Scan(&ms_tenant_id)
+	return ms_tenant_id, err
+}
+
+const unlinkOtherOrganisations = `-- name: UnlinkOtherOrganisations :execrows
+DELETE FROM user_microsoft WHERE ms_tenant_id <> coalesce($1::text, '')
+`
+
+// The company changed its organisation: links to any other go.
+func (q *Queries) UnlinkOtherOrganisations(ctx context.Context, microsoftTenantID *string) (int64, error) {
+	result, err := q.db.Exec(ctx, unlinkOtherOrganisations, microsoftTenantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateMember = `-- name: UpdateMember :one
@@ -1403,25 +1474,30 @@ func (q *Queries) UsedMicrosoft(ctx context.Context, userID string) error {
 
 const userAuth = `-- name: UserAuth :one
 SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
-  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required
+  u.microsoft_sessions_after,
+  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
+  coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
 FROM app_user u WHERE u.id = $1
 `
 
 type UserAuthRow struct {
-	ID                string
-	TenantID          string
-	Email             string
-	Name              string
-	Role              string
-	TeamID            *string
-	Active            bool
-	Invited           bool
-	PasswordHash      *string
-	TokensValidAfter  *time.Time
-	MicrosoftRequired bool
+	ID                     string
+	TenantID               string
+	Email                  string
+	Name                   string
+	Role                   string
+	TeamID                 *string
+	Active                 bool
+	Invited                bool
+	PasswordHash           *string
+	TokensValidAfter       *time.Time
+	MicrosoftSessionsAfter *time.Time
+	MicrosoftRequired      bool
+	MicrosoftSignIn        bool
 }
 
-// microsoft_required: the company requires Microsoft (passwords only for owners).
+// microsoft_required: the company requires Microsoft (passwords only for owners);
+// microsoft_sign_in: it signs in with Microsoft at all (else Microsoft sessions stop).
 func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) {
 	row := q.db.QueryRow(ctx, userAuth, id)
 	var i UserAuthRow
@@ -1436,7 +1512,9 @@ func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) 
 		&i.Invited,
 		&i.PasswordHash,
 		&i.TokensValidAfter,
+		&i.MicrosoftSessionsAfter,
 		&i.MicrosoftRequired,
+		&i.MicrosoftSignIn,
 	)
 	return i, err
 }

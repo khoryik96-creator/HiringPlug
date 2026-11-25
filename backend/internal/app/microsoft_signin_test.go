@@ -47,7 +47,7 @@ func TestSigningInWithMicrosoft(t *testing.T) {
 	assert.Equal(t, "server-secret", last.ClientSecret)
 	assert.Equal(t, "http://app.test/v1/auth/microsoft/callback", last.Redirect)
 	assert.Equal(t, flow.challenge, entratest.Challenge(last.Verifier), "PKCE: the verifier behind the challenge")
-	assert.Equal(t, []string{`{"organisationId": "` + org + `"}`}, audited(t, tenant.ID, "user.microsoft_linked"))
+	assert.Equal(t, []string{`{"by": "sign_in", "organisationId": "` + org + `"}`}, audited(t, tenant.ID, "user.microsoft_linked"))
 	assert.Contains(t, audited(t, tenant.ID, "user.signed_in"), `{"method": "microsoft"}`)
 
 	// Later sign-ins match the account, whatever its address has become.

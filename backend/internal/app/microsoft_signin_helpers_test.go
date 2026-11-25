@@ -79,12 +79,47 @@ type msFlow struct {
 // start starts a sign-in (body: email, company or invite).
 func (f *msTest) start(body map[string]any) (msFlow, *response) {
 	f.t.Helper()
+	return f.begin("/v1/auth/microsoft/start", "", body)
+}
+
+// startConnecting starts connecting the signed-in person's Microsoft account (Your account).
+func (f *msTest) startConnecting(token string) (msFlow, *response) {
+	f.t.Helper()
+	return f.begin("/v1/me/microsoft/start", token, nil)
+}
+
+// connect connects the Microsoft account claims are for to the person signed in with token.
+func (f *msTest) connect(token string, claims func(msFlow) jwt.MapClaims) *response {
+	f.t.Helper()
+	flow, res := f.startConnecting(token)
+	require.Equal(f.t, http.StatusOK, res.Status, "%s", res.Body)
+	code := "code-" + randomBinding()
+	f.ms.Grant(code, entratest.Grant{Claims: claims(flow)})
+	return f.finishConnecting(token, f.ticket(flow, code), flow.binding)
+}
+
+func (f *msTest) finishConnecting(token, ticket, binding string) *response {
+	f.t.Helper()
+	return f.a.request(http.MethodPost, "/v1/me/microsoft/complete", token, map[string]any{"ticket": ticket, "binding": binding})
+}
+
+// connectRefused checks connecting was refused, and why.
+func connectRefused(t *testing.T, res *response, reason string) {
+	t.Helper()
+	require.Equal(t, http.StatusUnprocessableEntity, res.Status, "%s", res.Body)
+	e := res.Error()
+	require.Equal(t, api.ErrorCodeMICROSOFTCONNECTFAILED, e.Error.Code)
+	assert.Equal(t, reason, (*e.Error.Details)["reason"])
+}
+
+func (f *msTest) begin(path, token string, body map[string]any) (msFlow, *response) {
+	f.t.Helper()
 	flow := msFlow{binding: randomBinding()}
 	if body == nil {
 		body = map[string]any{}
 	}
 	body["bindingHash"] = bindingHash(flow.binding)
-	res := f.a.request(http.MethodPost, "/v1/auth/microsoft/start", "", body)
+	res := f.a.request(http.MethodPost, path, token, body)
 	if res.Status != http.StatusOK {
 		return flow, res
 	}

@@ -16,7 +16,15 @@ const (
 	ReasonNotOnTeam         = "not_on_team"
 	ReasonOtherOrganisation = "other_organisation"
 	ReasonPersonalAccount   = "personal_account"
+	ReasonConnectFirst      = "connect_first"
 	ReasonFailed            = "failed"
+)
+
+// Why connecting a Microsoft account (Your account) did not work
+// (details.reason of MICROSOFT_CONNECT_FAILED), besides the reasons above.
+const (
+	ReasonAlreadyConnected = "already_connected"
+	ReasonLinkedElsewhere  = "linked_elsewhere"
 )
 
 // BindingMatches reports whether binding is the value whose SHA-256 (hex)
@@ -32,28 +40,35 @@ func BindingMatches(bindingHash, binding string) bool {
 // MicrosoftAccount is a team member a Microsoft account may sign in as.
 type MicrosoftAccount struct {
 	TenantID, TenantName, Slug, UserID string
-	Linked                             bool // matched by the account linked to them, not by email
+	Linked                             bool // matched by the account linked to them, not by an address
+	Owner                              bool
 }
 
 // ChooseMicrosoftAccounts narrows the team members a Microsoft account
 // matches to those it may sign in as: at the company the sign-in was started
 // for (tenantID, if any) and the company chosen (slug, if any). A company
-// where it matches more than one person (its email and sign-in name are two
-// people's) is left out: nobody can tell which they meant.
-func ChooseMicrosoftAccounts(found []MicrosoftAccount, tenantID, slug string) []MicrosoftAccount {
+// where it matches more than one person (its sign-in name and email are two
+// people's) is left out: nobody can tell which they meant. An owner is
+// matched by an address only through their own invitation (invited: the
+// person whose invitation started the sign-in); otherwise they connect the
+// account from Your account first, and ownersLeftOut says one was left out.
+func ChooseMicrosoftAccounts(found []MicrosoftAccount, tenantID, slug, invited string) (out []MicrosoftAccount, ownersLeftOut bool) {
 	slug = strings.ToLower(strings.TrimSpace(slug))
 	perTenant := map[string]int{}
 	for _, a := range found {
 		perTenant[a.TenantID]++
 	}
-	var out []MicrosoftAccount
 	for _, a := range found {
 		if perTenant[a.TenantID] != 1 || (tenantID != "" && a.TenantID != tenantID) || (slug != "" && a.Slug != slug) {
 			continue
 		}
+		if a.Owner && !a.Linked && a.UserID != invited {
+			ownersLeftOut = true
+			continue
+		}
 		out = append(out, a)
 	}
-	return out
+	return out, ownersLeftOut
 }
 
 // MicrosoftLinkState is whether a person's invitation link may be used with

@@ -161,6 +161,17 @@ func (m *Module) StartMicrosoft(ctx context.Context, clientAddr string, in Micro
 	if err != nil {
 		return "", err
 	}
+	return m.startFlow(ctx, route, flowSignIn, in.BindingHash, email)
+}
+
+// What a sign-in under way is for (microsoft_sign_in_flow.purpose).
+const (
+	flowSignIn  = "sign_in"
+	flowConnect = "connect" // a signed-in person connecting their Microsoft account
+)
+
+// startFlow saves a sign-in under way and returns Microsoft's address.
+func (m *Module) startFlow(ctx context.Context, route msRoute, purpose, bindingHash, loginHint string) (string, error) {
 	state, verifier, nonce := randomToken(), randomToken(), randomToken()
 	key := hashLink(state)
 	sealed, err := m.ms.sealJSON("flow:"+key, flowSecret{Verifier: verifier, Nonce: nonce})
@@ -169,20 +180,23 @@ func (m *Module) StartMicrosoft(ctx context.Context, clientAddr string, in Micro
 	}
 	target, err := m.ms.entra.AuthorizeURL(entra.Authorize{
 		Authority: route.authority, ClientID: route.app.ClientID, RedirectURI: m.microsoftCallback(),
-		State: state, Nonce: nonce, Challenge: pkceChallenge(verifier), LoginHint: email,
+		State: state, Nonce: nonce, Challenge: pkceChallenge(verifier), LoginHint: loginHint,
 	})
 	if err != nil {
 		return "", err
 	}
-	var tenant *string
-	if route.tenantID != "" {
-		tenant = &route.tenantID
-	}
 	err = store.New(m.pool).SaveMicrosoftFlow(ctx, store.SaveMicrosoftFlowParams{
-		KeyHash: key, BindingHash: in.BindingHash, TenantID: tenant, ClientID: route.app.ClientID, Authority: route.authority,
-		Sealed: sealed, ExpiresAt: time.Now().Add(microsoftFlowLife),
+		KeyHash: key, BindingHash: bindingHash, TenantID: orNil(route.tenantID), Purpose: purpose, UserID: orNil(route.userID),
+		ClientID: route.app.ClientID, Authority: route.authority, Sealed: sealed, ExpiresAt: time.Now().Add(microsoftFlowLife),
 	})
 	return target, err
+}
+
+func orNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func pkceChallenge(verifier string) string {
@@ -191,10 +205,11 @@ func pkceChallenge(verifier string) string {
 }
 
 // msRoute is where a sign-in goes: a company (its organisation, and its app
-// or the server's), or (tenantID "") any company, through the server's app.
+// or the server's), or (tenantID "") any company, through the server's app;
+// userID is the person it is for, if known (their invitation, or connecting).
 type msRoute struct {
-	tenantID, authority string
-	app                 MicrosoftApp
+	tenantID, authority, userID string
+	app                         MicrosoftApp
 }
 
 // routeMicrosoft finds the company a sign-in is for: the invitation's, the
@@ -214,7 +229,9 @@ func (m *Module) routeMicrosoft(ctx context.Context, company, link string) (msRo
 		if err != nil {
 			return msRoute{}, err
 		}
-		return m.tenantRoute(ctx, l.TenantID)
+		route, err := m.tenantRoute(ctx, l.TenantID)
+		route.userID = l.UserID
+		return route, err
 	case company != "":
 		rows, err := q.MicrosoftSignInTenants(ctx, &company)
 		if err != nil || len(rows) == 0 {

@@ -84,6 +84,16 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 		if PasswordRefused(u.MicrosoftRequired, u.Role) && claims.Method() != authn.MethodMicrosoft {
 			return fmt.Errorf("%w: the company requires signing in with Microsoft", authn.ErrInvalidToken)
 		}
+		// Microsoft sessions stop when the company stops signing in with
+		// Microsoft, and when the link (or the organisation) changed since.
+		if claims.Method() == authn.MethodMicrosoft {
+			if !u.MicrosoftSignIn {
+				return fmt.Errorf("%w: the company no longer signs in with Microsoft", authn.ErrInvalidToken)
+			}
+			if u.MicrosoftSessionsAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.MicrosoftSessionsAfter) {
+				return fmt.Errorf("%w: Microsoft session from before the account was unlinked", authn.ErrInvalidToken)
+			}
+		}
 		// Signed out on the server (this token only).
 		if claims.ID != "" {
 			revoked, err := store.New(tx).SessionRevoked(ctx, claims.ID)
