@@ -151,17 +151,46 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml st
 ```
 
 ```bash
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml run --rm backup /app/hp restore -yes hiringplug-YYYYMMDD-HHMMSS
 ```
 
 ```bash
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml up -d
 ```
 
-(`hp fetch` prints the backup's name for the restore.) Sign in on the test
-server and check a few candidates and their CVs, then delete the test server.
+(`hp fetch` prints the backup's name for the restore; `-yes` may also come
+after it.) The restore exits non-zero if anything fails, and prints what it
+did:
+
+- **Files**: they are given to the user the API and workers run as
+  (`HP_FILES_OWNER`, 65532:65532 in compose), still private to it (folders
+  0700, files 0600); then a sample is opened as that user. Nothing is
+  replaced if that fails. The kept backups are never changed: the restore
+  copies their files. A server restored before 1.47.0 whose CV previews say
+  "permission denied" is fixed with `... run --rm backup /app/hp repair-files
+  -apply` (without `-apply` it only reports).
+- **Jobs**: the database is brought up to date, and the jobs waiting in the
+  backup that reach people or other systems (emails, interview reminders,
+  digests, invoices, automations, calendar updates, webhooks, claim uploads,
+  Apollo and mailbox checks, and the Outlook, calendar, job-board and
+  company-website reads that use the restored sign-ins) are **held**: they
+  may have happened already, and a test server must never email real
+  candidates. Settings › System lists them in each company, to release or
+  cancel, each or all; the server's alert email waits until none is held.
+  Work that stays inside HiringPlug (reading CVs, PDF copies, search by
+  meaning) runs again by itself. `hp restore -yes -resume-outbound NAME` lets
+  the held kinds run at once: only when you know they did not happen.
+- **Paid AI**: a backup from another server (the restore prints both) is
+  put back with paid AI paused for every company, company keys included, so
+  a copy spends nobody's credit. The agency that runs the server turns it
+  back on in Settings › System (`HP_AI_PAID=off` in deploy/.env keeps it off
+  whatever Settings says). CVs are still read, by the rules.
+
+Sign in on the test server and check a few candidates and their CVs (open a
+PDF, a Word CV's preview, upload a new one), then delete the test server.
 If the live server is ever lost, the same four commands on a new server bring
-everything back.
+everything back; then release the held jobs that still need doing and turn
+paid AI back on.
 
 Sharing the storage is safe: each server deletes there only its own oldest
 backups (as many as it keeps), never another server's, and uploaded files

@@ -31,7 +31,13 @@ is now: a table of jobs read row by row, a name in a Word file's header), the
 old text kept should the file not read. A CV read by an older reader is read
 again by itself when its review is opened (1.40.3). When the details cannot be read, the bar says so with
 where the reader broke (its error type and line, never CV text), until
-dismissed; asking again clears it. A formatted CV (our own output) has no
+dismissed; asking again clears it. A reading that fails for good (1.47.0:
+the reader gave up, the file is gone) says so within seconds of the worker
+giving up, instead of reading forever; a CV read before keeps its details,
+with a warning that reading again failed; a CV whose text could not be read
+offers **Read the CV again** (from the file, with a fresh link). The page
+stops checking after 10 minutes of reading and offers reading again; asking
+while a reading is under way never queues a second one. A formatted CV (our own output) has no
 review: it is read for comparing, again from its ⋯ menu. Jobs uses the
 existing stage badge and separate Move to menu, including reason/cancel/reopen,
 interviews, offers, placements and stage history. Profile/history editing,
@@ -2050,7 +2056,16 @@ opens its editor.
 words (sending emails, reading CVs, making PDF copies, ...): how much is
 waiting, running or being retried, what failed for good in the last 30 days
 and why, with **Try again**; and the server's last backup, with a warning
-when it failed or is more than two days old.
+when it failed or is more than two days old. After a restore (1.47.0) it says
+when the server was restored and from which kind of backup, and lists the
+company's jobs the restore **held** because they reach people or other
+systems (emails, reminders, calendar updates, webhooks, automations...; they
+may have happened already): **Release** or **Cancel** each, or all at once
+(audited); the server's alert email waits until none is held. **Paid AI**
+shows whether paid AI is paused on the server; an owner of the agency that
+runs the server pauses it for every company at once, company keys included,
+or turns it back on (audited): CVs are then read by the rules alone, and the
+AI notice across the app says paid AI is paused.
 
 **Backups** (the owner of the agency that runs the server; permission
 `settings.backups:manage`) turns the nightly backup on or off, makes one now

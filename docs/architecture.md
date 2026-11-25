@@ -185,8 +185,23 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
 - **Retried** with growing waits (10s, 20s, 40s, up to 1 hour), then marked
   `dead` with its last error, so failures are visible, never silent: owners
   and admins see them in **Settings > System** and can try one again. A
-  failure retrying cannot fix (a file larger than the AI worker may read) is
-  given up at once (`job_give_up`).
+  failure retrying cannot fix (a file larger than the AI worker may read, a
+  download answered 403, 404 or 410) is given up at once (`job_give_up`).
+- **A dead job ends what it was for.** A Go job's dead-job handler
+  (`Worker.OnDead`, the modules' `DeadJobHandlers`) runs in the transaction
+  that exhausts it. For the AI queue, a trigger on `job` queues a core notice
+  (`background_job.ended`) in the very transaction that ends the job,
+  whatever ended it (and for a held job cancelled), and the Go worker runs the
+  kind's handler with the dead job: a CV whose reading died is marked failed,
+  or goes back to the details read before, never "being read" forever. The
+  worker's hourly upkeep also ends readings left with no job at all
+  (`document_reading_stuck`: a crash, a restore, older data).
+- **Held after a restore.** `hp restore` moves the waiting and running jobs
+  that act outside HiringPlug (`jobqueue.Outbound`: emails, calendar
+  updates, webhooks, automations, uploads, paid lookups, and reads with the
+  restored sign-ins) to `held`, which no claim takes, and records the restore
+  (`restore_marker`). Each company releases or cancels them in Settings >
+  System; the alert email waits until none is held.
 - **Most urgent first.** Each job kind has a priority in the contract: `high`
   when someone waits on screen (an assistant question, an email, a job
   description's preview on the job's page), `low` for upkeep (webhooks,
@@ -221,9 +236,27 @@ where they are, and move into their subfolder when saved again.
 folder of its own (`hiringplug-YYYYMMDD-HHMMSS`, written under a hidden name
 and renamed when complete) and keeps the newest `HP_BACKUP_KEEP`. Docker
 Compose runs it every night (the `backup` service, a PostgreSQL image with
-`hp` in it) into the `backups` folder next to the repository. `hp restore NAME
--yes` puts one back. Each run is recorded; **Settings > System** shows the last
-one, and warns when it failed or is more than two days old.
+`hp` in it) into the `backups` folder next to the repository. `hp restore -yes
+NAME` puts one back (flags may come before or after the name in every `hp`
+command): it stages the files, gives them to the runtime user
+(`HP_FILES_OWNER`) before they replace the current ones, restores the
+database in one transaction, brings it up to date, holds the outbound jobs,
+pauses paid AI when the backup is from another server, and checks that the
+runtime user can open a sample of the files; `hp repair-files -apply` fixes
+the owners of a server restored before. Each run is recorded; **Settings >
+System** shows the last one, and warns when it failed or is more than two
+days old.
+
+## Paid AI switch
+
+One row for the server (`ai_paid_control`): paused, no AI call is made
+through a company's key or the server's provider. It is checked where AI work
+is admitted (`aiproviders` access: nothing queued with a key) and where it
+runs (the AI worker's `Deps.provider`, through `ai_paid_paused()`, cached
+five seconds), so jobs queued before the pause make no call either; CV and
+job-description reading falls back to the rules. `HP_AI_PAID=off` pauses it
+whatever the row says. Only an owner of the agency that runs the server turns
+it, in Settings > System.
 
 ## Web app
 
