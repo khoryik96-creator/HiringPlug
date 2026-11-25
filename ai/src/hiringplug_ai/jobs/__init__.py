@@ -43,6 +43,7 @@ from ..contracts import (
 )
 from ..extraction import Limits, OcrEngine
 from ..meaning.model import MeaningModel
+from ..paid_switch import PAID_PAUSED, PaidAIPausedError
 from ..providers import Completion, Provider, ProviderError
 from ..queue import FollowUp
 from . import (
@@ -140,13 +141,20 @@ class _Watched:
         return done
 
 
-PAID_PAUSED = "paid AI is paused on this server (Settings > System), so the AI was not asked"
+@dataclass(frozen=True)
+class _Paid:
+    """A provider that asks the server's paid-AI switch before every call
+    (PaidSwitch caches it for seconds), so a job of many calls (ranking a
+    long list, a batch) stops within seconds of a pause, not at its end.
+    Outermost: a paused call never reaches _Watched (never an outage)."""
 
+    inner: Provider
+    paused: Callable[[], bool]
 
-class PaidAIPausedError(ProviderError):
-    """The server's paid AI is paused: a job queued before still makes no
-    paid call. Its handler treats it as the AI not answering: a CV is read by
-    the rules alone, an assistant question answered with why."""
+    def complete(self, system: str, user: str, *, max_tokens: int) -> Completion:
+        if self.paused():
+            raise PaidAIPausedError(PAID_PAUSED)
+        return self.inner.complete(system, user, max_tokens=max_tokens)
 
 
 @dataclass(frozen=True)
@@ -201,9 +209,11 @@ class Deps:
             and hasattr(chosen, "timeout_seconds")
         ):
             chosen = dataclasses.replace(chosen, timeout_seconds=self.long_timeout_seconds)
-        if chosen is not None and self.log is not None:
-            return _Watched(chosen, name, self.log)
-        return chosen
+        if chosen is None:
+            return None
+        if self.log is not None:
+            chosen = _Watched(chosen, name, self.log)
+        return _Paid(chosen, self.paid_paused)
 
 
 @dataclass(frozen=True)

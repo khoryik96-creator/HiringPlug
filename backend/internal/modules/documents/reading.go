@@ -38,10 +38,16 @@ const (
 	noDetails     = "The details could not be read from this CV. Read it again, or fill them in by hand."
 	textStopped   = "The CV's text could not be read: the reader stopped after several tries. Read it again; if it fails again, upload the file again."
 	fileMissing   = "The file was not found on the server, so its text could not be read. Upload it again."
+	linkExpired   = "The file's link expired before the reader could fetch it (the file itself is fine). Read it again."
 	readingLost   = "Reading this file stopped before it finished (the server was restarted or restored). Read it again."
 	pdfNotMade    = "The PDF copy could not be made."
-	missingReason = "HTTP 404"
-	goneReason    = "HTTP 410"
+	// What the AI worker's download says (ai/.../download.py): the file
+	// server's own "not found", a refused link, and (before 1.47.1) any 404.
+	missingReason = "file missing"
+	expiredReason = "link expired"
+	foreignReason = "other than HiringPlug's file server"
+	legacyMissing = "HTTP 404"
+	legacyGone    = "HTTP 410"
 )
 
 // DeadJobHandlers end a document's reading, or its PDF copy, when the AI
@@ -61,7 +67,13 @@ func (s *Service) extractionDied(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 		return err
 	}
 	why := textStopped
-	if strings.Contains(job.LastError, missingReason) || strings.Contains(job.LastError, goneReason) {
+	switch e := job.LastError; {
+	case strings.Contains(e, missingReason):
+		why = fileMissing
+	case strings.Contains(e, expiredReason):
+		why = linkExpired
+	case strings.Contains(e, foreignReason): // a setting, tried again: stopped after several tries
+	case strings.Contains(e, legacyMissing), strings.Contains(e, legacyGone):
 		why = fileMissing
 	}
 	return s.endReading(ctx, tx, job.TenantID, p.DocumentId, why, "document.reading_failed", job.Kind)

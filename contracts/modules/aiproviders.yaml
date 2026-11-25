@@ -200,8 +200,11 @@ components:
       type: object
       required: [status, message, checkedAt]
       properties:
-        status: { type: string, enum: [queued, ok, failed] }
-        message: { type: string, nullable: true, description: "Why it failed: the key was refused, no credit left, an unknown model..." }
+        status:
+          type: string
+          enum: [queued, ok, failed, paused]
+          description: "paused: not checked, as paid AI was paused on the server (the key may well work: check it once it is back on)."
+        message: { type: string, nullable: true, description: "Why it failed (the key was refused, no credit left, an unknown model...), or why it was not checked." }
         checkedAt: { type: string, format: date-time }
     AiProviderChoiceInput:
       type: object
@@ -274,6 +277,7 @@ components:
         sealedKey: { type: string, description: The key checked (a check of a key since replaced is dropped). }
         ok: { type: boolean }
         message: { type: string, nullable: true }
+        paused: { type: boolean, description: "The provider was not asked: paid AI is paused on the server (ok is false; the key is not failed)." }
         checkId: { type: string, maxLength: 200, description: "The check job's checkId, unchanged." }
         askedBy: { type: string, maxLength: 200, description: "The check job's askedBy, unchanged." }
         inputTokens: { type: integer, format: int64, minimum: 0, description: "Tokens the check's request took (counted in the monthly AI use)." }

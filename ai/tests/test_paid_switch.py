@@ -5,16 +5,24 @@ providers only: no test ever calls a paid AI."""
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 import psycopg
 import pytest
 
-from hiringplug_ai.contracts import AiAccess, AssistantAskJob, DocumentCvParsedJob, DocumentParseCvJob
+from hiringplug_ai.contracts import (
+    AiAccess,
+    AiProviderCheckedJob,
+    AiProviderCheckJob,
+    AssistantAskJob,
+    DocumentCvParsedJob,
+    DocumentParseCvJob,
+)
 from hiringplug_ai.extraction import DEFAULT_LIMITS
-from hiringplug_ai.jobs import Deps, PaidAIPausedError, assistant_ask
+from hiringplug_ai.jobs import Deps, ProviderLog, ai_check, assistant_ask
 from hiringplug_ai.jobs import parse_cv as parse_job
-from hiringplug_ai.paid_switch import PaidSwitch
+from hiringplug_ai.paid_switch import PaidAIPausedError, PaidSwitch
 from hiringplug_ai.providers import Completion
 
 from .test_queue_db import database  # noqa: F401 - the real database, as the AI role
@@ -61,6 +69,39 @@ def test_paused_no_provider_is_called_neither_the_companys_nor_the_servers() -> 
         deps(True, server, company).provider(ACCESS)
     assistant_ask.run(ask(ACCESS), deps(False, server, company))
     assert company.calls == 1, "back on: the company's key answers"
+
+
+# Review of 1.47.0: the switch was read once per job, so a job of many
+# calls (ranking a long list) went on calling for minutes after a pause.
+# It is read before each call (cached for seconds), and a paused call is
+# never noted as the provider failing.
+def test_a_job_of_many_calls_stops_within_seconds_of_a_pause() -> None:
+    company = Fake()
+    paused = [False]
+    log = ProviderLog()
+    d = dataclasses.replace(deps(False, Fake(), company), paid_paused=lambda: paused[0], log=log)
+    ai = d.provider(ACCESS)
+    assert ai is not None
+    ai.complete("s", "first", max_tokens=8)
+    paused[0] = True
+    with pytest.raises(PaidAIPausedError):
+        ai.complete("s", "second", max_tokens=8)
+    assert company.calls == 1, "the second call never reached the provider"
+    assert log.ok is True, "a pause is not an outage"
+
+
+# Review of 1.47.0: a key check queued before the pause, run during it,
+# reported the key as failed ("Not working"). It reports "paused".
+def test_a_key_check_during_a_pause_reports_paused_not_failed() -> None:
+    payload = AiProviderCheckJob(provider="claude", access=ACCESS, checkId="chk_1", askedBy="usr_1")
+    [result] = ai_check.run(payload, deps(True, Fake(), Fake()))
+    assert isinstance(result.payload, AiProviderCheckedJob)
+    assert result.payload.paused is True
+    assert result.payload.ok is False
+    [fine] = ai_check.run(payload, deps(False, Fake(), Fake()))
+    assert isinstance(fine.payload, AiProviderCheckedJob)
+    assert fine.payload.ok is True
+    assert not fine.payload.paused
 
 
 def test_paused_a_cv_is_still_read_by_the_rules() -> None:

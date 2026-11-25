@@ -6164,9 +6164,12 @@ export interface components {
             check: components["schemas"]["AiProviderCheck"] | null;
         };
         AiProviderCheck: {
-            /** @enum {string} */
-            status: "queued" | "ok" | "failed";
-            /** @description Why it failed: the key was refused, no credit left, an unknown model... */
+            /**
+             * @description paused: not checked, as paid AI was paused on the server (the key may well work: check it once it is back on).
+             * @enum {string}
+             */
+            status: "queued" | "ok" | "failed" | "paused";
+            /** @description Why it failed (the key was refused, no credit left, an unknown model...), or why it was not checked. */
             message: string | null;
             /** Format: date-time */
             checkedAt: string;
@@ -6229,6 +6232,8 @@ export interface components {
             sealedKey: string;
             ok: boolean;
             message: string | null;
+            /** @description The provider was not asked: paid AI is paused on the server (ok is false; the key is not failed). */
+            paused?: boolean;
             /** @description The check job's checkId, unchanged. */
             checkId?: string;
             /** @description The check job's askedBy, unchanged. */

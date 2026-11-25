@@ -368,13 +368,21 @@ class Status(StrEnum):
     queued = "queued"
     ok = "ok"
     failed = "failed"
+    paused = "paused"
 
 
 class AiProviderCheck(BaseModel):
-    status: Status
+    status: Annotated[
+        Status,
+        Field(
+            description="paused: not checked, as paid AI was paused on the server (the key may well work: check it once it is back on)."
+        ),
+    ]
     message: Annotated[
         str | None,
-        Field(description="Why it failed: the key was refused, no credit left, an unknown model..."),
+        Field(
+            description="Why it failed (the key was refused, no credit left, an unknown model...), or why it was not checked."
+        ),
     ]
     checkedAt: AwareDatetime
 
@@ -477,6 +485,12 @@ class AiProviderCheckedJob(BaseModel):
     ]
     ok: bool
     message: Annotated[str | None, Field(...)]
+    paused: Annotated[
+        bool | None,
+        Field(
+            description="The provider was not asked: paid AI is paused on the server (ok is false; the key is not failed)."
+        ),
+    ] = None
     checkId: Annotated[
         str | None, Field(description="The check job's checkId, unchanged.", max_length=200)
     ] = None

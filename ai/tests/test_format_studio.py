@@ -323,10 +323,11 @@ def test_a_long_answer_gets_the_long_time_limit() -> None:
         ai=server,
         long_timeout_seconds=300,
     )
-    long = deps.provider(None, long=True)
+    # Each comes behind the paid-AI switch (asked before every call): the provider is its inner one.
+    long = getattr(deps.provider(None, long=True), "inner", None)
     assert isinstance(long, OpenAICompatible)
     assert (long.timeout_seconds, server.timeout_seconds) == (300, 90)
-    assert deps.provider(None) is server
+    assert getattr(deps.provider(None), "inner", None) is server
 
 
 SUMMARY = (

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/oapi-codegen/nullable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -95,4 +96,56 @@ func TestHPAIPaidOffPausesPaidAI(t *testing.T) {
 	assert.True(t, st.PaidAi.PausedByServer)
 	on := newTestApp(t, map[string]string{"HP_AI_PROVIDER": "openai_compatible"})
 	assert.True(t, on.assistantOn(owner), "without it, the server's provider answers")
+}
+
+// Review of 1.47.0: a key's check that could not run because paid AI was
+// paused (asked before the pause, or a key saved during it) said the key
+// was "failed", "Not working". It is "paused": not checked, saying why.
+// Not parallel: the switch is the whole server's.
+func TestAKeyIsNeverFailedBecausePaidAIWasPaused(t *testing.T) {
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	a := newTestApp(t, map[string]string{"HP_AI_KEYS_SECRET": aiKeysSecret, "HP_BACKUP_TENANT": tenant.ID})
+	t.Cleanup(func() {
+		_, _ = testutil.Current.Admin.Exec(context.Background(), `UPDATE ai_paid_control SET paused = false, reason = NULL`)
+		_, _ = testutil.Current.Admin.Exec(context.Background(), `DELETE FROM job WHERE tenant_id = $1`, tenant.ID)
+	})
+	res := a.request(http.MethodPut, "/v1/ai-providers/claude", owner, map[string]any{"model": "claude-opus-5-5", "apiKey": "sk-ant-api03-synthetic-0000"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res = a.request(http.MethodPut, "/v1/settings/system/paid-ai", owner, map[string]any{"paused": true})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	checkOf := func(provider string) api.AiProviderCheck {
+		var st api.AiProviders
+		a.request(http.MethodGet, "/v1/ai-providers", owner, nil).JSON(&st)
+		for _, p := range st.Providers {
+			if string(p.Provider) == provider {
+				return p.Check.MustGet()
+			}
+		}
+		t.Fatalf("no %s", provider)
+		return api.AiProviderCheck{}
+	}
+
+	// The check asked before the pause runs during it: the worker does not ask the AI.
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	var checkID string
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT payload->>'checkId' FROM job WHERE tenant_id = $1 AND kind = 'aiprovider.check'`,
+		tenant.ID).Scan(&checkID))
+	job := claimAIJobWhere(t, conn, "checkId", checkID)
+	var check api.AiProviderCheckJob
+	require.NoError(t, json.Unmarshal(job.Payload, &check))
+	paused := true
+	answerAIJob(t, a, conn, job, api.JobKindAiproviderChecked, api.AiProviderCheckedJob{Provider: check.Provider, SealedKey: check.Access.SealedKey,
+		Ok: false, Paused: &paused, Message: nullable.NewNullableWithValue("paid AI is paused on this server (Settings > System), so the AI was not asked"),
+		CheckId: check.CheckId, AskedBy: check.AskedBy})
+	got := checkOf("claude")
+	assert.Equal(t, api.AiProviderCheckStatusPaused, got.Status, "not failed: the key may well work")
+	assert.Contains(t, got.Message.MustGet(), "Paid AI is paused")
+
+	res = a.request(http.MethodPut, "/v1/ai-providers/openai", owner, map[string]any{"model": "gpt-5", "apiKey": "sk-proj-synthetic-0000"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, api.AiProviderCheckStatusPaused, checkOf("openai").Status, "saved during the pause: not checked")
 }

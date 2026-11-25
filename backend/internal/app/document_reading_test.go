@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -134,7 +135,7 @@ func TestACVWhoseFileIsGoneFailsAtOnceAndCanBeReadAgain(t *testing.T) {
 	var doc api.Document
 	res.JSON(&doc)
 
-	failAIJob(t, conn, claimAIJobFor(t, conn, doc.Id), true, "DownloadGoneError: download failed with HTTP 404: the file is gone or its link no longer works")
+	failAIJob(t, conn, claimAIJobFor(t, conn, doc.Id), true, "FileMissingError: file missing (HTTP 404): it is not on the server any more; upload it again")
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	got := a.getDocument(token, doc.Id)
 	assert.Equal(t, api.DocumentStatusFailed, got.Status)
@@ -269,4 +270,37 @@ func TestACVWhoseReadingKeepsKillingTheWorkerEnds(t *testing.T) {
 	got := a.getDocument(token, doc.Id)
 	assert.Equal(t, api.DocumentStatusFailed, got.Status, "not being read for ever")
 	assert.Contains(t, got.ErrorMessage.MustGet(), "could not be read")
+}
+
+// Review of 1.47.0: a refused link (expired, or signed by another server)
+// told people the file was gone and to upload it again, though the file
+// was there; and a 404 from something else than the file server too. A
+// dead link says to read it again; the other is a setting, tried again.
+func TestADeadLinkSaysReadItAgainNotUploadItAgain(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	t.Cleanup(func() {
+		_, _ = testutil.Current.Admin.Exec(context.Background(), `DELETE FROM job WHERE queue = 'ai' AND tenant_id = $1`, tenant.ID)
+	})
+	c := a.createCandidate(token, map[string]any{"firstName": "Ravi"})
+	for reason, want := range map[string]string{
+		"LinkExpiredError: link expired (HTTP 403): the file's link no longer works; read it again":                                  "The file's link expired before the reader could fetch it (the file itself is fine). Read it again.",
+		"DownloadError: download failed: answer 404 from something other than HiringPlug's file server (check HP_INTERNAL_BASE_URL)": "The CV's text could not be read: the reader stopped after several tries. Read it again; if it fails again, upload the file again.",
+	} {
+		res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.pdf", pdfWith(reason))
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var doc api.Document
+		res.JSON(&doc)
+		failAIJob(t, conn, claimAIJobFor(t, conn, doc.Id), strings.HasPrefix(reason, "LinkExpired"), reason)
+		runCoreJobsUntilIdle(t, a, tenant.ID)
+		got := a.getDocument(token, doc.Id)
+		assert.Equal(t, api.DocumentStatusFailed, got.Status)
+		assert.Equal(t, want, got.ErrorMessage.MustGet(), reason)
+	}
 }

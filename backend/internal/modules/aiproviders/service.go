@@ -171,14 +171,18 @@ func (s *Service) Save(ctx context.Context, p authz.Principal, provider, model s
 // pausedMessage is why no key is checked while the server's paid AI is paused.
 const pausedMessage = "Paid AI is paused on this server, so no key is checked (Settings > System turns it back on)."
 
+// checkPaused is a key's check status when it could not be checked because
+// paid AI was paused: not failed (the key may well work).
+const checkPaused = "paused"
+
 // queueCheck queues a check of a key, with its own ID and who asked, sent
 // back with the result so its AI use is counted once, for them. While the
-// server's paid AI is paused the key is saved unchecked, saying why.
+// server's paid AI is paused the key is saved unchecked ("paused"), saying why.
 func (s *Service) queueCheck(ctx context.Context, tx pgx.Tx, p authz.Principal, provider, model, sealed string) error {
 	if paused, err := s.paidPaused(ctx, tx); err != nil {
 		return err
 	} else if paused {
-		status, msg := "failed", pausedMessage
+		status, msg := checkPaused, pausedMessage
 		_, err := store.New(tx).SaveCheck(ctx, store.SaveCheckParams{Provider: provider, SealedKey: sealed, CheckStatus: &status, CheckMessage: &msg})
 		return err
 	}
@@ -253,7 +257,10 @@ func (s *Service) checked(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	}
 	status := "ok"
 	var message *string
-	if !r.Ok {
+	switch {
+	case r.Paused != nil && *r.Paused: // queued before paid AI was paused: not asked, not failed
+		status, message = checkPaused, ptr(pausedMessage)
+	case !r.Ok:
 		status = "failed"
 		m := "The provider did not answer."
 		if v, err := r.Message.Get(); err == nil && v != "" {
@@ -331,3 +338,5 @@ func (s *Service) paidPaused(ctx context.Context, tx pgx.Tx) (bool, error) {
 	}
 	return aipaid.Paused(ctx, tx)
 }
+
+func ptr(s string) *string { return &s }

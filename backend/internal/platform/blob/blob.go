@@ -155,6 +155,10 @@ func (e *OpenError) LogValue() slog.Value {
 	return slog.GroupValue(slog.String("key_hash", e.KeyHash), slog.Int("errno", int(e.Errno)), slog.String("error", e.Error()))
 }
 
+// MissingHeader marks ServeHTTP's own 404, the file not on this server
+// ("missing"): the AI worker tells it from a 404 of something else.
+const MissingHeader = "X-HyPlug-File"
+
 // ServeHTTP serves GET /internal/files/{key}?exp=...&sig=... for workers.
 func (s *Store) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, PathPrefix)
@@ -170,6 +174,10 @@ func (s *Store) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid or expired link", http.StatusForbidden)
 		return
 	case errors.Is(err, os.ErrNotExist): // gone for good: the worker gives up
+		// Says it is this server's answer about the file (MissingHeader): a
+		// 404 from anything else on the way (a wrong HP_INTERNAL_BASE_URL)
+		// is a setting to fix, tried again, never "upload it again".
+		w.Header().Set(MissingHeader, "missing")
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	case err != nil: // there but unreadable (its owner, a disk error): fixable, so the worker tries again

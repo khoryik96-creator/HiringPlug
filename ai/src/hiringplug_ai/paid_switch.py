@@ -18,7 +18,17 @@ from typing import Any
 
 import psycopg
 
+from .providers import ProviderError
+
 log = logging.getLogger(__name__)
+
+PAID_PAUSED = "paid AI is paused on this server (Settings > System), so the AI was not asked"
+
+
+class PaidAIPausedError(ProviderError):
+    """The server's paid AI is paused: a job queued before still makes no
+    paid call. Its handler treats it as the AI not answering: a CV is read by
+    the rules alone, an assistant question answered with why."""
 
 
 class PaidSwitch:

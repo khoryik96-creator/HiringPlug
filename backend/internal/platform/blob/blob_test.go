@@ -130,3 +130,21 @@ func TestAnUnreadableFileIsAServerErrorNotAMissingOne(t *testing.T) {
 	assert.NotContains(t, err.Error(), s.dir, "the error names no path")
 	assert.NotContains(t, err.Error(), "tnt_a")
 }
+
+// Review of 1.47.0: the AI worker gave up on any 404 as "the file is gone,
+// upload it again", including one from something else on the way (a wrong
+// HP_INTERNAL_BASE_URL): fixing the setting brought nothing back. This
+// server's own "not found" says so in a header; a refused link does not.
+func TestOnlyAFileNotHereIsMarkedMissing(t *testing.T) {
+	s := newStore(t)
+	missing := get(s, s.SignedURL("tnt_a/doc_none", time.Minute))
+	assert.Equal(t, http.StatusNotFound, missing.Code)
+	assert.Equal(t, "missing", missing.Header().Get(MissingHeader))
+	require.NoError(t, s.Put("tnt_a/doc_b", []byte("cv")))
+	expired := get(s, s.SignedURL("tnt_a/doc_b", -time.Minute))
+	assert.Equal(t, http.StatusForbidden, expired.Code)
+	assert.Empty(t, expired.Header().Get(MissingHeader))
+	found := get(s, s.SignedURL("tnt_a/doc_b", time.Minute))
+	assert.Equal(t, http.StatusOK, found.Code)
+	assert.Empty(t, found.Header().Get(MissingHeader))
+}

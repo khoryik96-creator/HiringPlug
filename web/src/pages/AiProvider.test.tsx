@@ -76,4 +76,20 @@ describe("AI provider settings", () => {
     expect(await screen.findByRole("radio", { name: "Server default" })).toHaveProperty("checked", true);
     expect(screen.getByRole("alert").textContent).toContain("HP_AI_KEYS_SECRET");
   });
+
+  // Review of 1.47.0: a key whose check could not run while paid AI was
+  // paused showed "Not working" though nothing was wrong with it.
+  it("says a key was not checked while paid AI was paused, never that it does not work", async () => {
+    const message = "Paid AI is paused on this server, so no key is checked (Settings > System turns it back on).";
+    vi.spyOn(api, "GET").mockResolvedValue(ok(state({
+      providers: [{ provider: "deepseek", ...none }, { provider: "claude", model: "claude-opus-5-5", keyHint: "…5678", updatedAt: "2026-11-06T00:00:00Z",
+        check: { status: "paused", message, checkedAt: "2026-11-06T00:00:00Z" } }, { provider: "openai", ...none }],
+    })));
+    renderWithClient(<AiProvider />);
+    const card = await screen.findByRole("region", { name: "Claude" });
+    expect(within(card).getByText("Not checked")).toBeTruthy();
+    expect(within(card).queryByText("Not working")).toBeNull();
+    expect(within(card).getByText(/so no key is checked/)).toBeTruthy();
+  });
 });
+
