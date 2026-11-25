@@ -139,7 +139,10 @@ jobs:
       - name: rclone (backups are also copied off the server)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq rclone && rclone version
       - name: Test (unit and integration, real PostgreSQL)
+        env: { HP_TEST_ROOT: later } # the file-ownership tests skip here: the next step runs them as root
         run: task test:go
+      - name: File-ownership tests, as root (a restore runs as root in Docker; not root, they fail, never skip)
+        run: sudo -E env "PATH=$PATH" "GOMODCACHE=$(go env GOMODCACHE)" "GOCACHE=$RUNNER_TEMP/go-root-cache" go test -count=1 ./internal/platform/backup/
       - name: A newly generated module passes every check
         run: |
           task new:module -- name=ci_samples entity=ci_sample

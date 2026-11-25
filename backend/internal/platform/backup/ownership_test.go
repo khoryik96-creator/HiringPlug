@@ -22,10 +22,21 @@ import (
 // runtime is the user the API and workers run as in Docker.
 var runtime = backup.Owner{UID: 65532, GID: 65532}
 
+// requireRoot runs a test only as root (only root may give files to
+// another user; the backup service in Docker runs as root). Never skipped
+// silently in CI: CI's main test step (HP_TEST_ROOT=later) leaves them to
+// the step that runs them as root, and anywhere else in CI (CI or HP_CI
+// set) not being root fails.
 func requireRoot(t *testing.T) {
 	t.Helper()
-	if os.Geteuid() != 0 {
-		t.Skip("only root may give files to another user (the backup service in Docker runs as root)")
+	switch {
+	case os.Geteuid() == 0:
+	case os.Getenv("HP_TEST_ROOT") == "later":
+		t.Skip("not root: CI runs this again as root, in the step after (.github/workflows/ci.yml)")
+	case os.Getenv("CI") != "" || os.Getenv("HP_CI") != "":
+		t.Fatal("not root: in CI this must run as root (sudo), as the backup service does; see .github/workflows/ci.yml")
+	default:
+		t.Skip("only root may give files to another user (the backup service in Docker runs as root): run as root, as CI does")
 	}
 }
 
