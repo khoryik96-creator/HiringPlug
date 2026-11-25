@@ -237,6 +237,10 @@ x-error-codes:
     module: shared
     status: 405
     description: The endpoint exists but not with this HTTP method.
+  MICROSOFT_APP_OWNERS_ONLY:
+    module: emails
+    status: 403
+    description: The company signs in with Microsoft through its Microsoft app (Settings › Roles and access), so only an owner may change or remove the Microsoft app while that is on.
   MICROSOFT_CONNECT_FAILED:
     module: identity
     status: 422
@@ -5130,7 +5134,7 @@ paths:
       tags: [emails]
       summary: Save the agency's app details for one provider (the secret is kept when left out)
       description: >
-        The secret is stored encrypted and never shown again, only its last four characters. Mailboxes connected with other details must connect again.
+        The secret is stored encrypted and never shown again, only its last four characters. Mailboxes connected with other details must connect again. While the company signs in with Microsoft, only an owner may save the Microsoft app (MICROSOFT_APP_OWNERS_ONLY): signing in uses it.
 
       x-permission: emails.apps:manage
       requestBody:
@@ -5151,6 +5155,7 @@ paths:
       operationId: deleteMailApp
       tags: [emails]
       summary: Remove the agency's app details for one provider (the server's are used again, if any)
+      description: While the company signs in with Microsoft, only an owner may remove the Microsoft app (MICROSOFT_APP_OWNERS_ONLY).
       x-permission: emails.apps:manage
       responses:
         '200':
@@ -9715,6 +9720,7 @@ components:
         - MEANING_READING
         - MEANING_UNAVAILABLE
         - METHOD_NOT_ALLOWED
+        - MICROSOFT_APP_OWNERS_ONLY
         - MICROSOFT_CONNECT_FAILED
         - MICROSOFT_REQUIRED
         - MICROSOFT_SIGN_IN_FAILED

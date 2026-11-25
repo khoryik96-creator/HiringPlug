@@ -141,6 +141,7 @@ func NewModules(d Deps) *Modules {
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy, Users: m.Identity,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
 		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts, InterviewReminders: calendarReminderMail{m}, Invoices: invoiceDelivery{m},
+		SignIn: m.Identity, // the Microsoft app signs people in too: owners only, then
 	}, d.Mail, d.Files)
 	mode := mail.DeliveryMode(d.Config.SMTP.Addr)
 	m.Emails.ConnectMailboxesWith(emails.ConnectionSettings{

@@ -146,6 +146,12 @@ type Deps struct {
 		MayDeliver(ctx context.Context, tx pgx.Tx, emailID string) (bool, error)
 		Delivered(ctx context.Context, tx pgx.Tx, emailID string, failed bool) error
 	}
+	// SignIn says whether the company signs in with Microsoft (identity
+	// module): its Microsoft app is then for owners only to change. Nil: it
+	// never does.
+	SignIn interface {
+		MicrosoftSignInOn(ctx context.Context, tx pgx.Tx) (bool, error)
+	}
 	InterviewReminders interface {
 		ReminderBody(context.Context, pgx.Tx, string, api.InterviewReminderDelivery, []string) (string, error)
 		ReminderSent(context.Context, pgx.Tx, api.InterviewReminderDelivery) error

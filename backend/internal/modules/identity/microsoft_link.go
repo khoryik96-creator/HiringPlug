@@ -215,6 +215,14 @@ func (m *Module) UnlinkMicrosoft(ctx context.Context, p authz.Principal, userID 
 	})
 }
 
+// MicrosoftSignInOn reports whether the caller's company signs in with
+// Microsoft, in the caller's transaction (the emails module keeps its
+// Microsoft app for owners then).
+func (m *Module) MicrosoftSignInOn(ctx context.Context, tx pgx.Tx) (bool, error) {
+	s, err := store.New(tx).MicrosoftSettings(ctx)
+	return s.MicrosoftSignIn, err
+}
+
 // MyMicrosoft says whether the person's company signs in with Microsoft
 // (on this server), and whether a Microsoft account is linked to them.
 func (m *Module) MyMicrosoft(ctx context.Context, p authz.Principal) (signIn, linked bool, err error) {

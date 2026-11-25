@@ -266,3 +266,32 @@ func TestTheEmailDoesNotShowWhereSomeoneIsOnATeam(t *testing.T) {
 	flow, _ := f.start(map[string]any{"email": email})
 	assert.Equal(t, at.Users[api.RoleRecruiter].ID, f.me(session(t, f.signInAs(flow, newAccount(org, email).claims(flow)))).User.Id)
 }
+
+// Signing in with Microsoft uses the company's Microsoft app, and only
+// owners control signing in: while it is on, only owners change that app.
+func TestOnlyOwnersChangeTheMicrosoftAppSignInUses(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	owner, admin := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin].Token
+	app := map[string]any{"clientId": "agency-client", "clientSecret": "agency-secret-value"}
+	save := func(token, provider string) *response {
+		return f.a.request(http.MethodPut, "/v1/settings/email-apps/"+provider, token, app)
+	}
+	require.Equal(t, http.StatusOK, save(admin, "microsoft").Status, "Microsoft sign-in is off: admins may")
+	org := newGUID()
+	f.enable(owner, org, false)
+
+	for _, res := range []*response{save(admin, "microsoft"), f.a.request(http.MethodDelete, "/v1/settings/email-apps/microsoft", admin, nil)} {
+		require.Equal(t, http.StatusForbidden, res.Status, "%s", res.Body)
+		e := res.Error()
+		assert.Equal(t, api.ErrorCodeMICROSOFTAPPOWNERSONLY, e.Error.Code)
+		assert.Contains(t, e.Error.Message, "only an owner")
+	}
+	assert.Equal(t, http.StatusOK, save(admin, "google").Status, "the Google app is not for signing in")
+	assert.Equal(t, http.StatusOK, save(owner, "microsoft").Status)
+
+	res := f.a.request(http.MethodPut, "/v1/agency/microsoft-sign-in", owner, map[string]any{"enabled": false, "organisationId": org, "required": false})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, http.StatusOK, f.a.request(http.MethodDelete, "/v1/settings/email-apps/microsoft", admin, nil).Status, "off again: admins may")
+}

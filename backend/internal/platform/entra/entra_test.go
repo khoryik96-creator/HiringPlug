@@ -239,7 +239,6 @@ func TestGuestsAreRefused(t *testing.T) {
 	assert.Empty(t, entra.Identity{Username: entratest.GuestUPN("sam@contoso.test", "f.onmicrosoft.com")}.Addresses())
 }
 
-
 func TestMadeUpKeyIDsFetchTheKeysOnlyAFewTimes(t *testing.T) {
 	ms := entratest.New(t)
 	c := entra.New(ms.URL, ms.Client())

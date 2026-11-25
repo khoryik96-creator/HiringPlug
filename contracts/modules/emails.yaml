@@ -28,6 +28,9 @@ x-module:
       description: "Enter the agency's Microsoft and Google app details (client ID and secret) that let people connect their mailbox."
       roles: [owner, admin]
   errorCodes:
+    MICROSOFT_APP_OWNERS_ONLY:
+      status: 403
+      description: The company signs in with Microsoft through its Microsoft app (Settings › Roles and access), so only an owner may change or remove the Microsoft app while that is on.
     EMAIL_DO_NOT_CONTACT:
       status: 409
       description: The candidate withdrew consent to be contacted (see their data protection panel), so no email is sent to them.
@@ -1616,6 +1619,8 @@ paths:
       description: >
         The secret is stored encrypted and never shown again, only its last four
         characters. Mailboxes connected with other details must connect again.
+        While the company signs in with Microsoft, only an owner may save the
+        Microsoft app (MICROSOFT_APP_OWNERS_ONLY): signing in uses it.
       x-permission: emails.apps:manage
       requestBody:
         required: true
@@ -1635,6 +1640,7 @@ paths:
       operationId: deleteMailApp
       tags: [emails]
       summary: Remove the agency's app details for one provider (the server's are used again, if any)
+      description: While the company signs in with Microsoft, only an owner may remove the Microsoft app (MICROSOFT_APP_OWNERS_ONLY).
       x-permission: emails.apps:manage
       responses:
         '200':
