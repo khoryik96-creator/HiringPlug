@@ -102,8 +102,12 @@ func (h *HTTP) GetDocumentPdf(ctx context.Context, req api.GetDocumentPdfRequest
 }
 
 // MakePdf queues a Word document's PDF copy when it has none (one uploaded
-// before previews began); anything else is returned as it is.
-func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Document, error) {
+// before previews began), or, again (a person asked: "Make the PDF
+// again"), when it failed: from its file, through a newly signed link
+// (one from a failed attempt may have expired, or been signed elsewhere).
+// Anything else is returned as it is: a failed copy is never tried again on
+// its own, on every view.
+func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string, again bool) (Document, error) {
 	var out Document
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
@@ -117,21 +121,27 @@ func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Do
 		if _, err := s.salaryCV(ctx, tx, row); err != nil {
 			return err
 		}
-		if filekind.Office(row.ContentType) && row.PdfStatus == nil { // a failed copy is not tried again on every view
-			key, err := q.QueuePdfIfNone(ctx, id) // two asking at once: one queues it
-			switch {
-			case database.IsNoRows(err):
-			case err != nil:
+		var key string
+		switch failed := row.PdfStatus != nil && *row.PdfStatus == string(api.PdfStatusFailed); {
+		case !filekind.Office(row.ContentType):
+		case row.PdfStatus == nil:
+			key, err = q.QueuePdfIfNone(ctx, id) // two asking at once: one queues it
+		case failed && again:
+			key, err = q.QueuePdfAgain(ctx, id)
+		}
+		switch {
+		case database.IsNoRows(err), key == "" && err == nil:
+		case err != nil:
+			return err
+		default:
+			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindDocumentRenderPdf, api.DocumentRenderPdfJob{
+				DocumentId: id, DownloadUrl: s.files.SignedURL(key, downloadLinkTTL),
+			}); err != nil {
 				return err
-			default:
-				if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindDocumentRenderPdf, api.DocumentRenderPdfJob{
-					DocumentId: id, DownloadUrl: s.files.SignedURL(key, downloadLinkTTL),
-				}); err != nil {
-					return err
-				}
-				if err := audit.Record(ctx, tx, audit.Entry{Action: "document.pdf_requested", EntityType: "document", EntityID: id}); err != nil {
-					return err
-				}
+			}
+			if err := audit.Record(ctx, tx, audit.Entry{Action: "document.pdf_requested", EntityType: "document", EntityID: id,
+				Changes: map[string]any{"again": again}}); err != nil {
+				return err
 			}
 			if row, err = q.GetDocument(ctx, id); err != nil {
 				return err
@@ -145,7 +155,8 @@ func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Do
 
 // MakeDocumentPdf handles POST /v1/documents/{documentId}/pdf.
 func (h *HTTP) MakeDocumentPdf(ctx context.Context, req api.MakeDocumentPdfRequestObject) (api.MakeDocumentPdfResponseObject, error) {
-	doc, err := h.svc.MakePdf(ctx, authz.MustFromContext(ctx), req.DocumentId)
+	again := req.Body != nil && req.Body.Again != nil && *req.Body.Again
+	doc, err := h.svc.MakePdf(ctx, authz.MustFromContext(ctx), req.DocumentId, again)
 	if err != nil {
 		return nil, err
 	}

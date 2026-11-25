@@ -2952,6 +2952,12 @@ class DocumentParseStatus(StrEnum):
     failed = "failed"
 
 
+class ReadingJob(StrEnum):
+    waiting = "waiting"
+    running = "running"
+    held = "held"
+
+
 class SourcedText(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -8748,6 +8754,12 @@ class Document(BaseModel):
             description="Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise."
         ),
     ]
+    readingJob: Annotated[
+        ReadingJob | None,
+        Field(
+            description="While the document is being read (status or parseStatus queued): its job is waiting for the reader, running, or held after a restore of the server (Settings > System releases it); null when no job is left for it (the reading stopped: reading it again is offered). Left out where not worked out."
+        ),
+    ] = None
     readOutdated: Annotated[
         bool | None,
         Field(

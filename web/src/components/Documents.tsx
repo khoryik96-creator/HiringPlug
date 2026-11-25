@@ -80,7 +80,8 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       unwrap(await api.POST("/v1/documents/{documentId}/parse", { params: { path: { documentId } } })),
     onSuccess: (d) => {
       // The list shows it being read at once (an earlier "read" must not open the old review).
-      queryClient.setQueryData<Document[]>(["documents", candidateId], (list) => list?.map((x) => (x.id === d.id ? { ...x, status: d.status, parseStatus: d.parseStatus, updatedAt: d.updatedAt } : x)));
+      queryClient.setQueryData<Document[]>(["documents", candidateId], (list) => list?.map((x) => (x.id === d.id
+        ? { ...x, status: d.status, parseStatus: d.parseStatus, updatedAt: d.updatedAt, readingJob: d.readingJob ?? "waiting" } : x)));
       setAsked(new Set([...asked, d.id]));
       setWatched(new Set([...watched, d.id]));
       setPicked(d.id);
@@ -88,6 +89,13 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       void queryClient.invalidateQueries({ queryKey: ["document", d.id] });
       return queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
     },
+  });
+
+  // A Word file's PDF copy that failed (its file unreadable then, say): made again on request.
+  const remakePdf = useMutation({
+    mutationFn: async (documentId: string) =>
+      unwrap(await api.POST("/v1/documents/{documentId}/pdf", { params: { path: { documentId } }, body: { again: true } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", candidateId] }),
   });
 
   const remove = useMutation({
@@ -209,7 +217,13 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               onClick={(e) => { parse.mutate(d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
               Read details again (for comparing)
             </button>}
-            {d.pdfStatus === "failed" && <p className="muted small">No PDF copy (the Word file is fine).</p>}
+            {d.pdfStatus === "failed" && <>
+              <p className="muted small">No PDF copy (the Word file is fine).</p>
+              <button type="button" role="menuitem" disabled={remakePdf.isPending}
+                onClick={(e) => { remakePdf.mutate(d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
+                Make the PDF again
+              </button>
+            </>}
             {canBin && <button type="button" role="menuitem" disabled={bin.isPending}
               onClick={(e) => {
                 e.currentTarget.closest("details")?.removeAttribute("open");
@@ -289,7 +303,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
       {canFormat && <StudioProgress run={studio} />}
-      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? remove.error ?? bin.error} />
+      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? remove.error ?? bin.error ?? remakePdf.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
       {selected && comparing && all.length >= 2 && <CvCompare docs={all} firstId={selected.id} />}
       {oneCv && selected.extractionWarnings.map((w) => <p key={w} className="warning small">{w}</p>)}

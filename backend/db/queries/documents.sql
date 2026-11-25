@@ -274,3 +274,19 @@ UPDATE document SET
   updated_at = now()
 WHERE id = @id AND parse_status = 'queued'
 RETURNING *;
+
+-- A Word document's PDF copy made again after it failed (a person asked:
+-- "Make the PDF again"), from its file.
+-- name: QueuePdfAgain :one
+UPDATE document SET pdf_status = 'queued', pdf_error = NULL WHERE id = @id AND pdf_status = 'failed' RETURNING storage_key;
+
+-- The document, locked until the transaction ends: ending a reading waits
+-- for one asked for at the same moment (and then sees its job).
+-- name: LockDocument :one
+SELECT id FROM document WHERE id = @id FOR UPDATE;
+
+-- Documents left "being read" with no job to finish them, in every company,
+-- oldest first, leaving out skip (ones the upkeep could not set right lately).
+-- name: ReadingStuck :many
+SELECT tenant_id::text AS tenant_id, document_id::text AS document_id
+FROM document_reading_stuck(make_interval(secs => @older_seconds::float8), @max_count::integer, @skip::text[]);

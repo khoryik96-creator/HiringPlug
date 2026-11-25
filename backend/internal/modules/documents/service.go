@@ -3,6 +3,7 @@ package documents
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -38,6 +39,9 @@ type Service struct {
 	ai             AIAllowance         // nil: the AI never fills in CV readings
 	salaryCVs      SalaryCVs           // formatted CVs made with the salary (CheckSalaryCVsWith)
 	salaryViews    salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
+	// stuckFailed are the documents the upkeep could not set right lately (ReconcileReading).
+	stuckMu     sync.Mutex
+	stuckFailed map[string]time.Time
 }
 
 // AIAllowance says whether the AI may be used now (the company has one,
@@ -199,7 +203,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID strin
 		for i, r := range rows {
 			docs[i] = fromRow(store.Document(r))
 		}
-		return nil
+		return readingJobs(ctx, tx, docs)
 	})
 	return docs, err
 }
@@ -221,7 +225,10 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Docume
 		doc = fromRow(row)
 		doc.ExtractedText = row.ExtractedText
 		doc.ParsedProfile = row.ParsedProfile
-		return nil
+		one := []Document{doc}
+		err = readingJobs(ctx, tx, one)
+		doc = one[0]
+		return err
 	})
 	return doc, err
 }
@@ -234,10 +241,14 @@ func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Docu
 	var doc Document
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		row, err := q.GetDocument(ctx, id)
-		if database.IsNoRows(err) {
+		// Locked before looking for a reading under way: two asking at once,
+		// or a reading ending at that moment (endReading), wait for each other.
+		if _, err := q.LockDocument(ctx, id); database.IsNoRows(err) {
 			return apperr.NotFound("document")
+		} else if err != nil {
+			return err
 		}
+		row, err := q.GetDocument(ctx, id)
 		if err != nil {
 			return err
 		}

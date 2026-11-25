@@ -132,6 +132,12 @@ func documentToAPI(d Document, withText bool) api.Document {
 	} else {
 		out.ParseStatus = nullable.NewNullNullable[api.DocumentParseStatus]()
 	}
+	if d.ReadingKnown {
+		out.ReadingJob = nullable.NewNullNullable[api.DocumentReadingJob]()
+		if d.ReadingJob != nil {
+			out.ReadingJob.Set(api.DocumentReadingJob(*d.ReadingJob))
+		}
+	}
 	out.PdfStatus = nullable.NewNullNullable[api.PdfStatus]()
 	if d.PdfStatus != nil {
 		out.PdfStatus = nullable.NewNullableWithValue(api.PdfStatus(*d.PdfStatus))

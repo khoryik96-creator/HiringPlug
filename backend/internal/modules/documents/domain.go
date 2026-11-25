@@ -52,8 +52,13 @@ type Document struct {
 	ParsedProfile []byte   // JSON (api.ParsedProfile); only loaded for single-document reads
 	PdfStatus     *string  // formatted CVs made by the app: queued, ready, failed
 	Salary        bool     // a formatted CV made with the salary (CVFile only)
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// ReadingJob is how far the job reading it is ("waiting", "running",
+	// "held"), nil when none is left; worked out (ReadingKnown) only where
+	// documents are shown being read.
+	ReadingJob   *string
+	ReadingKnown bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // DetectContentType identifies an uploaded file from its bytes (and, for a

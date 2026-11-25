@@ -1,0 +1,48 @@
+package main
+
+import (
+	"context"
+	"io"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// stdout runs fn and returns what it printed.
+func stdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	saved := os.Stdout
+	os.Stdout = w
+	got := make(chan string)
+	go func() {
+		b, _ := io.ReadAll(r)
+		got <- string(b)
+	}()
+	defer func() { os.Stdout = saved }()
+	fn()
+	require.NoError(t, w.Close())
+	return <-got
+}
+
+// yourself is this process's user, as HP_FILES_OWNER (repairing needs no root then).
+func yourself() string { return strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid()) }
+
+// Review of 1.47.0: repairing the files gave them back, but the PDF copies
+// that had failed meanwhile stayed "No PDF copy", and nothing said how to
+// make them again.
+func TestRepairFilesSaysHowToRemakeFailedPreviews(t *testing.T) {
+	files := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(files, "tnt_1"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(files, "tnt_1", "doc_1"), []byte("cv"), 0o600))
+	t.Setenv("HP_FILES_DIR", files)
+	t.Setenv("HP_FILES_OWNER", yourself())
+	t.Setenv("HP_DATABASE_ADMIN_URL", "")
+	out := stdout(t, func() { require.NoError(t, run(context.Background(), "repair-files", []string{"-apply"})) })
+	assert.Contains(t, out, "Make the PDF again")
+}

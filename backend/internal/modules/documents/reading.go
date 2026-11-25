@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
@@ -108,12 +107,19 @@ func (s *Service) failPdf(ctx context.Context, tx pgx.Tx, id, why string) error 
 // endReading ends a document's reading that has no result coming: its text
 // failed when it was never read, and its details go back to those read
 // before (with a warning) or fail. Nothing changes while another reading of
-// it is under way (asked for since): that one decides.
+// it is under way (asked for since): that one decides. The document is
+// locked first, so a reading asked for at the same moment is either seen
+// (its job) or waits for this to end; one already ended is left as it is.
 func (s *Service) endReading(ctx context.Context, tx pgx.Tx, tenantID, id, textWhy, action string, kind api.JobKind) error {
+	q := store.New(tx)
+	if _, err := q.LockDocument(ctx, id); database.IsNoRows(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
 	if active, err := jobqueue.Active(ctx, tx, readingKinds, "documentId", id); err != nil || active {
 		return err
 	}
-	q := store.New(tx)
 	row, err := q.GetDocument(ctx, id)
 	if database.IsNoRows(err) {
 		return nil
@@ -123,16 +129,22 @@ func (s *Service) endReading(ctx context.Context, tx pgx.Tx, tenantID, id, textW
 	}
 	changes := map[string]any{"job": kind}
 	if row.Status == string(api.DocumentStatusQueued) {
-		if row, err = q.FailExtraction(ctx, store.FailExtractionParams{ID: id, ErrorMessage: &textWhy}); err != nil {
+		switch ended, err := q.FailExtraction(ctx, store.FailExtractionParams{ID: id, ErrorMessage: &textWhy}); {
+		case database.IsNoRows(err): // ended already
+		case err != nil:
 			return err
+		default:
+			row, changes["status"] = ended, ended.Status
 		}
-		changes["status"] = row.Status
 	}
 	if row.ParseStatus != nil && *row.ParseStatus == string(api.DocumentParseStatusQueued) {
-		if row, err = q.EndParse(ctx, store.EndParseParams{ID: id, FailedError: noDetails, KeptWarning: keptWarning}); err != nil {
+		switch ended, err := q.EndParse(ctx, store.EndParseParams{ID: id, FailedError: noDetails, KeptWarning: keptWarning}); {
+		case database.IsNoRows(err): // ended already
+		case err != nil:
 			return err
+		default:
+			row, changes["parseStatus"] = ended, *ended.ParseStatus
 		}
-		changes["parseStatus"] = *row.ParseStatus
 	}
 	if len(changes) == 1 {
 		return nil // it had ended already
@@ -143,39 +155,75 @@ func (s *Service) endReading(ctx context.Context, tx pgx.Tx, tenantID, id, textW
 	return s.readDone(ctx, tx, tenantID, id, nil)
 }
 
+// readingJobs works out, for the documents being read, how far the job
+// reading them is (none left: the reading stopped, and reading again is
+// offered), so a page can tell a long wait from a reading that stopped.
+func readingJobs(ctx context.Context, tx pgx.Tx, docs []Document) error {
+	var reading []string
+	for _, d := range docs {
+		if beingRead(d) {
+			reading = append(reading, d.ID)
+		}
+	}
+	jobs, err := jobqueue.ActiveFor(ctx, tx, readingKinds, "documentId", reading)
+	if err != nil {
+		return err
+	}
+	for i, d := range docs {
+		if beingRead(d) {
+			docs[i].ReadingKnown = true
+			if state, ok := jobs[d.ID]; ok {
+				docs[i].ReadingJob = &state
+			}
+		}
+	}
+	return nil
+}
+
+func beingRead(d Document) bool {
+	return d.Status == string(api.DocumentStatusQueued) || (d.ParseStatus != nil && *d.ParseStatus == string(api.DocumentParseStatusQueued))
+}
+
 // StuckAfter is how long a document may show as being read with no job for
 // it before the upkeep ends its reading.
 const StuckAfter = 15 * time.Minute
 
 // ReconcileReading ends the reading of documents left "being read" with no
 // job to finish it, in every company (the worker's upkeep, at most limit at
-// a time). It returns how many it set right.
+// a time), oldest first. One it could not set right is left out for a day,
+// so a few that keep failing never crowd the others out. It returns how
+// many it set right.
 func (m *Module) ReconcileReading(ctx context.Context, limit int) (int, error) {
-	return reconcileReading(ctx, m.service, m.service.pool, limit)
+	return m.service.reconcileReading(ctx, limit, time.Now())
 }
 
-func reconcileReading(ctx context.Context, s *Service, pool *pgxpool.Pool, limit int) (int, error) {
-	rows, err := pool.Query(ctx, `SELECT tenant_id, document_id FROM document_reading_stuck(make_interval(secs => $1), $2)`,
-		StuckAfter.Seconds(), limit)
+// reconcileAgainAfter is how long the upkeep leaves a document it could not set right.
+const reconcileAgainAfter = 24 * time.Hour
+
+func (s *Service) reconcileReading(ctx context.Context, limit int, now time.Time) (int, error) {
+	s.stuckMu.Lock()
+	skip := []string{}
+	for id, at := range s.stuckFailed {
+		if now.Sub(at) < reconcileAgainAfter {
+			skip = append(skip, id)
+		} else {
+			delete(s.stuckFailed, id)
+		}
+	}
+	s.stuckMu.Unlock()
+	found, err := store.New(s.pool).ReadingStuck(ctx, store.ReadingStuckParams{
+		OlderSeconds: StuckAfter.Seconds(), MaxCount: int32(min(limit, 10000)), Skip: skip, //nolint:gosec // capped
+	})
 	if err != nil {
 		return 0, fmt.Errorf("finding documents left being read: %w", err)
 	}
-	type stuck struct{ tenant, id string }
-	found, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (stuck, error) {
-		var st stuck
-		err := r.Scan(&st.tenant, &st.id)
-		return st, err
-	})
-	if err != nil {
-		return 0, err
-	}
 	fixed := 0
 	for _, st := range found {
-		err := database.InTx(ctx, pool, authz.System(st.tenant), func(tx pgx.Tx) error {
-			if err := s.endReading(ctx, tx, st.tenant, st.id, readingLost, "document.reading_reconciled", "upkeep"); err != nil {
+		err := database.InTx(ctx, s.pool, authz.System(st.TenantID), func(tx pgx.Tx) error {
+			if err := s.endReading(ctx, tx, st.TenantID, st.DocumentID, readingLost, "document.reading_reconciled", "upkeep"); err != nil {
 				return err
 			}
-			row, err := store.New(tx).GetDocument(ctx, st.id)
+			row, err := store.New(tx).GetDocument(ctx, st.DocumentID)
 			if database.IsNoRows(err) {
 				return nil
 			}
@@ -183,12 +231,15 @@ func reconcileReading(ctx context.Context, s *Service, pool *pgxpool.Pool, limit
 				return err
 			}
 			if row.PdfStatus != nil && *row.PdfStatus == string(api.PdfStatusQueued) {
-				return s.failPdf(ctx, tx, st.id, "upkeep")
+				return s.failPdf(ctx, tx, st.DocumentID, "upkeep")
 			}
 			return nil
 		})
 		if err != nil {
-			logx.From(ctx).Warn("a document left being read could not be set right", "document_id", st.id, "error", err)
+			logx.From(ctx).Warn("a document left being read could not be set right", "document_id", st.DocumentID, "error", err)
+			s.stuckMu.Lock()
+			s.stuckFailed[st.DocumentID] = now
+			s.stuckMu.Unlock()
 			continue
 		}
 		fixed++

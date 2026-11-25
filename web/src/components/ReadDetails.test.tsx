@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type Document } from "../api/client";
 import { ok, renderWithClient, testCandidate } from "../test-utils";
 import { Documents } from "./Documents";
-import { pollEvery, STALLED_AFTER } from "./ReadDetails";
+import { pollEvery, SLOW_POLL, STALLED_AFTER } from "./ReadDetails";
 
 afterEach(() => {
   cleanup();
@@ -66,5 +66,36 @@ describe("reading a CV's details", () => {
     renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     expect(await screen.findByText(/the details read before are kept/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Review details" })).toBeTruthy();
+  });
+
+  // Review of 1.47.0: after 10 minutes a reading was taken for stopped even
+  // while its job still waited (a long queue, held after a restore), and
+  // reading again was offered: the server knows whether a job is left.
+  it("checks a long reading less often while its job is left, and stops once none is", () => {
+    const started = new Date(NOW - 20 * 60_000).toISOString();
+    const long = doc({ parseStatus: "queued", createdAt: "2026-11-01T00:00:00Z", updatedAt: started });
+    expect(pollEvery([{ ...long, readingJob: "waiting" }], NOW)).toBe(SLOW_POLL);
+    expect(pollEvery([{ ...long, readingJob: "held" }], NOW)).toBe(SLOW_POLL);
+    expect(pollEvery([{ ...long, readingJob: null }], NOW)).toBe(false);
+    expect(pollEvery([long], NOW)).toBe(false); // the server did not say: as before
+  });
+
+  it("says a long reading still waits instead of offering to read it again", async () => {
+    const waiting = doc({ id: "doc_wait", contentType: "text/plain", extractedText: "Waiting text", parseStatus: "queued", readingJob: "held",
+      createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-24T00:00:00Z" });
+    serve(waiting);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("Waiting text");
+    expect((await screen.findAllByText(/Held after a restore of the server/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Read details again" })).toBeNull();
+  });
+
+  it("offers reading again at once when no job is left for it", async () => {
+    const stopped = doc({ id: "doc_stop", contentType: "text/plain", extractedText: "Stopped text", parseStatus: "queued", readingJob: null,
+      createdAt: "2026-11-01T00:00:00Z", updatedAt: new Date().toISOString() });
+    serve(stopped);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("Stopped text");
+    expect(await screen.findByRole("button", { name: "Read details again" })).toBeTruthy();
   });
 });

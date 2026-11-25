@@ -650,6 +650,19 @@ func (q *Queries) LockCandidateCVs(ctx context.Context, candidateID string) erro
 	return err
 }
 
+const lockDocument = `-- name: LockDocument :one
+SELECT id FROM document WHERE id = $1 FOR UPDATE
+`
+
+// The document, locked until the transaction ends: ending a reading waits
+// for one asked for at the same moment (and then sees its job).
+func (q *Queries) LockDocument(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, lockDocument, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const maySeeSalary = `-- name: MaySeeSalary :one
 SELECT app_has_permission('candidates.compensation:read')::boolean AS may
 `
@@ -895,6 +908,19 @@ func (q *Queries) QueuePdf(ctx context.Context, id string) error {
 	return err
 }
 
+const queuePdfAgain = `-- name: QueuePdfAgain :one
+UPDATE document SET pdf_status = 'queued', pdf_error = NULL WHERE id = $1 AND pdf_status = 'failed' RETURNING storage_key
+`
+
+// A Word document's PDF copy made again after it failed (a person asked:
+// "Make the PDF again"), from its file.
+func (q *Queries) QueuePdfAgain(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, queuePdfAgain, id)
+	var storage_key string
+	err := row.Scan(&storage_key)
+	return storage_key, err
+}
+
 const queuePdfIfNone = `-- name: QueuePdfIfNone :one
 UPDATE document SET pdf_status = 'queued' WHERE id = $1 AND pdf_status IS NULL RETURNING storage_key
 `
@@ -945,6 +971,44 @@ func (q *Queries) RankCVsByText(ctx context.Context, arg RankCVsByTextParams) ([
 	for rows.Next() {
 		var i RankCVsByTextRow
 		if err := rows.Scan(&i.CandidateID, &i.Rank); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readingStuck = `-- name: ReadingStuck :many
+SELECT tenant_id::text AS tenant_id, document_id::text AS document_id
+FROM document_reading_stuck(make_interval(secs => $1::float8), $2::integer, $3::text[])
+`
+
+type ReadingStuckParams struct {
+	OlderSeconds float64
+	MaxCount     int32
+	Skip         []string
+}
+
+type ReadingStuckRow struct {
+	TenantID   string
+	DocumentID string
+}
+
+// Documents left "being read" with no job to finish them, in every company,
+// oldest first, leaving out skip (ones the upkeep could not set right lately).
+func (q *Queries) ReadingStuck(ctx context.Context, arg ReadingStuckParams) ([]ReadingStuckRow, error) {
+	rows, err := q.db.Query(ctx, readingStuck, arg.OlderSeconds, arg.MaxCount, arg.Skip)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadingStuckRow
+	for rows.Next() {
+		var i ReadingStuckRow
+		if err := rows.Scan(&i.TenantID, &i.DocumentID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

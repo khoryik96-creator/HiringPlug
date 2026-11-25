@@ -59,3 +59,30 @@ func Active(ctx context.Context, db Querier, kinds []api.JobKind, key, value str
 		AND status IN ('pending', 'running', 'held') AND kind = ANY ($1) AND payload->>$2 = $3)`, names(kinds), key, value).Scan(&active)
 	return active, err
 }
+
+// ActiveFor tells, for each of values (such as documentIds), how far its job
+// of one of kinds is in the caller's company: "running", "waiting" (pending),
+// or "held" (after a restore); values with none are left out.
+func ActiveFor(ctx context.Context, db Querier, kinds []api.JobKind, key string, values []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(values) == 0 {
+		return out, nil
+	}
+	rows, err := db.Query(ctx, `SELECT payload->>$2, CASE min(CASE status WHEN 'running' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END)
+		  WHEN 1 THEN 'running' WHEN 2 THEN 'waiting' ELSE 'held' END
+		FROM job WHERE tenant_id = app_current_tenant() AND status IN ('pending', 'running', 'held')
+		  AND kind = ANY ($1) AND payload->>$2 = ANY ($3)
+		GROUP BY 1`, names(kinds), key, values)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var value, state string
+		if err := rows.Scan(&value, &state); err != nil {
+			return nil, err
+		}
+		out[value] = state
+	}
+	return out, rows.Err()
+}

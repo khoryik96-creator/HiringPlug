@@ -2177,8 +2177,8 @@ export interface paths {
         get: operations["getDocumentPdf"];
         put?: never;
         /**
-         * Make a Word document's PDF copy (for previewing it), if it has none yet
-         * @description Word CVs uploaded since previews began get one at once; this makes one for older ones. A PDF, or a document whose copy is made or being made, is left as it is.
+         * Make a Word document's PDF copy (for previewing it), if it has none yet, or again after it failed
+         * @description Word CVs uploaded since previews began get one at once; this makes one for older ones. With again (a person asked: "Make the PDF again"), a copy that failed is made again, from a newly signed link. A PDF, or a document whose copy is made or being made, is left as it is.
          */
         post: operations["makeDocumentPdf"];
         delete?: never;
@@ -8771,6 +8771,11 @@ export interface components {
             parseStatus: components["schemas"]["DocumentParseStatus"] | null;
             /** @description Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise. */
             parseError: string | null;
+            /**
+             * @description While the document is being read (status or parseStatus queued): its job is waiting for the reader, running, or held after a restore of the server (Settings > System releases it); null when no job is left for it (the reading stopped: reading it again is offered). Left out where not worked out.
+             * @enum {string|null}
+             */
+            readingJob?: "waiting" | "running" | "held" | null;
             /** @description A CV the candidate sent, read by older CV-reading rules than this server's: reading it again (POST .../parse) may find more. Reviewing its details reads it again first. */
             readOutdated?: boolean;
             /** @description Only included when fetching a single document. */
@@ -17213,7 +17218,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Make a copy that failed again. */
+                    again?: boolean;
+                };
+            };
+        };
         responses: {
             /** @description Being made (or already there) */
             202: {

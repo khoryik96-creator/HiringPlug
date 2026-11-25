@@ -2,8 +2,10 @@
 // "Review details" opens the review beside the CV. While the CV is read the
 // button is orange with a timer and a bar fills, as for Format a CV; green
 // once the details are ready. A reading that ended without details says why
-// and offers reading again; one that runs far too long stops being watched
-// (no endless checking) and offers reading again too.
+// and offers reading again. One that runs far too long is checked less
+// often while the server still has a job for it (waiting for the reader,
+// running, or held after a restore: it says which), and offers reading
+// again only once none is left.
 import type { ReactNode } from "react";
 
 import type { Document } from "../api/client";
@@ -12,23 +14,42 @@ import { fill, ProgressLine, useNow } from "./StudioProgress";
 
 const TYPICAL = 15; // seconds reading a CV usually takes
 const FRESH = 120_000; // a CV this new has been read since its upload
-/** Seconds after which a reading is taken for stopped: no more checking, reading again offered. */
+/** Seconds after which a reading is long: checked less often, and taken for stopped when the server does not say a job is left. */
 export const STALLED_AFTER = 10 * 60;
 const POLL = 2000;
+/** How often a long reading the server still has a job for is checked. */
+export const SLOW_POLL = 30_000;
 
 export const isReading = (d: Document) => d.status === "queued" || d.parseStatus === "queued";
 
-/** Read for far longer than a CV ever takes: the reader may have stopped. */
-export const isStalled = (d: Document, now: number) => isReading(d) && readSeconds(d, now) > STALLED_AFTER;
+/** Read for far longer than a CV usually takes. */
+const isLong = (d: Document, now: number) => isReading(d) && readSeconds(d, now) > STALLED_AFTER;
+
+/**
+ * The reading stopped: the server has no job left for it (readingJob null),
+ * or, where it does not say, it ran far too long. Reading again is offered.
+ */
+export const isStalled = (d: Document, now: number) =>
+  isReading(d) && (d.readingJob === null || (d.readingJob === undefined && isLong(d, now)));
 
 /**
  * How often to check a candidate's CVs: every 2 seconds while one is being
- * read (or its PDF copy made), for at most STALLED_AFTER; then not at all.
+ * read (or its PDF copy made), for STALLED_AFTER; then every 30 seconds
+ * while the server still has a job for it; never once it stopped.
  */
 export function pollEvery(docs: Document[] | undefined, now = Date.now()): number | false {
-  const busy = (docs ?? []).some((d) => (isReading(d) && !isStalled(d, now))
-    || (d.pdfStatus === "queued" && now - Date.parse(d.updatedAt) < STALLED_AFTER * 1000));
-  return busy ? POLL : false;
+  const list = docs ?? [];
+  const reading = list.filter((d) => isReading(d) && !isStalled(d, now));
+  if (reading.some((d) => !isLong(d, now))
+    || list.some((d) => d.pdfStatus === "queued" && now - Date.parse(d.updatedAt) < STALLED_AFTER * 1000)) return POLL;
+  return reading.length > 0 ? SLOW_POLL : false;
+}
+
+/** What a reading's job is doing, when the server says so and it is worth saying. */
+function waitingFor(d: Document): string | null {
+  if (d.readingJob === "held") return "Held after a restore of the server (Settings › System releases it)";
+  if (d.readingJob === "waiting") return "Waiting for the reader";
+  return null;
 }
 
 /** When reading began: its upload for a new CV, else when the details were asked for. */
@@ -73,14 +94,18 @@ export function DetailsButton({ doc, ready, reviewing, canReview, canRead, busy,
 
 /**
  * The orange button while the CV is read, its seconds ticking (only it
- * re-renders each second); once the reading has run far too long, reading
- * again instead (the server never queues a second reading).
+ * re-renders each second), or what its job waits for; once the reading
+ * stopped, reading again instead (the server never queues a second reading).
  */
 function ReadingButton({ doc, again, busy }: { doc: Document; again?: () => void; busy: boolean }) {
   const now = useNow(true);
   if (isStalled(doc, now)) {
-    return again ? <IconButton label="Read details again" icon={<TextIcon />} className="icon-soft" disabled={busy} onClick={again} /> : null;
+    return again
+      ? <IconButton label="Read details again" icon={<TextIcon />} className="icon-soft" disabled={busy} onClick={again} />
+      : <span className="muted small" role="status">Reading stopped</span>;
   }
+  const waiting = waitingFor(doc);
+  if (waiting) return <button type="button" className="doc-btn format-running" disabled title={waiting}>{waiting}…</button>;
   return <button type="button" className="doc-btn format-running" disabled>Reading details… {readSeconds(doc, now)}s</button>;
 }
 
@@ -104,14 +129,16 @@ export function ReadProgress({ doc, finished, action, onDismiss }: {
   if (!isReading(doc) && !finished) return <ReadNote doc={doc} />;
   const seconds = readSeconds(doc, now);
   const failed = stalled || (!reading && doc.parseStatus !== "parsed");
-  const why = stalled ? "The reader may have stopped: read it again."
-    : failed ? doc.status === "failed" ? doc.errorMessage : doc.parseError ?? doc.errorMessage
-      : doc.parseError; // read again and it failed: the details before are kept
+  const waiting = reading ? waitingFor(doc) ?? (isLong(doc, now) ? "Still reading: this one takes longer than usual" : null) : null;
+  const why = stalled ? "The reader stopped: read it again."
+    : waiting ? `${waiting}.`
+      : failed ? doc.status === "failed" ? doc.errorMessage : doc.parseError ?? doc.errorMessage
+        : doc.parseError; // read again and it failed: the details before are kept
   return (
     <ProgressLine state={reading ? "running" : failed ? "failed" : "done"} ariaLabel="Reading the CV" seconds={seconds}
       pct={reading ? fill(seconds, TYPICAL) : 100}
       label={reading ? (doc.status === "queued" ? "Reading the CV…" : "Reading the details…")
-        : stalled ? "This is taking far longer than usual"
+        : stalled ? "Reading stopped"
           : doc.status === "failed" ? "The CV could not be read"
             : failed ? "The details could not be read" : <>Details read from <strong>{doc.fileName}</strong></>}
       end={<>{action}<button type="button" className="link" onClick={onDismiss}>Dismiss</button></>}>

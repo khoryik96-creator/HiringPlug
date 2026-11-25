@@ -84,8 +84,15 @@ func runRepairFiles(ctx context.Context, args []string) error {
 	if !after.OK() {
 		return fmt.Errorf("some files still cannot be used by %s%s", owner, unreadableList(after))
 	}
+	fmt.Println(remakePreviews)
 	return nil
 }
+
+// remakePreviews says what repairing the files does not do: PDF copies that
+// failed while the files could not be opened stay failed until asked for again.
+const remakePreviews = "PDF copies of Word CVs that failed while the files could not be opened stay failed: " +
+	"on each such CV (\"No PDF copy\"), choose ⋯ > Make the PDF again. A CV whose text could not be read: Read the CV again."
+
 
 func unreadableList(c backup.FilesCheck) string {
 	if len(c.Unreadable) == 0 {

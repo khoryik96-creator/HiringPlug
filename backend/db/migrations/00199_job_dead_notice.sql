@@ -7,8 +7,10 @@
 -- the Go worker runs that kind's dead-job handler (jobqueue OnDead).
 -- document_reading_stuck lists documents still shown as being read with no
 -- job left for them (from before this, a crash, a restore): the worker's
--- upkeep sets them right. The two indexes keep that, and the check for a
--- reading already under way, cheap.
+-- upkeep sets them right, oldest first, leaving out those it could not set
+-- right lately (p_skip) so they never crowd the others out. A job held
+-- after a restore (migration 00200) is still a job for them. The two
+-- indexes keep that, and the check for a reading already under way, cheap.
 -- Committed migrations are never edited (CI enforces this): add a new file.
 
 -- +goose Up
@@ -29,30 +31,31 @@ CREATE TRIGGER job_ai_dead_notice AFTER UPDATE OF status ON job
   EXECUTE FUNCTION job_ai_dead_notice();
 
 CREATE INDEX job_document_active_idx ON job ((payload->>'documentId'))
-  WHERE status IN ('pending', 'running') AND kind LIKE 'document.%';
+  WHERE status IN ('pending', 'running', 'held') AND kind LIKE 'document.%';
 CREATE INDEX document_reading_idx ON document (updated_at)
   WHERE status = 'queued' OR parse_status = 'queued' OR pdf_status = 'queued';
 
 -- +goose StatementBegin
-CREATE FUNCTION document_reading_stuck(p_older interval, p_limit integer)
+CREATE FUNCTION document_reading_stuck(p_older interval, p_limit integer, p_skip text[])
 RETURNS TABLE (tenant_id text, document_id text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT d.tenant_id, d.id
     FROM document d
    WHERE (d.status = 'queued' OR d.parse_status = 'queued' OR d.pdf_status = 'queued')
      AND d.updated_at < now() - p_older
+     AND d.id <> ALL (coalesce(p_skip, '{}'))
      AND NOT EXISTS (SELECT 1 FROM job j
-                      WHERE j.status IN ('pending', 'running') AND j.kind LIKE 'document.%'
+                      WHERE j.status IN ('pending', 'running', 'held') AND j.kind LIKE 'document.%'
                         AND j.payload->>'documentId' = d.id AND j.tenant_id = d.tenant_id)
    ORDER BY d.updated_at
    LIMIT p_limit
 $$;
 -- +goose StatementEnd
-REVOKE ALL ON FUNCTION document_reading_stuck(interval, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION document_reading_stuck(interval, integer) TO hiringplug_app;
+REVOKE ALL ON FUNCTION document_reading_stuck(interval, integer, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION document_reading_stuck(interval, integer, text[]) TO hiringplug_app;
 
 -- +goose Down
-DROP FUNCTION IF EXISTS document_reading_stuck(interval, integer);
+DROP FUNCTION IF EXISTS document_reading_stuck(interval, integer, text[]);
 DROP INDEX IF EXISTS document_reading_idx;
 DROP INDEX IF EXISTS job_document_active_idx;
 DROP TRIGGER IF EXISTS job_ai_dead_notice ON job;
