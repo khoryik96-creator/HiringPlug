@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient, sentBody } from "../test-utils";
-import { Team } from "./Team";
+import { ChangePassword, Team } from "./Team";
 
 afterEach(() => {
   cleanup();
@@ -85,5 +85,37 @@ describe("team", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add team" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ name: "Tech desk" });
+  });
+});
+
+describe("how each person signs in", () => {
+  it("shows Microsoft and/or Password beside each name, and nothing while invited", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [
+      { ...member("usr_me", "Aina", "owner"), signInMethods: ["password", "microsoft"] },
+      { ...member("usr_r", "Rizal", "recruiter"), signInMethods: ["microsoft"] },
+      member("usr_s", "Sam", "sourcer"),
+      { ...member("usr_n", "Nur", "sourcer", "invited"), signInMethods: [] },
+    ] }));
+    renderWithClient(<Team myRole="owner" myId="usr_me" />);
+    await screen.findByLabelText("Role of Rizal");
+    const row = (name: string) => Promise.resolve(screen.getAllByRole("row").find((r) => r.textContent.startsWith(name)) as HTMLElement);
+    const badges = async (name: string) => within(await row(name)).queryAllByText(/^\s*(Microsoft|Password)$/).map((b) => b.textContent.trim());
+    expect(await badges("Aina")).toEqual(["Microsoft", "Password"]);
+    expect(await badges("Rizal")).toEqual(["Microsoft"]);
+    expect(await badges("Sam")).toEqual(["Password"]);
+    expect(await badges("Nur")).toEqual([]);
+    expect(within(await row("Rizal")).getByLabelText("Signs in with Microsoft")).toBeTruthy();
+  });
+});
+
+describe("your password", () => {
+  it("says there is none to change for someone who signs in with Microsoft", () => {
+    renderWithClient(<ChangePassword hasPassword={false} />);
+    expect(screen.getByText(/You sign in with Microsoft/)).toBeTruthy();
+    expect(screen.queryByLabelText("Current password")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Change password" })).toBeNull();
+    cleanup();
+    renderWithClient(<ChangePassword hasPassword />);
+    expect(screen.getByLabelText("Current password")).toBeTruthy();
   });
 });

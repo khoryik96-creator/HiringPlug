@@ -85,6 +85,18 @@ describe("your two-step sign-in", () => {
     expect(sentBody(post)).toEqual({ password: "purple-gecko-41" });
   });
 
+  it("turns it off with the app's code for someone without a password", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ enabled: true, enabledAt: "2026-11-20T00:00:00Z", recoveryCodesLeft: 3, required: false }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({}));
+    renderWithClient(<MyTwoStep hasPassword={false} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
+    expect(screen.queryByLabelText("Your password")).toBeNull();
+    fill("Code from the app", "287082");
+    fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({ code: "287082" });
+  });
+
   it("has no Turn off while the company requires it", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ enabled: true, enabledAt: "2026-11-20T00:00:00Z", recoveryCodesLeft: 10, required: true }));
     renderWithClient(<MyTwoStep />);
