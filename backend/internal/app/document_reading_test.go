@@ -239,3 +239,34 @@ func TestTheUpkeepEndsReadingsWithNoJobLeft(t *testing.T) {
 	_, err = testutil.Current.Admin.Exec(ctx, `DELETE FROM job WHERE queue = 'ai' AND tenant_id = $1`, tenant.ID)
 	require.NoError(t, err)
 }
+
+// Review of 1.47.0 (before it): a CV whose reading kills the AI worker (a
+// crash, out of memory) was claimed again whenever its lease ran out, for
+// ever, and stayed "Reading details..." The claim after its last attempt
+// ends it, and the CV says its text could not be read.
+func TestACVWhoseReadingKeepsKillingTheWorkerEnds(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	c := a.createCandidate(token, map[string]any{"firstName": "Hafiz"})
+	res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.pdf", pdfWith(c.Id))
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var doc api.Document
+	res.JSON(&doc)
+	job := claimAIJobFor(t, conn, doc.Id)
+	// Its worker died on its last attempt: nothing recorded, the lease ran out.
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET max_attempts = attempts, locked_until = now() - interval '1 second' WHERE id = $1`, job.ID)
+	require.NoError(t, err)
+	var claimed int
+	require.NoError(t, testutil.Current.App.QueryRow(ctx, `SELECT count(*) FROM job_claim_for_tenant('ai', 'python-test', 60, $1)`, tenant.ID).Scan(&claimed))
+	assert.Zero(t, claimed, "not claimed again")
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	got := a.getDocument(token, doc.Id)
+	assert.Equal(t, api.DocumentStatusFailed, got.Status, "not being read for ever")
+	assert.Contains(t, got.ErrorMessage.MustGet(), "could not be read")
+}
