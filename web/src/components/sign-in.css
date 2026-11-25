@@ -7,6 +7,9 @@
   min-height: 44px; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong);
 }
 .ms-button .ms-mark { flex-shrink: 0; }
+/* Your account: a button of its own size in the panel (full width on a phone). */
+.ms-connect .ms-button { width: auto; padding-inline: 1.1rem; }
+@media (max-width: 600px) { .ms-connect .ms-button { width: 100%; } }
 .ms-note { margin: 0; }
 .ms-or { display: flex; align-items: center; gap: 0.75rem; margin: 1.1rem 0; color: var(--muted); font-size: 0.85rem; }
 .ms-or::before, .ms-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
