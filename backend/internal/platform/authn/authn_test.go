@@ -38,3 +38,19 @@ func TestBadTokensAreRejected(t *testing.T) {
 		assert.ErrorIs(t, err, ErrInvalidToken, name)
 	}
 }
+
+func TestSessionsSayHowTheyWereSignedIn(t *testing.T) {
+	for _, method := range []string{MethodPassword, MethodMicrosoft} {
+		token, err := verifier().MintSession(tenantID, userID, method, time.Now(), time.Hour)
+		require.NoError(t, err)
+		claims, err := verifier().Verify(token)
+		require.NoError(t, err)
+		assert.Equal(t, method, claims.Method())
+	}
+	token, err := verifier().Mint(tenantID, userID, time.Hour)
+	require.NoError(t, err)
+	claims, err := verifier().Verify(token)
+	require.NoError(t, err)
+	assert.Empty(t, claims.Method(), "hp token says nothing")
+	assert.Empty(t, Claims{AMR: []string{"microsoft", "pwd"}}.Method(), "only one known method counts")
+}

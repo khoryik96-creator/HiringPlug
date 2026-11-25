@@ -44,10 +44,12 @@ type Principal struct {
 }
 
 // Session is the sign-in a request came with: its token's ID and expiry
-// (zero for API keys and tokens without an ID).
+// (zero for API keys and tokens without an ID), and how the person signed in
+// ("pwd", "microsoft", or "" when the token does not say).
 type Session struct {
 	ID      string
 	Expires time.Time
+	Method  string
 }
 
 // WithSession returns p signed in with session s.

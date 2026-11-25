@@ -1,9 +1,9 @@
 // Package authn checks who is calling: it verifies signed bearer tokens (JWT).
 //
-// Development and tests use tokens signed with a shared secret (`hp token`
-// mints one). For production single sign-on (Google, Microsoft), put an OIDC
-// provider in front and swap Verify for JWKS-based verification; the rest of
-// the app only sees the Claims.
+// Every token is HiringPlug's own, signed with a shared secret (`hp token`
+// mints one for development). Signing in with Microsoft checks Microsoft's
+// token once (platform/entra) and then issues one of these, which says how
+// the person signed in (amr).
 package authn
 
 import (
@@ -26,10 +26,27 @@ var (
 // the wrapped error for logs, never in the response.
 var ErrInvalidToken = errors.New("invalid token")
 
+// How a session was signed in (the token's amr claim, RFC 8176 style).
+const (
+	MethodPassword  = "pwd"
+	MethodMicrosoft = "microsoft"
+)
+
 // Claims are what a token says about the caller.
 type Claims struct {
 	TenantID string `json:"tid"`
+	// AMR is how the session was signed in: MethodPassword or MethodMicrosoft
+	// (none in tokens from before 1.46.0 and from hp token).
+	AMR []string `json:"amr,omitempty"`
 	jwt.RegisteredClaims
+}
+
+// Method is how the session was signed in ("" when the token does not say).
+func (c Claims) Method() string {
+	if len(c.AMR) == 1 && (c.AMR[0] == MethodPassword || c.AMR[0] == MethodMicrosoft) {
+		return c.AMR[0]
+	}
+	return ""
 }
 
 // Verifier checks and issues tokens.
@@ -70,8 +87,14 @@ func (v *Verifier) Mint(tenantID, userID string, ttl time.Duration) (string, err
 	return v.MintAt(tenantID, userID, v.now(), ttl)
 }
 
-// MintAt issues a token for a user, issued at now (signing in).
+// MintAt issues a token for a user, issued at now.
 func (v *Verifier) MintAt(tenantID, userID string, now time.Time, ttl time.Duration) (string, error) {
+	return v.MintSession(tenantID, userID, "", now, ttl)
+}
+
+// MintSession issues a sign-in token, issued at now, saying how the person
+// signed in (method: MethodPassword or MethodMicrosoft).
+func (v *Verifier) MintSession(tenantID, userID, method string, now time.Time, ttl time.Duration) (string, error) {
 	id := make([]byte, 16)
 	if _, err := rand.Read(id); err != nil {
 		return "", err
@@ -86,6 +109,9 @@ func (v *Verifier) MintAt(tenantID, userID string, now time.Time, ttl time.Durat
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 		},
+	}
+	if method != "" {
+		c.AMR = []string{method}
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(v.secret)
 }
