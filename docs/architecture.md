@@ -195,13 +195,29 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   kind's handler with the dead job: a CV whose reading died is marked failed,
   or goes back to the details read before, never "being read" forever. The
   worker's hourly upkeep also ends readings left with no job at all
-  (`document_reading_stuck`: a crash, a restore, older data).
+  (`document_reading_stuck`: a crash, a restore, older data), oldest first,
+  leaving out for a day those it could not set right. Ending a reading locks
+  the document first, as asking for one does, so neither overwrites the
+  other. Outbound kinds whose record shows a status have a handler too (an
+  email "not sent", a webhook delivery or calendar push failed, an invoice
+  not emailed, an automation run failed, a mailbox check unknown; a morning
+  email queues the next morning's).
+- **A worker that dies on the last attempt ends its job.** A claim takes
+  back a running job whose lease ran out (its worker died) only while it has
+  tries left; on its last attempt the claim ends it (dead, migration 00202),
+  and its dead-job handler runs, so a job that kills its worker never loops.
 - **Held after a restore.** `hp restore` moves the waiting and running jobs
   that act outside HiringPlug (`jobqueue.Outbound`: emails, calendar
   updates, webhooks, automations, uploads, paid lookups, and reads with the
-  restored sign-ins) to `held`, which no claim takes, and records the restore
-  (`restore_marker`). Each company releases or cancels them in Settings >
-  System; the alert email waits until none is held.
+  restored sign-ins) and the paid AI work (`jobqueue.PaidAI`, and CV and job
+  description readings that ask the AI) to `held`, which no claim takes, and
+  records the restore (`restore_marker`). Each company releases or cancels
+  its own in Settings > System; the agency that runs the server sees and
+  settles every company's there, and `hp jobs list|release|cancel` does it on
+  the server. Other companies learn only that some of theirs are held, and
+  how many. After a restore from another server the alert email waits until
+  none is held, 72 hours at most; a public booking page reads no calendar
+  meanwhile.
 - **Most urgent first.** Each job kind has a priority in the contract: `high`
   when someone waits on screen (an assistant question, an email, a job
   description's preview on the job's page), `low` for upkeep (webhooks,
@@ -241,9 +257,14 @@ NAME` puts one back (flags may come before or after the name in every `hp`
 command): it stages the files, gives them to the runtime user
 (`HP_FILES_OWNER`) before they replace the current ones, restores the
 database in one transaction, brings it up to date, holds the outbound jobs,
-pauses paid AI when the backup is from another server, and checks that the
-runtime user can open a sample of the files; `hp repair-files -apply` fixes
-the owners of a server restored before. Each run is recorded; **Settings >
+pauses paid AI when the backup is from another server, and then checks that
+the runtime user can open a sample of the files (the files and database are
+back by then: a failed check prints the command to run). `hp repair-files
+-apply` fixes the owners of a server restored before (stop the API and
+workers first: it refuses while they are connected). Both walk the files
+folder without ever following a link: each folder and file is opened
+relative to its folder (`O_NOFOLLOW`) and changed through that descriptor,
+so a name swapped for a link meanwhile changes nothing outside it. Each run is recorded; **Settings >
 System** shows the last one, and warns when it failed or is more than two
 days old.
 
@@ -255,8 +276,11 @@ is admitted (`aiproviders` access: nothing queued with a key) and where it
 runs (the AI worker's `Deps.provider`, through `ai_paid_paused()`, cached
 five seconds), so jobs queued before the pause make no call either; CV and
 job-description reading falls back to the rules. `HP_AI_PAID=off` pauses it
-whatever the row says. Only an owner of the agency that runs the server turns
-it, in Settings > System.
+whatever the row says. An owner of the agency that runs the server turns it
+in Settings > System; `hp paid-ai on|off` does on the server (a multi-agency
+server without `HP_BACKUP_TENANT` has no such agency). The AI worker asks
+before every provider call, so a job of many calls stops within seconds. A
+key check that could not run because of it is `paused`, never failed.
 
 ## Web app
 

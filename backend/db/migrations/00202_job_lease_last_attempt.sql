@@ -1,4 +1,4 @@
--- job queue (1.47.1): a job whose worker dies on its last attempt ends.
+-- job queue (1.47.0): a job whose worker dies on its last attempt ends.
 -- A claim took back a running job whose lease had run out (its worker
 -- died) whatever its attempts, so a job that kills its worker (a CV that
 -- crashes the reader, a worker stopped by memory) was claimed, and killed

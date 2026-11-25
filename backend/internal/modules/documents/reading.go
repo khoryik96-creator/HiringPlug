@@ -42,7 +42,7 @@ const (
 	readingLost   = "Reading this file stopped before it finished (the server was restarted or restored). Read it again."
 	pdfNotMade    = "The PDF copy could not be made."
 	// What the AI worker's download says (ai/.../download.py): the file
-	// server's own "not found", a refused link, and (before 1.47.1) any 404.
+	// server's own "not found", a refused link, and (before 1.47.0) any 404.
 	missingReason = "file missing"
 	expiredReason = "link expired"
 	foreignReason = "other than HiringPlug's file server"

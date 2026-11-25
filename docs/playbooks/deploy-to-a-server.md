@@ -164,27 +164,41 @@ did:
 
 - **Files**: they are given to the user the API and workers run as
   (`HP_FILES_OWNER`, 65532:65532 in compose), still private to it (folders
-  0700, files 0600); then a sample is opened as that user. Nothing is
-  replaced if that fails. The kept backups are never changed: the restore
-  copies their files. A server restored before 1.47.0 whose CV previews say
-  "permission denied" is fixed with `... run --rm backup /app/hp repair-files
-  -apply` (without `-apply` it only reports).
+  0700, files 0600), before they replace the current ones: if that fails,
+  nothing is replaced. Once the database and files are back, a sample is
+  opened as that user; if that fails the restore exits non-zero and prints
+  the command to run: `... run --rm backup /app/hp repair-files -apply`, with
+  the API and workers still stopped (it refuses while they run, and never
+  follows a link). The kept backups are never changed: the restore copies
+  their files. A server restored before 1.47.0 whose CV previews say
+  "permission denied" is fixed the same way (without `-apply` it only
+  reports); Word CVs whose PDF copy failed meanwhile get theirs from the
+  file's menu, **Make the PDF again**.
 - **Jobs**: the database is brought up to date, and the jobs waiting in the
   backup that reach people or other systems (emails, interview reminders,
   digests, invoices, automations, calendar updates, webhooks, claim uploads,
   Apollo and mailbox checks, and the Outlook, calendar, job-board and
   company-website reads that use the restored sign-ins) are **held**: they
   may have happened already, and a test server must never email real
-  candidates. Settings › System lists them in each company, to release or
-  cancel, each or all; the server's alert email waits until none is held.
-  Work that stays inside HiringPlug (reading CVs, PDF copies, search by
-  meaning) runs again by itself. `hp restore -yes -resume-outbound NAME` lets
-  the held kinds run at once: only when you know they did not happen.
+  candidates. Paid AI work waiting in the backup (fit scores, rankings, CV
+  formatting, AI readings...) is held too, so nothing is billed twice.
+  Settings › System lists them in each company, to release or cancel, each
+  or all; the agency that runs the server (`HP_BACKUP_TENANT`) sees every
+  company's. On the server, `... run --rm backup /app/hp jobs list` lists
+  every company's, and `hp jobs release -yes` or `hp jobs cancel -yes` (add a
+  job's id for one) settles them. After a restore from another server the
+  alert email waits until none is held, 72 hours at most. Work that stays
+  inside HiringPlug (reading CVs, PDF copies, search by meaning) runs again
+  by itself. `hp restore -yes -resume-outbound NAME` lets the outbound kinds
+  run at once, and `-resume-paid-ai` the paid AI work (and leaves paid AI
+  on): only when you know they did not happen.
 - **Paid AI**: a backup from another server (the restore prints both) is
   put back with paid AI paused for every company, company keys included, so
-  a copy spends nobody's credit. The agency that runs the server turns it
-  back on in Settings › System (`HP_AI_PAID=off` in deploy/.env keeps it off
-  whatever Settings says). CVs are still read, by the rules.
+  a copy spends nobody's credit. The agency that runs the server
+  (`HP_BACKUP_TENANT`, or the only one) turns it back on in Settings ›
+  System, or anyone on the server with `... run --rm backup /app/hp paid-ai
+  on` (`HP_AI_PAID=off` in deploy/.env keeps it off whatever they say). CVs
+  are still read, by the rules.
 
 Sign in on the test server and check a few candidates and their CVs (open a
 PDF, a Word CV's preview, upload a new one), then delete the test server.

@@ -148,13 +148,14 @@ restore gives the files it puts back to the user the API runs as
 (`HP_FILES_OWNER`, 65532:65532 in Docker) and checks that user can open
 them; it brings the database up to date; and it **holds** the emails,
 calendar updates, webhooks and automations waiting in the backup (they may
-have happened already) until someone releases or cancels them in Settings ›
-System (`-resume-outbound` lets them run at once). A backup from another
-server also pauses paid AI, until it is turned back on in Settings › System.
-A server restored before 1.47.0 whose CV previews fail with "permission
-denied": `docker compose -f deploy/docker-compose.yml run --rm backup /app/hp
-repair-files` reports, and `... repair-files -apply` fixes it (no chmod or
-chown by hand).
+have happened already), and the paid AI work, until someone releases or
+cancels them in Settings › System or with `hp jobs` (`-resume-outbound` and
+`-resume-paid-ai` let them run at once). A backup from another server also
+pauses paid AI, until it is turned back on in Settings › System or with `hp
+paid-ai on`. A server restored before 1.47.0 whose CV previews fail with
+"permission denied": stop the API and workers, then `docker compose -f
+deploy/docker-compose.yml run --rm backup /app/hp repair-files` reports, and
+`... repair-files -apply` fixes it (no chmod or chown by hand).
 
 Test a restore now and then, on another machine. Without Docker, `hp backup`
 needs the PostgreSQL client tools of the database's own version (it refuses

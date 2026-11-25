@@ -349,7 +349,12 @@ Design:
 top: the newest CV they sent, with their other CVs to pick from. A PDF is shown
 as it is; a Word file (.docx or old .doc) gets a PDF copy made by the AI worker
 with LibreOffice when it is uploaded (its text shows meanwhile). Word CVs from
-before this get their copy the first time the page is opened.
+before this get their copy the first time the page is opened. A copy that
+failed (the file could not be opened then, after a restore say) says "No PDF
+copy" in the file's menu, with **Make the PDF again**. A CV being read says
+when it is waiting for the reader or held after a restore; reading again is
+offered once no job is left for it (a long reading is checked every 30
+seconds meanwhile).
 
 **Formatted CVs, CV Studio's way ✅.** "Make formatted CV" offers two ways.
 **From their CV** formats one of the CVs the candidate sent with CV Studio's
@@ -2060,12 +2065,18 @@ when it failed or is more than two days old. After a restore (1.47.0) it says
 when the server was restored and from which kind of backup, and lists the
 company's jobs the restore **held** because they reach people or other
 systems (emails, reminders, calendar updates, webhooks, automations...; they
-may have happened already): **Release** or **Cancel** each, or all at once
-(audited); the server's alert email waits until none is held. **Paid AI**
-shows whether paid AI is paused on the server; an owner of the agency that
-runs the server pauses it for every company at once, company keys included,
-or turns it back on (audited): CVs are then read by the rules alone, and the
-AI notice across the app says paid AI is paused.
+may have happened already) or ask a paid AI: **Release** or **Cancel** each,
+or all at once, after a confirmation (audited). The agency that runs the
+server sees every company's held jobs, with a Company column, and settles
+them for all; other companies see only that some of theirs are held after a
+restore of the server, and how many. A cancelled job's record says it was not
+done (an email "Not sent: cancelled after the server was restored"). After a
+restore from another server the server's alert email waits until none is
+held, 72 hours at most. **Paid AI** shows whether paid AI is paused on the
+server; an owner of the agency that runs the server pauses it for every
+company at once, company keys included, or turns it back on (audited; on the
+server, `hp paid-ai on|off`): CVs are then read by the rules alone, and the AI
+notice across the app says paid AI is paused.
 
 **Backups** (the owner of the agency that runs the server; permission
 `settings.backups:manage`) turns the nightly backup on or off, makes one now
