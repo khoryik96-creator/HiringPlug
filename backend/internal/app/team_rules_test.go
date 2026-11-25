@@ -118,3 +118,32 @@ func TestChangingSomeoneNotOnTheTeamIsNotFound(t *testing.T) {
 	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT role FROM app_user WHERE id = $1`, other.Users[api.RoleRecruiter].ID).Scan(&role))
 	assert.Equal(t, "recruiter", role, "another company's person is unchanged")
 }
+
+// Two owners demoting each other at the same moment: one is refused, and
+// the company keeps an active owner.
+func TestTwoOwnersCannotDemoteEachOtherAtOnce(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	first, second := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin]
+	res := a.request(http.MethodPatch, "/v1/team/"+second.ID, first.Token, map[string]any{"role": "owner"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	// Both changes wait (to write their audit entries) until both have checked.
+	h := hold(t, `SELECT 1 FROM tenant WHERE id = $1 FOR UPDATE`, tenant.ID)
+	answers := make(chan *response, 2)
+	go func() {
+		answers <- a.request(http.MethodPatch, "/v1/team/"+second.ID, first.Token, map[string]any{"role": "admin"})
+	}()
+	go func() {
+		answers <- a.request(http.MethodPatch, "/v1/team/"+first.ID, second.Token, map[string]any{"role": "admin"})
+	}()
+	h.waitBlocked(2)
+	h.release()
+	statuses := []int{(<-answers).Status, (<-answers).Status}
+	assert.ElementsMatch(t, []int{http.StatusOK, http.StatusUnprocessableEntity}, statuses)
+	var owners int
+	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(),
+		`SELECT count(*) FROM app_user WHERE tenant_id = $1 AND role = 'owner' AND active`, tenant.ID).Scan(&owners))
+	assert.Equal(t, 1, owners, "an active owner is left")
+}

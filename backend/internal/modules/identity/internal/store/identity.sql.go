@@ -492,6 +492,19 @@ func (q *Queries) HoldTeam(ctx context.Context) error {
 	return err
 }
 
+const holdTeamChanges = `-- name: HoldTeamChanges :exec
+SELECT pg_advisory_xact_lock(hashtextextended('team-changes:' || app_current_tenant(), 0))
+`
+
+// Changes of the team's roles and activity, one at a time per company until
+// the transaction ends: taken before anything else is held (nothing else
+// takes it, so it never deadlocks), it keeps two changes from each counting
+// the other's owner (ActiveOwners) and leaving the company with none.
+func (q *Queries) HoldTeamChanges(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, holdTeamChanges)
+	return err
+}
+
 const holdUser = `-- name: HoldUser :one
 SELECT id FROM app_user WHERE id = $1 FOR NO KEY UPDATE
 `

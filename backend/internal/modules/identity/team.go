@@ -153,6 +153,11 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 	var out TeamMember
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		// First, one change of the team at a time: the active owners counted
+		// below stay so until this one is made (another demotion waits).
+		if err := q.HoldTeamChanges(ctx); err != nil {
+			return err
+		}
 		_, err := q.HoldUser(ctx, userID) // a sign-in of theirs under way finishes first (or waits, and sees the change)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("user")

@@ -203,7 +203,9 @@ in, so a company that requires Microsoft refuses them to non-owners).
 
 **Team rules** (`identity.team:manage`: owners and admins): nobody changes
 their own role or deactivates themselves; only owners make, change or
-deactivate owners; the company always keeps an active owner.
+deactivate owners; the company always keeps an active owner (changes of the
+team are made one at a time per company, so two owners demoting each other
+at once leave one).
 
 **Public endpoints** (`x-permission: public`, under `/v1/public/`) are the only
 exception: the careers page and its apply form, for signed-out candidates. The

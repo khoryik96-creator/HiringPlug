@@ -99,6 +99,13 @@ DELETE FROM app_user WHERE id = @id AND invited;
 -- name: ActiveOwners :one
 SELECT count(*) FROM app_user WHERE role = 'owner' AND active;
 
+-- Changes of the team's roles and activity, one at a time per company until
+-- the transaction ends: taken before anything else is held (nothing else
+-- takes it, so it never deadlocks), it keeps two changes from each counting
+-- the other's owner (ActiveOwners) and leaving the company with none.
+-- name: HoldTeamChanges :exec
+SELECT pg_advisory_xact_lock(hashtextextended('team-changes:' || app_current_tenant(), 0));
+
 -- A company's own settings for one role (none: the contract's defaults).
 -- name: GetRoleSetting :one
 SELECT * FROM role_setting WHERE role = @role;
