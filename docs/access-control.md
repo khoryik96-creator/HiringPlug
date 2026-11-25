@@ -37,18 +37,34 @@ company's Microsoft organisation (the Entra *Directory (tenant) ID*;
 `agency.microsoft_sign_in_changed`). Only people already on the Team page
 (active, or invited: signing in accepts the invitation, without a password)
 with an account of that organisation can sign in; personal Microsoft accounts
-and other organisations are refused. The first sign-in links the account
-(organisation + object ID) to the team member with its address
-(`user.microsoft_linked`); later ones match the account, whatever its address
-has become. It goes through the company's own Microsoft app (Settings > Email
-connection) or the server's (`HP_MAIL_MICROSOFT_*`).
+and other organisations, and guests in the company's (`acct` 1, or a `#EXT#`
+sign-in name), are refused. The first sign-in links the account
+(organisation + object ID) to the team member with its sign-in name
+(`preferred_username`, the UPN: a domain the organisation verified), or with
+its email only when Microsoft says the email's domain is verified
+(`xms_edov`): anyone's address can be typed as an account's mail, so it proves
+nothing by itself. Later sign-ins match the linked account, whatever its
+address has become. An account is **never linked to an owner by its address**:
+owners connect theirs from Your account › Connect Microsoft sign-in while
+signed in (`POST /v1/me/microsoft/start` and `/complete`, the same tab; an
+account of the company's organisation, linked to nobody else there), or accept
+their own invitation with it. Every link is audited (`user.microsoft_linked`,
+`by`: `sign_in`, `invitation` or `self`) and the person is emailed ("not you?
+tell an owner"). Owners (and admins, for everyone but owners) **unlink** an
+account on the Team page (`DELETE /v1/team/{userId}/microsoft`,
+`identity.team:manage`, `user.microsoft_unlinked`), which ends that person's
+Microsoft sessions; they link one again at their next sign-in (owners from
+Your account). It goes through the company's own Microsoft app (Settings >
+Email connection) or the server's (`HP_MAIL_MICROSOFT_*`); while Microsoft
+sign-in is on, only owners may change or remove the company's Microsoft app
+(`MICROSOFT_APP_OWNERS_ONLY`).
 
 - *Flow.* `POST /v1/auth/microsoft/start` (public) finds the company from an
-  invitation, a careers page address, the email (when exactly one company that
-  signs in with Microsoft has it on its team), the only such company on the
-  server, or else goes through the server's app for any organisation (the
-  account's organisation then finds the company; an account at several asks
-  which one). It saves the sign-in (`microsoft_sign_in_flow`, 10 minutes) with
+  invitation, a careers page address, or the only company on the server that
+  signs in with Microsoft, or else goes through the server's app for any
+  organisation (the account's organisation then finds the company; an account
+  at several asks which one). The email typed is only a hint to Microsoft:
+  routing by it would show, in the address returned, where it is on a team. It saves the sign-in (`microsoft_sign_in_flow`, 10 minutes) with
   the PKCE S256 verifier and nonce sealed (AES-GCM, key derived from
   `HP_AUTH_JWT_SECRET`), the state's SHA-256, and the SHA-256 of a random value
   the browser tab keeps in sessionStorage. Microsoft returns to
@@ -66,13 +82,19 @@ connection) or the server's (`HP_MAIL_MICROSOFT_*`).
   its audience the app, within its times (2 minutes' leeway), with the nonce,
   and its organisation the company's (never the personal-accounts one).
 - *Answers.* Refusals are `MICROSOFT_SIGN_IN_FAILED` with a reason:
-  `not_on_team` (also for deactivated members: the same words),
-  `other_organisation`, `personal_account` or `failed`. They come only after
+  `not_on_team` (also for deactivated members, and invitations older than
+  their 7 days: the same words), `other_organisation` (guests too),
+  `personal_account`, `connect_first` (an owner's address: connect from Your
+  account) or `failed`; connecting from Your account answers
+  `MICROSOFT_CONNECT_FAILED` (`already_connected`, `linked_elsewhere`, or as
+  above). They come only after
   Microsoft has vouched for the account, and only about it: the redirect is the
   same for anyone. The pre-tenant lookups are `SECURITY DEFINER` functions
   (`app_microsoft_*`, migration 00198); the app cannot read the sign-ins table
-  directly. Start and complete share the password sign-in limits per address
-  (start also per email).
+  directly. Microsoft has its own limits per address, apart from passwords'
+  (start 120 per 15 minutes, also per email; the redirect and finishing 300
+  each), so a busy office signs in all morning and neither way uses up the
+  other's.
 - *Sessions.* HiringPlug's own token says how it was signed in (`amr`: `pwd`
   or `microsoft`). Microsoft sign-ins skip the two-step code (password sign-ins
   still need it). An owner can **require** Microsoft: then signing in with a
@@ -84,6 +106,12 @@ connection) or the server's (`HP_MAIL_MICROSOFT_*`).
   (`hasPassword` in `/v1/me`): changing one answers `PASSWORD_NOT_SET` (a reset
   link sets one, unless Microsoft is required), and turning two-step off takes
   the app's code instead. The Team page lists each member's sign-in methods.
+  Microsoft sessions stop when the company turns Microsoft sign-in off (and
+  stay stopped if it is turned on again), when the person's account is
+  unlinked, and when the company changes its organisation: that also removes
+  the links to the old organisation's accounts (`linksRemoved` in the audit
+  entry), and everyone links again at their next sign-in
+  (`app_user.microsoft_sessions_after`; password sessions go on).
 
 **Invitations and resets.** Owners and admins invite people (email, name,
 role); the invitation is emailed and its link is also shown, to pass on if

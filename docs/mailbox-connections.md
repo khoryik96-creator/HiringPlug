@@ -159,7 +159,12 @@ agency's, or else the server's) and needs one more Web redirect URI on it:
 ```
 
 (locally `http://localhost:3000/v1/auth/microsoft/callback`). It asks only
-`openid profile email`, and it needs no new setting. An owner turns it on in
+`openid profile email`, and it needs no new setting. In Microsoft Entra ›
+**Token configuration**, add the optional claims **`xms_edov`** and **`acct`**
+to the ID token: with `xms_edov` an account's email counts for finding the
+team member when Microsoft has verified its domain (without it only the
+sign-in name, the UPN, does), and `acct` marks guests, who are refused (a
+`#EXT#` sign-in name is refused too). An owner turns it on in
 Settings › Roles and access with the organisation's *Directory (tenant) ID*,
 shown on the app's overview page in Microsoft Entra (only that organisation's
 accounts are accepted; personal accounts never are), and the same box shows
@@ -167,7 +172,9 @@ the redirect URI to copy. The server's app should allow accounts in any
 organizational directory (multi-tenant): sign-ins that name no company go
 through it, and the account's organisation then finds the company. An agency's
 own single-tenant app is used whenever the sign-in names its company (its
-careers page address, an invitation, or an email on its team). The nginx proxy
+careers page address, or an invitation), or is the only company on the server
+that signs in with Microsoft. While Microsoft sign-in is on, only owners can
+change or remove the company's Microsoft app here. The nginx proxy
 keeps this callback out of its access log too. See
 [access-control.md](access-control.md#who-is-calling) for how it is checked.
 
