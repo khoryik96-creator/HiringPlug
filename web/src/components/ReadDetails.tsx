@@ -105,7 +105,10 @@ function ReadingButton({ doc, again, busy }: { doc: Document; again?: () => void
       : <span className="muted small" role="status">Reading stopped</span>;
   }
   const waiting = waitingFor(doc);
-  if (waiting) return <button type="button" className="doc-btn format-running" disabled title={waiting}>{waiting}…</button>;
+  if (waiting) {
+    const short = doc.readingJob === "held" ? "Held after a restore" : "Waiting for the reader";
+    return <button type="button" className="doc-btn format-running" disabled title={waiting}>{short}…</button>;
+  }
   return <button type="button" className="doc-btn format-running" disabled>Reading details… {readSeconds(doc, now)}s</button>;
 }
 
