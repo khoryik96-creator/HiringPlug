@@ -113,18 +113,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 $$;
 -- +goose StatementEnd
 
--- The companies that sign in with Microsoft where someone with this email is
--- on the team (active or invited): where to send them before they sign in.
--- +goose StatementBegin
-CREATE FUNCTION app_microsoft_tenants_by_email(p_email text)
-RETURNS TABLE (tenant_id text)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT DISTINCT u.tenant_id FROM app_user u JOIN tenant t ON t.id = u.tenant_id
-  WHERE t.microsoft_sign_in AND u.email = lower(p_email) AND (u.active OR u.invited)
-  ORDER BY u.tenant_id LIMIT 20
-$$;
--- +goose StatementEnd
-
 -- Whom a Microsoft account that Microsoft has just vouched for may sign in
 -- as, at every company of its organisation that signs in with Microsoft: the
 -- person it was linked to, or else (not linked yet) the person on the team
@@ -158,13 +146,11 @@ REVOKE ALL ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, tex
 REVOKE ALL ON FUNCTION app_microsoft_flow_park(text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_flow_take(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_sign_in_tenants(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app_microsoft_tenants_by_email(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_accounts(text, text, text[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, boolean, text, timestamptz) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_park(text, text, text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_take(text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_sign_in_tenants(text) TO hiringplug_app;
-GRANT EXECUTE ON FUNCTION app_microsoft_tenants_by_email(text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_accounts(text, text, text[]) TO hiringplug_app;
 
 -- +goose Down

@@ -3302,7 +3302,7 @@ export interface paths {
         put?: never;
         /**
          * Start signing in with Microsoft (send the browser to the returned address)
-         * @description The company is found from, in order: the invitation, the careers page address (company), the email (when exactly one company that signs in with Microsoft has it on its team), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
+         * @description The company is found from, in order: the invitation, the careers page address (company), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). The email is only suggested to Microsoft: it never chooses the company, so the answer never shows where an email is on a team. Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
          */
         post: operations["startMicrosoftSignIn"];
         delete?: never;
@@ -9555,7 +9555,7 @@ export interface components {
             bindingHash: string;
             /**
              * Format: email
-             * @description The email they typed: finds their company, and is suggested to Microsoft.
+             * @description The email they typed: suggested to Microsoft (it does not choose the company).
              */
             email?: string;
             /** @description The company's careers page address (slug). */

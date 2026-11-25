@@ -245,9 +245,6 @@ FROM app_microsoft_flow_take(@ticket_hash::text);
 SELECT tenant_id::text AS tenant_id, microsoft_tenant_id::text AS microsoft_tenant_id
 FROM app_microsoft_sign_in_tenants(sqlc.narg(slug)::text);
 
--- name: MicrosoftTenantsByEmail :many
-SELECT tenant_id::text AS tenant_id FROM app_microsoft_tenants_by_email(@email::text);
-
 -- name: MicrosoftAccounts :many
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
   user_id::text AS user_id, linked::boolean AS linked

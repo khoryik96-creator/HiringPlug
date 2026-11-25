@@ -818,30 +818,6 @@ func (q *Queries) MicrosoftSignInTenants(ctx context.Context, slug *string) ([]M
 	return items, nil
 }
 
-const microsoftTenantsByEmail = `-- name: MicrosoftTenantsByEmail :many
-SELECT tenant_id::text AS tenant_id FROM app_microsoft_tenants_by_email($1::text)
-`
-
-func (q *Queries) MicrosoftTenantsByEmail(ctx context.Context, email string) ([]string, error) {
-	rows, err := q.db.Query(ctx, microsoftTenantsByEmail, email)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var tenant_id string
-		if err := rows.Scan(&tenant_id); err != nil {
-			return nil, err
-		}
-		items = append(items, tenant_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const parkMicrosoftFlow = `-- name: ParkMicrosoftFlow :one
 SELECT app_microsoft_flow_park($1::text, $2::text, $3::text)::integer AS parked
 `

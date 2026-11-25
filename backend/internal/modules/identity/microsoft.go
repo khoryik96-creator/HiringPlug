@@ -144,7 +144,7 @@ func microsoftUnavailable() error {
 // MicrosoftStart is what starting a sign-in may name.
 type MicrosoftStart struct {
 	BindingHash          string // SHA-256 (hex) of the browser tab's value
-	Email, Company, Link string // all optional: see routeMicrosoft
+	Email, Company, Link string // all optional: see routeMicrosoft (the email is only suggested to Microsoft)
 }
 
 // StartMicrosoft saves a new sign-in and returns Microsoft's address to send
@@ -157,7 +157,7 @@ func (m *Module) StartMicrosoft(ctx context.Context, clientAddr string, in Micro
 	if m.ms == nil {
 		return "", microsoftUnavailable()
 	}
-	route, err := m.routeMicrosoft(ctx, email, in.Company, in.Link)
+	route, err := m.routeMicrosoft(ctx, in.Company, in.Link)
 	if err != nil {
 		return "", err
 	}
@@ -198,12 +198,12 @@ type msRoute struct {
 }
 
 // routeMicrosoft finds the company a sign-in is for: the invitation's, the
-// careers page address's, the one company that signs in with Microsoft
-// where the email is on the team, the only company on the server that signs
-// in with Microsoft; else any company, through the server's app (the
-// account's organisation then finds it). An email not on any such team is
-// routed as if none were typed.
-func (m *Module) routeMicrosoft(ctx context.Context, email, company, link string) (msRoute, error) {
+// careers page address's, or the only company on the server that signs in
+// with Microsoft; else any company, through the server's app (the account's
+// organisation then finds it). The email typed never chooses: where it is on
+// a team would show in the address Microsoft is opened at (the company's
+// organisation and app), to anyone typing it.
+func (m *Module) routeMicrosoft(ctx context.Context, company, link string) (msRoute, error) {
 	q := store.New(m.pool)
 	switch {
 	case link != "":
@@ -221,15 +221,6 @@ func (m *Module) routeMicrosoft(ctx context.Context, email, company, link string
 			return msRoute{}, firstErr(err, microsoftUnavailable())
 		}
 		return m.tenantRoute(ctx, rows[0].TenantID)
-	}
-	if email != "" {
-		ids, err := q.MicrosoftTenantsByEmail(ctx, email)
-		if err != nil {
-			return msRoute{}, err
-		}
-		if len(ids) == 1 {
-			return m.tenantRoute(ctx, ids[0])
-		}
 	}
 	all, err := q.MicrosoftSignInTenants(ctx, nil)
 	if err != nil {

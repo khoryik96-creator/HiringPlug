@@ -5591,7 +5591,7 @@ paths:
       tags: [identity]
       summary: Start signing in with Microsoft (send the browser to the returned address)
       description: >-
-        The company is found from, in order: the invitation, the careers page address (company), the email (when exactly one company that signs in with Microsoft has it on its team), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
+        The company is found from, in order: the invitation, the careers page address (company), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). The email is only suggested to Microsoft: it never chooses the company, so the answer never shows where an email is on a team. Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
       x-permission: public
       requestBody:
         required: true
@@ -15043,7 +15043,7 @@ components:
           type: string
           pattern: '^[0-9a-f]{64}$'
           description: SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.
-        email: {type: string, format: email, maxLength: 254, description: "The email they typed: finds their company, and is suggested to Microsoft."}
+        email: {type: string, format: email, maxLength: 254, description: "The email they typed: suggested to Microsoft (it does not choose the company)."}
         company: {type: string, maxLength: 100, description: "The company's careers page address (slug)."}
         invite: {type: string, minLength: 20, maxLength: 200, description: "An invitation link's token: accept it with Microsoft instead of choosing a password."}
     MicrosoftSignInRedirect:

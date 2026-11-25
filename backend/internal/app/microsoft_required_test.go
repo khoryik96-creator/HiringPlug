@@ -244,3 +244,25 @@ func TestMicrosoftSignInGoesToTheOnlyCompanyThatUsesIt(t *testing.T) {
 	flow, _ := f.start(nil)
 	session(t, f.signInAs(flow, newAccount(org, emailOf(api.RoleRecruiter, tenant.ID)).claims(flow)))
 }
+
+// The email typed never chooses the company: the address Microsoft is
+// opened at (organisation, app) would show where it is on a team.
+func TestTheEmailDoesNotShowWhereSomeoneIsOnATeam(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	at := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	other := testutil.Current.NewTenant(t, api.RoleOwner)
+	org := newGUID()
+	f.enable(at.Users[api.RoleOwner].Token, org, false)
+	f.enable(other.Users[api.RoleOwner].Token, newGUID(), false) // two companies sign in with Microsoft
+	email := emailOf(api.RoleRecruiter, at.ID)
+	for _, typed := range []string{email, "nobody." + at.ID + "@test.local"} {
+		flow, res := f.start(map[string]any{"email": typed})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		assert.Equal(t, "organizations", flow.authority, typed)
+		assert.Equal(t, "server-client", flow.clientID, typed)
+	}
+	// The account's organisation still finds the company.
+	flow, _ := f.start(map[string]any{"email": email})
+	assert.Equal(t, at.Users[api.RoleRecruiter].ID, f.me(session(t, f.signInAs(flow, newAccount(org, email).claims(flow)))).User.Id)
+}

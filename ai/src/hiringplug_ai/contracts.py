@@ -4128,7 +4128,7 @@ class MicrosoftSignInStart(BaseModel):
     email: Annotated[
         EmailStr | None,
         Field(
-            description="The email they typed: finds their company, and is suggested to Microsoft.",
+            description="The email they typed: suggested to Microsoft (it does not choose the company).",
             max_length=254,
         ),
     ] = None

@@ -28,9 +28,10 @@ func TestSigningInWithMicrosoft(t *testing.T) {
 	recruiter := tenant.Users[api.RoleRecruiter]
 	sam := newAccount(org, emailOf(api.RoleRecruiter, tenant.ID))
 
-	// The email finds the company: its organisation, through the server's app.
-	flow, _ := f.start(map[string]any{"email": strings.ToUpper(sam.email)})
+	// The careers page address finds the company: its organisation, through the server's app.
+	flow, _ := f.start(map[string]any{"email": strings.ToUpper(sam.email), "company": f.me(tenant.Users[api.RoleOwner].Token).Tenant.CareersSlug})
 	assert.Equal(t, org, flow.authority)
+	assert.Equal(t, sam.email, flow.loginHint, "the email is suggested to Microsoft")
 	assert.Equal(t, "server-client", flow.clientID)
 	assert.Equal(t, "http://app.test/v1/auth/microsoft/callback", flow.redirect)
 
