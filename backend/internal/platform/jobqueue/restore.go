@@ -39,6 +39,27 @@ var Outbound = []api.JobKind{
 	api.JobKindSchedulingRefreshCalendar, api.JobKindLeadSourceCheck, api.JobKindCompanyAutofill,
 }
 
+// PaidAI are the AI-queue kinds that exist to ask a paid AI: held after any
+// restore too (the backup may hold work already asked and billed once).
+// PaidAIIfUsed are those that ask it only when their payload says useAi
+// (reading a CV's details, a job description): held then. Reading text and
+// scans, PDF copies and search by meaning are local and run again.
+var (
+	PaidAI = []api.JobKind{
+		api.JobKindAiproviderCheck, api.JobKindAssistantAsk, api.JobKindAssistantEmail, api.JobKindCompanyIndustry,
+		api.JobKindCvFormatStudio, api.JobKindInterviewPrepWrite, api.JobKindJdBlind, api.JobKindMatchScore,
+		api.JobKindTalentRank,
+	}
+	PaidAIIfUsed = []api.JobKind{api.JobKindDocumentParseCv, api.JobKindJobReadJd}
+)
+
+// CancelledAfterRestore is the last error of a held job someone cancelled
+// (job_cancel_held): its dead-job handler says it was not sent.
+const CancelledAfterRestore = "Cancelled after the server was restored: not run."
+
+// WasCancelledAfterRestore reports whether a dead job was a held one cancelled.
+func WasCancelledAfterRestore(j Job) bool { return j.LastError == CancelledAfterRestore }
+
 // HeldCount is how many jobs of one kind a restore held.
 type HeldCount struct {
 	Kind  string
@@ -69,6 +90,9 @@ type Restored struct {
 	Held              int
 	Resumed           bool
 	ReleasedAt        *time.Time
+	// ResumedPaidAI: restored with -resume-paid-ai (paid AI work runs, and
+	// paid AI is not paused); not recorded.
+	ResumedPaidAI bool
 }
 
 // FromAnotherServer reports whether the backup was made on another
@@ -80,18 +104,35 @@ func (r Restored) FromAnotherServer() bool {
 // Holding reports whether jobs it held still wait for someone.
 func (r Restored) Holding() bool { return r.ReleasedAt == nil }
 
+// AlertsWaitFor is how long the server's alert emails wait for a restore
+// from another server to be settled, at most: a copy of production (a
+// staging server) must not email its people, but nobody settling it must
+// not silence a server's alerts for ever either.
+const AlertsWaitFor = 72 * time.Hour
+
+// AlertsWait reports whether the server's alert emails wait at now: a
+// restore from another server whose held jobs nobody has settled yet,
+// within AlertsWaitFor. A restore of this server's own backup never
+// silences them (it is still the same server, with the same people).
+func (r Restored) AlertsWait(now time.Time) bool {
+	return r.FromAnotherServer() && r.Holding() && now.Sub(r.RestoredAt) < AlertsWaitFor
+}
+
 // HoldAfterRestore records the restore and, unless resume, holds the
 // outbound jobs; jobs still marked running (their worker is gone) are made
 // ready again. One transaction, as the database owner, before the workers
 // start.
 func HoldAfterRestore(ctx context.Context, tx pgx.Tx, r Restored) (AfterRestore, error) {
 	var out AfterRestore
-	if !r.Resumed {
-		kinds := make([]string, len(Outbound))
-		for i, k := range Outbound {
-			kinds[i] = string(k)
+	if !r.Resumed || !r.ResumedPaidAI {
+		var kinds, ifUsed []string
+		if !r.Resumed {
+			kinds = names(Outbound)
 		}
-		rows, err := tx.Query(ctx, `SELECT kind, held FROM job_hold($1)`, kinds)
+		if !r.ResumedPaidAI {
+			kinds, ifUsed = append(kinds, names(PaidAI)...), names(PaidAIIfUsed)
+		}
+		rows, err := tx.Query(ctx, `SELECT kind, held FROM job_hold($1, $2)`, kinds, ifUsed)
 		if err != nil {
 			return out, fmt.Errorf("holding the outbound jobs: %w", err)
 		}
@@ -137,40 +178,62 @@ func LastRestore(ctx context.Context, db interface {
 
 // HeldJob is a job a restore held.
 type HeldJob struct {
-	ID, Kind  string
-	Attempts  int
-	CreatedAt time.Time
-	HeldAt    *time.Time
-	RunAfter  time.Time
+	ID, TenantID, Company, Kind string
+	Attempts                    int
+	CreatedAt                   time.Time
+	HeldAt                      *time.Time
+	RunAfter                    time.Time
 }
 
-// Held returns a company's held jobs, oldest first.
+// Everywhere, as a company, stands for every company on the server: only
+// for the agency that runs it (Settings > System) and hp jobs. An empty
+// company matches none.
+const Everywhere = "*"
+
+// company is a company id for the held-job functions: NULL for Everywhere.
+func company(tenantID string) *string {
+	if tenantID == Everywhere {
+		return nil
+	}
+	return &tenantID
+}
+
+// Held returns a company's held jobs (every company's: Everywhere), oldest first.
 func Held(ctx context.Context, db Querier, tenantID string, limit int) ([]HeldJob, error) {
-	rows, err := db.Query(ctx, `SELECT id, kind, attempts, created_at, held_at, run_after FROM job_held($1, $2)`, tenantID, limit)
+	rows, err := db.Query(ctx, `SELECT id, tenant_id, company, kind, attempts, created_at, held_at, run_after FROM job_held($1, $2)`,
+		company(tenantID), limit)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (HeldJob, error) {
 		var h HeldJob
-		err := r.Scan(&h.ID, &h.Kind, &h.Attempts, &h.CreatedAt, &h.HeldAt, &h.RunAfter)
+		err := r.Scan(&h.ID, &h.TenantID, &h.Company, &h.Kind, &h.Attempts, &h.CreatedAt, &h.HeldAt, &h.RunAfter)
 		return h, err
 	})
 }
 
 // Release lets one of a company's held jobs run (jobID), or all of them
-// (""). It returns how many.
+// (""); every company's with Everywhere. It returns how many.
 func Release(ctx context.Context, db Querier, tenantID, jobID string) (int, error) {
 	var n int
-	err := db.QueryRow(ctx, `SELECT job_release($1, $2)`, tenantID, nullIfEmpty(jobID)).Scan(&n)
+	err := db.QueryRow(ctx, `SELECT job_release($1, $2)`, company(tenantID), nullIfEmpty(jobID)).Scan(&n)
 	return n, err
 }
 
 // CancelHeld cancels one of a company's held jobs (jobID), or all of them
-// (""): dead, never run. It returns how many.
+// (""): dead, never run; every company's with Everywhere. It returns how many.
 func CancelHeld(ctx context.Context, db Querier, tenantID, jobID string) (int, error) {
 	var n int
-	err := db.QueryRow(ctx, `SELECT job_cancel_held($1, $2)`, tenantID, nullIfEmpty(jobID)).Scan(&n)
+	err := db.QueryRow(ctx, `SELECT job_cancel_held($1, $2)`, company(tenantID), nullIfEmpty(jobID)).Scan(&n)
 	return n, err
+}
+
+func names(kinds []api.JobKind) []string {
+	out := make([]string, len(kinds))
+	for i, k := range kinds {
+		out[i] = string(k)
+	}
+	return out
 }
 
 func nullIfEmpty(s string) *string {

@@ -69,8 +69,8 @@ func (s *Service) SetPaidAI(ctx context.Context, p authz.Principal, paused bool,
 			return apperr.New(api.ErrorCodeFORBIDDEN, "Paid AI is paused or turned back on by an owner of the agency that runs this server.")
 		}
 		reason = strings.TrimSpace(reason)
-		if paused && reason == "" {
-			reason = "Paused in Settings > System by " + p.Name + "."
+		if paused && reason == "" { // every company sees it: never who did it (the audit log says)
+			reason = "Paused in Settings > System."
 		}
 		if !paused {
 			reason = ""

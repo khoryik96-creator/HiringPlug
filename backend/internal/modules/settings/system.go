@@ -27,10 +27,14 @@ type SystemStatus struct {
 	Backup *backup.Last
 	// BackupAuto: the nightly backup is on (off, an old last backup is expected).
 	BackupAuto bool
-	// Held are the company's jobs a restore held; Restore the server's last restore.
-	Held    []jobqueue.HeldJob
-	Restore *jobqueue.Restored
-	PaidAI  PaidAI
+	// Held are the jobs a restore held: the company's, or every company's
+	// (HeldEveryCompany: p runs the server). Restore is the server's last
+	// restore as p may see it (only the date and their count, unless they
+	// run the server; nil when it does not concern them).
+	Held             []jobqueue.HeldJob
+	HeldEveryCompany bool
+	Restore          *jobqueue.Restored
+	PaidAI           PaidAI
 }
 
 // System returns the company's background jobs and the last backup.
@@ -64,15 +68,8 @@ func (s *Service) systemStatus(ctx context.Context, tx pgx.Tx, p authz.Principal
 	if ok {
 		out.Backup = &last
 	}
-	if out.Held, err = jobqueue.Held(ctx, tx, tenantID, heldShown); err != nil {
+	if err := s.heldStatus(ctx, tx, p, &out); err != nil {
 		return out, err
-	}
-	restored, ok, err := jobqueue.LastRestore(ctx, tx)
-	if err != nil {
-		return out, err
-	}
-	if ok {
-		out.Restore = &restored
 	}
 	control, err := backup.ReadControl(ctx, tx)
 	out.BackupAuto = control.Auto

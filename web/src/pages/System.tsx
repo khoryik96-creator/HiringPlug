@@ -99,7 +99,7 @@ export function System() {
       {st && (
         <>
           <Backup backup={st.backup} auto={st.backupAuto} restore={st.restore} />
-          <HeldJobs held={st.held} label={label} statusKey={systemKey} />
+          <HeldJobs held={st.held} everyCompany={st.heldEveryCompany} label={label} statusKey={systemKey} />
           <PaidAi paidAi={st.paidAi} statusKey={systemKey} />
           <section className="panel" aria-label="Background jobs">
             <h3>Background jobs</h3>

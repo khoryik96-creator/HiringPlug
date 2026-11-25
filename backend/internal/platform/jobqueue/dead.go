@@ -50,15 +50,12 @@ func (w *Worker) jobEnded(ctx context.Context, tx pgx.Tx, notice Job) error {
 }
 
 // Active reports whether the caller's company (the transaction's tenant)
-// has a job of one of kinds waiting or running whose payload has key =
-// value, such as a CV's reading by its documentId.
+// has a job of one of kinds waiting, running or held after a restore (it
+// may still run) whose payload has key = value, such as a CV's reading by
+// its documentId.
 func Active(ctx context.Context, db Querier, kinds []api.JobKind, key, value string) (bool, error) {
-	names := make([]string, len(kinds))
-	for i, k := range kinds {
-		names[i] = string(k)
-	}
 	var active bool
 	err := db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM job WHERE tenant_id = app_current_tenant()
-		AND status IN ('pending', 'running') AND kind = ANY ($1) AND payload->>$2 = $3)`, names, key, value).Scan(&active)
+		AND status IN ('pending', 'running', 'held') AND kind = ANY ($1) AND payload->>$2 = $3)`, names(kinds), key, value).Scan(&active)
 	return active, err
 }

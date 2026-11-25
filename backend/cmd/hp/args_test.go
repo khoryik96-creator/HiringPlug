@@ -43,7 +43,7 @@ func TestAWrongCommandSaysWhatItTakes(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"restore", nil, "hp restore takes exactly one name, got none; usage: hp restore -yes [-resume-outbound] hiringplug-YYYYMMDD-HHMMSS"},
+		{"restore", nil, "hp restore takes exactly one name, got none; usage: hp restore -yes [-resume-outbound] [-resume-paid-ai] hiringplug-YYYYMMDD-HHMMSS"},
 		{"restore", []string{"hiringplug-20261125-023050", "hiringplug-20261124-023050", "-yes"}, "got 2 (hiringplug-20261125-023050 hiringplug-20261124-023050)"},
 		{"restore", []string{"latest", "-yes"}, `"latest" is not a backup name`},
 		{"restore", []string{"-no", "hiringplug-20261125-023050"}, "flag provided but not defined: -no"},

@@ -168,13 +168,15 @@ func (w *Watcher) Check(ctx context.Context) error {
 	for _, p := range due {
 		w.Log.Warn("server problem", "problem", p.Key, "text", p.Text)
 	}
-	// Restored, with jobs held until someone releases them: a copy of
-	// another server (staging) must not email its people either. The
-	// problems are emailed once the restore is settled.
+	// Restored from another server, with jobs held until someone settles
+	// them: a copy of production (staging) must not email its people either.
+	// The problems are emailed once the restore is settled, or after
+	// jobqueue.AlertsWaitFor at the latest. A restore of this server's own
+	// backup never silences them.
 	if r, ok, err := jobqueue.LastRestore(ctx, w.Checks.DB); err != nil {
 		return err
-	} else if ok && r.Holding() {
-		w.Log.Info("alert email waits: the server was restored and its held jobs are not released yet (Settings > System)")
+	} else if ok && r.AlertsWait(now()) {
+		w.Log.Info("alert email waits: the server was restored from another server's backup and its held jobs are not settled yet (Settings > System, or hp jobs)")
 		return nil
 	}
 	if len(w.To) > 0 {

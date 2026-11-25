@@ -7268,6 +7268,12 @@ class PaidAiSwitch(BaseModel):
 
 class HeldJob(BaseModel):
     id: str
+    company: Annotated[
+        str | None,
+        Field(
+            description="The company's name, in the list of every company's (heldEveryCompany); null otherwise."
+        ),
+    ]
     kind: Annotated[str, Field(description="e.g. email.send")]
     attempts: Annotated[int, Field(description="Tries before it was held.")]
     createdAt: Annotated[AwareDatetime, Field(description="When it was queued (before the backup was made).")]
@@ -7278,17 +7284,36 @@ class HeldJob(BaseModel):
 
 
 class RestoreInfo(BaseModel):
-    backupName: str
+    everyCompany: Annotated[
+        bool,
+        Field(
+            description="The restore as the agency that runs the server sees it (every company's count, the backup's name). false: only that some of this company's jobs are held after a restore of the server, and how many."
+        ),
+    ]
+    backupName: Annotated[str | None, Field(description="Null unless everyCompany.")]
     restoredAt: AwareDatetime
     fromAnotherServer: Annotated[
-        bool, Field(description="The backup was made on another database server (or is too old to say).")
+        bool | None,
+        Field(
+            description="The backup was made on another database server (or is too old to say); null unless everyCompany."
+        ),
     ]
-    held: Annotated[int, Field(description="Jobs the restore held, in every company.")]
-    resumed: Annotated[bool, Field(description="Restored with -resume-outbound (nothing held).")]
+    held: Annotated[
+        int,
+        Field(
+            description="Jobs the restore held in every company (everyCompany), or this company's still held."
+        ),
+    ]
+    resumed: Annotated[
+        bool,
+        Field(
+            description="Restored with -resume-outbound (no outbound job held); false unless everyCompany."
+        ),
+    ]
     releasedAt: Annotated[
         AwareDatetime | None,
         Field(
-            description="When the last held job was released or cancelled; null while some wait (the server's alert email waits too)."
+            description="When the last held job was released or cancelled (everyCompany); null while some wait (and for other companies). Alert emails wait while a restore from another server is unsettled, 72 hours at most."
         ),
     ]
 
@@ -9735,11 +9760,20 @@ class SystemStatus(BaseModel):
     held: Annotated[
         list[HeldJob],
         Field(
-            description="Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...): they run only once released (oldest first, at most 200)."
+            description="Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany)."
+        ),
+    ]
+    heldEveryCompany: Annotated[
+        bool,
+        Field(
+            description="The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company."
         ),
     ]
     restore: Annotated[
-        RestoreInfo | None, Field(description="The server's last restore; null when it was never restored.")
+        RestoreInfo | None,
+        Field(
+            description="The server's last restore; null when it was never restored. Other companies than the one that runs the server see it only while some of their own jobs are held, and only that."
+        ),
     ]
     backupAuto: Annotated[
         bool,

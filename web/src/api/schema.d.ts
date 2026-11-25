@@ -5850,7 +5850,7 @@ export interface paths {
         get?: never;
         /**
          * Pause every paid AI call on the server, or turn paid AI back on
-         * @description The server-wide switch: paused, no AI call is made through any company's key or the server's own provider, for new work or work already queued; local work (reading text and scans, PDF copies, search by meaning, reading CVs by the rules) goes on. Only an owner of the agency that runs the server (HP_BACKUP_TENANT, or the only agency) may change it. HP_AI_PAID=off keeps it paused whatever this says.
+         * @description The server-wide switch: paused, no AI call is made through any company's key or the server's own provider, for new work or work already queued; local work (reading text and scans, PDF copies, search by meaning, reading CVs by the rules) goes on. Only an owner of the agency that runs the server (HP_BACKUP_TENANT, or the only agency) may change it here; on the server, `hp paid-ai on|off` changes it too. HP_AI_PAID=off keeps it paused whatever this says.
          */
         put: operations["setPaidAi"];
         post?: never;
@@ -12446,9 +12446,11 @@ export interface components {
         };
         SystemStatus: {
             paidAi: components["schemas"]["PaidAiSwitch"];
-            /** @description Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...): they run only once released (oldest first, at most 200). */
+            /** @description Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany). */
             held: components["schemas"]["HeldJob"][];
-            /** @description The server's last restore; null when it was never restored. */
+            /** @description The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company. */
+            heldEveryCompany: boolean;
+            /** @description The server's last restore; null when it was never restored. Other companies than the one that runs the server see it only while some of their own jobs are held, and only that. */
             restore: components["schemas"]["RestoreInfo"] | null;
             /** @description The nightly backup is on (Settings > Backups): off, an old last backup is expected. */
             backupAuto: boolean;
@@ -12472,6 +12474,8 @@ export interface components {
         };
         HeldJob: {
             id: string;
+            /** @description The company's name, in the list of every company's (heldEveryCompany); null otherwise. */
+            company: string | null;
             /** @description e.g. email.send */
             kind: string;
             /** @description Tries before it was held. */
@@ -12490,18 +12494,21 @@ export interface components {
             runAfter: string;
         };
         RestoreInfo: {
-            backupName: string;
+            /** @description The restore as the agency that runs the server sees it (every company's count, the backup's name). false: only that some of this company's jobs are held after a restore of the server, and how many. */
+            everyCompany: boolean;
+            /** @description Null unless everyCompany. */
+            backupName: string | null;
             /** Format: date-time */
             restoredAt: string;
-            /** @description The backup was made on another database server (or is too old to say). */
-            fromAnotherServer: boolean;
-            /** @description Jobs the restore held, in every company. */
+            /** @description The backup was made on another database server (or is too old to say); null unless everyCompany. */
+            fromAnotherServer: boolean | null;
+            /** @description Jobs the restore held in every company (everyCompany), or this company's still held. */
             held: number;
-            /** @description Restored with -resume-outbound (nothing held). */
+            /** @description Restored with -resume-outbound (no outbound job held); false unless everyCompany. */
             resumed: boolean;
             /**
              * Format: date-time
-             * @description When the last held job was released or cancelled; null while some wait (the server's alert email waits too).
+             * @description When the last held job was released or cancelled (everyCompany); null while some wait (and for other companies). Alert emails wait while a restore from another server is unsettled, 72 hours at most.
              */
             releasedAt: string | null;
         };

@@ -184,10 +184,11 @@ func backupTurn(ctx context.Context, pool *pgxpool.Pool, o backup.Options, every
 }
 
 func runRestore(ctx context.Context, args []string) error {
-	c := command{name: "restore", synopsis: "-yes [-resume-outbound] hiringplug-YYYYMMDD-HHMMSS", min: 1, max: 1}
+	c := command{name: "restore", synopsis: "-yes [-resume-outbound] [-resume-paid-ai] hiringplug-YYYYMMDD-HHMMSS", min: 1, max: 1}
 	fs := c.flags()
 	yes := fs.Bool("yes", false, "replace the database and files with the backup's")
-	resume := fs.Bool("resume-outbound", false, "let the emails, calendar updates, webhooks and automations waiting in the backup run (they may have happened already); without it they are held until released in Settings > System")
+	resume := fs.Bool("resume-outbound", false, "let the emails, calendar updates, webhooks and automations waiting in the backup run (they may have happened already); without it they are held until released in Settings > System or with hp jobs. Paid AI is not affected: see -resume-paid-ai")
+	resumeAI := fs.Bool("resume-paid-ai", false, "let the paid AI work waiting in the backup run (it may have been billed already), and leave paid AI on after a restore from another server; without it that work is held like the emails, and paid AI is paused until hp paid-ai on (or Settings > System)")
 	names, err := c.parse(fs, args)
 	if err != nil {
 		return err
@@ -216,7 +217,7 @@ func runRestore(ctx context.Context, args []string) error {
 	if err := database.AllowSearchIndexes(ctx, o.AdminURL, os.Stderr); err != nil {
 		return err
 	}
-	if err := settleJobs(ctx, o, name, *resume); err != nil {
+	if err := settleJobs(ctx, o, name, *resume, *resumeAI); err != nil {
 		return err
 	}
 	if err := verifyRestoredFiles(ctx, o); err != nil {

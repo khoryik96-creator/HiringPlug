@@ -18,7 +18,7 @@ const lastBackup: NonNullable<Schemas["SystemStatus"]["backup"]> = {
 const status = (over: Partial<Schemas["SystemStatus"]> = {}): Schemas["SystemStatus"] => ({
   jobs: [{ kind: "email.send", waiting: 2, running: 1, retrying: 0, failed: 1, oldestWaitingSince: "2026-11-07T06:00:00Z" }],
   failed: [{ id: "job_1", kind: "email.send", attempts: 5, error: "smtp: 550 mailbox unavailable", failedAt: "2026-11-07T05:00:00Z" }],
-  backup: lastBackup, backupAuto: true, held: [], restore: null,
+  backup: lastBackup, backupAuto: true, held: [], heldEveryCompany: false, restore: null,
   paidAi: { paused: false, reason: null, changedAt: null, pausedByServer: false, canChange: true },
   ...over,
 });
@@ -81,15 +81,17 @@ describe("System", () => {
   // IMP-002: after a restore, what reaches people waits for someone.
   it("lists the jobs a restore held, to release or cancel, and says the alert emails wait", async () => {
     const held: Schemas["SystemStatus"]["held"] = [
-      { id: "job_h1", kind: "email.send", attempts: 0, createdAt: "2026-11-24T23:50:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:50:00Z" },
-      { id: "job_h2", kind: "webhook.deliver", attempts: 1, createdAt: "2026-11-24T23:55:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:56:00Z" },
+      { id: "job_h1", company: "Acme Recruitment", kind: "email.send", attempts: 0, createdAt: "2026-11-24T23:50:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:50:00Z" },
+      { id: "job_h2", company: "Borneo Talent", kind: "webhook.deliver", attempts: 1, createdAt: "2026-11-24T23:55:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:56:00Z" },
     ];
-    const restore = { backupName: "hiringplug-20261125-023050", restoredAt: "2026-11-25T03:00:00Z", fromAnotherServer: true, held: 2, resumed: false, releasedAt: null };
-    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ held, restore })));
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(status({ held: held.slice(1), restore })));
+    const restore = { everyCompany: true, backupName: "hiringplug-20261125-023050", restoredAt: "2026-11-25T03:00:00Z", fromAnotherServer: true, held: 2, resumed: false, releasedAt: null };
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ held, heldEveryCompany: true, restore })));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(status({ held: held.slice(1), heldEveryCompany: true, restore })));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderWithClient(<System />);
     const section = await screen.findByRole("region", { name: "Held after the restore" });
     expect(section.textContent).toContain("Sending webhooks to your other systems");
+    expect(section.textContent).toContain("Borneo Talent"); // the agency that runs the server sees every company's
     expect(screen.getByRole("status").textContent).toContain("from a backup from another server");
     expect(screen.getByRole("status").textContent).toContain("alert emails wait");
     const [first] = screen.getAllByRole("button", { name: "Release" });
@@ -97,15 +99,35 @@ describe("System", () => {
     await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/jobs/{jobId}/release", { params: { path: { jobId: "job_h1" } } }); });
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
     await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/jobs/{jobId}/cancel", { params: { path: { jobId: "job_h2" } } }); });
+    // Releasing them all may email again: asked first, like cancelling them all.
+    fireEvent.click(screen.getByRole("button", { name: /^Release all/ }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("may go a second time"));
+    expect(post).not.toHaveBeenCalledWith("/v1/settings/system/held", { body: { action: "release" } });
+    confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: /^Release all/ }));
     await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/held", { body: { action: "release" } }); });
+  });
+
+  // Other companies on the server: only that some of theirs are held, and how many.
+  it("tells another company only about its own held jobs", async () => {
+    const held: Schemas["SystemStatus"]["held"] = [
+      { id: "job_h1", company: null, kind: "email.send", attempts: 0, createdAt: "2026-11-24T23:50:00Z", heldAt: "2026-11-25T03:00:00Z", runAfter: "2026-11-24T23:50:00Z" },
+    ];
+    const restore = { everyCompany: false, backupName: null, restoredAt: "2026-11-25T03:00:00Z", fromAnotherServer: null, held: 1, resumed: false, releasedAt: null };
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ held, restore })));
+    renderWithClient(<System />);
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent).toContain("1 job of your company");
+    expect(notice.textContent).not.toContain("hiringplug-");
+    expect(notice.textContent).not.toContain("alert emails");
+    expect(screen.queryByRole("columnheader", { name: "Company" })).toBeNull();
   });
 
   // IMP-001: the server's paid-AI switch, for the agency that runs it.
   it("pauses paid AI for the whole server, and says what still works", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(status()));
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const paused = { paused: true, reason: "Paused in Settings > System by Aisyah.", changedAt: "2026-11-25T04:00:00Z", pausedByServer: false, canChange: true };
+    const paused = { paused: true, reason: "Paused in Settings > System.", changedAt: "2026-11-25T04:00:00Z", pausedByServer: false, canChange: true };
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(status({ paidAi: paused })));
     renderWithClient(<System />);
     fireEvent.click(await screen.findByRole("button", { name: "Pause paid AI" }));
@@ -119,7 +141,9 @@ describe("System", () => {
   it("shows the switch to other agencies without letting them turn it", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(status({ paidAi: { paused: false, reason: null, changedAt: null, pausedByServer: false, canChange: false } })));
     renderWithClient(<System />);
-    expect(await screen.findByText(/Only an owner of the agency that runs this server/)).toBeTruthy();
+    const note = await screen.findByText(/Only an owner of the agency that runs this server/);
+    expect(note.textContent).toContain("HP_BACKUP_TENANT"); // who that is, and how to turn it back on without them
+    expect(note.textContent).toContain("hp paid-ai on");
     expect(screen.queryByRole("button", { name: "Pause paid AI" })).toBeNull();
   });
 

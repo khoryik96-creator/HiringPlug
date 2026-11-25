@@ -9,6 +9,7 @@ package aipaid
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -29,10 +30,12 @@ type Switch struct {
 	ChangedBy *string
 }
 
-// Read returns the switch.
+// Read returns the switch: not paused when its row is missing, as
+// ai_paid_paused() says (the AI worker's view), never an error.
 func Read(ctx context.Context, db DB) (Switch, error) {
 	var s Switch
-	err := db.QueryRow(ctx, `SELECT paused, reason, changed_at, changed_by FROM ai_paid_control`).
+	err := db.QueryRow(ctx, `SELECT coalesce(c.paused, false), c.reason, c.changed_at, c.changed_by
+		FROM (SELECT) one LEFT JOIN ai_paid_control c ON true`).
 		Scan(&s.Paused, &s.Reason, &s.ChangedAt, &s.ChangedBy)
 	return s, err
 }
@@ -44,9 +47,15 @@ func Paused(ctx context.Context, db DB) (bool, error) {
 	return paused, err
 }
 
+// ErrNoSwitch: the switch's row is gone, so nothing could be changed.
+var ErrNoSwitch = errors.New("the paid-AI switch is missing from the database (no row in ai_paid_control): hp paid-ai puts it back")
+
 // Set pauses paid AI, or turns it back on, saying why and who.
 func Set(ctx context.Context, db DB, paused bool, reason, by string) error {
-	_, err := db.Exec(ctx, `UPDATE ai_paid_control SET paused = $1, reason = NULLIF(left($2, 300), ''), changed_at = now(), changed_by = $3`,
+	tag, err := db.Exec(ctx, `UPDATE ai_paid_control SET paused = $1, reason = NULLIF(left($2, 300), ''), changed_at = now(), changed_by = $3`,
 		paused, reason, by)
+	if err == nil && tag.RowsAffected() == 0 {
+		err = ErrNoSwitch
+	}
 	return err
 }

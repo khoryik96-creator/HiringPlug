@@ -8,9 +8,11 @@
 //	hp password-link -user usr_...   (a link to choose a password)
 //	hp token -user usr_... [-ttl 12h]  print a sign-in token for a user (development)
 //	hp backup [-every 24h]             back up the database and files into HP_BACKUP_DIR
-//	hp restore -yes NAME               put a backup back (stop the API and workers first); -resume-outbound lets held jobs run
+//	hp restore -yes NAME               put a backup back (stop the API and workers first); -resume-outbound, -resume-paid-ai let held jobs run
 //	hp fetch [NAME]                    copy a backup from off the server into HP_BACKUP_DIR (the newest unless named); then hp restore it
-//	hp repair-files [-apply]           check (and fix) that the API's user owns the uploaded files (HP_FILES_OWNER)
+//	hp repair-files [-apply]           check (and fix) that the API's user owns the uploaded files (HP_FILES_OWNER; stop the API and workers first)
+//	hp jobs list|release|cancel        the jobs a restore held, every company's: list them, let them run (-yes), or cancel them
+//	hp paid-ai on|off [-reason TEXT]   turn the server's paid AI back on, or pause it (every company)
 //
 // Flags go before or after the names (hp restore NAME -yes works too); -h
 // prints a command's usage.
@@ -59,7 +61,7 @@ func exitCode(err error, w io.Writer) int {
 	}
 }
 
-const commands = "migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch|repair-files"
+const commands = "migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch|repair-files|jobs|paid-ai"
 
 func usage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "usage: hp <"+commands+"> [flags] (hp <command> -h for its flags)")
@@ -105,6 +107,10 @@ func run(ctx context.Context, cmd string, args []string) error {
 		return runRestore(ctx, args)
 	case "repair-files":
 		return runRepairFiles(ctx, args)
+	case "jobs":
+		return runJobs(ctx, args)
+	case "paid-ai":
+		return runPaidAI(ctx, args)
 	case "-h", "-help", "--help", "help":
 		usage(os.Stdout)
 		return flag.ErrHelp

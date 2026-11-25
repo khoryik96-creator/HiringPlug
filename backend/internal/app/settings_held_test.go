@@ -75,3 +75,82 @@ func TestOwnersReleaseOrCancelTheJobsARestoreHeld(t *testing.T) {
 	}
 	assert.Equal(t, []string{"settings.job_released", "settings.job_cancelled", "settings.held_jobs_released"}, actions)
 }
+
+// Review of 1.47.0: a restore stayed unsettled while any company had held
+// jobs nobody released (the alert email waited with it), as each company
+// could settle only its own; and every company saw the backup's name and
+// the whole server's count, and the name of whoever paused paid AI. The
+// agency that runs the server now sees and settles every company's held
+// jobs; the others see only that some of theirs are held, and how many.
+// Not parallel: the restore is the whole server's.
+func TestTheAgencyRunningTheServerSettlesEveryCompanysHeldJobs(t *testing.T) {
+	ctx := context.Background()
+	op := testutil.Current.NewTenant(t, api.RoleOwner)
+	other := testutil.Current.NewTenant(t, api.RoleOwner)
+	idle := testutil.Current.NewTenant(t, api.RoleOwner)
+	a := newTestApp(t, map[string]string{"HP_BACKUP_TENANT": op.ID})
+	t.Cleanup(func() {
+		_, _ = testutil.Current.Admin.Exec(context.Background(), `DELETE FROM job WHERE tenant_id IN ($1, $2)`, op.ID, other.ID)
+		_, _ = testutil.Current.Admin.Exec(context.Background(), `DELETE FROM restore_marker`)
+		_, _ = testutil.Current.Admin.Exec(context.Background(), `UPDATE ai_paid_control SET paused = false, reason = NULL`)
+	})
+	held := map[string]string{}
+	for tenant, kind := range map[string]string{op.ID: "webhook.deliver", other.ID: "email.send"} {
+		var id string
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `INSERT INTO job (tenant_id, queue, kind, payload, status, held_at)
+			VALUES ($1, 'core', $2, '{}', 'held', now()) RETURNING id`, tenant, kind).Scan(&id))
+		held[tenant] = id
+	}
+	_, err := testutil.Current.Admin.Exec(ctx, `INSERT INTO restore_marker (backup_name, source_server, destination_server, held)
+		VALUES ('hiringplug-20261125-023050', '1', '2', 2)`)
+	require.NoError(t, err)
+	status := func(token string) api.SystemStatus {
+		var st api.SystemStatus
+		res := a.request(http.MethodGet, "/v1/settings/system", token, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&st)
+		return st
+	}
+	opOwner, otherOwner := op.Users[api.RoleOwner].Token, other.Users[api.RoleOwner].Token
+
+	st := status(opOwner)
+	assert.True(t, st.HeldEveryCompany)
+	require.Len(t, st.Held, 2, "every company's")
+	assert.Contains(t, []string{st.Held[0].Company.MustGet(), st.Held[1].Company.MustGet()}, "Test tenant "+t.Name())
+	r := st.Restore.MustGet()
+	assert.True(t, r.EveryCompany)
+	assert.Equal(t, "hiringplug-20261125-023050", r.BackupName.MustGet())
+	assert.Equal(t, 2, r.Held)
+
+	st = status(otherOwner)
+	assert.False(t, st.HeldEveryCompany)
+	require.Len(t, st.Held, 1)
+	assert.True(t, st.Held[0].Company.IsNull())
+	r = st.Restore.MustGet()
+	assert.False(t, r.EveryCompany)
+	assert.True(t, r.BackupName.IsNull(), "never the backup's name")
+	assert.True(t, r.FromAnotherServer.IsNull())
+	assert.Equal(t, 1, r.Held, "only their own count")
+	assert.True(t, status(idle.Users[api.RoleOwner].Token).Restore.IsNull(), "nothing of theirs held: nothing to say")
+
+	res := a.request(http.MethodPut, "/v1/settings/system/paid-ai", opOwner, map[string]any{"paused": true})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, "Paused in Settings > System.", status(otherOwner).PaidAi.Reason.MustGet(), "never who paused it")
+
+	res = a.request(http.MethodPost, "/v1/settings/system/jobs/"+held[other.ID]+"/release", opOwner, nil)
+	require.Equal(t, http.StatusOK, res.Status, "another company's job: %s", res.Body)
+	res = a.request(http.MethodPost, "/v1/settings/system/held", opOwner, map[string]any{"action": "cancel"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res.JSON(&st)
+	assert.Empty(t, st.Held)
+	assert.False(t, st.Restore.MustGet().ReleasedAt.IsNull(), "settled: the alert email goes again")
+	var statuses []string
+	rows, err := testutil.Current.Admin.Query(ctx, `SELECT status FROM job WHERE id = ANY ($1) ORDER BY tenant_id = $2`, []string{held[op.ID], held[other.ID]}, other.ID)
+	require.NoError(t, err)
+	for rows.Next() {
+		var s string
+		require.NoError(t, rows.Scan(&s))
+		statuses = append(statuses, s)
+	}
+	assert.Equal(t, []string{"dead", "pending"}, statuses)
+}

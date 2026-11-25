@@ -44,7 +44,12 @@ export function PaidAi({ paidAi, statusKey }: { paidAi: Status["paidAi"]; status
             Pause paid AI
           </button>
       )}
-      {!canChange && <p className="muted small">Only an owner of the agency that runs this server can pause or restart it.</p>}
+      {!canChange && (
+        <p className="muted small">
+          Only an owner of the agency that runs this server can pause or restart it here: the agency the server&apos;s HP_BACKUP_TENANT
+          setting names (or the only one on the server). On the server itself, <code>hp paid-ai on</code> turns it back on.
+        </p>
+      )}
     </section>
   );
 }

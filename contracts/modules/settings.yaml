@@ -281,7 +281,8 @@ paths:
         already queued; local work (reading text and scans, PDF copies, search
         by meaning, reading CVs by the rules) goes on. Only an owner of the
         agency that runs the server (HP_BACKUP_TENANT, or the only agency)
-        may change it. HP_AI_PAID=off keeps it paused whatever this says.
+        may change it here; on the server, `hp paid-ai on|off` changes it
+        too. HP_AI_PAID=off keeps it paused whatever this says.
       x-permission: settings:manage
       requestBody:
         required: true
@@ -442,17 +443,25 @@ components:
   schemas:
     SystemStatus:
       type: object
-      required: [jobs, failed, backup, backupAuto, held, restore, paidAi]
+      required: [jobs, failed, backup, backupAuto, held, heldEveryCompany, restore, paidAi]
       properties:
         paidAi: { $ref: '#/components/schemas/PaidAiSwitch' }
         held:
           type: array
           description: >-
             Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks,
-            automations...): they run only once released (oldest first, at most 200).
+            automations...) or ask a paid AI: they run only once released (oldest first, at most 200).
+            The company's own; every company's for the agency that runs the server (heldEveryCompany).
           items: { $ref: '#/components/schemas/HeldJob' }
+        heldEveryCompany:
+          type: boolean
+          description: >-
+            The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one):
+            held lists every company's held jobs, and releasing or cancelling them all acts on every company.
         restore:
-          description: The server's last restore; null when it was never restored.
+          description: >-
+            The server's last restore; null when it was never restored. Other companies than the one that
+            runs the server see it only while some of their own jobs are held, and only that.
           nullable: true
           allOf: [{ $ref: '#/components/schemas/RestoreInfo' }]
         backupAuto: { type: boolean, description: "The nightly backup is on (Settings > Backups): off, an old last backup is expected." }
@@ -479,9 +488,10 @@ components:
         canChange: { type: boolean, description: "The person may change it (an owner of the agency that runs the server)." }
     HeldJob:
       type: object
-      required: [id, kind, attempts, createdAt, heldAt, runAfter]
+      required: [id, company, kind, attempts, createdAt, heldAt, runAfter]
       properties:
         id: { type: string }
+        company: { type: string, nullable: true, description: "The company's name, in the list of every company's (heldEveryCompany); null otherwise." }
         kind: { type: string, description: "e.g. email.send" }
         attempts: { type: integer, description: "Tries before it was held." }
         createdAt: { type: string, format: date-time, description: "When it was queued (before the backup was made)." }
@@ -489,18 +499,25 @@ components:
         runAfter: { type: string, format: date-time, description: "When it was due; released, one due later still waits for its time." }
     RestoreInfo:
       type: object
-      required: [backupName, restoredAt, fromAnotherServer, held, resumed, releasedAt]
+      required: [everyCompany, backupName, restoredAt, fromAnotherServer, held, resumed, releasedAt]
       properties:
-        backupName: { type: string }
+        everyCompany:
+          type: boolean
+          description: >-
+            The restore as the agency that runs the server sees it (every company's count, the backup's name).
+            false: only that some of this company's jobs are held after a restore of the server, and how many.
+        backupName: { type: string, nullable: true, description: Null unless everyCompany. }
         restoredAt: { type: string, format: date-time }
-        fromAnotherServer: { type: boolean, description: "The backup was made on another database server (or is too old to say)." }
-        held: { type: integer, description: "Jobs the restore held, in every company." }
-        resumed: { type: boolean, description: "Restored with -resume-outbound (nothing held)." }
+        fromAnotherServer: { type: boolean, nullable: true, description: "The backup was made on another database server (or is too old to say); null unless everyCompany." }
+        held: { type: integer, description: "Jobs the restore held in every company (everyCompany), or this company's still held." }
+        resumed: { type: boolean, description: "Restored with -resume-outbound (no outbound job held); false unless everyCompany." }
         releasedAt:
           type: string
           format: date-time
           nullable: true
-          description: When the last held job was released or cancelled; null while some wait (the server's alert email waits too).
+          description: >-
+            When the last held job was released or cancelled (everyCompany); null while some wait (and for
+            other companies). Alert emails wait while a restore from another server is unsettled, 72 hours at most.
     JobKindStatus:
       type: object
       required: [kind, waiting, running, retrying, failed, oldestWaitingSince]
