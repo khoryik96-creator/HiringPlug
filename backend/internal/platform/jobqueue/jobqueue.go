@@ -219,7 +219,7 @@ func (w *Worker) handle(ctx context.Context, job Job) (err error) {
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
-	if job.Kind == api.JobKindBackgroundJobEnded { // the database's own notice: no module handles it
+	if IsWorkerKind(job.Kind) { // the database's own notice: no module handles it
 		return database.InTx(ctx, w.Pool, authz.System(job.TenantID), func(tx pgx.Tx) error {
 			if err := w.jobEnded(ctx, tx, job); err != nil {
 				return err
@@ -368,8 +368,8 @@ func (w *Worker) waitForNotifications(ctx context.Context, wakes []chan struct{}
 // checkHandlers refuses to start if a job kind on this queue has no handler.
 func (w *Worker) checkHandlers() error {
 	for _, kind := range KindsForQueue(w.Queue) {
-		if kind == api.JobKindBackgroundJobEnded {
-			continue // handled by the worker itself
+		if IsWorkerKind(kind) {
+			continue
 		}
 		_, inside := w.Handlers[kind]
 		_, outside := w.Outside[kind]

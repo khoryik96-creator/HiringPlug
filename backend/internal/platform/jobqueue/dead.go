@@ -16,6 +16,10 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
+// IsWorkerKind reports whether the Go worker handles kind itself (the
+// database's notice of a dead job), with no module's handler.
+func IsWorkerKind(kind api.JobKind) bool { return kind == api.JobKindBackgroundJobEnded }
+
 // jobEnded runs the dead-job handler of the job a notice names,
 // with that job as it ended (its payload and last error). Nothing to do when
 // its kind has none, or when the job is no longer dead (tried again since)
