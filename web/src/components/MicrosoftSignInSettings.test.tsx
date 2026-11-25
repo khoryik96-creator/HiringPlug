@@ -95,4 +95,26 @@ describe("Roles and access › Microsoft sign-in", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("Organisation: enter the Directory (tenant) ID");
     expect(screen.getByLabelText(/Your Microsoft organisation/).getAttribute("aria-invalid")).toBe("true");
   });
+
+  it("warns before changing the organisation or turning it off: links and Microsoft sessions end", async () => {
+    serve(settings({ enabled: true, organisationId: ORG }));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(settings({ enabled: true, organisationId: ORG })));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderWithClient(<Access owner />);
+    const box = await screen.findByRole("region", { name: "Microsoft sign-in" });
+    expect((await within(box).findByText(/optional claims/)).textContent).toContain("xms_edov");
+    fireEvent.change(within(box).getByLabelText(/Your Microsoft organisation/), { target: { value: "11111111-2222-3333-4444-555555555555" } });
+    fireEvent.click(within(box).getByRole("button", { name: "Save" }));
+    expect(confirm.mock.calls[0]?.[0]).toContain("Every Microsoft account linked to the team is unlinked");
+    expect(put).not.toHaveBeenCalled();
+    fireEvent.change(within(box).getByLabelText(/Your Microsoft organisation/), { target: { value: ORG.toUpperCase() } });
+    fireEvent.click(within(box).getByLabelText(/Let the team sign in with Microsoft/));
+    fireEvent.click(within(box).getByRole("button", { name: "Save" }));
+    expect(confirm.mock.calls[1]?.[0]).toContain("Turn Microsoft sign-in off?"); // the same organisation, in capitals: no warning for it
+    expect(confirm).toHaveBeenCalledTimes(2);
+    confirm.mockReturnValue(true);
+    fireEvent.click(within(box).getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({ enabled: false, organisationId: ORG.toUpperCase(), required: false });
+  });
 });

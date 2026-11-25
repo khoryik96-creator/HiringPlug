@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import { getToken } from "../auth";
 import { browser, microsoftRoute, takeBinding } from "../microsoft";
 import { failure, ok, renderWithClient, sentBody } from "../test-utils";
-import { MicrosoftSignIn, REFUSED } from "./MicrosoftSignIn";
+import { MicrosoftSignIn, NOT_CONNECTED, REFUSED } from "./MicrosoftSignIn";
 import { SignIn } from "./SignIn";
 
 const session = { token: "tok_ms", expiresAt: "2026-11-26T00:00:00Z" };
@@ -22,6 +22,13 @@ async function sha256(text: string): Promise<string> {
 function arrive(query: string, binding: string | null = VALUE) {
   window.history.replaceState(null, "", `/#/sign-in/microsoft?${query}`);
   if (binding) sessionStorage.setItem(BINDING, binding);
+}
+
+/** Back from connecting an account from Your account, signed in in this tab. */
+function arriveConnecting(query: string) {
+  arrive(query);
+  sessionStorage.setItem("hiringplug.microsoft.connecting", "1");
+  sessionStorage.setItem("hiringplug.token", "tok_signed_in");
 }
 
 beforeEach(() => { window.history.replaceState(null, "", "/"); });
@@ -177,4 +184,45 @@ describe("back from Microsoft", () => {
     renderWithClient(<MicrosoftSignIn onSignedIn={vi.fn()} />);
     expect((await screen.findByRole("alert")).textContent).toContain("Too many attempts; wait a few minutes.");
   });
+});
+
+describe("back from connecting an account (Your account)", () => {
+  it("links it to whoever is signed in in this tab, keeps their session, and forgets the value", async () => {
+    arriveConnecting(`ticket=${TICKET}`);
+    const connected = { data: undefined, error: undefined, response: new Response(null, { status: 204 }) } as never;
+    const post = vi.spyOn(api, "POST").mockResolvedValue(connected);
+    const onSignedIn = vi.fn();
+    renderWithClient(<MicrosoftSignIn onSignedIn={onSignedIn} />);
+    expect((await screen.findByText(/Your Microsoft account is connected/)).textContent).toContain("you can sign in to HiringPlug with it");
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0]?.[0]).toBe("/v1/me/microsoft/complete");
+    expect(sentBody(post)).toEqual({ ticket: TICKET, binding: VALUE });
+    expect(getToken()).toBe("tok_signed_in");
+    expect(onSignedIn).not.toHaveBeenCalled();
+    expect(takeBinding()).toBeNull();
+    expect(screen.getByRole("link", { name: "Back to Your account" }).getAttribute("href")).toBe("#/account");
+    expect(window.location.href).not.toContain(TICKET);
+  });
+
+  it.each(Object.keys(NOT_CONNECTED))("says what %s means", async (reason) => {
+    arriveConnecting(`ticket=${TICKET}`);
+    vi.spyOn(api, "POST").mockResolvedValue(failure("MICROSOFT_CONNECT_FAILED", "server words", { reason }, 422));
+    renderWithClient(<MicrosoftSignIn onSignedIn={vi.fn()} />);
+    expect((await screen.findByRole("alert")).textContent).toBe(NOT_CONNECTED[reason]);
+    expect(screen.getByRole("link", { name: "Back to Your account" })).toBeTruthy();
+    expect(takeBinding()).toBeNull();
+  });
+
+  it("says when it was cancelled, without asking the server", async () => {
+    arriveConnecting("error=cancelled");
+    const post = vi.spyOn(api, "POST");
+    renderWithClient(<MicrosoftSignIn onSignedIn={vi.fn()} />);
+    expect((await screen.findByRole("alert")).textContent).toContain("You cancelled");
+    expect(screen.getByRole("heading", { name: "Connect Microsoft sign-in" })).toBeTruthy();
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
+it("tells an owner to connect their account first", () => {
+  expect(REFUSED.connect_first).toContain("Your account › Connect Microsoft sign-in");
 });

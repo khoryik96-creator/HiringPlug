@@ -63,6 +63,11 @@ function SettingsForm({ saved }: { saved: Settings }) {
   const submit = () => {
     const newlyRequired = form.enabled && form.required && !saved.required;
     if (newlyRequired && !window.confirm("Require Microsoft for everyone? Everyone but owners signed in with a password is signed out now, and passwords stop working for them.")) return;
+    const organisation = form.organisationId.trim().toLowerCase();
+    if (saved.organisationId && organisation !== saved.organisationId && !window.confirm(
+      "Change the Microsoft organisation? Every Microsoft account linked to the team is unlinked, and everyone signed in with Microsoft is signed out. "
+      + "They link an account of the new organisation at their next sign-in (owners from Your account).")) return;
+    if (saved.enabled && !form.enabled && !window.confirm("Turn Microsoft sign-in off? Everyone signed in with Microsoft is signed out now.")) return;
     setDone(false);
     save.mutate();
   };
@@ -78,6 +83,11 @@ function SettingsForm({ saved }: { saved: Settings }) {
         <p className="ms-https">Microsoft accepts only https addresses (localhost aside): HiringPlug needs its https address (HP_PUBLIC_URL) first.</p>
       )}
       {saved.clientId && <p className="muted small">Application (client) ID: <code>{saved.clientId}</code></p>}
+      <p className="muted small">
+        In Microsoft Entra, also add the optional claims <code>xms_edov</code> and <code>acct</code> to the ID token (Token configuration):
+        an account is then recognised by its email too when Microsoft has verified the email&apos;s domain, and guests are recognised as such.
+        Without them, only the account&apos;s sign-in name (UPN) is matched to the team.
+      </p>
       <label className="check">
         <input type="checkbox" checked={form.enabled} onChange={(e) => { edit({ enabled: e.target.checked }); }} />
         <span>Let the team sign in with Microsoft <span className="muted small">(people already on the Team page, with their work account)</span></span>

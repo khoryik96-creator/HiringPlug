@@ -149,8 +149,13 @@ export function MyTwoStep({ hasPassword = true }: { hasPassword?: boolean }) {
       <h3>Two-step sign-in</h3>
       <ErrorMessage error={status.error} />
       {s && <p>{s.enabled
-        ? <><span className="badge accepted">On</span> A code from your authenticator app is asked after your password. {s.recoveryCodesLeft} recovery {s.recoveryCodesLeft === 1 ? "code" : "codes"} left.</>
-        : <><span className="badge draft">Off</span> Add an authenticator app so a stolen password alone cannot sign in as you.</>}
+        ? <><span className="badge accepted">On</span> {hasPassword
+          ? "A code from your authenticator app is asked after your password."
+          : "You sign in with Microsoft, which checks it is you with your work account's own security; the code from your app is asked only if you ever sign in with a password."}
+          {" "}{s.recoveryCodesLeft} recovery {s.recoveryCodesLeft === 1 ? "code" : "codes"} left.</>
+        : <><span className="badge draft">Off</span> {hasPassword
+          ? "Add an authenticator app so a stolen password alone cannot sign in as you."
+          : "You sign in with Microsoft, which checks it is you with your work account's own security (HiringPlug's code is not asked then). Add an app only if you will also sign in with a password."}</>}
         {s.required && <span className="muted"> Your company requires it.</span>}</p>}
       {codes && <RecoveryCodes codes={codes} />}
       {s && mode === "" && (

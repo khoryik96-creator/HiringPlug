@@ -2,9 +2,12 @@
 // in this tab's sessionStorage and sends only its SHA-256; Microsoft sends
 // the browser back to #/sign-in/microsoft?ticket=…, and finishing sends the
 // value itself, so a ticket copied to another browser signs nobody in.
+// Connecting a Microsoft account from Your account (signed in) goes the same
+// way; the tab also keeps that it is connecting, to finish it as such.
 import { api, type Schemas, unwrap } from "./api/client";
 
 const BINDING = "hiringplug.microsoft.binding";
+const CONNECTING = "hiringplug.microsoft.connecting";
 
 /** The value this tab started a Microsoft sign-in with, if any. */
 export function takeBinding(): string | null {
@@ -18,7 +21,17 @@ export function takeBinding(): string | null {
 export function clearBinding(): void {
   try {
     sessionStorage.removeItem(BINDING);
+    sessionStorage.removeItem(CONNECTING);
   } catch { /* nothing kept */ }
+}
+
+/** Whether this tab started connecting a Microsoft account (Your account), not signing in. */
+export function isConnecting(): boolean {
+  try {
+    return sessionStorage.getItem(CONNECTING) === "1";
+  } catch {
+    return false;
+  }
 }
 
 async function sha256Hex(text: string): Promise<string> {
@@ -27,11 +40,19 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 /** A new random value for this tab (64 hex characters); returns its SHA-256. */
-export async function newBinding(): Promise<string> {
+export async function newBinding(connecting = false): Promise<string> {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const value = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
   sessionStorage.setItem(BINDING, value);
+  if (connecting) sessionStorage.setItem(CONNECTING, "1");
+  else sessionStorage.removeItem(CONNECTING);
   return sha256Hex(value);
+}
+
+function needsHttps(): void {
+  if (typeof crypto === "undefined" || !("subtle" in crypto)) {
+    throw new Error("Signing in with Microsoft needs the secure (https) address of HiringPlug.");
+  }
 }
 
 /** Where the browser goes next (replaced in tests: jsdom cannot navigate). */
@@ -43,9 +64,7 @@ type Start = Omit<Schemas["MicrosoftSignInStart"], "bindingHash">;
 
 /** Starts signing in with Microsoft and sends the browser there. */
 export async function startMicrosoft(from: Start): Promise<void> {
-  if (typeof crypto === "undefined" || !("subtle" in crypto)) {
-    throw new Error("Signing in with Microsoft needs the secure (https) address of HiringPlug.");
-  }
+  needsHttps();
   const email = from.email?.trim() ?? "";
   const body: Schemas["MicrosoftSignInStart"] = {
     bindingHash: await newBinding(),
@@ -54,6 +73,13 @@ export async function startMicrosoft(from: Start): Promise<void> {
     ...(from.invite ? { invite: from.invite } : {}),
   };
   const { url } = unwrap(await api.POST("/v1/auth/microsoft/start", { body }));
+  browser.go(url);
+}
+
+/** Starts connecting the signed-in person's Microsoft account (Your account) and sends the browser there. */
+export async function startConnecting(): Promise<void> {
+  needsHttps();
+  const { url } = unwrap(await api.POST("/v1/me/microsoft/start", { body: { bindingHash: await newBinding(true) } }));
   browser.go(url);
 }
 

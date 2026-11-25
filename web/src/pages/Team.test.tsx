@@ -32,6 +32,32 @@ describe("team", () => {
     expect(screen.getByRole("button", { name: "Send new invitation" })).toBeTruthy();
   });
 
+  it("unlinks a member's Microsoft account, after asking; owners' only for owners", async () => {
+    const withMicrosoft = (m: Schemas["TeamMember"]): Schemas["TeamMember"] => ({ ...m, signInMethods: ["password", "microsoft"] });
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({
+      items: [member("usr_me", "Aina", "admin"), withMicrosoft(member("usr_o", "Olivia", "owner")), withMicrosoft(member("usr_r", "Rizal", "recruiter")), member("usr_s", "Siti", "sourcer")],
+    }));
+    const del = vi.spyOn(api, "DELETE").mockResolvedValue({ data: undefined, error: undefined, response: new Response(null, { status: 204 }) });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<Team myRole="admin" myId="usr_me" />);
+    const buttons = await screen.findAllByRole("button", { name: "Unlink Microsoft" });
+    expect(buttons).toHaveLength(1); // Rizal's: not the owner's (admins), nor Siti's (none linked)
+    fireEvent.click(buttons[0] as HTMLElement);
+    expect(confirm.mock.calls[0]?.[0]).toContain("Unlink Rizal's Microsoft account? Their sessions signed in with Microsoft end now.");
+    await waitFor(() => { expect(del).toHaveBeenCalled(); });
+    expect(del.mock.calls[0]?.[0]).toBe("/v1/team/{userId}/microsoft");
+    expect(del.mock.calls[0]?.[1]).toEqual({ params: { path: { userId: "usr_r" } } });
+    cleanup();
+
+    get.mockClear();
+    confirm.mockReturnValue(false);
+    renderWithClient(<Team myRole="owner" myId="usr_me" />);
+    expect(await screen.findAllByRole("button", { name: "Unlink Microsoft" })).toHaveLength(2); // owners unlink owners too
+    fireEvent.click(screen.getAllByRole("button", { name: "Unlink Microsoft" })[0] as HTMLElement);
+    expect(confirm.mock.calls.at(-1)?.[0]).toContain("They can connect one again from Your account.");
+    expect(del).toHaveBeenCalledTimes(1); // not confirmed: nothing unlinked
+  });
+
   it("cancels an invitation sent to the wrong person, after asking", async () => {
     reads();
     const del = vi.spyOn(api, "DELETE").mockResolvedValue(ok(undefined));

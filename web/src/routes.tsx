@@ -10,6 +10,7 @@ import { type ComponentType, lazy, type LazyExoticComponent, type ReactNode } fr
 
 import type { Me, Permission } from "./api/client";
 import { MyTwoStep } from "./components/TwoStep";
+import { ConnectMicrosoft } from "./components/ConnectMicrosoft";
 import { NotificationSettings } from "./components/Notifications";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- React's own bound for lazy components
@@ -200,7 +201,7 @@ export const ROUTES: Route[] = [
     render: () => <Bin /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
     render: (c) => <main><h2>Your account</h2>{can(c, "notifications:read") && <NotificationSettings permissions={c.permissions} />}{can(c, "calendars:use") && <p><a href="#/calendar">Outlook calendar</a></p>}{can(c, "scheduling:use") && <BookingHours />}
-      {can(c, "emails:send") && <EmailSignature canUploadBanners={can(c, "emails.templates:manage")} />}<ChangePassword hasPassword={c.me.hasPassword} /><MyTwoStep hasPassword={c.me.hasPassword} /></main> },
+      {can(c, "emails:send") && <EmailSignature canUploadBanners={can(c, "emails.templates:manage")} />}<ConnectMicrosoft me={c.me} /><ChangePassword hasPassword={c.me.hasPassword} /><MyTwoStep hasPassword={c.me.hasPassword} /></main> },
   { section: "my-dropdowns", path: /^#\/my-dropdowns/, menu: { in: "settings", label: "My dropdowns", href: "#/my-dropdowns" },
     render: () => <MyDropdowns /> },
   { section: "companion", path: /^#\/companion/, menu: { in: "settings", label: "LinkedIn companion", href: "#/companion" },

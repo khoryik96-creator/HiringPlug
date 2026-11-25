@@ -59,6 +59,10 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
     mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/two-step", { params: { path: { userId: m.id } } })); },
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
   });
+  const unlink = useMutation({
+    mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/microsoft", { params: { path: { userId: m.id } } })); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+  });
   const cancel = useMutation({
     mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })); },
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
@@ -96,6 +100,13 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
             if (window.confirm(`Reset ${m.name}'s two-step sign-in (a lost phone)? They are signed out and add their app again.`)) resetTwoStep.mutate();
           }}>Reset two-step</button>
         )}
+        {m.signInMethods.includes("microsoft") && (myRole === "owner" || m.role !== "owner") && (
+          <button type="button" className="link" disabled={unlink.isPending} onClick={() => {
+            if (window.confirm(`Unlink ${m.name}'s Microsoft account? Their sessions signed in with Microsoft end now. ${m.role === "owner"
+              ? "They can connect one again from Your account."
+              : "Their next sign-in with Microsoft links their work account again."}`)) unlink.mutate();
+          }}>Unlink Microsoft</button>
+        )}
         {m.status === "invited" && <button type="button" className="link" disabled={resend.isPending} onClick={() => { resend.mutate(); }}>Send new invitation</button>}
         {m.status === "invited" && !locked && (
           <button type="button" className="link danger" disabled={cancel.isPending} onClick={() => {
@@ -103,7 +114,7 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
           }}>Cancel invitation</button>
         )}
         {link && <div className="secret">{link}</div>}
-        <ErrorMessage error={update.error ?? resend.error ?? cancel.error ?? resetTwoStep.error} />
+        <ErrorMessage error={update.error ?? resend.error ?? cancel.error ?? resetTwoStep.error ?? unlink.error} />
       </td>
     </tr>
   );

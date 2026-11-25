@@ -1,11 +1,11 @@
-import { useMutation } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, unwrap } from "../api/client";
 import { setToken } from "../auth";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SignInFrame } from "../components/SignInFrame";
-import { clearBinding, forgetTicket, microsoftRoute, takeBinding } from "../microsoft";
+import { clearBinding, forgetTicket, isConnecting, microsoftRoute, takeBinding } from "../microsoft";
 
 type Company = { slug: string; name: string };
 
@@ -14,7 +14,17 @@ export const REFUSED: Record<string, string> = {
   not_on_team: "Your Microsoft account isn't on this HiringPlug team yet. Ask an owner to invite you.",
   other_organisation: "This Microsoft account belongs to another organisation. Sign in with your work account at this company.",
   personal_account: "This is a personal Microsoft account. Sign in with your work account instead.",
+  connect_first: "Owners connect their Microsoft account once before signing in with it: sign in with your password, then use Your account › Connect Microsoft sign-in.",
   failed: "Signing in with Microsoft didn't work, or took too long. Please start again.",
+};
+
+/** What each refusal to connect an account (MICROSOFT_CONNECT_FAILED's details.reason) means. */
+export const NOT_CONNECTED: Record<string, string> = {
+  already_connected: "A Microsoft account is already connected to you. To use another, ask an owner to unlink it on the Team page first.",
+  linked_elsewhere: "This Microsoft account is already connected to someone else on your team. Choose your own account.",
+  other_organisation: "This Microsoft account belongs to another organisation (or is a guest in yours). Use your work account at this company.",
+  personal_account: "This is a personal Microsoft account. Use your work account instead.",
+  failed: "Connecting your Microsoft account didn't work, or took too long. Please start again from Your account.",
 };
 
 /** Why there is nothing to finish, before asking the server. */
@@ -32,7 +42,65 @@ const NOTHING_TO_FINISH: Record<string, string> = {
  */
 export function MicrosoftSignIn({ onSignedIn }: { onSignedIn: () => void }) {
   // Read once: the address loses its ticket at once (history included).
-  const [arrived] = useState(() => ({ ...(microsoftRoute(window.location.hash) ?? { ticket: "", error: "" }), binding: takeBinding() }));
+  const [arrived] = useState(() => ({ ...(microsoftRoute(window.location.hash) ?? { ticket: "", error: "" }), binding: takeBinding(), connecting: isConnecting() }));
+  if (arrived.connecting) return <FinishConnecting arrived={arrived} />;
+  return <FinishSignIn arrived={arrived} onSignedIn={onSignedIn} />;
+}
+
+type Arrived = { ticket: string; error: string; binding: string | null };
+
+/** Why there is nothing to finish (a key of NOTHING_TO_FINISH), or "". */
+const nothingToFinish = (a: Arrived) => a.error ? (a.error === "cancelled" ? "cancelled" : "failed")
+  : !a.ticket ? "ticket" : !a.binding ? "binding" : "";
+
+/** Finishes (once) as soon as the page opens, unless there is nothing to finish. */
+function useFinishOnce(arrived: Arrived, finish: (ticket: string) => void) {
+  const why = nothingToFinish(arrived);
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return; // once, even when React runs effects twice
+    started.current = true;
+    forgetTicket();
+    if (why) clearBinding();
+    else finish(arrived.ticket);
+  }, [arrived, finish, why]);
+  return why;
+}
+
+/**
+ * Back from connecting a Microsoft account (Your account, signed in): links
+ * it to the person signed in in this tab, or says why it did not work.
+ */
+function FinishConnecting({ arrived }: { arrived: Arrived }) {
+  const cache = useQueryClient();
+  const connect = useMutation({
+    mutationFn: async (ticket: string) => {
+      unwrap(await api.POST("/v1/me/microsoft/complete", { body: { ticket, binding: arrived.binding ?? "" } }));
+    },
+    onSettled: async () => { clearBinding(); await cache.invalidateQueries({ queryKey: ["me"] }); },
+  });
+  const why = useFinishOnce(arrived, connect.mutate);
+  const err = connect.error;
+  const reason = err instanceof ApiError && err.code === "MICROSOFT_CONNECT_FAILED"
+    ? (typeof err.details.reason === "string" ? err.details.reason : "failed") : "";
+  const back = <a href="#/account" className="button">Back to Your account</a>;
+  return (
+    <SignInFrame>
+      <h2 className="sign-in-title">Connect Microsoft sign-in</h2>
+      {why ? (
+        <div className="ms-outcome"><p role="alert">{NOTHING_TO_FINISH[why]}</p>{back}</div>
+      ) : connect.isSuccess ? (
+        <div className="ms-outcome"><p role="status">Your Microsoft account is connected. From now on you can sign in to HiringPlug with it.</p>{back}</div>
+      ) : err ? (
+        <div className="ms-outcome">{reason ? <p role="alert">{NOT_CONNECTED[reason] ?? NOT_CONNECTED.failed}</p> : <ErrorMessage error={err} />}{back}</div>
+      ) : (
+        <p className="muted" role="status">Connecting your Microsoft account…</p>
+      )}
+    </SignInFrame>
+  );
+}
+
+function FinishSignIn({ arrived, onSignedIn }: { arrived: Arrived; onSignedIn: () => void }) {
   const [choice, setChoice] = useState<{ ticket: string; companies: Company[] } | null>(null);
   const complete = useMutation({
     mutationFn: async (to: { ticket: string; company?: string }) => unwrap(await api.POST("/v1/auth/microsoft/complete", {
@@ -52,17 +120,9 @@ export function MicrosoftSignIn({ onSignedIn }: { onSignedIn: () => void }) {
       clearBinding();
     },
   });
-  const why = arrived.error ? (arrived.error === "cancelled" ? "cancelled" : "failed")
-    : !arrived.ticket ? "ticket" : !arrived.binding ? "binding" : "";
-  const started = useRef(false);
   const { mutate } = complete;
-  useEffect(() => {
-    if (started.current) return; // once, even when React runs effects twice
-    started.current = true;
-    forgetTicket();
-    if (why) clearBinding();
-    else mutate({ ticket: arrived.ticket });
-  }, [arrived, mutate, why]);
+  const finish = useCallback((ticket: string) => { mutate({ ticket }); }, [mutate]);
+  const why = useFinishOnce(arrived, finish);
 
   const err = complete.error;
   const reason = err instanceof ApiError && err.code === "MICROSOFT_SIGN_IN_FAILED"
