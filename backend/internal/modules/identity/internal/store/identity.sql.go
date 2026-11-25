@@ -480,7 +480,7 @@ func (q *Queries) HoldTeam(ctx context.Context) error {
 	return err
 }
 
-const holdUser = `-- name: HoldUser :exec
+const holdUser = `-- name: HoldUser :one
 SELECT id FROM app_user WHERE id = $1 FOR NO KEY UPDATE
 `
 
@@ -488,10 +488,13 @@ SELECT id FROM app_user WHERE id = $1 FOR NO KEY UPDATE
 // address) until the transaction ends: a change to it waits, and so does
 // another sign-in of theirs. FOR NO KEY UPDATE, not FOR SHARE: the holder
 // updates the row afterwards (last sign-in, sessions ended), and two
-// holders sharing it would wait for each other.
-func (q *Queries) HoldUser(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, holdUser, id)
-	return err
+// holders sharing it would wait for each other. No row: no such person
+// here (pgx.ErrNoRows).
+func (q *Queries) HoldUser(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, holdUser, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
 }
 
 const insertLink = `-- name: InsertLink :one

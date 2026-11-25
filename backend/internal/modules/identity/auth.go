@@ -114,7 +114,7 @@ func normEmail(email string) string { return strings.ToLower(strings.TrimSpace(e
 // before) and reads it: what was checked before the transaction is checked
 // again on what it reads.
 func holdUser(ctx context.Context, q *store.Queries, userID string) (store.UserAuthRow, error) {
-	if err := q.HoldUser(ctx, userID); err != nil {
+	if _, err := q.HoldUser(ctx, userID); err != nil {
 		return store.UserAuthRow{}, err
 	}
 	return q.UserAuth(ctx, userID)

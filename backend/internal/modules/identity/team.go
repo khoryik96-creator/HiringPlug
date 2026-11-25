@@ -111,7 +111,7 @@ func (m *Module) CancelInvite(ctx context.Context, p authz.Principal, userID str
 		if problem := InviteProblem(string(p.Role), row.Role); problem != "" {
 			return teamProblem(problem)
 		}
-		if err := q.HoldUser(ctx, userID); err != nil { // before their link, as a sign-in with it holds them
+		if _, err := q.HoldUser(ctx, userID); err != nil { // before their link, as a sign-in with it holds them
 			return err
 		}
 		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "invite"}); err != nil {
@@ -152,7 +152,7 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 	var out TeamMember
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		err := q.HoldUser(ctx, userID) // a sign-in of theirs under way finishes first (or waits, and sees the change)
+		_, err := q.HoldUser(ctx, userID) // a sign-in of theirs under way finishes first (or waits, and sees the change)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("user")
 		}

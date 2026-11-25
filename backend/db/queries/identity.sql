@@ -326,8 +326,9 @@ SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid
 -- address) until the transaction ends: a change to it waits, and so does
 -- another sign-in of theirs. FOR NO KEY UPDATE, not FOR SHARE: the holder
 -- updates the row afterwards (last sign-in, sessions ended), and two
--- holders sharing it would wait for each other.
--- name: HoldUser :exec
+-- holders sharing it would wait for each other. No row: no such person
+-- here (pgx.ErrNoRows).
+-- name: HoldUser :one
 SELECT id FROM app_user WHERE id = @id FOR NO KEY UPDATE;
 
 -- Everyone in the company, held as HoldUser does (in the same order, by

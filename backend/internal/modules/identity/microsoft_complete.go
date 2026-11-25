@@ -232,7 +232,7 @@ func (m *Module) signInWithMicrosoft(ctx context.Context, a MicrosoftAccount, id
 // Microsoft account signs in as, once the company still signs in with
 // accounts of its organisation and they are still on the team.
 func (m *Module) microsoftUser(ctx context.Context, q *store.Queries, userID string, id entra.Identity) (store.UserAuthRow, error) {
-	if err := q.HoldUser(ctx, userID); database.IsNoRows(err) {
+	if _, err := q.HoldUser(ctx, userID); database.IsNoRows(err) {
 		return store.UserAuthRow{}, microsoftFailed(ReasonNotOnTeam)
 	} else if err != nil {
 		return store.UserAuthRow{}, err

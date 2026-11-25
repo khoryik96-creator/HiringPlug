@@ -1,8 +1,10 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -97,4 +99,22 @@ func TestNobodyGivesARoleAboveTheirOwn(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, key(recruiter.Token, "admin"), "nor a key that acts as an admin")
 	assert.Equal(t, http.StatusCreated, key(recruiter.Token, "recruiter"))
 	assert.Equal(t, http.StatusCreated, key(admin.Token, "admin"))
+}
+
+// Changing someone who is not on the team (no such person, or someone at
+// another company) answers 404, never a server error.
+func TestChangingSomeoneNotOnTheTeamIsNotFound(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	other := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner := tenant.Users[api.RoleOwner]
+	for _, id := range []string{"usr_" + strings.Repeat("0", 26), other.Users[api.RoleRecruiter].ID} {
+		res := a.request(http.MethodPatch, "/v1/team/"+id, owner.Token, map[string]any{"role": "viewer"})
+		require.Equal(t, http.StatusNotFound, res.Status, "%s: %s", id, res.Body)
+		assert.Equal(t, api.ErrorCodeNOTFOUND, res.Error().Error.Code)
+	}
+	var role string
+	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT role FROM app_user WHERE id = $1`, other.Users[api.RoleRecruiter].ID).Scan(&role))
+	assert.Equal(t, "recruiter", role, "another company's person is unchanged")
 }
