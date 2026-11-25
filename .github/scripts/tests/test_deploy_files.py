@@ -13,6 +13,7 @@ NGINX = (ROOT / "deploy" / "nginx.conf").read_text(encoding="utf-8")
 PROD = (ROOT / "deploy" / "docker-compose.prod.yml").read_text(encoding="utf-8")
 CADDY = (ROOT / "deploy" / "Caddyfile").read_text(encoding="utf-8")
 REAL_IP = (ROOT / "deploy" / "real-ip.conf").read_text(encoding="utf-8")
+CONTRACT = (ROOT / "contracts" / "openapi.yaml").read_text(encoding="utf-8")
 
 
 class DeployFiles(unittest.TestCase):
@@ -41,6 +42,14 @@ class DeployFiles(unittest.TestCase):
         self.assertIn("location = /openapi.json { return 404; }", NGINX)
         self.assertNotRegex(NGINX, r"location = /(docs|openapi\.json) \{ proxy_pass")
         self.assertIn("location /internal/ { return 404; }", NGINX)
+
+    def test_sign_in_codes_never_enter_the_access_log(self):
+        # Every address a provider sends people back to carries a sign-in code
+        # and signed state in its query: none may be written to nginx's log.
+        callbacks = re.findall(r"^  (/v1/\S*/callback):$", CONTRACT, re.MULTILINE)
+        self.assertIn("/v1/auth/microsoft/callback", callbacks)
+        for path in callbacks:
+            self.assertRegex(NGINX, rf"location = {re.escape(path)} \{{ access_log off;[^}}]*proxy_pass http://api:8080;", path)
 
     def test_an_uptime_monitor_can_ask_whether_the_app_is_up(self):
         self.assertIn("location = /health/ready {", NGINX, "not the app's own page, which always loads")
