@@ -156,7 +156,12 @@ paths:
         tables), then the details are read. A text, RTF or ODT file's text is
         read on the server and only its details are read again. If taking the
         text out fails, the text read before is kept and read again. Returns
-        the document with parseStatus `queued`.
+        the document with parseStatus `queued`. A document whose text could not
+        be read (status `failed`) has its text taken out of the file again
+        (status `queued`). Asked while a reading of its details is under way,
+        it queues nothing more and returns the document as it is. If the new reading
+        fails for good, the details read before are kept (parseStatus `parsed`
+        with a parseError warning).
       x-permission: documents:create
       responses:
         '202':
@@ -422,7 +427,9 @@ components:
         parseError:
           type: string
           nullable: true
-          description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+          description: >-
+            Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading
+            them again failed (a warning: the details read before are kept). Never CV text. Null otherwise.
         readOutdated:
           type: boolean
           description: >-

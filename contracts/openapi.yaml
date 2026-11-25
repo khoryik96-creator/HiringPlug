@@ -3503,7 +3503,7 @@ paths:
       tags: [documents]
       summary: Read the profile details out of a CV again
       description: >
-        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`.
+        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`. A document whose text could not be read (status `failed`) has its text taken out of the file again (status `queued`). Asked while a reading of its details is under way, it queues nothing more and returns the document as it is. If the new reading fails for good, the details read before are kept (parseStatus `parsed` with a parseError warning).
 
       x-permission: documents:create
       responses:
@@ -9791,6 +9791,7 @@ components:
         - assistant.emailed
         - automation.event
         - automation.run
+        - background_job.ended
         - bin.purge
         - bin.remove_files
         - calendar.push
@@ -13456,7 +13457,8 @@ components:
         parseError:
           type: string
           nullable: true
-          description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+          description: >-
+            Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise.
         readOutdated:
           type: boolean
           description: >-
@@ -18563,6 +18565,13 @@ components:
         retrying: {type: integer, description: Failed at least once; tried again later.}
         failed: {type: integer, description: Failed for good in the last 30 days.}
         oldestWaitingSince: {type: string, format: date-time, nullable: true, description: When the longest-waiting one was queued.}
+    BackgroundJobEndedJob:
+      type: object
+      additionalProperties: false
+      required: [jobId, kind]
+      properties:
+        jobId: {type: string, description: The AI-queue job that failed for good (it keeps its payload until pruned).}
+        kind: {type: string, description: Its kind.}
     FailedJob:
       type: object
       required: [id, kind, attempts, error, failedAt]
@@ -19636,6 +19645,13 @@ x-jobs:
     payload: AutomationRunJob
     priority: normal
     description: 'An automation run is due: check it still applies, then email or add the task, or put the email up for approval (Go worker).'
+  background_job.ended:
+    module: settings
+    queue: core
+    payload: BackgroundJobEndedJob
+    priority: normal
+    description: |
+      An AI-queue job failed for good (its last attempt failed, or the AI worker gave up on it). Queued by the database itself, in the transaction that ends the job (migration 00199): the Go worker runs that kind's dead-job handler, so what the job was for (a CV being read) is not left waiting.
   bin.purge:
     module: bin
     queue: core

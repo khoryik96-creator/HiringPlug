@@ -190,20 +190,23 @@ func RunWorker(ctx context.Context, getenv func(string) string, out io.Writer) e
 		return err
 	}
 	defer closeDeps()
-	w, err := NewWorker(d, NewModules(d))
+	m := NewModules(d)
+	w, err := NewWorker(d, m)
 	if err != nil {
 		return err
 	}
-	go pruneJobs(ctx, d)
+	go upkeep(ctx, d, m)
 	// Tells HP_ALERT_EMAIL when the server needs someone (failed backups, a full disk...).
 	go (&alerts.Watcher{Checks: alerts.Checks{DB: d.Pool, FilesDir: cfg.FilesDir}, Mail: d.Mail, To: cfg.AlertEmails,
 		Server: cfg.PublicURL, Log: logger.With("part", "alerts")}).Run(ctx)
 	return w.Run(ctx)
 }
 
-// pruneJobs deletes finished and dead jobs after jobqueue.KeepFinished, every
-// hour (several workers doing it at once is harmless).
-func pruneJobs(ctx context.Context, d Deps) {
+// upkeep, when the worker starts and every hour after (several workers
+// doing it at once is harmless): deletes finished and dead jobs after
+// jobqueue.KeepFinished, and ends the reading of documents left "being
+// read" with no job to finish it (a crash, a restore).
+func upkeep(ctx context.Context, d Deps, m *Modules) {
 	for {
 		if n, err := jobqueue.Prune(ctx, d.Pool, jobqueue.KeepFinished); err != nil {
 			if ctx.Err() == nil {
@@ -211,6 +214,13 @@ func pruneJobs(ctx context.Context, d Deps) {
 			}
 		} else if n > 0 {
 			d.Logger.Info("old jobs pruned", "count", n)
+		}
+		if n, err := m.Documents.ReconcileReading(ctx, 500); err != nil {
+			if ctx.Err() == nil {
+				d.Logger.Warn("documents left being read not checked", "error", err)
+			}
+		} else if n > 0 {
+			d.Logger.Info("documents left being read set right", "count", n)
 		}
 		select {
 		case <-ctx.Done():

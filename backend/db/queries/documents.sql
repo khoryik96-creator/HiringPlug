@@ -251,3 +251,26 @@ ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC;
 -- the salary is only theirs to open).
 -- name: MaySeeSalary :one
 SELECT app_has_permission('candidates.compensation:read')::boolean AS may;
+
+-- Reading a file's text again after it failed: shown as being read until
+-- the worker's result (the details are read after it, as on upload).
+-- name: RequeueExtraction :one
+UPDATE document SET status = 'queued', error_message = NULL, updated_at = now() WHERE id = @id AND status = 'failed' RETURNING *;
+
+-- The text could not be read, for good (the worker gave up, or it stopped
+-- and nothing is left to finish it): only while still shown as being read.
+-- name: FailExtraction :one
+UPDATE document SET status = 'failed', error_message = @error_message, updated_at = now()
+WHERE id = @id AND status = 'queued'
+RETURNING *;
+
+-- A reading of the details that ended without a result: back to the
+-- details read before (parsed, with why the new reading failed as a
+-- warning), or failed when there are none. Only while still being read.
+-- name: EndParse :one
+UPDATE document SET
+  parse_status = CASE WHEN parsed_profile IS NULL THEN 'failed' ELSE 'parsed' END,
+  parse_error = CASE WHEN parsed_profile IS NULL THEN @failed_error::text ELSE @kept_warning::text END,
+  updated_at = now()
+WHERE id = @id AND parse_status = 'queued'
+RETURNING *;

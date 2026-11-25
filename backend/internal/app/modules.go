@@ -414,7 +414,7 @@ func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
 // DeadJobHandlers merges the modules' handlers for jobs given up.
 func (m *Modules) DeadJobHandlers() jobqueue.Handlers {
 	all := jobqueue.Handlers{}
-	for _, handlers := range []jobqueue.Handlers{m.Emails.DeadJobHandlers(), m.Claims.DeadJobHandlers()} {
+	for _, handlers := range []jobqueue.Handlers{m.Emails.DeadJobHandlers(), m.Claims.DeadJobHandlers(), m.Documents.DeadJobHandlers()} {
 		maps.Copy(all, handlers)
 	}
 	return all

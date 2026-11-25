@@ -225,6 +225,7 @@ class JobKind(StrEnum):
     assistant_emailed = "assistant.emailed"
     automation_event = "automation.event"
     automation_run = "automation.run"
+    background_job_ended = "background_job.ended"
     bin_purge = "bin.purge"
     bin_remove_files = "bin.remove_files"
     calendar_push = "calendar.push"
@@ -7257,6 +7258,16 @@ class JobKindStatus(BaseModel):
     ]
 
 
+class BackgroundJobEndedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jobId: Annotated[
+        str, Field(description="The AI-queue job that failed for good (it keeps its payload until pruned).")
+    ]
+    kind: Annotated[str, Field(description="Its kind.")]
+
+
 class FailedJob(BaseModel):
     id: str
     kind: str
@@ -8663,7 +8674,7 @@ class Document(BaseModel):
     parseError: Annotated[
         str | None,
         Field(
-            description="Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+            description="Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise."
         ),
     ]
     readOutdated: Annotated[

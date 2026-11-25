@@ -16,7 +16,7 @@ import { ErrorMessage } from "./ErrorMessage";
 import { fileKind } from "./fileKind";
 import { CvReplacement, replacementCount } from "./CvReplacement";
 import { FormatCv } from "./FormatCv";
-import { DetailsButton, isReading, ReadProgress } from "./ReadDetails";
+import { DetailsButton, isReading, pollEvery, ReadProgress } from "./ReadDetails";
 import { StudioProgress, useStudioRun } from "./StudioProgress";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
@@ -61,9 +61,8 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     queryKey: ["documents", candidateId],
     queryFn: async () =>
       unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
-    // Keep checking while any CV is still being read by the AI worker.
-    refetchInterval: (query) =>
-      query.state.data?.some((d) => d.status === "queued" || d.parseStatus === "queued" || d.pdfStatus === "queued") ? 2000 : false,
+    // Keep checking while a CV is being read by the AI worker, for so long only.
+    refetchInterval: (query) => pollEvery(query.state.data),
   });
 
   // A CV read since: its details may have brought the profile up to date (the newest CV does).
@@ -307,7 +306,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         </div>)}</nav>}
         <CandidateCv candidateId={candidateId} selectedId={selected.id} unified actions={actions(selected)} highlight={hashParam("hl")}
           toolbar={{ target: fileToolbar, details: <DetailsButton doc={selected} ready={finished(selected)} reviewing={reviewing === selected.id}
-            canReview={canEdit} canRead={canUpload && selected.status === "extracted"} busy={parse.isPending}
+            canReview={canEdit} canRead={canUpload && (selected.status === "extracted" || selected.status === "failed")} busy={parse.isPending}
             onRead={() => { parse.mutate(selected.id); }} onReview={() => { review(selected.id); }} /> }} />
       </div>}
     </section>

@@ -95,8 +95,17 @@ func (s *Service) applyExtraction(ctx context.Context, tx pgx.Tx, tenantID strin
 				}
 			}
 		}
-	} else if err := s.readDone(ctx, tx, tenantID, row.ID, nil); err != nil { // no text: nothing to parse
-		return err
+	} else {
+		// No text: nothing to parse. A reading asked for again ends here too
+		// (back to the details read before, or failed), not "being read" forever.
+		if row.ParseStatus != nil && *row.ParseStatus == string(api.DocumentParseStatusQueued) {
+			if _, err := store.New(tx).EndParse(ctx, store.EndParseParams{ID: row.ID, FailedError: noDetails, KeptWarning: keptWarning}); err != nil {
+				return err
+			}
+		}
+		if err := s.readDone(ctx, tx, tenantID, row.ID, nil); err != nil {
+			return err
+		}
 	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "document.text_extracted", EntityType: "document", EntityID: result.DocumentId,
@@ -164,6 +173,11 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 	status := string(api.DocumentParseStatusFailed)
 	params := store.SaveParseParams{ID: row.ID, ParseStatus: &status, ParseError: parseError(result)}
 	changes := map[string]any{"status": status}
+	if row.ParsedProfile != nil { // read again and it failed: the details read before stay, with why as a warning
+		status = string(api.DocumentParseStatusParsed)
+		params.ParsedProfile, params.Parser, params.ParseError = row.ParsedProfile, row.Parser, keptError(result)
+		changes = map[string]any{"status": "failed", "kept": true}
+	}
 	var kept *api.ParsedProfile
 	if profile, err := result.Profile.Get(); err == nil && hasText(row.ExtractedText) {
 		grounded := groundProfile(*row.ExtractedText, profile)
@@ -246,6 +260,16 @@ func nonNil(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// keptError is why a reading again read nothing, as a warning shown with
+// the details read before (at most 300 characters, as the column allows).
+func keptError(result api.DocumentCvParsedJob) *string {
+	msg := "The CV could not be read again, so the details read before are kept: " + *parseError(result)
+	if r := []rune(msg); len(r) > 300 {
+		msg = string(r[:300])
+	}
+	return &msg
 }
 
 // parseError is why the parser read nothing (its error type and where it

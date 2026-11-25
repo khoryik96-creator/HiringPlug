@@ -24,7 +24,16 @@ x-module:
         (a backup holds every agency's data on it).
       roles: [owner]
   errorCodes: {}
-  jobs: {}
+  jobs:
+    background_job.ended:
+      queue: core
+      payload: BackgroundJobEndedJob
+      description: >
+        An AI-queue job failed for good (its last attempt failed, or the AI
+        worker gave up on it). Queued by the database itself, in the
+        transaction that ends the job (migration 00199): the Go worker runs
+        that kind's dead-job handler, so what the job was for (a CV being
+        read) is not left waiting.
 
 paths:
   /v1/settings/salary-calculation:
@@ -356,6 +365,13 @@ components:
         retrying: { type: integer, description: Failed at least once; tried again later. }
         failed: { type: integer, description: Failed for good in the last 30 days. }
         oldestWaitingSince: { type: string, format: date-time, nullable: true, description: When the longest-waiting one was queued. }
+    BackgroundJobEndedJob:
+      type: object
+      additionalProperties: false
+      required: [jobId, kind]
+      properties:
+        jobId: { type: string, description: The AI-queue job that failed for good (it keeps its payload until pruned). }
+        kind: { type: string, description: Its kind. }
     FailedJob:
       type: object
       required: [id, kind, attempts, error, failedAt]

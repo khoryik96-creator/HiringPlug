@@ -283,6 +283,105 @@ func (q *Queries) DocumentsWithContent(ctx context.Context, arg DocumentsWithCon
 	return items, nil
 }
 
+const endParse = `-- name: EndParse :one
+UPDATE document SET
+  parse_status = CASE WHEN parsed_profile IS NULL THEN 'failed' ELSE 'parsed' END,
+  parse_error = CASE WHEN parsed_profile IS NULL THEN $1::text ELSE $2::text END,
+  updated_at = now()
+WHERE id = $3 AND parse_status = 'queued'
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at
+`
+
+type EndParseParams struct {
+	FailedError string
+	KeptWarning string
+	ID          string
+}
+
+// A reading of the details that ended without a result: back to the
+// details read before (parsed, with why the new reading failed as a
+// warning), or failed when there are none. Only while still being read.
+func (q *Queries) EndParse(ctx context.Context, arg EndParseParams) (Document, error) {
+	row := q.db.QueryRow(ctx, endParse, arg.FailedError, arg.KeptWarning, arg.ID)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.Source,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Sha256,
+		&i.StorageKey,
+		&i.Status,
+		&i.ExtractedText,
+		&i.PageCount,
+		&i.Extractor,
+		&i.ErrorMessage,
+		&i.ExtractionWarnings,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
+		&i.ParseError,
+		&i.BinnedAt,
+	)
+	return i, err
+}
+
+const failExtraction = `-- name: FailExtraction :one
+UPDATE document SET status = 'failed', error_message = $1, updated_at = now()
+WHERE id = $2 AND status = 'queued'
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at
+`
+
+type FailExtractionParams struct {
+	ErrorMessage *string
+	ID           string
+}
+
+// The text could not be read, for good (the worker gave up, or it stopped
+// and nothing is left to finish it): only while still shown as being read.
+func (q *Queries) FailExtraction(ctx context.Context, arg FailExtractionParams) (Document, error) {
+	row := q.db.QueryRow(ctx, failExtraction, arg.ErrorMessage, arg.ID)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.Source,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Sha256,
+		&i.StorageKey,
+		&i.Status,
+		&i.ExtractedText,
+		&i.PageCount,
+		&i.Extractor,
+		&i.ErrorMessage,
+		&i.ExtractionWarnings,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
+		&i.ParseError,
+		&i.BinnedAt,
+	)
+	return i, err
+}
+
 const getDocument = `-- name: GetDocument :one
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at FROM document WHERE id = $1
 `
@@ -868,6 +967,46 @@ type RecordAIUseParams struct {
 func (q *Queries) RecordAIUse(ctx context.Context, arg RecordAIUseParams) error {
 	_, err := q.db.Exec(ctx, recordAIUse, arg.DocumentID, arg.Tokens)
 	return err
+}
+
+const requeueExtraction = `-- name: RequeueExtraction :one
+UPDATE document SET status = 'queued', error_message = NULL, updated_at = now() WHERE id = $1 AND status = 'failed' RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error, parse_error, binned_at
+`
+
+// Reading a file's text again after it failed: shown as being read until
+// the worker's result (the details are read after it, as on upload).
+func (q *Queries) RequeueExtraction(ctx context.Context, id string) (Document, error) {
+	row := q.db.QueryRow(ctx, requeueExtraction, id)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.Source,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Sha256,
+		&i.StorageKey,
+		&i.Status,
+		&i.ExtractedText,
+		&i.PageCount,
+		&i.Extractor,
+		&i.ErrorMessage,
+		&i.ExtractionWarnings,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
+		&i.ParseError,
+		&i.BinnedAt,
+	)
+	return i, err
 }
 
 const restoreBinnedDocument = `-- name: RestoreBinnedDocument :execrows

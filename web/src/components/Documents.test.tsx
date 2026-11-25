@@ -144,7 +144,7 @@ describe("CVs and documents", () => {
 
   it("reads a CV never read with the same button, then shows it ready", async () => {
     let parseStatus: Document["parseStatus"] = null;
-    const cv = () => doc({ id: "doc_old", fileName: "Old CV.txt", contentType: "text/plain", extractedText: "Old text", parseStatus,
+    const cv = () => doc({ id: "doc_old", fileName: "Old CV.txt", contentType: "text/plain", extractedText: "Old text", parseStatus, updatedAt: new Date().toISOString(),
       parsedProfile: { parser: "rules@1", fullName: { value: "Ali", quote: "ALI" }, skills: [], experience: [], education: [], dropped: 0 } as never });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
@@ -162,7 +162,7 @@ describe("CVs and documents", () => {
 
   it("shows the profile again once a new CV is read: its details may have updated it", async () => {
     let parseStatus: Document["parseStatus"] = "queued";
-    const cv = () => doc({ id: "doc_new", fileName: "New CV.txt", contentType: "text/plain", extractedText: "New text", parseStatus });
+    const cv = () => doc({ id: "doc_new", fileName: "New CV.txt", contentType: "text/plain", extractedText: "New text", parseStatus, updatedAt: new Date().toISOString() });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
     ))) as never);
@@ -176,7 +176,7 @@ describe("CVs and documents", () => {
 
   it("says so when the details asked for could not be read, until dismissed", async () => {
     let parseStatus: Document["parseStatus"] = null;
-    const cv = () => doc({ id: "doc_bad", fileName: "Bad CV.txt", contentType: "text/plain", extractedText: "Bad text", parseStatus,
+    const cv = () => doc({ id: "doc_bad", fileName: "Bad CV.txt", contentType: "text/plain", extractedText: "Bad text", parseStatus, updatedAt: new Date().toISOString(),
       parseError: parseStatus === "failed" ? "The details could not be read from this CV (IndexError at experience.py:120)." : null });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
@@ -199,6 +199,7 @@ describe("CVs and documents", () => {
   it("reads a formatted CV again only for comparing: from the menu, never offering its review", async () => {
     let parseStatus: Document["parseStatus"] = "parsed";
     const f = () => doc({ id: "doc_f", source: "formatted", fileName: "Formatted CV.txt", contentType: "text/plain", extractedText: "Formatted text", parseStatus,
+      updatedAt: new Date().toISOString(),
       parsedProfile: { parser: "rules@1", fullName: { value: "Siti", quote: "SITI" }, skills: [], experience: [], education: [], dropped: 0 } as never });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [f()] } : f()
