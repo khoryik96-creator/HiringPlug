@@ -70,10 +70,28 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-// sessionsEndedAt is when a password change ends the user's sessions: the
-// next whole second, so every token issued until now (tokens carry whole
-// seconds) is before it, and the new session, issued at it, is not.
-func sessionsEndedAt() time.Time { return time.Now().Truncate(time.Second).Add(time.Second) }
+// databaseSecond is the database's clock, to the second (tokens carry whole
+// seconds). Sessions are issued, and ended (tokens_valid_after,
+// microsoft_sessions_after, some of them set in SQL), by it alone: by two
+// clocks a little apart, a session issued just before an end could outlive it.
+func databaseSecond(ctx context.Context, q *store.Queries) (time.Time, error) {
+	return q.DatabaseSecond(ctx)
+}
+
+// sessionsEndedAt is when a password change ends u's sessions: the next
+// whole second, so every token issued until now is before it, and the new
+// session, issued at it, is not; and after every earlier end (a session may
+// have been issued at one, in this second).
+func sessionsEndedAt(ctx context.Context, q *store.Queries, u store.UserAuthRow) (time.Time, error) {
+	now, err := databaseSecond(ctx, q)
+	end := now.Add(time.Second)
+	for _, after := range []*time.Time{u.TokensValidAfter, u.MicrosoftSessionsAfter} {
+		if after != nil && !end.After(*after) {
+			end = after.Add(time.Second)
+		}
+	}
+	return end, err
+}
 
 // session mints a token issued at now, saying how the person signed in
 // (authn.MethodPassword or authn.MethodMicrosoft).
@@ -132,13 +150,23 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 		return Session{}, apperr.New(api.ErrorCodeSIGNINCHOOSECOMPANY, "Your account is at several companies: choose one.").WithDetail("companies", companies)
 	}
 	a := matches[0]
-	now := time.Now().Truncate(time.Second)
+	var now time.Time
 	var next *apperr.Error // a code is needed first
 	err = database.InTx(ctx, m.pool, authz.NewPrincipal(a.TenantID, a.UserID, email, a.UserName, ""), func(tx pgx.Tx) error {
 		q := store.New(tx)
 		var err error
 		if next, err = m.nextStep(ctx, q, a.TenantID, a.UserID); err != nil || next != nil {
 			return err
+		}
+		if now, err = databaseSecond(ctx, q); err != nil {
+			return err
+		}
+		u, err := q.UserAuth(ctx, a.UserID)
+		if err != nil {
+			return err
+		}
+		if u.TokensValidAfter != nil && now.Before(*u.TokensValidAfter) { // never before their sessions were last ended
+			now = *u.TokensValidAfter
 		}
 		if err := q.SignedIn(ctx, a.UserID); err != nil {
 			return err
@@ -198,14 +226,11 @@ func (m *Module) link(ctx context.Context, q *store.Queries, userID, kind string
 		return "", time.Time{}, err
 	}
 	token, hash := newLinkToken()
-	expires := time.Now().Add(valid)
+	expires := m.now().Add(valid)
 	if _, err := q.InsertLink(ctx, store.InsertLinkParams{UserID: userID, Kind: kind, TokenHash: hash, ExpiresAt: expires}); err != nil {
 		return "", time.Time{}, err
 	}
-	path := "/#/reset/"
-	if kind == "invite" {
-		path = "/#/invite/"
-	}
+	path := map[string]string{"invite": "/#/invite/", "reset": "/#/reset/", "reconnect": "/#/reconnect/"}[kind]
 	return m.publicURL + path + token, expires, nil
 }
 
@@ -287,7 +312,7 @@ func (m *Module) lookupLink(ctx context.Context, clientAddr, token string, fn fu
 		if err != nil {
 			return err
 		}
-		if l.Kind == "reset" && !u.Active { // deactivated since
+		if l.Kind != "invite" && !u.Active { // deactivated since
 			return linkGone()
 		}
 		return fn(tx, q, l, u)
@@ -305,6 +330,9 @@ func (m *Module) Link(ctx context.Context, clientAddr, token string) (LinkInfo, 
 		s, err := q.MicrosoftSettings(ctx)
 		out = LinkInfo{Kind: l.Kind, Email: u.Email, Name: u.Name, CompanyName: t.Name,
 			Microsoft: MicrosoftLinkState(s.MicrosoftSignIn && m.ms != nil, s.MicrosoftRequired, u.Role)}
+		if l.Kind == "reconnect" && out.Microsoft != "none" { // Microsoft only, owners too
+			out.Microsoft = "required"
+		}
 		return err
 	})
 	return out, err
@@ -317,6 +345,9 @@ func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string
 	var out Session
 	var next *apperr.Error // the password is saved; two-step sign-in still asks for its code
 	err := m.lookupLink(ctx, clientAddr, token, func(tx pgx.Tx, q *store.Queries, l store.LinkByHashRow, u store.UserAuthRow) error {
+		if l.Kind == "reconnect" { // only to sign in with Microsoft
+			return linkGone()
+		}
 		if l.Kind != "invite" {
 			name = nil
 		} else if name != nil {
@@ -336,7 +367,10 @@ func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string
 		if err != nil {
 			return err
 		}
-		now := sessionsEndedAt()
+		now, err := sessionsEndedAt(ctx, q, u)
+		if err != nil {
+			return err
+		}
 		if err := q.SetPassword(ctx, store.SetPasswordParams{ID: u.ID, PasswordHash: &hash, ValidAfter: &now, Name: name}); err != nil {
 			return err
 		}
@@ -391,7 +425,10 @@ func (m *Module) ChangePassword(ctx context.Context, p authz.Principal, current,
 		if err != nil {
 			return err
 		}
-		now := sessionsEndedAt()
+		now, err := sessionsEndedAt(ctx, q, u)
+		if err != nil {
+			return err
+		}
 		if err := q.SetPassword(ctx, store.SetPasswordParams{ID: u.ID, PasswordHash: &hash, ValidAfter: &now}); err != nil {
 			return err
 		}

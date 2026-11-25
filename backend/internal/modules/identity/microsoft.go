@@ -5,7 +5,9 @@ package identity
 // turned it on, with an account of the company's own Microsoft organisation;
 // never personal accounts. The first sign-in links the account to the team
 // member with its address; later ones match the account (organisation and
-// object ID), whatever its address has become. Microsoft sign-ins skip the
+// object ID), whatever its address has become. An invitation or reconnect
+// link links the account to its person whatever its address
+// (microsoft_link.go). Microsoft sign-ins skip the
 // two-step code; sessions say how they were signed in (amr), so a company
 // that requires Microsoft refuses password sessions to everyone but owners.
 //
@@ -99,6 +101,9 @@ func (m *Module) microsoftCallback() string { return m.publicURL + "/v1/auth/mic
 const (
 	microsoftFlowLife   = 10 * time.Minute
 	microsoftChoiceLife = 5 * time.Minute
+	// The same in seconds, as the database counts them (by its own clock).
+	microsoftFlowSeconds   int32 = int32(microsoftFlowLife / time.Second)
+	microsoftChoiceSeconds int32 = int32(microsoftChoiceLife / time.Second)
 )
 
 func (s *microsoftSignIn) sealJSON(aad string, v any) (string, error) {
@@ -150,8 +155,10 @@ type MicrosoftStart struct {
 // StartMicrosoft saves a new sign-in and returns Microsoft's address to send
 // the browser to.
 func (m *Module) StartMicrosoft(ctx context.Context, clientAddr string, in MicrosoftStart) (string, error) {
+	// The email is only a hint to Microsoft: no limit per email (that would
+	// use up password sign-in's for the address, from anywhere).
 	email := normEmail(in.Email)
-	if !m.limits.msStart.Allow(clientAddr) || (email != "" && !m.limits.signInEmail.Allow(email)) {
+	if !m.limits.msStart.Allow(clientAddr) {
 		return "", tooMany()
 	}
 	if m.ms == nil {
@@ -187,7 +194,7 @@ func (m *Module) startFlow(ctx context.Context, route msRoute, purpose, bindingH
 	}
 	err = store.New(m.pool).SaveMicrosoftFlow(ctx, store.SaveMicrosoftFlowParams{
 		KeyHash: key, BindingHash: bindingHash, TenantID: orNil(route.tenantID), Purpose: purpose, UserID: orNil(route.userID),
-		ClientID: route.app.ClientID, Authority: route.authority, Sealed: sealed, ExpiresAt: time.Now().Add(microsoftFlowLife),
+		ClientID: route.app.ClientID, Authority: route.authority, Sealed: sealed, Seconds: microsoftFlowSeconds,
 	})
 	return target, err
 }
@@ -212,7 +219,8 @@ type msRoute struct {
 	app                         MicrosoftApp
 }
 
-// routeMicrosoft finds the company a sign-in is for: the invitation's, the
+// routeMicrosoft finds the company a sign-in is for: the invitation's (or
+// reconnect link's: it is for that person, whatever the account's address), the
 // careers page address's, or the only company on the server that signs in
 // with Microsoft; else any company, through the server's app (the account's
 // organisation then finds it). The email typed never chooses: where it is on
@@ -223,7 +231,7 @@ func (m *Module) routeMicrosoft(ctx context.Context, company, link string) (msRo
 	switch {
 	case link != "":
 		l, err := q.LinkByHash(ctx, hashLink(link))
-		if database.IsNoRows(err) || (err == nil && l.Kind != "invite") {
+		if database.IsNoRows(err) || (err == nil && l.Kind != "invite" && l.Kind != "reconnect") {
 			return msRoute{}, linkGone()
 		}
 		if err != nil {

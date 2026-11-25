@@ -192,6 +192,11 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 			return err
 		}
 		out = TeamMember(updated)
+		if newRole == string(api.RoleOwner) && row.Role != newRole {
+			if err := m.dropAddressLinkOfNewOwner(ctx, tx, q, userID); err != nil {
+				return err
+			}
+		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.updated", EntityType: "user", EntityID: userID,
 			Changes: audit.Diff(map[string]any{"role": row.Role, "active": row.Active, "teamId": deref(row.TeamID)},
 				map[string]any{"role": newRole, "active": newActive, "teamId": deref(newTeam)})})

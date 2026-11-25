@@ -38,7 +38,7 @@ FROM app_user_link(sqlc.arg(token_hash)::text);
 -- microsoft_sign_in: it signs in with Microsoft at all (else Microsoft sessions stop).
 -- name: UserAuth :one
 SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
-  u.microsoft_sessions_after,
+  u.microsoft_sessions_after, u.microsoft_connect_only,
   coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
   coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
 FROM app_user u WHERE u.id = @id;
@@ -74,10 +74,11 @@ RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, crea
 SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
 
 -- Deactivating signs the user out: tokens issued up to the end of this second
--- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
+-- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go),
+-- and any issued at an earlier end (a session is never issued before one).
 -- name: UpdateMember :one
 UPDATE app_user SET role = @role, active = @active, team_id = sqlc.narg(team_id),
-  tokens_valid_after = CASE WHEN active AND NOT @active THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
+  tokens_valid_after = CASE WHEN active AND NOT @active THEN greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
 WHERE id = @id
 RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
 
@@ -221,11 +222,13 @@ UPDATE tenant SET two_step_required = @required WHERE id = app_current_tenant();
 
 -- Requiring two-step sign-in signs out everyone who has not set it up.
 -- name: EndSessionsWithoutTwoStep :exec
-UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second'
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL);
 
+-- Ends every session of theirs: after this second by the database's clock,
+-- and after every earlier end (a session issued at one is ended too).
 -- name: EndUserSessions :exec
-UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second' WHERE id = @id;
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') WHERE id = @id;
 
 -- Sign in with Microsoft ------------------------------------------------------
 
@@ -234,7 +237,7 @@ UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval 
 
 -- name: SaveMicrosoftFlow :exec
 SELECT app_microsoft_flow_save(@key_hash::text, @binding_hash::text, sqlc.narg(tenant_id)::text, @purpose::text, sqlc.narg(user_id)::text,
-  @client_id::text, @authority::text, @sealed::text, @verified::boolean, sqlc.narg(ticket_hash)::text, @expires_at::timestamptz);
+  @client_id::text, @authority::text, @sealed::text, @verified::boolean, sqlc.narg(ticket_hash)::text, @seconds::integer);
 
 -- name: ParkMicrosoftFlow :one
 SELECT app_microsoft_flow_park(@key_hash::text, @sealed_code::text, @ticket_hash::text)::integer AS parked;
@@ -251,15 +254,30 @@ FROM app_microsoft_sign_in_tenants(sqlc.narg(slug)::text);
 
 -- name: MicrosoftAccounts :many
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
-  user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner
+  user_id::text AS user_id, linked::boolean AS linked, is_owner::boolean AS is_owner, connect_only::boolean AS connect_only
 FROM app_microsoft_accounts(@ms_tenant_id::text, @ms_object_id::text, @addresses::text[]);
+
+-- Microsoft vouched for an account of ms_tenant_id: whether its token said
+-- member or guest (acct), for that organisation's companies.
+-- name: NoteMicrosoftClaims :exec
+SELECT app_microsoft_note_claims(@ms_tenant_id::text, @acct::boolean);
 
 -- The company's Microsoft sign-in settings.
 -- name: MicrosoftSettings :one
-SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required FROM tenant WHERE id = app_current_tenant();
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing FROM tenant WHERE id = app_current_tenant();
+
+-- The company's settings, kept from changing until the transaction ends:
+-- changing them (FOR UPDATE), or the Microsoft app they rely on (FOR SHARE,
+-- emails module), waits for the other.
+-- name: LockMicrosoftSettings :exec
+SELECT id FROM tenant WHERE id = app_current_tenant() FOR UPDATE;
+
+-- name: MicrosoftSignInHeld :one
+SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant() FOR SHARE;
 
 -- name: SetMicrosoftSettings :one
-UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(microsoft_tenant_id), microsoft_required = @required
+UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(microsoft_tenant_id), microsoft_required = @required,
+  microsoft_acct_missing = microsoft_acct_missing AND microsoft_tenant_id IS NOT DISTINCT FROM sqlc.narg(microsoft_tenant_id)
 WHERE id = app_current_tenant()
 RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
 
@@ -269,21 +287,48 @@ RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
 DELETE FROM user_microsoft WHERE user_id = @user_id AND ms_tenant_id <> @ms_tenant_id;
 
 -- name: LinkMicrosoft :exec
-INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id)
-VALUES (app_current_tenant(), @user_id, @ms_tenant_id, @ms_object_id);
+INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id, linked_by)
+VALUES (app_current_tenant(), @user_id, @ms_tenant_id, @ms_object_id, @linked_by);
 
 -- name: UnlinkMicrosoft :one
 DELETE FROM user_microsoft WHERE user_id = @user_id RETURNING ms_tenant_id;
+
+-- Their account was unlinked: one is linked again only on purpose.
+-- name: MicrosoftConnectOnly :exec
+UPDATE app_user SET microsoft_connect_only = true WHERE id = @id;
+
+-- Someone made an owner keeps no account linked by a sign-in's address.
+-- name: UnlinkSignInLink :many
+DELETE FROM user_microsoft WHERE user_id = @user_id AND linked_by = 'sign_in' RETURNING ms_tenant_id;
+
+-- Who the Microsoft account is linked to here, if anyone.
+-- name: MicrosoftAccountHolder :one
+SELECT user_id FROM user_microsoft WHERE ms_tenant_id = @ms_tenant_id AND ms_object_id = @ms_object_id;
+
+-- Whether they have a link of kind still unused and unexpired.
+-- name: HasValidLink :one
+SELECT EXISTS (SELECT 1 FROM user_link WHERE user_id = @user_id AND kind = @kind AND used_at IS NULL AND expires_at > now())::boolean;
+
+-- Keeps the person's row (role, whether they may be linked by address)
+-- from changing until the sign-in's transaction ends.
+-- name: HoldUser :exec
+SELECT id FROM app_user WHERE id = @id FOR SHARE;
+
+-- The database's clock, to the second: every session's issue time and
+-- cut-off (tokens_valid_after, microsoft_sessions_after) is by it.
+-- name: DatabaseSecond :one
+SELECT date_trunc('second', now())::timestamptz AS now;
 
 -- The company changed its organisation: links to any other go.
 -- name: UnlinkOtherOrganisations :execrows
 DELETE FROM user_microsoft WHERE ms_tenant_id <> coalesce(sqlc.narg(microsoft_tenant_id)::text, '');
 
--- Ends sessions signed in with Microsoft before at: one person's, or (no user)
--- everyone's. Always later than before: a session signed in since the last
--- end (dated that end, in the same second) ends too.
+-- Ends sessions signed in with Microsoft until now (the next whole second,
+-- by the database's clock): one person's, or (no user) everyone's. Always
+-- later than every earlier end, of these or of all their sessions: a session
+-- signed in since (dated that end, in the same second) ends too.
 -- name: EndMicrosoftSessions :exec
-UPDATE app_user SET microsoft_sessions_after = greatest(@at::timestamptz, microsoft_sessions_after + interval '1 second')
+UPDATE app_user SET microsoft_sessions_after = greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE sqlc.narg(user_id)::text IS NULL OR id = sqlc.narg(user_id)::text;
 
 -- Whether the company signs in with Microsoft, and whether a Microsoft account is linked to them.
@@ -291,8 +336,10 @@ WHERE sqlc.narg(user_id)::text IS NULL OR id = sqlc.narg(user_id)::text;
 SELECT coalesce((SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant()), false)::boolean AS sign_in,
   EXISTS (SELECT 1 FROM user_microsoft WHERE user_id = @user_id)::boolean AS linked;
 
--- name: UsedMicrosoft :exec
-UPDATE user_microsoft SET last_used_at = now() WHERE user_id = @user_id;
+-- The account linked to them is still this one (it may have been unlinked
+-- meanwhile: 0 rows).
+-- name: UsedMicrosoft :execrows
+UPDATE user_microsoft SET last_used_at = now() WHERE user_id = @user_id AND ms_tenant_id = @ms_tenant_id AND ms_object_id = @ms_object_id;
 
 -- Accepting an invitation with Microsoft: active, without a password.
 -- name: JoinWithMicrosoft :exec

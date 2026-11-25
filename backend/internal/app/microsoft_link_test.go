@@ -195,3 +195,45 @@ func TestAnInvitationExpiresForMicrosoftToo(t *testing.T) {
 	flow, _ = f.start(map[string]any{"company": slug})
 	session(t, f.signInAs(flow, newAccount(org, late.Member.Email).claims(flow)))
 }
+
+// Without the optional acct claim a guest cannot be told from a member (a
+// guest's preferred_username is its home address, which may be anyone's):
+// no account is linked by its address then, and Settings says to add the
+// claim. Accounts linked already, and connecting on purpose, still work.
+func TestNoAddressLinksWithoutTheAcctClaim(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
+	owner, admin := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin]
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	warned := func() bool {
+		var s api.MicrosoftSignInSettings
+		f.a.request(http.MethodGet, "/v1/agency/microsoft-sign-in", owner.Token, nil).JSON(&s)
+		return s.AcctClaimMissing
+	}
+	recruiterEmail := emailOf(api.RoleRecruiter, tenant.ID)
+	sam := newAccount(org, recruiterEmail)
+	flow, _ := f.start(map[string]any{"company": slug})
+	session(t, f.signInAs(flow, sam.claims(flow))) // acct sent: linked by its address
+	assert.False(t, warned())
+
+	// A guest whose home address is the admin's, and no acct nor upn sent.
+	guest := newAccount(org, emailOf(api.RoleAdmin, tenant.ID))
+	flow, _ = f.start(map[string]any{"company": slug})
+	msRefused(t, f.signInAs(flow, entratest.Guest(guest.claims(flow), false, false)), "not_on_team")
+	assert.Len(t, audited(t, tenant.ID, "user.microsoft_linked"), 1, "nobody linked")
+	assert.True(t, warned(), "Settings says to add the acct claim")
+
+	// Linked already: signs in. Connecting on purpose: works.
+	flow, _ = f.start(map[string]any{"company": slug})
+	session(t, f.signInAs(flow, entratest.WithoutAcct(sam.claims(flow))))
+	ada := newAccount(org, "ada."+tenant.ID+"@contoso.test")
+	require.Equal(t, http.StatusNoContent, f.connect(admin.Token, func(fl msFlow) jwt.MapClaims { return entratest.WithoutAcct(ada.claims(fl)) }).Status)
+
+	// The claim added in Entra: the warning goes.
+	flow, _ = f.start(map[string]any{"company": slug})
+	session(t, f.signInAs(flow, sam.claims(flow)))
+	assert.False(t, warned())
+}

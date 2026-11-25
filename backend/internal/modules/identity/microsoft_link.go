@@ -2,12 +2,14 @@ package identity
 
 // Which Microsoft account is linked to whom. A first sign-in links the
 // account to the team member with its sign-in name (or its email, when
-// Microsoft vouches for the email's domain), but never to an owner: owners
-// connect it from Your account while signed in (or accept their invitation
-// with it). Whoever gets an account linked is emailed. Owners (and admins,
-// for everyone but owners) unlink it on the Team page; that, the company
-// changing its organisation, or turning Microsoft off ends the sessions
-// signed in with Microsoft.
+// Microsoft vouches for the email's domain), but never to an owner, nor to
+// someone whose account was unlinked: they link one on purpose, from Your
+// account while signed in (with their password), or with an invitation or
+// reconnect link (microsoft_reconnect.go). Someone made an owner loses a
+// link made by an address. Whoever gets an account linked is emailed.
+// Owners (and admins, for everyone but owners) unlink it on the Team page;
+// that, the company changing its organisation, or turning Microsoft off
+// ends the sessions signed in with Microsoft.
 
 import (
 	"context"
@@ -27,9 +29,10 @@ import (
 
 // How a Microsoft account came to be linked (user.microsoft_linked's by).
 const (
-	linkedBySignIn     = "sign_in"    // its first sign-in, by its address
-	linkedByInvitation = "invitation" // accepting an invitation with it
-	linkedBySelf       = "self"       // connected from Your account
+	linkedBySignIn     = "sign_in"        // its first sign-in, by its address
+	linkedByInvitation = "invitation"     // accepting an invitation with it
+	linkedBySelf       = "self"           // connected from Your account
+	linkedByReconnect  = "reconnect_link" // with a reconnect link an owner sent
 )
 
 var (
@@ -69,7 +72,7 @@ func (m *Module) linkMicrosoft(ctx context.Context, tx pgx.Tx, q *store.Queries,
 	if err := q.DropStaleMicrosoftLink(ctx, store.DropStaleMicrosoftLinkParams{UserID: u.ID, MsTenantID: id.TenantID}); err != nil {
 		return err
 	}
-	err := q.LinkMicrosoft(ctx, store.LinkMicrosoftParams{UserID: u.ID, MsTenantID: id.TenantID, MsObjectID: id.ObjectID})
+	err := q.LinkMicrosoft(ctx, store.LinkMicrosoftParams{UserID: u.ID, MsTenantID: id.TenantID, MsObjectID: id.ObjectID, LinkedBy: how})
 	switch {
 	case database.IsUniqueViolation(err, "user_microsoft_tenant_id_ms_tenant_id_ms_object_id_key"):
 		return errLinkTaken
@@ -99,20 +102,35 @@ func linkedEmail(name, company string, id entra.Identity, how string) string {
 		linkedBySignIn:     "when it was first used to sign in",
 		linkedByInvitation: "when your invitation was accepted with it",
 		linkedBySelf:       "from Your account",
+		linkedByReconnect:  "with the link an owner sent you to connect it",
 	}[how]
 	return "Hello " + name + ",\n\nThe Microsoft account " + account + " was connected to your HiringPlug account at " + company +
 		" (" + when + "). It can now sign in to HiringPlug as you.\n\n" +
 		"Not you? Tell an owner at " + company + " at once: they can unlink it on the Team page.\n\nHiringPlug"
 }
 
+func notWithAPIKey() error {
+	return apperr.New(api.ErrorCodeFORBIDDEN, "Connect Microsoft sign-in while signed in, not with an API key.")
+}
+
+// ConnectStart is what starting to connect a Microsoft account takes: the
+// browser tab's value (its SHA-256), and proof it is the person signed in:
+// their password (if they have one) and two-step code (if they use it).
+type ConnectStart struct {
+	BindingHash    string
+	Password, Code *string
+}
+
 // StartConnectingMicrosoft starts connecting the signed-in person's
-// Microsoft account (Your account) and returns Microsoft's address.
-func (m *Module) StartConnectingMicrosoft(ctx context.Context, p authz.Principal, clientAddr, bindingHash string) (string, error) {
-	if !m.limits.msStart.Allow(clientAddr) {
+// Microsoft account (Your account) and returns Microsoft's address. A
+// session left open on someone's computer is not enough: it asks for their
+// password and two-step code first (limited like changing the password).
+func (m *Module) StartConnectingMicrosoft(ctx context.Context, p authz.Principal, clientAddr string, in ConnectStart) (string, error) {
+	if !m.limits.msStart.Allow(clientAddr) || !m.limits.change.Allow(p.UserID) {
 		return "", tooMany()
 	}
 	if p.Session().ID == "" {
-		return "", apperr.New(api.ErrorCodeFORBIDDEN, "Connect Microsoft sign-in while signed in, not with an API key.")
+		return "", notWithAPIKey()
 	}
 	if m.ms == nil {
 		return "", microsoftUnavailable()
@@ -122,17 +140,50 @@ func (m *Module) StartConnectingMicrosoft(ctx context.Context, p authz.Principal
 		return "", err
 	}
 	err = database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
-		mine, err := store.New(tx).MyMicrosoft(ctx, p.UserID)
+		q := store.New(tx)
+		mine, err := q.MyMicrosoft(ctx, p.UserID)
 		if err == nil && mine.Linked {
 			return connectFailed(ReasonAlreadyConnected)
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		u, err := q.UserAuth(ctx, p.UserID)
+		if err != nil {
+			return err
+		}
+		return m.proveItIsThem(ctx, q, u, in.Password, in.Code)
 	})
 	if err != nil {
 		return "", err
 	}
 	route.userID = p.UserID
-	return m.startFlow(ctx, route, flowConnect, bindingHash, p.Email)
+	return m.startFlow(ctx, route, flowConnect, in.BindingHash, p.Email)
+}
+
+// proveItIsThem checks, before a Microsoft account is connected, the
+// person's current password (if they have one) and their two-step code or a
+// recovery code (if they use two-step sign-in).
+func (m *Module) proveItIsThem(ctx context.Context, q *store.Queries, u store.UserAuthRow, password, code *string) error {
+	var errs apperr.FieldErrors
+	if u.PasswordHash != nil && (password == nil || !CheckPassword(*u.PasswordHash, *password)) {
+		errs.Add("password", "is not your current password")
+	}
+	ts, err := q.GetTwoStep(ctx, u.ID)
+	if err != nil && !database.IsNoRows(err) {
+		return err
+	}
+	if err == nil && ts.EnabledAt != nil && len(errs) == 0 { // a code is used up only with the right password
+		switch {
+		case code == nil || *code == "":
+			errs.Add("code", "enter the code your authenticator app shows now, or a recovery code")
+		default:
+			if _, err := m.checkCode(ctx, q, u.TenantID, u.ID, *code, true); err != nil {
+				errs.Add("code", "is not the code your app shows now, nor an unused recovery code")
+			}
+		}
+	}
+	return errs.Err()
 }
 
 // FinishConnectingMicrosoft links the Microsoft account Microsoft vouched
@@ -141,6 +192,9 @@ func (m *Module) StartConnectingMicrosoft(ctx context.Context, p authz.Principal
 func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principal, clientAddr, ticket, binding string) error {
 	if !m.limits.msComplete.Allow(clientAddr) {
 		return tooMany()
+	}
+	if p.Session().ID == "" {
+		return notWithAPIKey()
 	}
 	if m.ms == nil {
 		return connectFailed(ReasonFailed)
@@ -185,7 +239,9 @@ func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principa
 }
 
 // UnlinkMicrosoft removes the Microsoft account linked to someone and ends
-// their sessions signed in with it (password sessions go on). Only owners
+// their sessions signed in with it (password sessions go on). From then on
+// one is linked to them only on purpose (Your account, a reconnect link),
+// never by a sign-in's address: it was unlinked for a reason. Only owners
 // unlink owners.
 func (m *Module) UnlinkMicrosoft(ctx context.Context, p authz.Principal, userID string) error {
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
@@ -207,7 +263,10 @@ func (m *Module) UnlinkMicrosoft(ctx context.Context, p authz.Principal, userID 
 		if err != nil {
 			return err
 		}
-		if err := q.EndMicrosoftSessions(ctx, store.EndMicrosoftSessionsParams{At: sessionsEndedAt(), UserID: &userID}); err != nil {
+		if err := q.MicrosoftConnectOnly(ctx, userID); err != nil {
+			return err
+		}
+		if err := q.EndMicrosoftSessions(ctx, &userID); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.microsoft_unlinked", EntityType: "user", EntityID: userID,
@@ -217,10 +276,25 @@ func (m *Module) UnlinkMicrosoft(ctx context.Context, p authz.Principal, userID 
 
 // MicrosoftSignInOn reports whether the caller's company signs in with
 // Microsoft, in the caller's transaction (the emails module keeps its
-// Microsoft app for owners then).
+// Microsoft app for owners then), and keeps it so until that transaction
+// ends: turning it on (SetMicrosoftSignIn) waits for a change of the app.
 func (m *Module) MicrosoftSignInOn(ctx context.Context, tx pgx.Tx) (bool, error) {
-	s, err := store.New(tx).MicrosoftSettings(ctx)
-	return s.MicrosoftSignIn, err
+	return store.New(tx).MicrosoftSignInHeld(ctx)
+}
+
+// dropAddressLinkOfNewOwner removes, from someone made an owner, a Microsoft
+// account linked by a sign-in's address (owners link one only on purpose),
+// and ends their Microsoft sessions; audited.
+func (m *Module) dropAddressLinkOfNewOwner(ctx context.Context, tx pgx.Tx, q *store.Queries, userID string) error {
+	orgs, err := q.UnlinkSignInLink(ctx, userID)
+	if err != nil || len(orgs) == 0 {
+		return err
+	}
+	if err := q.EndMicrosoftSessions(ctx, &userID); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "user.microsoft_unlinked", EntityType: "user", EntityID: userID,
+		Changes: map[string]any{"organisationId": orgs[0], "reason": "made_owner"}})
 }
 
 // MyMicrosoft says whether the person's company signs in with Microsoft

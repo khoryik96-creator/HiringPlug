@@ -27,7 +27,9 @@ x-module:
         `not_on_team` (the Microsoft account is not on the team of a company that signs in with Microsoft, or was deactivated: an owner invites them),
         `other_organisation` (an account of another Microsoft organisation than the company's, or a guest in it),
         `personal_account` (a personal Microsoft account: use the work account),
-        `connect_first` (the account's address is an owner's: an account is never linked to an owner by its address; the owner connects it from Your account, signed in, or accepts their invitation with it),
+        `connect_first` (the account's address is an owner's, or someone's whose Microsoft account was unlinked: an account is never linked to them by its address; they connect it from Your account, signed in, or with an invitation or reconnect link an owner sent),
+        `linked_elsewhere` (an invitation or reconnect link was used with a Microsoft account connected to someone else on the team),
+        `already_connected` (a reconnect link was used by someone who has another Microsoft account connected: an owner unlinks it first),
         `failed` (the sign-in expired, was used already or finished in another browser, or Microsoft's answer could not be checked: start again).
     MICROSOFT_CONNECT_FAILED:
       status: 422
@@ -36,6 +38,7 @@ x-module:
         `already_connected` (one is connected to you already: an owner unlinks it on the Team page first),
         `linked_elsewhere` (that Microsoft account is connected to someone else on the team),
         `other_organisation`, `personal_account` or `failed` (as for signing in).
+        Starting it asks for your current password (and your two-step code, when you use one): a wrong one is a 400 on `password` or `code`.
     MICROSOFT_SIGN_IN_UNAVAILABLE:
       status: 422
       description: Signing in with Microsoft is not set up for this company (or, when no company is named, on this server).
@@ -343,7 +346,10 @@ paths:
         The company is found from, in order: the invitation, the careers page
         address (company), the only company on the server that signs in with
         Microsoft, or else the server's own Microsoft app for any company
-        (matched after sign-in by organisation and account). The email is
+        (matched after sign-in by organisation and account). An invitation
+        or reconnect link (invite) links the Microsoft account to its person,
+        whatever the account's address (an account of the company's
+        organisation, connected to nobody else there). The email is
         only suggested to Microsoft: it never chooses the company, so the
         answer never shows where an email is on a team.
         Keep a random value (at least 32 characters) in this browser tab's
@@ -425,8 +431,10 @@ paths:
       summary: Connect your Microsoft work account, to sign in with it (send the browser to the returned address)
       description: >-
         Signed in (with a session, not an API key), at a company that signs in
-        with Microsoft. Microsoft's redirect comes back to
-        /#/sign-in/microsoft as for signing in; finish with
+        with Microsoft, and proving it is you: your current password, and
+        your two-step code (or a recovery code) when you use two-step sign-in
+        (rate limited like changing your password). Microsoft's redirect
+        comes back to /#/sign-in/microsoft as for signing in; finish with
         /v1/me/microsoft/complete in this browser tab, still signed in. The
         way owners link a Microsoft account (never linked to them by its
         address alone); anyone else may use it too. They are emailed.
@@ -453,7 +461,7 @@ paths:
       operationId: finishConnectingMicrosoft
       tags: [identity]
       summary: Finish connecting your Microsoft account, in the browser tab that started it
-      description: The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
+      description: Signed in with a session (not an API key). The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
       x-permission: authenticated
       requestBody:
         required: true
@@ -476,12 +484,39 @@ paths:
       tags: [identity]
       summary: Unlink someone's Microsoft account; their Microsoft sessions end (only owners unlink owners)
       description: >-
-        They can link one again by signing in with Microsoft (with an address
-        of theirs), or, owners, from Your account. Audited
+        From then on a Microsoft account is linked to them only on purpose,
+        never by a sign-in's address: they connect one from Your account
+        (with their password), or with a reconnect link an owner sends
+        (POST /v1/team/{userId}/microsoft/reconnect). Audited
         (user.microsoft_unlinked).
       x-permission: identity.team:manage
       responses:
         '204': { description: Unlinked }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+
+  /v1/team/{userId}/microsoft/reconnect:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: '#/components/schemas/UserId' } }
+    post:
+      operationId: sendMicrosoftReconnectLink
+      tags: [identity]
+      summary: Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners)
+      description: >-
+        For someone whose Microsoft account was unlinked, or whose sign-in
+        name differs from their HiringPlug email. Signing in with Microsoft
+        from the link links the account to them: an account of the company's
+        organisation, connected to nobody else there. A newer link replaces
+        the older one. Audited (user.microsoft_reconnect_sent).
+      x-permission: identity.team:manage
+      responses:
+        '201':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicrosoftReconnectLink' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -575,7 +610,7 @@ paths:
       operationId: useAuthLink
       tags: [identity]
       summary: Choose a password with an invitation or reset link, and sign in
-      description: An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft).
+      description: An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft). Never with a reconnect link (410).
       x-permission: public
       requestBody:
         required: true
@@ -1220,12 +1255,14 @@ components:
           description: SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.
         email: { type: string, format: email, maxLength: 254, description: "The email they typed: suggested to Microsoft (it does not choose the company)." }
         company: { type: string, maxLength: 100, description: "The company's careers page address (slug)." }
-        invite: { type: string, minLength: 20, maxLength: 200, description: "An invitation link's token: accept it with Microsoft instead of choosing a password." }
+        invite: { type: string, minLength: 20, maxLength: 200, description: "An invitation link's token (accept it with Microsoft instead of choosing a password), or a reconnect link's." }
     MicrosoftConnectStart:
       type: object
       additionalProperties: false
       required: [bindingHash]
       properties:
+        password: { type: string, minLength: 1, maxLength: 200, description: "Your current password (needed if you have one)." }
+        code: { type: string, minLength: 1, maxLength: 20, description: "Your authenticator app's current code, or a recovery code (needed if you use two-step sign-in)." }
         bindingHash:
           type: string
           pattern: '^[0-9a-f]{64}$'
@@ -1252,7 +1289,7 @@ components:
         company: { type: string, maxLength: 100, description: "The company's careers page address, when the account is at several." }
     MicrosoftSignInSettings:
       type: object
-      required: [enabled, organisationId, required, callbackUrl, appSource, clientId]
+      required: [enabled, organisationId, required, callbackUrl, appSource, clientId, acctClaimMissing]
       properties:
         enabled: { type: boolean, description: The team may sign in with Microsoft accounts of the organisation. }
         organisationId:
@@ -1266,6 +1303,16 @@ components:
           enum: [agency, server, none]
           description: "Whose Microsoft app is used: the company's (Settings > Email connection), the server's, or none yet."
         clientId: { type: string, nullable: true }
+        acctClaimMissing:
+          type: boolean
+          description: "The last Microsoft sign-in came without the optional acct claim: guests cannot be told from members, so no account is linked by its address until it is added in Entra (Token configuration)."
+    MicrosoftReconnectLink:
+      type: object
+      required: [link, expiresAt, emailed]
+      properties:
+        link: { type: string, description: "The link (also emailed), to pass on another way if needed." }
+        expiresAt: { type: string, format: date-time }
+        emailed: { type: boolean, description: "Whether an email was queued (it fails later if no mail server is set up)." }
     MicrosoftSignInInput:
       type: object
       additionalProperties: false
@@ -1287,8 +1334,8 @@ components:
         microsoft:
           type: string
           enum: [none, available, required]
-          description: "Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused)."
-        kind: { type: string, enum: [invite, reset] }
+          description: "Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused). Always required for a reconnect link."
+        kind: { type: string, enum: [invite, reset, reconnect], description: "reconnect: an owner's link to connect a Microsoft account (/v1/auth/microsoft/start with invite); no password is chosen with it." }
         email: { type: string }
         name: { type: string }
         companyName: { type: string }

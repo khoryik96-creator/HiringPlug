@@ -21,6 +21,9 @@ type MicrosoftSignIn struct {
 	CallbackURL    string
 	AppSource      string // agency, server or none
 	ClientID       *string
+	// AcctMissing: the last Microsoft sign-in came without the optional acct
+	// claim, so no account was linked by its address (Settings warns).
+	AcctMissing bool
 }
 
 // MicrosoftSignInSettings returns the company's settings.
@@ -40,7 +43,7 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 		return MicrosoftSignIn{}, err
 	}
 	out := MicrosoftSignIn{Enabled: s.MicrosoftSignIn, OrganisationID: s.MicrosoftTenantID, Required: s.MicrosoftRequired,
-		CallbackURL: m.microsoftCallback(), AppSource: "none"}
+		CallbackURL: m.microsoftCallback(), AppSource: "none", AcctMissing: s.MicrosoftSignIn && s.MicrosoftAcctMissing}
 	if m.ms == nil {
 		return out, nil
 	}
@@ -88,6 +91,11 @@ func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enab
 	var out MicrosoftSignIn
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		// First: a change of the Microsoft app (emails module) under way
+		// finishes before the app is looked at, and none starts meanwhile.
+		if err := q.LockMicrosoftSettings(ctx); err != nil {
+			return err
+		}
 		before, err := m.microsoftSignIn(ctx, tx, q, p.TenantID)
 		if err != nil {
 			return err
@@ -118,7 +126,7 @@ func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enab
 			changes["linksRemoved"] = removed
 		}
 		if (before.Enabled && !out.Enabled) || (orgChanged && before.OrganisationID != nil) {
-			if err := q.EndMicrosoftSessions(ctx, store.EndMicrosoftSessionsParams{At: sessionsEndedAt()}); err != nil {
+			if err := q.EndMicrosoftSessions(ctx, nil); err != nil {
 				return err
 			}
 		}

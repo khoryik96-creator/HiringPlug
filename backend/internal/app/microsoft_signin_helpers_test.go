@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -82,16 +83,22 @@ func (f *msTest) start(body map[string]any) (msFlow, *response) {
 	return f.begin("/v1/auth/microsoft/start", "", body)
 }
 
-// startConnecting starts connecting the signed-in person's Microsoft account (Your account).
-func (f *msTest) startConnecting(token string) (msFlow, *response) {
+// startConnecting starts connecting the signed-in person's Microsoft account
+// (Your account); proof is their password and two-step code, if they have any.
+func (f *msTest) startConnecting(token string, proof ...map[string]any) (msFlow, *response) {
 	f.t.Helper()
-	return f.begin("/v1/me/microsoft/start", token, nil)
+	body := map[string]any{}
+	for _, p := range proof {
+		maps.Copy(body, p)
+	}
+	return f.begin("/v1/me/microsoft/start", token, body)
 }
 
-// connect connects the Microsoft account claims are for to the person signed in with token.
-func (f *msTest) connect(token string, claims func(msFlow) jwt.MapClaims) *response {
+// connect connects the Microsoft account claims are for to the person
+// signed in with token (proof: as for startConnecting).
+func (f *msTest) connect(token string, claims func(msFlow) jwt.MapClaims, proof ...map[string]any) *response {
 	f.t.Helper()
-	flow, res := f.startConnecting(token)
+	flow, res := f.startConnecting(token, proof...)
 	require.Equal(f.t, http.StatusOK, res.Status, "%s", res.Body)
 	code := "code-" + randomBinding()
 	f.ms.Grant(code, entratest.Grant{Claims: claims(flow)})

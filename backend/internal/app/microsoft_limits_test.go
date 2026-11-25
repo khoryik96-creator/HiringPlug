@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -45,4 +46,28 @@ func TestMicrosoftSignInHasItsOwnLimits(t *testing.T) {
 	flow, res := f.start(map[string]any{"company": slug})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	session(t, f.signInAs(flow, sam.claims(flow)))
+}
+
+// The email typed when starting a Microsoft sign-in is only a hint to
+// Microsoft: starting many (from anywhere) never uses up password sign-in's
+// limit for that email.
+func TestMicrosoftStartsUseNoPasswordLimitOfTheEmail(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, map[string]string{
+		"HP_PUBLIC_URL": "http://app.test", "HP_MAIL_MICROSOFT_CLIENT_ID": "server-client", "HP_MAIL_MICROSOFT_CLIENT_SECRET": "server-secret",
+		"HP_CLIENT_IP_HEADER": "X-Real-IP",
+	})
+	f := &msTest{t: t, a: a}
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	setPassword(t, tenant.Users[api.RoleRecruiter].ID, testPassword)
+	f.enable(tenant.Users[api.RoleOwner].Token, newGUID(), false)
+	slug := f.me(tenant.Users[api.RoleOwner].Token).Tenant.CareersSlug
+	email := emailOf(api.RoleRecruiter, tenant.ID)
+	for i := range 210 { // more than password sign-in allows per email in 15 minutes (200), from 3 addresses
+		res := a.request(http.MethodPost, "/v1/auth/microsoft/start", "",
+			map[string]any{"bindingHash": bindingHash(randomBinding()), "company": slug, "email": email}, "X-Real-IP", fmt.Sprintf("192.0.2.%d", 1+i%3))
+		require.Equal(t, http.StatusOK, res.Status, "start %d: %s", i, res.Body)
+	}
+	res := a.request(http.MethodPost, "/v1/auth/sign-in", "", map[string]any{"email": email, "password": testPassword}, "X-Real-IP", "192.0.2.9")
+	assert.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 }

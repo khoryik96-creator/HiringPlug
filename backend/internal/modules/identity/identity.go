@@ -47,15 +47,22 @@ type Module struct {
 	limits    limits
 	twoStep   twoStepKeys
 	ms        *microsoftSignIn // nil until UseMicrosoft
-	HTTP      *HTTP
+	// now is the app server's clock (links, two-step codes). Sessions are
+	// issued and ended by the database's clock instead (databaseSecond).
+	now  func() time.Time
+	HTTP *HTTP
 }
 
 // New wires the module. Links in emails point to publicURL (the web app).
 func New(pool *pgxpool.Pool, verifier *authn.Verifier, mailer Mailer, publicURL string) *Module {
-	m := &Module{pool: pool, verifier: verifier, mailer: mailer, publicURL: publicURL, limits: newLimits(time.Now)}
+	m := &Module{pool: pool, verifier: verifier, mailer: mailer, publicURL: publicURL, limits: newLimits(time.Now), now: time.Now}
 	m.HTTP = &HTTP{m: m}
 	return m
 }
+
+// UseClock sets the app server's clock: tests only, to show that a server
+// whose clock is off ends no session too late.
+func (m *Module) UseClock(now func() time.Time) { m.now = now }
 
 // Authenticate verifies a bearer token and loads the user it names. Inactive
 // or unknown users are rejected even if the token is otherwise valid.

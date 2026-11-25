@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,8 @@ func status(a *testApp, token string) int {
 
 // Owners (and admins, for everyone but owners) unlink a member's Microsoft
 // account on the Team page: their Microsoft sessions end, their password
-// ones go on, and they can link one again.
+// ones go on, and one is linked to them again only on purpose: signing in
+// with it does not link it again.
 func TestUnlinkingMicrosoft(t *testing.T) {
 	t.Parallel()
 	f := newMicrosoftTest(t)
@@ -67,7 +69,16 @@ func TestUnlinkingMicrosoft(t *testing.T) {
 	assert.Equal(t, []api.SignInMethod{api.SignInMethodPassword}, f.methodsOf(owner.Token, recruiter.ID))
 	assert.Equal(t, http.StatusNotFound, f.unlink(admin.Token, recruiter.ID).Status, "nothing linked")
 
-	// They link one again by signing in (here, at once: the same second).
+	// Signing in with it does not link it again: it was unlinked for a reason.
+	flow, _ = f.start(map[string]any{"company": slug})
+	msRefused(t, f.signInAs(flow, sam.claims(flow)), "connect_first")
+	assert.Len(t, audited(t, tenant.ID, "user.microsoft_linked"), 2)
+	// They connect it on purpose, from Your account, with their password
+	// (or with a reconnect link: TestReconnectLinks); then it signs them in
+	// (here at once, in the same second as the unlink).
+	_, res = f.startConnecting(samPassword)
+	require.Equal(t, http.StatusBadRequest, res.Status, "their password first: %s", res.Body)
+	require.Equal(t, http.StatusNoContent, f.connect(samPassword, sam.claims, map[string]any{"password": testPassword}).Status)
 	flow, _ = f.start(map[string]any{"company": slug})
 	again := session(t, f.signInAs(flow, sam.claims(flow)))
 	assert.Equal(t, http.StatusOK, status(f.a, again))
@@ -141,4 +152,78 @@ func TestMicrosoftSessionsNeedMicrosoftOn(t *testing.T) {
 	_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE tenant SET microsoft_sign_in = false WHERE id = $1`, tenant.ID)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, status(f.a, token))
+}
+
+// Sessions are issued and ended by the database's clock alone: an app
+// server whose clock is off (here 3 minutes either way) still ends them.
+func TestSessionsEndWhateverTheServersClock(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
+	setPassword(t, recruiter.ID, testPassword)
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	sam := newAccount(org, emailOf(api.RoleRecruiter, tenant.ID))
+	signIn := func() (microsoft, password string) {
+		t.Helper()
+		flow, _ := f.start(map[string]any{"company": slug})
+		microsoft = session(t, f.signInAs(flow, sam.claims(flow)))
+		_, password = f.a.signIn(map[string]any{"email": sam.email, "password": testPassword})
+		require.NotEmpty(t, password)
+		return microsoft, password
+	}
+
+	// Fast: ended in SQL (a two-step reset), by the database's clock.
+	f.a.modules.Identity.UseClock(func() time.Time { return time.Now().Add(3 * time.Minute) })
+	microsoft, password := signIn()
+	require.Equal(t, http.StatusNoContent, f.a.request(http.MethodDelete, "/v1/team/"+recruiter.ID+"/two-step", owner.Token, nil).Status)
+	assert.Equal(t, http.StatusUnauthorized, status(f.a, microsoft), "a Microsoft session")
+	assert.Equal(t, http.StatusUnauthorized, status(f.a, password), "a password session")
+
+	// Slow: Microsoft sessions ended by an unlink.
+	f.a.modules.Identity.UseClock(func() time.Time { return time.Now().Add(-3 * time.Minute) })
+	microsoft, _ = signIn()
+	require.Equal(t, http.StatusNoContent, f.unlink(owner.Token, recruiter.ID).Status)
+	assert.Equal(t, http.StatusUnauthorized, status(f.a, microsoft))
+}
+
+// A session issued at the last end of sessions (in the same second: dated
+// that end) is ended by the next end, of any kind.
+func TestAnEndEndsSessionsIssuedAtTheLastOne(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	sam := newAccount(org, emailOf(api.RoleRecruiter, tenant.ID))
+	// The last end: a few seconds ahead, so every step below falls before it.
+	endedAt := func(column string) {
+		t.Helper()
+		_, err := testutil.Current.Admin.Exec(context.Background(),
+			`UPDATE app_user SET `+column+` = date_trunc('second', now()) + interval '5 seconds' WHERE tenant_id = $1 AND id = $2`, tenant.ID, recruiter.ID)
+		require.NoError(t, err)
+	}
+	signIn := func() string {
+		t.Helper()
+		flow, _ := f.start(map[string]any{"company": slug})
+		return session(t, f.signInAs(flow, sam.claims(flow)))
+	}
+
+	endedAt("tokens_valid_after")
+	token := signIn() // dated that end
+	require.Equal(t, http.StatusOK, status(f.a, token))
+	require.Equal(t, http.StatusNoContent, f.unlink(owner.Token, recruiter.ID).Status)
+	assert.Equal(t, http.StatusUnauthorized, status(f.a, token), "ended by an unlink")
+
+	link := f.reconnectLink(owner.Token, recruiter.ID)
+	endedAt("microsoft_sessions_after")
+	flow, _ := f.start(map[string]any{"invite": link})
+	token = session(t, f.signInAs(flow, sam.claims(flow)))
+	require.Equal(t, http.StatusOK, status(f.a, token))
+	require.Equal(t, http.StatusNoContent, f.a.request(http.MethodDelete, "/v1/team/"+recruiter.ID+"/two-step", owner.Token, nil).Status)
+	assert.Equal(t, http.StatusUnauthorized, status(f.a, token), "ended by a two-step reset")
 }

@@ -112,6 +112,7 @@ type AppUser struct {
 	LastSignInAt           *time.Time
 	TeamID                 *string
 	MicrosoftSessionsAfter *time.Time
+	MicrosoftConnectOnly   bool
 }
 
 type Application struct {
@@ -1876,14 +1877,15 @@ type TeamGroup struct {
 }
 
 type Tenant struct {
-	ID                string
-	Name              string
-	CreatedAt         time.Time
-	CareersSlug       *string
-	TwoStepRequired   bool
-	MicrosoftSignIn   bool
-	MicrosoftTenantID *string
-	MicrosoftRequired bool
+	ID                   string
+	Name                 string
+	CreatedAt            time.Time
+	CareersSlug          *string
+	TwoStepRequired      bool
+	MicrosoftSignIn      bool
+	MicrosoftTenantID    *string
+	MicrosoftRequired    bool
+	MicrosoftAcctMissing bool
 }
 
 type TenantPolicy struct {
@@ -1909,6 +1911,7 @@ type UserMicrosoft struct {
 	UserID     string
 	MsTenantID string
 	MsObjectID string
+	LinkedBy   string
 	LinkedAt   time.Time
 	LastUsedAt time.Time
 }

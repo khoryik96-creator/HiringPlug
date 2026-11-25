@@ -3305,7 +3305,7 @@ export interface paths {
         put?: never;
         /**
          * Start signing in with Microsoft (send the browser to the returned address)
-         * @description The company is found from, in order: the invitation, the careers page address (company), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). The email is only suggested to Microsoft: it never chooses the company, so the answer never shows where an email is on a team. Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
+         * @description The company is found from, in order: the invitation, the careers page address (company), the only company on the server that signs in with Microsoft, or else the server's own Microsoft app for any company (matched after sign-in by organisation and account). An invitation or reconnect link (invite) links the Microsoft account to its person, whatever the account's address (an account of the company's organisation, connected to nobody else there). The email is only suggested to Microsoft: it never chooses the company, so the answer never shows where an email is on a team. Keep a random value (at least 32 characters) in this browser tab's sessionStorage, send its SHA-256 here, and the value itself to finish: a sign-in can be finished only in the tab that started it.
          */
         post: operations["startMicrosoftSignIn"];
         delete?: never;
@@ -3365,7 +3365,7 @@ export interface paths {
         put?: never;
         /**
          * Connect your Microsoft work account, to sign in with it (send the browser to the returned address)
-         * @description Signed in (with a session, not an API key), at a company that signs in with Microsoft. Microsoft's redirect comes back to /#/sign-in/microsoft as for signing in; finish with /v1/me/microsoft/complete in this browser tab, still signed in. The way owners link a Microsoft account (never linked to them by its address alone); anyone else may use it too. They are emailed.
+         * @description Signed in (with a session, not an API key), at a company that signs in with Microsoft, and proving it is you: your current password, and your two-step code (or a recovery code) when you use two-step sign-in (rate limited like changing your password). Microsoft's redirect comes back to /#/sign-in/microsoft as for signing in; finish with /v1/me/microsoft/complete in this browser tab, still signed in. The way owners link a Microsoft account (never linked to them by its address alone); anyone else may use it too. They are emailed.
          */
         post: operations["startConnectingMicrosoft"];
         delete?: never;
@@ -3385,7 +3385,7 @@ export interface paths {
         put?: never;
         /**
          * Finish connecting your Microsoft account, in the browser tab that started it
-         * @description The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
+         * @description Signed in with a session (not an API key). The account must be of the company's organisation (not a guest) and connected to nobody else on the team. Audited (user.microsoft_linked, by self).
          */
         post: operations["finishConnectingMicrosoft"];
         delete?: never;
@@ -3408,9 +3408,31 @@ export interface paths {
         post?: never;
         /**
          * Unlink someone's Microsoft account; their Microsoft sessions end (only owners unlink owners)
-         * @description They can link one again by signing in with Microsoft (with an address of theirs), or, owners, from Your account. Audited (user.microsoft_unlinked).
+         * @description From then on a Microsoft account is linked to them only on purpose, never by a sign-in's address: they connect one from Your account (with their password), or with a reconnect link an owner sends (POST /v1/team/{userId}/microsoft/reconnect). Audited (user.microsoft_unlinked).
          */
         delete: operations["unlinkMicrosoft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/team/{userId}/microsoft/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners)
+         * @description For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
+         */
+        post: operations["sendMicrosoftReconnectLink"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3488,7 +3510,7 @@ export interface paths {
         put?: never;
         /**
          * Choose a password with an invitation or reset link, and sign in
-         * @description An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft).
+         * @description An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft). Never with a reconnect link (410).
          */
         post: operations["useAuthLink"];
         delete?: never;
@@ -9629,10 +9651,14 @@ export interface components {
             email?: string;
             /** @description The company's careers page address (slug). */
             company?: string;
-            /** @description An invitation link's token: accept it with Microsoft instead of choosing a password. */
+            /** @description An invitation link's token (accept it with Microsoft instead of choosing a password), or a reconnect link's. */
             invite?: string;
         };
         MicrosoftConnectStart: {
+            /** @description Your current password (needed if you have one). */
+            password?: string;
+            /** @description Your authenticator app's current code, or a recovery code (needed if you use two-step sign-in). */
+            code?: string;
             /** @description SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes. */
             bindingHash: string;
         };
@@ -9669,6 +9695,16 @@ export interface components {
              */
             appSource: "agency" | "server" | "none";
             clientId: string | null;
+            /** @description The last Microsoft sign-in came without the optional acct claim: guests cannot be told from members, so no account is linked by its address until it is added in Entra (Token configuration). */
+            acctClaimMissing: boolean;
+        };
+        MicrosoftReconnectLink: {
+            /** @description The link (also emailed), to pass on another way if needed. */
+            link: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Whether an email was queued (it fails later if no mail server is set up). */
+            emailed: boolean;
         };
         MicrosoftSignInInput: {
             enabled: boolean;
@@ -9681,12 +9717,15 @@ export interface components {
         };
         AuthLink: {
             /**
-             * @description Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused).
+             * @description Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused). Always required for a reconnect link.
              * @enum {string}
              */
             microsoft: "none" | "available" | "required";
-            /** @enum {string} */
-            kind: "invite" | "reset";
+            /**
+             * @description reconnect: an owner's link to connect a Microsoft account (/v1/auth/microsoft/start with invite); no password is chosen with it.
+             * @enum {string}
+             */
+            kind: "invite" | "reset" | "reconnect";
             email: string;
             name: string;
             companyName: string;
@@ -19670,6 +19709,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["TeamChangeNotAllowed"];
+        };
+    };
+    sendMicrosoftReconnectLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftReconnectLink"];
+                };
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];

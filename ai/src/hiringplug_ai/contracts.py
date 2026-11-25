@@ -4140,7 +4140,7 @@ class MicrosoftSignInStart(BaseModel):
     invite: Annotated[
         str | None,
         Field(
-            description="An invitation link's token: accept it with Microsoft instead of choosing a password.",
+            description="An invitation link's token (accept it with Microsoft instead of choosing a password), or a reconnect link's.",
             max_length=200,
             min_length=20,
         ),
@@ -4151,6 +4151,18 @@ class MicrosoftConnectStart(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    password: Annotated[
+        str | None,
+        Field(description="Your current password (needed if you have one).", max_length=200, min_length=1),
+    ] = None
+    code: Annotated[
+        str | None,
+        Field(
+            description="Your authenticator app's current code, or a recovery code (needed if you use two-step sign-in).",
+            max_length=20,
+            min_length=1,
+        ),
+    ] = None
     bindingHash: Annotated[
         str,
         Field(
@@ -4235,6 +4247,20 @@ class MicrosoftSignInSettings(BaseModel):
         ),
     ]
     clientId: Annotated[str | None, Field(...)]
+    acctClaimMissing: Annotated[
+        bool,
+        Field(
+            description="The last Microsoft sign-in came without the optional acct claim: guests cannot be told from members, so no account is linked by its address until it is added in Entra (Token configuration)."
+        ),
+    ]
+
+
+class MicrosoftReconnectLink(BaseModel):
+    link: Annotated[str, Field(description="The link (also emailed), to pass on another way if needed.")]
+    expiresAt: AwareDatetime
+    emailed: Annotated[
+        bool, Field(description="Whether an email was queued (it fails later if no mail server is set up).")
+    ]
 
 
 class MicrosoftSignInInput(BaseModel):
@@ -4262,16 +4288,22 @@ class Microsoft(StrEnum):
 class Kind3(StrEnum):
     invite = "invite"
     reset = "reset"
+    reconnect = "reconnect"
 
 
 class AuthLink(BaseModel):
     microsoft: Annotated[
         Microsoft,
         Field(
-            description="Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused)."
+            description="Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused). Always required for a reconnect link."
         ),
     ]
-    kind: Kind3
+    kind: Annotated[
+        Kind3,
+        Field(
+            description="reconnect: an owner's link to connect a Microsoft account (/v1/auth/microsoft/start with invite); no password is chosen with it."
+        ),
+    ]
     email: str
     name: str
     companyName: str

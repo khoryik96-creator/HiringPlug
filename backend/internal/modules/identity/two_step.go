@@ -119,14 +119,14 @@ func (m *Module) challengeError(code api.ErrorCode, message, tenantID, userID st
 	if len(m.twoStep.challenge) == 0 {
 		return nil, errTwoStepOff
 	}
-	token := SignChallenge(m.twoStep.challenge, Challenge{TenantID: tenantID, UserID: userID, Setup: setup, Expires: time.Now().Add(challengeLife).Unix()})
+	token := SignChallenge(m.twoStep.challenge, Challenge{TenantID: tenantID, UserID: userID, Setup: setup, Expires: m.now().Add(challengeLife).Unix()})
 	return apperr.New(code, message).WithDetail("challenge", token), nil
 }
 
 // withChallenge runs fn for the person a challenge names, in their company,
 // once the attempt is allowed.
 func (m *Module) withChallenge(ctx context.Context, clientAddr, token string, setup bool, fn func(tx pgx.Tx, q *store.Queries, u store.UserAuthRow) error) error {
-	c, err := ReadChallenge(m.twoStep.challenge, token, time.Now())
+	c, err := ReadChallenge(m.twoStep.challenge, token, m.now())
 	if err != nil || c.Setup != setup {
 		return signInExpired()
 	}
@@ -174,7 +174,7 @@ func (m *Module) checkCode(ctx context.Context, q *store.Queries, tenantID, user
 	if err != nil {
 		return "", err
 	}
-	step, ok := CheckTOTP(secret, code, time.Now(), ts.LastStep)
+	step, ok := CheckTOTP(secret, code, m.now(), ts.LastStep)
 	if !ok {
 		return "", wrongCode()
 	}
@@ -197,7 +197,10 @@ func (m *Module) signedIn(ctx context.Context, tx pgx.Tx, q *store.Queries, u st
 	if err := audit.Record(ctx, tx, audit.Entry{Action: "user.signed_in", EntityType: "user", EntityID: u.ID, Changes: map[string]any{"twoStep": how}}); err != nil {
 		return Session{}, err
 	}
-	now := time.Now().Truncate(time.Second)
+	now, err := databaseSecond(ctx, q)
+	if err != nil {
+		return Session{}, err
+	}
 	if u.TokensValidAfter != nil && now.Before(*u.TokensValidAfter) {
 		now = *u.TokensValidAfter
 	}
@@ -250,7 +253,7 @@ func (m *Module) enable(ctx context.Context, tx pgx.Tx, q *store.Queries, tenant
 	if err != nil {
 		return nil, err
 	}
-	step, ok := CheckTOTP(secret, code, time.Now(), 0)
+	step, ok := CheckTOTP(secret, code, m.now(), 0)
 	if !ok {
 		return nil, apperr.Validation(apperr.FieldErrors{{Field: "code", Message: "is not the code the app shows now"}})
 	}

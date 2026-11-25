@@ -42,17 +42,25 @@ type MicrosoftAccount struct {
 	TenantID, TenantName, Slug, UserID string
 	Linked                             bool // matched by the account linked to them, not by an address
 	Owner                              bool
+	ConnectOnly                        bool // their Microsoft account was unlinked: linked again only on purpose
+}
+
+// MayLinkByAddress reports whether a Microsoft account may be linked to
+// someone because its address is theirs: never to an owner, nor to someone
+// whose account was unlinked (connectOnly). They link one on purpose: from
+// Your account, or with an invitation or reconnect link.
+func MayLinkByAddress(owner, connectOnly bool) bool {
+	return !owner && !connectOnly
 }
 
 // ChooseMicrosoftAccounts narrows the team members a Microsoft account
 // matches to those it may sign in as: at the company the sign-in was started
 // for (tenantID, if any) and the company chosen (slug, if any). A company
 // where it matches more than one person (its sign-in name and email are two
-// people's) is left out: nobody can tell which they meant. An owner is
-// matched by an address only through their own invitation (invited: the
-// person whose invitation started the sign-in); otherwise they connect the
-// account from Your account first, and ownersLeftOut says one was left out.
-func ChooseMicrosoftAccounts(found []MicrosoftAccount, tenantID, slug, invited string) (out []MicrosoftAccount, ownersLeftOut bool) {
+// people's) is left out: nobody can tell which they meant. Someone matched
+// by an address only, who may not be linked that way (MayLinkByAddress), is
+// left out too, and leftOut says so: they connect the account first.
+func ChooseMicrosoftAccounts(found []MicrosoftAccount, tenantID, slug string) (out []MicrosoftAccount, leftOut bool) {
 	slug = strings.ToLower(strings.TrimSpace(slug))
 	perTenant := map[string]int{}
 	for _, a := range found {
@@ -62,13 +70,13 @@ func ChooseMicrosoftAccounts(found []MicrosoftAccount, tenantID, slug, invited s
 		if perTenant[a.TenantID] != 1 || (tenantID != "" && a.TenantID != tenantID) || (slug != "" && a.Slug != slug) {
 			continue
 		}
-		if a.Owner && !a.Linked && a.UserID != invited {
-			ownersLeftOut = true
+		if !a.Linked && !MayLinkByAddress(a.Owner, a.ConnectOnly) {
+			leftOut = true
 			continue
 		}
 		out = append(out, a)
 	}
-	return out, ownersLeftOut
+	return out, leftOut
 }
 
 // MicrosoftLinkState is whether a person's invitation link may be used with

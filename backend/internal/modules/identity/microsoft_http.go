@@ -51,7 +51,8 @@ func (h *HTTP) CompleteMicrosoftSignIn(ctx context.Context, req api.CompleteMicr
 
 // StartConnectingMicrosoft handles POST /v1/me/microsoft/start.
 func (h *HTTP) StartConnectingMicrosoft(ctx context.Context, req api.StartConnectingMicrosoftRequestObject) (api.StartConnectingMicrosoftResponseObject, error) {
-	target, err := h.m.StartConnectingMicrosoft(ctx, authz.MustFromContext(ctx), clientip.From(ctx), req.Body.BindingHash)
+	b := req.Body
+	target, err := h.m.StartConnectingMicrosoft(ctx, authz.MustFromContext(ctx), clientip.From(ctx), ConnectStart{BindingHash: b.BindingHash, Password: b.Password, Code: b.Code})
 	if err != nil {
 		return nil, err
 	}
@@ -74,9 +75,19 @@ func (h *HTTP) UnlinkMicrosoft(ctx context.Context, req api.UnlinkMicrosoftReque
 	return api.UnlinkMicrosoft204Response{}, nil
 }
 
+// SendMicrosoftReconnectLink handles POST /v1/team/{userId}/microsoft/reconnect.
+func (h *HTTP) SendMicrosoftReconnectLink(ctx context.Context, req api.SendMicrosoftReconnectLinkRequestObject) (api.SendMicrosoftReconnectLinkResponseObject, error) {
+	l, err := h.m.SendMicrosoftReconnectLink(ctx, authz.MustFromContext(ctx), req.UserId)
+	if err != nil {
+		return nil, err
+	}
+	return api.SendMicrosoftReconnectLink201JSONResponse{Link: l.Link, ExpiresAt: l.ExpiresAt, Emailed: l.Emailed}, nil
+}
+
 func microsoftSignInToAPI(s MicrosoftSignIn) api.MicrosoftSignInSettings {
 	return api.MicrosoftSignInSettings{Enabled: s.Enabled, OrganisationId: c.OrNull(s.OrganisationID), Required: s.Required,
-		CallbackUrl: s.CallbackURL, AppSource: api.MicrosoftSignInSettingsAppSource(s.AppSource), ClientId: c.OrNull(s.ClientID)}
+		CallbackUrl: s.CallbackURL, AppSource: api.MicrosoftSignInSettingsAppSource(s.AppSource), ClientId: c.OrNull(s.ClientID),
+		AcctClaimMissing: s.AcctMissing}
 }
 
 // GetMicrosoftSignIn handles GET /v1/agency/microsoft-sign-in.

@@ -22,8 +22,11 @@ var microsoftMessages = map[string]string{
 	ReasonNotOnTeam:         "Your Microsoft account isn't on the HiringPlug team. Ask an owner to invite you.",
 	ReasonOtherOrganisation: "This Microsoft account belongs to another organisation. Sign in with your work account at this company.",
 	ReasonPersonalAccount:   "This is a personal Microsoft account. Sign in with your work account.",
-	ReasonConnectFirst:      "Owners connect their Microsoft account once before signing in with it: sign in with your password, then use Your account › Connect Microsoft sign-in.",
-	ReasonFailed:            "Signing in with Microsoft didn't work or has expired. Start again.",
+	ReasonConnectFirst: "This Microsoft account has to be connected to your HiringPlug account on purpose before it signs you in: sign in with your password, " +
+		"then use Your account › Connect Microsoft sign-in, or ask an owner to send you a link to connect it.",
+	ReasonLinkedElsewhere:  "This Microsoft account is already connected to someone else on the team. Use your own work account.",
+	ReasonAlreadyConnected: "Another Microsoft account is already connected to you. Ask an owner to unlink it on the Team page first.",
+	ReasonFailed:           "Signing in with Microsoft didn't work or has expired. Start again.",
 }
 
 func microsoftFailed(reason string) error {
@@ -59,18 +62,22 @@ func (m *Module) CompleteMicrosoft(ctx context.Context, clientAddr string, in Mi
 	if err != nil {
 		return Session{}, err
 	}
+	if flow.UserID != "" && flow.TenantID != "" { // started from an invitation or reconnect link
+		return m.signInThroughLink(ctx, flow, id)
+	}
 	rows, err := store.New(m.pool).MicrosoftAccounts(ctx, store.MicrosoftAccountsParams{MsTenantID: id.TenantID, MsObjectID: id.ObjectID, Addresses: id.Addresses()})
 	if err != nil {
 		return Session{}, err
 	}
 	found := make([]MicrosoftAccount, len(rows))
 	for i, r := range rows {
-		found[i] = MicrosoftAccount{TenantID: r.TenantID, TenantName: r.TenantName, Slug: r.CareersSlug, UserID: r.UserID, Linked: r.Linked, Owner: r.IsOwner}
+		found[i] = MicrosoftAccount{TenantID: r.TenantID, TenantName: r.TenantName, Slug: r.CareersSlug, UserID: r.UserID,
+			Linked: r.Linked, Owner: r.IsOwner, ConnectOnly: r.ConnectOnly}
 	}
-	accounts, ownersLeftOut := ChooseMicrosoftAccounts(found, flow.TenantID, in.Company, flow.UserID)
+	accounts, leftOut := ChooseMicrosoftAccounts(found, flow.TenantID, in.Company)
 	switch len(accounts) {
 	case 0:
-		if ownersLeftOut {
+		if leftOut {
 			return Session{}, microsoftFailed(ReasonConnectFirst)
 		}
 		return Session{}, microsoftFailed(ReasonNotOnTeam)
@@ -104,6 +111,12 @@ func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoft
 		Code: code, RedirectURI: m.microsoftCallback(), Verifier: secret.Verifier})
 	if err == nil {
 		id, err = m.ms.entra.Validate(ctx, raw, entra.Expect{ClientID: flow.ClientID, Nonce: secret.Nonce, Organisation: organisation})
+	}
+	if err == nil { // Settings warns while Microsoft leaves out acct (no account is linked by address then)
+		err = store.New(m.pool).NoteMicrosoftClaims(ctx, store.NoteMicrosoftClaimsParams{MsTenantID: id.TenantID, Acct: id.Member})
+		if err != nil {
+			return id, err
+		}
 	}
 	if err != nil {
 		logx.From(ctx).Info("microsoft sign-in refused", "reason", err.Error())
@@ -154,7 +167,7 @@ func (m *Module) chooseCompany(ctx context.Context, flow store.TakeMicrosoftFlow
 	ticketHash := hashLink(ticket)
 	err = store.New(m.pool).SaveMicrosoftFlow(ctx, store.SaveMicrosoftFlowParams{
 		KeyHash: key, BindingHash: flow.BindingHash, Purpose: flowSignIn, UserID: orNil(flow.UserID), ClientID: flow.ClientID, Authority: flow.Authority,
-		Sealed: sealed, Verified: true, TicketHash: &ticketHash, ExpiresAt: time.Now().Add(microsoftChoiceLife),
+		Sealed: sealed, Verified: true, TicketHash: &ticketHash, Seconds: microsoftChoiceSeconds,
 	})
 	if err != nil {
 		return err
@@ -168,63 +181,93 @@ func (m *Module) chooseCompany(ctx context.Context, flow store.TakeMicrosoftFlow
 }
 
 // signInWithMicrosoft signs a team member in: their Microsoft account is
-// linked the first time, an invitation is accepted, and the session says it
-// was signed in with Microsoft (no two-step code).
+// linked the first time (by its address), an invitation is accepted, and the
+// session says it was signed in with Microsoft (no two-step code). What was
+// found before is checked again, their row held: the link may have been
+// removed, or they made an owner or unlinked, meanwhile.
 func (m *Module) signInWithMicrosoft(ctx context.Context, a MicrosoftAccount, id entra.Identity) (Session, error) {
 	var out Session
 	err := database.InTx(ctx, m.pool, authz.NewPrincipal(a.TenantID, a.UserID, "", "", ""), func(tx pgx.Tx) error {
 		q := store.New(tx)
-		s, err := q.MicrosoftSettings(ctx)
+		u, err := m.microsoftUser(ctx, q, a.UserID, id)
 		if err != nil {
 			return err
-		}
-		if !s.MicrosoftSignIn || s.MicrosoftTenantID == nil || *s.MicrosoftTenantID != id.TenantID { // changed meanwhile
-			return microsoftFailed(ReasonFailed)
-		}
-		u, err := q.UserAuth(ctx, a.UserID)
-		if err != nil {
-			return err
-		}
-		if !u.Active && !u.Invited { // deactivated meanwhile
-			return microsoftFailed(ReasonNotOnTeam)
 		}
 		if a.Linked {
-			err = q.UsedMicrosoft(ctx, u.ID)
-		} else {
-			how := linkedBySignIn
-			if u.Invited {
-				how = linkedByInvitation
+			n, err := q.UsedMicrosoft(ctx, store.UsedMicrosoftParams{UserID: u.ID, MsTenantID: id.TenantID, MsObjectID: id.ObjectID})
+			if err != nil {
+				return err
 			}
-			err = m.linkMicrosoft(ctx, tx, q, u, id, how)
+			if n == 0 { // unlinked meanwhile
+				return microsoftFailed(ReasonFailed)
+			}
+		} else {
+			if !MayLinkByAddress(u.Role == string(api.RoleOwner), u.MicrosoftConnectOnly) { // made an owner, or unlinked, meanwhile
+				return microsoftFailed(ReasonConnectFirst)
+			}
+			err = m.linkMicrosoft(ctx, tx, q, u, id, linkedBySignIn)
 			if errors.Is(err, errLinkTaken) || errors.Is(err, errAlreadyLinked) {
 				err = microsoftFailed(ReasonFailed) // linked by another sign-in at the same moment
 			}
-		}
-		if err != nil {
-			return err
-		}
-		if u.Invited {
-			if err := m.joinWithMicrosoft(ctx, tx, q, u.ID); err != nil {
+			if err != nil {
 				return err
 			}
 		}
-		if err := q.SignedIn(ctx, u.ID); err != nil {
-			return err
-		}
-		if err := audit.Record(ctx, tx, audit.Entry{Action: "user.signed_in", EntityType: "user", EntityID: u.ID,
-			Changes: map[string]any{"method": "microsoft"}}); err != nil {
-			return err
-		}
-		now := time.Now().Truncate(time.Second)
-		for _, after := range []*time.Time{u.TokensValidAfter, u.MicrosoftSessionsAfter} {
-			if after != nil && now.Before(*after) {
-				now = *after
-			}
-		}
-		out, err = m.session(a.TenantID, u.ID, authn.MethodMicrosoft, now)
+		out, err = m.signedInWithMicrosoft(ctx, tx, q, u)
 		return err
 	})
 	return out, err
+}
+
+// microsoftUser loads (and holds, until the transaction ends) the person a
+// Microsoft account signs in as, once the company still signs in with
+// accounts of its organisation and they are still on the team.
+func (m *Module) microsoftUser(ctx context.Context, q *store.Queries, userID string, id entra.Identity) (store.UserAuthRow, error) {
+	if err := q.HoldUser(ctx, userID); database.IsNoRows(err) {
+		return store.UserAuthRow{}, microsoftFailed(ReasonNotOnTeam)
+	} else if err != nil {
+		return store.UserAuthRow{}, err
+	}
+	s, err := q.MicrosoftSettings(ctx)
+	if err != nil {
+		return store.UserAuthRow{}, err
+	}
+	if !s.MicrosoftSignIn || s.MicrosoftTenantID == nil || *s.MicrosoftTenantID != id.TenantID { // changed meanwhile
+		return store.UserAuthRow{}, microsoftFailed(ReasonFailed)
+	}
+	u, err := q.UserAuth(ctx, userID)
+	if database.IsNoRows(err) || (err == nil && !u.Active && !u.Invited) { // removed or deactivated meanwhile
+		return u, microsoftFailed(ReasonNotOnTeam)
+	}
+	return u, err
+}
+
+// signedInWithMicrosoft accepts an invitation (if they were invited),
+// records the sign-in and mints its session, issued by the database's clock
+// and never before their sessions were last ended.
+func (m *Module) signedInWithMicrosoft(ctx context.Context, tx pgx.Tx, q *store.Queries, u store.UserAuthRow) (Session, error) {
+	if u.Invited {
+		if err := m.joinWithMicrosoft(ctx, tx, q, u.ID); err != nil {
+			return Session{}, err
+		}
+	}
+	if err := q.SignedIn(ctx, u.ID); err != nil {
+		return Session{}, err
+	}
+	if err := audit.Record(ctx, tx, audit.Entry{Action: "user.signed_in", EntityType: "user", EntityID: u.ID,
+		Changes: map[string]any{"method": "microsoft"}}); err != nil {
+		return Session{}, err
+	}
+	now, err := databaseSecond(ctx, q)
+	if err != nil {
+		return Session{}, err
+	}
+	for _, after := range []*time.Time{u.TokensValidAfter, u.MicrosoftSessionsAfter} {
+		if after != nil && now.Before(*after) {
+			now = *after
+		}
+	}
+	return m.session(u.TenantID, u.ID, authn.MethodMicrosoft, now)
 }
 
 // joinWithMicrosoft accepts an invitation (no password is chosen).

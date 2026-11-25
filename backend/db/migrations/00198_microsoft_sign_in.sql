@@ -2,11 +2,20 @@
 -- tenant: whether the company signs in with Microsoft, its own Microsoft
 --   organisation (Entra tenant ID; never personal accounts), and whether it
 --   requires Microsoft (password sign-in and resets then only for owners).
+--   microsoft_acct_missing: the last Microsoft sign-in came without the
+--   optional acct claim (member or guest), so no account was linked by its
+--   address (Settings warns).
 -- user_microsoft: the Microsoft account (organisation + object ID) linked to
---   a person: by their first sign-in (never for owners), their invitation, or
---   from Your account; later sign-ins match it, whatever their email.
+--   a person, and how (linked_by): by their first sign-in (never for owners),
+--   their invitation, from Your account, or a reconnect link an owner sent;
+--   later sign-ins match it, whatever their email.
 -- app_user.microsoft_sessions_after: sessions signed in with Microsoft before
 --   it no longer work (the link was removed, or the organisation changed).
+-- app_user.microsoft_connect_only: their Microsoft account was unlinked, so
+--   one is linked again only on purpose (Your account, an invitation or a
+--   reconnect link), never by a sign-in's address.
+-- user_link kind reconnect: an owner's link for someone to link their
+--   Microsoft account again, whatever its address (7 days, once).
 -- microsoft_sign_in_flow: a sign-in under way (10 minutes at most). It is
 --   started before anyone is signed in, often before the company is known, so
 --   the app never reads it directly: only through the app_microsoft_flow_*
@@ -20,16 +29,22 @@ ALTER TABLE tenant
     CHECK (microsoft_tenant_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
            AND microsoft_tenant_id <> '9188040d-6c67-4c5b-b112-36a304b66dad'),
   ADD COLUMN microsoft_required boolean NOT NULL DEFAULT false,
+  ADD COLUMN microsoft_acct_missing boolean NOT NULL DEFAULT false,
   ADD CONSTRAINT tenant_microsoft_sign_in_check
     CHECK ((NOT microsoft_sign_in OR microsoft_tenant_id IS NOT NULL) AND (NOT microsoft_required OR microsoft_sign_in));
 
-ALTER TABLE app_user ADD COLUMN microsoft_sessions_after timestamptz;
+ALTER TABLE app_user ADD COLUMN microsoft_sessions_after timestamptz,
+  ADD COLUMN microsoft_connect_only boolean NOT NULL DEFAULT false;
+
+ALTER TABLE user_link DROP CONSTRAINT user_link_kind_check,
+  ADD CONSTRAINT user_link_kind_check CHECK (kind IN ('invite', 'reset', 'reconnect'));
 
 CREATE TABLE user_microsoft (
   tenant_id     text NOT NULL REFERENCES tenant (id),
   user_id       text NOT NULL,
   ms_tenant_id  text NOT NULL CHECK (ms_tenant_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
   ms_object_id  text NOT NULL CHECK (ms_object_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+  linked_by     text NOT NULL CHECK (linked_by IN ('sign_in', 'invitation', 'self', 'reconnect_link')),
   linked_at     timestamptz NOT NULL DEFAULT now(),
   last_used_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, user_id),
@@ -74,16 +89,18 @@ ALTER TABLE microsoft_sign_in_flow ENABLE ROW LEVEL SECURITY;
 CREATE POLICY no_direct_access ON microsoft_sign_in_flow USING (false) WITH CHECK (false);
 REVOKE ALL ON microsoft_sign_in_flow FROM hiringplug_app;
 
--- A sign-in started (old ones are cleared on the way).
+-- A sign-in started (old ones are cleared on the way), for p_seconds by the
+-- database's clock (the one every check of it uses).
 -- +goose StatementBegin
 CREATE FUNCTION app_microsoft_flow_save(p_key_hash text, p_binding_hash text, p_tenant_id text, p_purpose text, p_user_id text,
-  p_client_id text, p_authority text, p_sealed text, p_verified boolean, p_ticket_hash text, p_expires_at timestamptz)
+  p_client_id text, p_authority text, p_sealed text, p_verified boolean, p_ticket_hash text, p_seconds integer)
 RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   DELETE FROM microsoft_sign_in_flow WHERE expires_at < now();
   INSERT INTO microsoft_sign_in_flow (key_hash, binding_hash, tenant_id, purpose, user_id, client_id, authority, sealed, verified, ticket_hash, expires_at)
-  VALUES (p_key_hash, p_binding_hash, p_tenant_id, p_purpose, p_user_id, p_client_id, p_authority, p_sealed, p_verified, p_ticket_hash, p_expires_at);
+  VALUES (p_key_hash, p_binding_hash, p_tenant_id, p_purpose, p_user_id, p_client_id, p_authority, p_sealed, p_verified, p_ticket_hash,
+          now() + make_interval(secs => p_seconds));
 END
 $$;
 -- +goose StatementEnd
@@ -129,15 +146,17 @@ $$;
 -- as, at every company of its organisation that signs in with Microsoft: the
 -- person it was linked to, or else (not linked yet) the person on the team
 -- with one of its addresses (p_addresses: its sign-in name, and its email
--- only when Microsoft says the email's domain is verified) who has no
--- Microsoft account of this organisation linked (a link to another
--- organisation is left over from before the company changed it). Only those
--- active, or invited while their invitation is valid (an invitation link
--- unused and unexpired). linked says which; is_owner, because an account is
--- never linked to an owner by its address alone (the caller decides).
+-- only when Microsoft says the email's domain is verified; none when
+-- Microsoft does not say it is a member) who has no Microsoft account of
+-- this organisation linked (a link to another organisation is left over
+-- from before the company changed it). Only those active, or invited while
+-- their invitation is valid (an invitation link unused and unexpired).
+-- linked says which; is_owner and connect_only, because an account is never
+-- linked to an owner, or to someone whose account was unlinked, by its
+-- address alone (the caller decides).
 -- +goose StatementBegin
 CREATE FUNCTION app_microsoft_accounts(p_ms_tenant_id text, p_ms_object_id text, p_addresses text[])
-RETURNS TABLE (tenant_id text, tenant_name text, careers_slug text, user_id text, linked boolean, is_owner boolean)
+RETURNS TABLE (tenant_id text, tenant_name text, careers_slug text, user_id text, linked boolean, is_owner boolean, connect_only boolean)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   WITH t AS (
     SELECT id, name, careers_slug FROM tenant WHERE microsoft_sign_in AND microsoft_tenant_id = p_ms_tenant_id),
@@ -150,7 +169,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
       AND NOT EXISTS (SELECT 1 FROM user_microsoft m
                       WHERE m.tenant_id = u.tenant_id AND m.user_id = u.id AND m.ms_tenant_id = p_ms_tenant_id)
       AND NOT EXISTS (SELECT 1 FROM by_link l WHERE l.tenant_id = u.tenant_id))
-  SELECT t.id, t.name, t.careers_slug, u.id, f.linked, u.role = 'owner'
+  SELECT t.id, t.name, t.careers_slug, u.id, f.linked, u.role = 'owner', u.microsoft_connect_only
   FROM (SELECT * FROM by_link UNION ALL SELECT * FROM by_address) f
   JOIN t ON t.id = f.tenant_id
   JOIN app_user u ON u.tenant_id = f.tenant_id AND u.id = f.user_id
@@ -163,26 +182,44 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 $$;
 -- +goose StatementEnd
 
-REVOKE ALL ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, timestamptz) FROM PUBLIC;
+-- Microsoft has just vouched for an account of p_ms_tenant_id: whether its
+-- token said member or guest (the optional acct claim), kept for the
+-- companies of that organisation (Settings warns when it did not).
+-- +goose StatementBegin
+CREATE FUNCTION app_microsoft_note_claims(p_ms_tenant_id text, p_acct boolean)
+RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  UPDATE tenant SET microsoft_acct_missing = NOT p_acct
+  WHERE microsoft_sign_in AND microsoft_tenant_id = p_ms_tenant_id AND microsoft_acct_missing <> NOT p_acct
+$$;
+-- +goose StatementEnd
+
+REVOKE ALL ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_flow_park(text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_flow_take(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_sign_in_tenants(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_accounts(text, text, text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, timestamptz) TO hiringplug_app;
+REVOKE ALL ON FUNCTION app_microsoft_note_claims(text, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, integer) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_park(text, text, text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_take(text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_sign_in_tenants(text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_accounts(text, text, text[]) TO hiringplug_app;
+GRANT EXECUTE ON FUNCTION app_microsoft_note_claims(text, boolean) TO hiringplug_app;
 
 -- +goose Down
+DROP FUNCTION IF EXISTS app_microsoft_note_claims(text, boolean);
 DROP FUNCTION IF EXISTS app_microsoft_accounts(text, text, text[]);
-DROP FUNCTION IF EXISTS app_microsoft_tenants_by_email(text);
 DROP FUNCTION IF EXISTS app_microsoft_sign_in_tenants(text);
 DROP FUNCTION IF EXISTS app_microsoft_flow_take(text);
 DROP FUNCTION IF EXISTS app_microsoft_flow_park(text, text, text);
-DROP FUNCTION IF EXISTS app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, timestamptz);
+DROP FUNCTION IF EXISTS app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, integer);
 DROP TABLE IF EXISTS microsoft_sign_in_flow;
 DROP TABLE IF EXISTS user_microsoft;
-ALTER TABLE app_user DROP COLUMN IF EXISTS microsoft_sessions_after;
+DELETE FROM user_link WHERE kind = 'reconnect';
+ALTER TABLE user_link DROP CONSTRAINT user_link_kind_check,
+  ADD CONSTRAINT user_link_kind_check CHECK (kind IN ('invite', 'reset'));
+ALTER TABLE app_user DROP COLUMN IF EXISTS microsoft_connect_only, DROP COLUMN IF EXISTS microsoft_sessions_after;
 ALTER TABLE tenant DROP CONSTRAINT IF EXISTS tenant_microsoft_sign_in_check,
+  DROP COLUMN IF EXISTS microsoft_acct_missing,
   DROP COLUMN IF EXISTS microsoft_required, DROP COLUMN IF EXISTS microsoft_tenant_id, DROP COLUMN IF EXISTS microsoft_sign_in;
