@@ -1649,3 +1649,35 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .badge.apollo-connected { background: #dcfce7; color: #166534; }
 .badge.apollo-disabled, .badge.apollo-disconnected { background: var(--soft, #f3f0fa); color: var(--muted, #5b5670); }
 .badge.apollo-expired, .badge.apollo-failed { background: #fef3c7; color: #92400e; }
+
+/* Settings › Team: one column for the person (name, email, how they sign
+   in), actions in a menu, so the table fits beside the settings menu
+   (1280px and up) without scrolling sideways; on phones each person is a card. */
+.menu-list button.danger { color: #b91c1c; }
+.team-table :is(th, td) { padding-inline: 0.8rem; }
+.team-table td { vertical-align: top; }
+.team-table .team-person { min-width: 13rem; }
+.team-table .team-name { font-weight: 600; }
+.team-table .team-email { font-size: 0.88rem; overflow-wrap: anywhere; }
+.team-table select { max-width: 11rem; }
+.team-table .team-status { min-width: 9.5rem; }
+.team-table .team-last { margin-top: 0.3rem; line-height: 1.35; }
+.team-table .team-actions { width: 3rem; text-align: right; }
+.team-table .team-role-text { display: inline-block; padding-block: 0.5rem; }
+.team-table tr.has-note td { border-bottom: 0; }
+.team-table tr.team-note td { padding-top: 0; }
+.team-table tr.team-note .warning { margin: 0; }
+.team-table .team-sent { display: inline-block; padding: 0.4rem 0.75rem; border-radius: 8px; background: var(--accent-soft); color: var(--ink); font-size: 0.9rem; }
+@media (max-width: 700px) {
+  .team-table thead { display: none; }
+  .team-table, .team-table tbody, .team-table tr, .team-table td { display: block; width: 100%; box-sizing: border-box; }
+  .team-table tr.team-row { position: relative; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--line); }
+  .team-table tr.team-row.has-note { border-bottom: 0; }
+  .team-table tr.team-note { padding: 0 0.9rem 0.75rem; border-bottom: 1px solid var(--line); }
+  .team-table tr:last-child { border-bottom: 0; }
+  .team-table td, .team-table tr.team-note td { border: 0; padding: 0.15rem 0; }
+  .team-table .team-person { min-width: 0; padding-right: 2.75rem; }
+  .team-table .team-role, .team-table .team-group { display: inline-block; width: auto; margin: 0.35rem 0.5rem 0.2rem 0; }
+  .team-table .team-actions { position: absolute; top: 0.6rem; right: 0.5rem; width: auto; }
+  .team-table tbody tr:hover td { background: transparent; }
+}

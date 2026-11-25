@@ -13,10 +13,30 @@ afterEach(() => {
 });
 
 const LINK = "a".repeat(64);
-const link = (kind: "invite" | "reset", microsoft: "none" | "available" | "required") =>
+const link = (kind: "invite" | "reset" | "reconnect", microsoft: "none" | "available" | "required") =>
   ok({ kind, email: "nur@contoh.my", name: "Nur", companyName: "Contoh Recruitment", microsoft });
 
 describe("invitation and reset links with Microsoft", () => {
+  it("connects Microsoft with a reconnect link, never a password", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(link("reconnect", "required"));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ url: "https://login.example/authorize" }));
+    const go = vi.spyOn(browser, "go").mockImplementation(() => undefined);
+    renderWithClient(<ChoosePassword token={LINK} onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Connect Microsoft sign-in" })).toBeTruthy();
+    expect(screen.queryByLabelText("Password (at least 10 characters)")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Connect with Microsoft" }));
+    await waitFor(() => { expect(go).toHaveBeenCalledWith("https://login.example/authorize"); });
+    expect(sentBody(post)).toEqual({ bindingHash: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown, invite: LINK });
+  });
+
+  it("says a reconnect link is no use once the company stopped signing in with Microsoft", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(link("reconnect", "none"));
+    renderWithClient(<ChoosePassword token={LINK} onSignedIn={vi.fn()} />);
+    expect((await screen.findByRole("alert")).textContent).toContain("does not sign in with Microsoft any more");
+    expect(screen.queryByRole("button", { name: "Connect with Microsoft" })).toBeNull();
+    expect(screen.queryByLabelText("Password (at least 10 characters)")).toBeNull();
+  });
+
   it("offers Accept with Microsoft beside choosing a password, started with the invitation", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(link("invite", "available"));
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ url: "https://login.example/authorize" }));

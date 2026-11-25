@@ -14,7 +14,9 @@ export const REFUSED: Record<string, string> = {
   not_on_team: "Your Microsoft account isn't on this HiringPlug team yet. Ask an owner to invite you.",
   other_organisation: "This Microsoft account belongs to another organisation. Sign in with your work account at this company.",
   personal_account: "This is a personal Microsoft account. Sign in with your work account instead.",
-  connect_first: "Owners connect their Microsoft account once before signing in with it: sign in with your password, then use Your account › Connect Microsoft sign-in.",
+  connect_first: "This Microsoft account has to be connected to your HiringPlug account on purpose first: sign in with your password and use Your account › Connect Microsoft sign-in, or ask an owner to send you a link to connect it.",
+  linked_elsewhere: "This Microsoft account is already connected to someone else on the team. Use your own work account.",
+  already_connected: "Another Microsoft account is already connected to you. Ask an owner to unlink it on the Team page first.",
   failed: "Signing in with Microsoft didn't work, or took too long. Please start again.",
 };
 

@@ -9,7 +9,10 @@ import { SaveError } from "../components/SaveError";
 import { SignInFrame } from "../components/SignInFrame";
 import { nextStepOf, TwoStepAtSignIn } from "../components/TwoStep";
 
-/** Choose a password with an invitation or password reset link, then sign in. */
+/**
+ * Choose a password with an invitation or password reset link, then sign
+ * in; or connect a Microsoft account with a reconnect link (Microsoft only).
+ */
 export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedIn: () => void }) {
   const link = useQuery({
     queryKey: ["auth-link", token],
@@ -43,6 +46,21 @@ export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedI
   // Microsoft instead of a password: offered, or (the company requires it) the only way.
   const microsoft = l?.microsoft ?? "none";
   const invite = l?.kind === "invite";
+  if (l?.kind === "reconnect") {
+    return (
+      <SignInFrame>
+        <h2 className="sign-in-title">Connect Microsoft sign-in</h2>
+        {microsoft === "none" ? <p role="alert">{l.companyName} does not sign in with Microsoft any more. <a href="#/">Go to sign in</a></p> : (
+          <>
+            <p>Sign in with your Microsoft work account to connect it to your HiringPlug account at <strong>{l.companyName}</strong>. From then on it signs you in.</p>
+            <p className="muted">{l.name} · {l.email}</p>
+            <MicrosoftButton label="Connect with Microsoft" from={() => ({ invite: token })} />
+            <p className="muted small">The link works once. If you did not expect it, close this page and tell an owner.</p>
+          </>
+        )}
+      </SignInFrame>
+    );
+  }
   return (
     <SignInFrame>
       <ErrorMessage error={link.error} />

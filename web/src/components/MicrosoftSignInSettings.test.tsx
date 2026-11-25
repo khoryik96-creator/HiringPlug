@@ -13,7 +13,7 @@ afterEach(() => {
 const ORG = "72f988bf-86f1-41af-91ab-2d7cd011db47";
 const CALLBACK = "https://ats.contoh.my/v1/auth/microsoft/callback";
 const settings = (over: Partial<Schemas["MicrosoftSignInSettings"]> = {}): Schemas["MicrosoftSignInSettings"] => ({
-  enabled: false, organisationId: null, required: false, callbackUrl: CALLBACK, appSource: "agency", clientId: "c1d2", ...over,
+  enabled: false, organisationId: null, required: false, callbackUrl: CALLBACK, appSource: "agency", clientId: "c1d2", acctClaimMissing: false, ...over,
 });
 const access: Schemas["AccessSettings"] = { roles: [], permissions: [] };
 const twoStep = { enabled: true, enabledAt: null, recoveryCodesLeft: 10, required: false };
@@ -116,5 +116,18 @@ describe("Roles and access › Microsoft sign-in", () => {
     fireEvent.click(within(box).getByRole("button", { name: "Save" }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect(sentBody(put)).toEqual({ enabled: false, organisationId: ORG.toUpperCase(), required: false });
+  });
+  it("warns when the last Microsoft sign-in came without the acct claim", async () => {
+    serve(settings({ enabled: true, organisationId: ORG, acctClaimMissing: true }));
+    renderWithClient(<Access owner />);
+    const warning = await screen.findByRole("alert");
+    expect(warning.textContent).toContain("Add the acct optional claim in Microsoft Entra.");
+    expect(warning.textContent).toContain("links no account to the team by its address");
+    cleanup();
+    serve(settings({ enabled: true, organisationId: ORG }));
+    renderWithClient(<Access owner />);
+    await screen.findByRole("region", { name: "Microsoft sign-in" });
+    await screen.findByText(/optional claims/);
+    expect(screen.queryByText(/Add the/)).toBeNull();
   });
 });

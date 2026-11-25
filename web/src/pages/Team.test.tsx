@@ -54,8 +54,43 @@ describe("team", () => {
     renderWithClient(<Team myRole="owner" myId="usr_me" />);
     expect(await screen.findAllByRole("button", { name: "Unlink Microsoft" })).toHaveLength(2); // owners unlink owners too
     fireEvent.click(screen.getAllByRole("button", { name: "Unlink Microsoft" })[0] as HTMLElement);
-    expect(confirm.mock.calls.at(-1)?.[0]).toContain("They can connect one again from Your account.");
+    expect(confirm.mock.calls.at(-1)?.[0]).toContain("connected to them only on purpose");
     expect(del).toHaveBeenCalledTimes(1); // not confirmed: nothing unlinked
+  });
+
+  it("keeps each person's actions in a menu, and their email under their name", async () => {
+    reads();
+    renderWithClient(<Team myRole="owner" myId="usr_me" />);
+    const menu = await screen.findByLabelText("Actions for Rizal");
+    expect(menu.tagName).toBe("SUMMARY");
+    expect(screen.queryByRole("columnheader", { name: "Email" })).toBeNull();
+    const row = menu.closest("tr") as HTMLElement;
+    expect(within(row).getByText("rizal@contoh.my")).toBeTruthy();
+    expect(within(row).getByText("Never signed in")).toBeTruthy();
+    expect(screen.queryByLabelText("Actions for Aina")).toBeNull(); // nothing to do to yourself here
+  });
+
+  it("emails someone a link to reconnect Microsoft, and shows it to pass on", async () => {
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({
+      items: [member("usr_me", "Aina", "admin"), member("usr_o", "Olivia", "owner"), member("usr_r", "Rizal", "recruiter"),
+        { ...member("usr_l", "Lina", "recruiter"), signInMethods: ["microsoft"] }, member("usr_n", "Nur", "sourcer", "invited")],
+    }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ expiresAt: "2026-12-02T00:00:00Z", emailed: true }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<Team myRole="admin" myId="usr_me" microsoft />);
+    const buttons = await screen.findAllByRole("button", { name: "Reconnect Microsoft" });
+    expect(buttons).toHaveLength(1); // Rizal's: not Aina's (her own: Your account), the owner's (admins), Lina's (linked) nor Nur's (invited)
+    fireEvent.click(within(screen.getByLabelText("Actions for Rizal").closest("tr") as HTMLElement).getByRole("button", { name: "Reconnect Microsoft" }));
+    expect(confirm.mock.calls[0]?.[0]).toContain("whatever its address");
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(post.mock.calls[0]?.[0]).toBe("/v1/team/{userId}/microsoft/reconnect");
+    expect(post.mock.calls[0]?.[1]).toEqual({ params: { path: { userId: "usr_r" } } });
+    expect((await screen.findByRole("status")).textContent).toContain("Link to connect Microsoft emailed to rizal@contoh.my. It works once, for 7 days.");
+    cleanup();
+    get.mockClear();
+    renderWithClient(<Team myRole="admin" myId="usr_me" />);
+    await screen.findByLabelText("Actions for Rizal");
+    expect(screen.queryByRole("button", { name: "Reconnect Microsoft" }), "the company does not sign in with Microsoft").toBeNull();
   });
 
   it("cancels an invitation sent to the wrong person, after asking", async () => {

@@ -83,10 +83,19 @@ function SettingsForm({ saved }: { saved: Settings }) {
         <p className="ms-https">Microsoft accepts only https addresses (localhost aside): HiringPlug needs its https address (HP_PUBLIC_URL) first.</p>
       )}
       {saved.clientId && <p className="muted small">Application (client) ID: <code>{saved.clientId}</code></p>}
+      {saved.acctClaimMissing && (
+        <p className="warning ms-claims-warning" role="alert">
+          <strong>Add the <code>acct</code> optional claim in Microsoft Entra.</strong> The last sign-in with Microsoft came without it, so
+          HiringPlug cannot tell your organisation&apos;s guests from its members, and links no account to the team by its address:
+          people connect theirs from Your account, or with an invitation or a link from the Team page, until it is added
+          (App registrations › your app › Token configuration › Add optional claim › ID › <code>acct</code>).
+        </p>
+      )}
       <p className="muted small">
-        In Microsoft Entra, also add the optional claims <code>xms_edov</code> and <code>acct</code> to the ID token (Token configuration):
-        an account is then recognised by its email too when Microsoft has verified the email&apos;s domain, and guests are recognised as such.
-        Without them, only the account&apos;s sign-in name (UPN) is matched to the team.
+        In Microsoft Entra, also add the optional claims <code>acct</code> and <code>xms_edov</code> to the ID token (Token configuration).
+        With <code>acct</code>, guests are recognised as such and a first sign-in links an account to the team member with its sign-in name (UPN);
+        with <code>xms_edov</code>, also by its email when Microsoft has verified the email&apos;s domain. Without <code>acct</code>, no account is
+        linked by its address.
       </p>
       <label className="check">
         <input type="checkbox" checked={form.enabled} onChange={(e) => { edit({ enabled: e.target.checked }); }} />

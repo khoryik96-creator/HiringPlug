@@ -76,10 +76,18 @@ export async function startMicrosoft(from: Start): Promise<void> {
   browser.go(url);
 }
 
+/** What proves it is you before an account is connected: your password, and your two-step code if you use one. */
+export type ConnectProof = Pick<Schemas["MicrosoftConnectStart"], "password" | "code">;
+
 /** Starts connecting the signed-in person's Microsoft account (Your account) and sends the browser there. */
-export async function startConnecting(): Promise<void> {
+export async function startConnecting(proof: ConnectProof = {}): Promise<void> {
   needsHttps();
-  const { url } = unwrap(await api.POST("/v1/me/microsoft/start", { body: { bindingHash: await newBinding(true) } }));
+  const body: Schemas["MicrosoftConnectStart"] = {
+    bindingHash: await newBinding(true),
+    ...(proof.password ? { password: proof.password } : {}),
+    ...(proof.code?.trim() ? { code: proof.code.trim() } : {}),
+  };
+  const { url } = unwrap(await api.POST("/v1/me/microsoft/start", { body }));
   browser.go(url);
 }
 

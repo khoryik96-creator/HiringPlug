@@ -171,7 +171,7 @@ export const ROUTES: Route[] = [
   { section: "ai-usage", path: /^#\/settings\/ai-usage/, permission: "aiusage:read", menu: { in: "settings", label: "AI usage", href: "#/settings/ai-usage" },
     render: (c) => <AiUsage canManage={can(c, "aiusage:manage")} /> },
   { section: "team", path: /^#\/team/, permission: "identity.team:manage", menu: { in: "settings", label: "Team", href: "#/team" },
-    render: (c) => <Team myRole={c.me.role} myId={c.me.user.id} /> },
+    render: (c) => <Team myRole={c.me.role} myId={c.me.user.id} microsoft={c.me.microsoftSignIn} /> },
   { section: "access", path: /^#\/access/, permission: "identity.roles:manage", menu: { in: "settings", label: "Roles and access", href: "#/access" },
     render: (c) => <Access owner={c.me.role === "owner"} /> },
   { section: "privacy", path: /^#\/privacy/, permission: "privacy:manage", menu: { in: "settings", label: "Data protection", href: "#/privacy" },

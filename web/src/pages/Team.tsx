@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { setToken } from "../auth";
 import { teamsKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Menu } from "../components/Menu";
 import { SignInMethods } from "../components/SignInMethods";
 import { SaveError } from "../components/SaveError";
 import { formatWhen, keysOf, ROLE, TEAM_STATUS } from "../labels";
@@ -14,7 +15,7 @@ type Group = Schemas["TeamGroup"];
 const teamKey = ["team"] as const;
 
 /** Who is in the company: invite people, change roles, deactivate (owners and admins). */
-export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }) {
+export function Team({ myRole, myId, microsoft = false }: { myRole: Schemas["Role"]; myId: string; microsoft?: boolean }) {
   const list = useQuery({ queryKey: teamKey, queryFn: async () => unwrap(await api.GET("/v1/team")).items });
   const groups = useQuery({ queryKey: teamsKey, queryFn: async () => unwrap(await api.GET("/v1/teams")).items });
   return (
@@ -24,9 +25,9 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
       <ErrorMessage error={list.error ?? groups.error} />
       {list.data && (
         <div className="table-scroll">
-          <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Last signed in</th><th /></tr></thead>
-            <tbody>{list.data.map((m) => <MemberRow key={m.id} member={m} myRole={myRole} me={m.id === myId} groups={groups.data ?? []} />)}</tbody>
+          <table className="team-table">
+            <thead><tr><th>Person</th><th>Role</th><th>Team</th><th>Status</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+            <tbody>{list.data.map((m) => <MemberRow key={m.id} member={m} myRole={myRole} me={m.id === myId} groups={groups.data ?? []} microsoft={microsoft} />)}</tbody>
           </table>
         </div>
       )}
@@ -40,9 +41,13 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
 const rank = (r: Schemas["Role"]) => (r === "owner" ? 3 : r === "admin" ? 2 : 1);
 const roles = (myRole: Schemas["Role"]) => keysOf(ROLE).filter((r) => rank(r) <= rank(myRole));
 
-function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[] }) {
+/** A link just emailed to someone: an invitation (shown, to pass on another way if email is not set up), or to connect Microsoft (never shown: it signs in as them). */
+type Sent = { what: string; link?: string };
+
+function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[]; microsoft: boolean }) {
   const queryClient = useQueryClient();
-  const [link, setLink] = useState<string | null>(null);
+  const [sent, setSent] = useState<Sent | null>(null);
+  const refresh = async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); };
   const update = useMutation({
     mutationFn: async (body: Schemas["TeamMemberUpdate"]) =>
       unwrap(await api.PATCH("/v1/team/{userId}", { params: { path: { userId: m.id } }, body })),
@@ -53,70 +58,112 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
   });
   const resend = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })),
-    onSuccess: (inv) => { setLink(inv.link); },
+    onSuccess: (inv) => { setSent({ what: "New invitation emailed", link: inv.link }); },
+  });
+  const reconnect = useMutation({
+    mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/microsoft/reconnect", { params: { path: { userId: m.id } } })),
+    onSuccess: () => { setSent({ what: "Link to connect Microsoft emailed" }); },
   });
   const resetTwoStep = useMutation({
     mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/two-step", { params: { path: { userId: m.id } } })); },
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+    onSuccess: refresh,
   });
   const unlink = useMutation({
     mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/microsoft", { params: { path: { userId: m.id } } })); },
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+    onSuccess: refresh,
   });
   const cancel = useMutation({
     mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })); },
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+    onSuccess: refresh,
   });
   const locked = me || rank(m.role) > rank(myRole);
+  const mayOwners = myRole === "owner" || m.role !== "owner"; // only owners act on owners' sign-in
+  const linked = m.signInMethods.includes("microsoft");
+  const actions: { label: string; danger?: boolean; busy?: boolean; run: () => void }[] = [];
+  if (!locked && m.status === "active") {
+    actions.push({ label: "Deactivate", run: () => { if (window.confirm(`Deactivate ${m.name}? They are signed out and cannot sign in.`)) update.mutate({ active: false }); } });
+  }
+  if (!locked && m.status === "deactivated") actions.push({ label: "Reactivate", run: () => { update.mutate({ active: true }); } });
+  if (m.twoStep && !me && mayOwners) {
+    actions.push({ label: "Reset two-step", busy: resetTwoStep.isPending, run: () => {
+      if (window.confirm(`Reset ${m.name}'s two-step sign-in (a lost phone)? They are signed out and add their app again.`)) resetTwoStep.mutate();
+    } });
+  }
+  if (linked && mayOwners) {
+    actions.push({ label: "Unlink Microsoft", busy: unlink.isPending, run: () => {
+      if (window.confirm(`Unlink ${m.name}'s Microsoft account? Their sessions signed in with Microsoft end now. `
+        + "A Microsoft account is then connected to them only on purpose: from Your account, or with a link you send them (Reconnect Microsoft).")) unlink.mutate();
+    } });
+  }
+  if (microsoft && !linked && !me && m.status === "active" && mayOwners) {
+    actions.push({ label: "Reconnect Microsoft", busy: reconnect.isPending, run: () => {
+      if (window.confirm(`Email ${m.name} a link to connect their Microsoft work account, whatever its address? `
+        + "Signing in with Microsoft from it connects that account to them. The link works once, for 7 days.")) reconnect.mutate();
+    } });
+  }
+  if (m.status === "invited") actions.push({ label: "Send new invitation", busy: resend.isPending, run: () => { resend.mutate(); } });
+  if (m.status === "invited" && !locked) {
+    actions.push({ label: "Cancel invitation", danger: true, busy: cancel.isPending, run: () => {
+      if (window.confirm(`Cancel the invitation of ${m.name} (${m.email})? Their link stops working now; you can invite them again later.`)) cancel.mutate();
+    } });
+  }
+  const error = update.error ?? resend.error ?? cancel.error ?? resetTwoStep.error ?? unlink.error ?? reconnect.error;
   return (
-    <tr>
-      <td>{m.name}{me && <span className="muted"> (you)</span>}<SignInMethods methods={m.signInMethods} /></td>
-      <td>{m.email}</td>
-      <td>
-        {locked ? ROLE[m.role] : (
-          <select aria-label={`Role of ${m.name}`} value={m.role} disabled={update.isPending}
-            onChange={(e) => { update.mutate({ role: e.target.value as Schemas["Role"] }); }}>
-            {roles(myRole).map((r) => <option key={r} value={r}>{ROLE[r]}</option>)}
+    <>
+      <tr className={sent || error ? "team-row has-note" : "team-row"}>
+        <td className="team-person">
+          <div className="team-name">{m.name}{me && <span className="muted"> (you)</span>}</div>
+          <div className="team-email muted">{m.email}</div>
+          <SignInMethods methods={m.signInMethods} />
+        </td>
+        <td className="team-role">
+          {locked ? <span className="team-role-text">{ROLE[m.role]}</span> : (
+            <select aria-label={`Role of ${m.name}`} value={m.role} disabled={update.isPending}
+              onChange={(e) => { update.mutate({ role: e.target.value as Schemas["Role"] }); }}>
+              {roles(myRole).map((r) => <option key={r} value={r}>{ROLE[r]}</option>)}
+            </select>
+          )}
+        </td>
+        <td className="team-group">
+          <select aria-label={`Team of ${m.name}`} value={m.teamId ?? ""} disabled={update.isPending}
+            onChange={(e) => { update.mutate({ teamId: e.target.value || null }); }}>
+            <option value="">No team</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
-        )}
-      </td>
-      <td>
-        <select aria-label={`Team of ${m.name}`} value={m.teamId ?? ""} disabled={update.isPending}
-          onChange={(e) => { update.mutate({ teamId: e.target.value || null }); }}>
-          <option value="">No team</option>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
-      </td>
-      <td><span className={`badge ${m.status === "active" ? "accepted" : m.status === "invited" ? "draft" : "withdrawn"}`}>{TEAM_STATUS[m.status]}</span>
-        {m.twoStep && <span className="badge two-step-badge" title="Signs in with a code from an authenticator app too">2-step</span>}</td>
-      <td className="muted">{m.lastSignInAt ? formatWhen(m.lastSignInAt) : "Never"}</td>
-      <td>
-        {!locked && m.status === "active" && (
-          <button type="button" className="link" onClick={() => { if (window.confirm(`Deactivate ${m.name}? They are signed out and cannot sign in.`)) update.mutate({ active: false }); }}>Deactivate</button>
-        )}
-        {!locked && m.status === "deactivated" && <button type="button" className="link" onClick={() => { update.mutate({ active: true }); }}>Reactivate</button>}
-        {m.twoStep && !me && (myRole === "owner" || m.role !== "owner") && (
-          <button type="button" className="link" disabled={resetTwoStep.isPending} onClick={() => {
-            if (window.confirm(`Reset ${m.name}'s two-step sign-in (a lost phone)? They are signed out and add their app again.`)) resetTwoStep.mutate();
-          }}>Reset two-step</button>
-        )}
-        {m.signInMethods.includes("microsoft") && (myRole === "owner" || m.role !== "owner") && (
-          <button type="button" className="link" disabled={unlink.isPending} onClick={() => {
-            if (window.confirm(`Unlink ${m.name}'s Microsoft account? Their sessions signed in with Microsoft end now. ${m.role === "owner"
-              ? "They can connect one again from Your account."
-              : "Their next sign-in with Microsoft links their work account again."}`)) unlink.mutate();
-          }}>Unlink Microsoft</button>
-        )}
-        {m.status === "invited" && <button type="button" className="link" disabled={resend.isPending} onClick={() => { resend.mutate(); }}>Send new invitation</button>}
-        {m.status === "invited" && !locked && (
-          <button type="button" className="link danger" disabled={cancel.isPending} onClick={() => {
-            if (window.confirm(`Cancel the invitation of ${m.name} (${m.email})? Their link stops working now; you can invite them again later.`)) cancel.mutate();
-          }}>Cancel invitation</button>
-        )}
-        {link && <div className="secret">{link}</div>}
-        <ErrorMessage error={update.error ?? resend.error ?? cancel.error ?? resetTwoStep.error ?? unlink.error} />
-      </td>
-    </tr>
+        </td>
+        <td className="team-status">
+          <span className={`badge ${m.status === "active" ? "accepted" : m.status === "invited" ? "draft" : "withdrawn"}`}>{TEAM_STATUS[m.status]}</span>
+          {m.twoStep && <span className="badge two-step-badge" title="Signs in with a code from an authenticator app too">2-step</span>}
+          <div className="team-last muted small">{m.lastSignInAt ? <>Last signed in {formatWhen(m.lastSignInAt)}</> : "Never signed in"}</div>
+        </td>
+        <td className="team-actions">
+          {actions.length > 0 && (
+            <Menu label="⋯" ariaLabel={`Actions for ${m.name}`}>
+              {(close) => actions.map((a) => (
+                <button key={a.label} type="button" className={a.danger ? "danger" : undefined} disabled={a.busy}
+                  onClick={() => { close(); a.run(); }}>{a.label}</button>
+              ))}
+            </Menu>
+          )}
+        </td>
+      </tr>
+      {(sent || error) && (
+        <tr className="team-note">
+          <td colSpan={5}>
+            {sent && (
+              <div className={sent.link ? "warning" : "team-sent"} role="status">
+                {sent.link ? <>
+                  {sent.what} to {m.email}. If email is not set up, send them this link (it works for 7 days):{" "}
+                  <code className="secret">{sent.link}</code>
+                </> : <>{sent.what} to {m.email}. It works once, for 7 days.</>}{" "}
+                <button type="button" className="link" onClick={() => { setSent(null); }}>Done</button>
+              </div>
+            )}
+            <ErrorMessage error={error} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

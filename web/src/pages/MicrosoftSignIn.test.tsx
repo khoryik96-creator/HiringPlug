@@ -223,6 +223,8 @@ describe("back from connecting an account (Your account)", () => {
   });
 });
 
-it("tells an owner to connect their account first", () => {
+it("tells an owner, or someone whose account was unlinked, how to connect it on purpose", () => {
   expect(REFUSED.connect_first).toContain("Your account › Connect Microsoft sign-in");
+  expect(REFUSED.connect_first).toContain("ask an owner to send you a link");
+  expect(Object.keys(REFUSED)).toEqual(expect.arrayContaining(["linked_elsewhere", "already_connected"]));
 });

@@ -86,6 +86,7 @@ describe("signing in", () => {
 
   it("recognises link addresses", () => {
     expect(authLinkRoute("#/invite/" + "b".repeat(64))).toEqual({ kind: "invite", token: "b".repeat(64) });
+    expect(authLinkRoute("#/reconnect/" + "c".repeat(64))).toEqual({ kind: "reconnect", token: "c".repeat(64) });
     expect(authLinkRoute("#/reset/short")).toBeNull();
     expect(authLinkRoute("#/candidates")).toBeNull();
   });
