@@ -39,6 +39,15 @@ var (
 
 // FailChown makes giving files to their owner fail until the test ends.
 func FailChown(t interface{ Cleanup(func()) }, err error) {
+	saved := chown
 	lchown = func(string, int, int) error { return err }
-	t.Cleanup(func() { lchown = os.Lchown })
+	chown = func(node, Owner) error { return err }
+	t.Cleanup(func() { lchown, chown = os.Lchown, saved })
+}
+
+// BeforeOpen runs swap just before the files' walk opens each name, until
+// the test ends: where a process racing it would swap the name for a link.
+func BeforeOpen(t interface{ Cleanup(func()) }, swap func(dir, name string)) {
+	beforeOpen = swap
+	t.Cleanup(func() { beforeOpen = nil })
 }

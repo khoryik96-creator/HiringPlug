@@ -39,33 +39,34 @@ func ParseOwner(v string) (Owner, error) {
 // stageName is the restore's staging folder inside the files folder.
 const stageName = ".hp-restore"
 
+// node is a folder or regular file met by walk, open: changes act on it
+// (fchown, fchmod), never on its name, so a name swapped for a link while
+// the walk runs (the API still running, writing) is never followed. rel is
+// its path inside the walked folder ("" for the folder itself).
+type node struct {
+	fd       int
+	rel      string
+	dir      bool
+	uid, gid int
+	perm     fs.FileMode
+	nlink    uint64
+}
+
+// chown gives one open folder or file to o; tests make it fail.
+var chown = func(n node, o Owner) error { return n.chown(o) }
+
 // giveFiles gives root, its folders and their regular files to o. Links are
-// never followed nor changed. With skipLinked, a file with more than one
-// link (shared with another folder, such as a kept backup's copy) is left
-// alone, so changing it here never changes the other copy; skipped counts
-// them.
+// never followed nor changed (walk). With skipLinked, a file with more
+// than one link (shared with another folder, such as a kept backup's copy)
+// is left alone, so changing it here never changes the other copy; skipped
+// counts them.
 func giveFiles(root string, o Owner, skipLinked bool) (skipped int, err error) {
-	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if p != root && d.IsDir() && d.Name() == stageName {
-			return fs.SkipDir
-		}
-		if !d.IsDir() && !d.Type().IsRegular() {
+	err = walk(root, func(n node) error {
+		if skipLinked && !n.dir && n.nlink > 1 {
+			skipped++
 			return nil
 		}
-		if skipLinked && !d.IsDir() {
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
-			if links(info) > 1 {
-				skipped++
-				return nil
-			}
-		}
-		return lchown(p, o.UID, o.GID)
+		return chown(n, o)
 	})
 	return skipped, err
 }
@@ -119,39 +120,27 @@ func CheckFiles(ctx context.Context, dir string, o Owner, sample int) (FilesChec
 	c := FilesCheck{Owner: o}
 	var picked []string
 	seen := 0
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if p != dir && d.IsDir() && d.Name() == stageName {
-			return fs.SkipDir
-		}
-		if !d.IsDir() && !d.Type().IsRegular() {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
+	err := walk(dir, func(n node) error {
+		if n.dir {
 			c.Folders++
 		} else {
 			c.Files++
-			if links(info) > 1 {
+			if n.nlink > 1 {
 				c.Linked++
 			}
 			// Reservoir sampling: every file equally likely, in one pass.
 			seen++
+			p := filepath.Join(dir, n.rel)
 			if len(picked) < sample {
 				picked = append(picked, p)
 			} else if i := rand.IntN(seen); i < sample { //nolint:gosec // which files to check, not a secret
 				picked[i] = p
 			}
 		}
-		if uid, gid, ok := ownerOf(info); ok && (uid != o.UID || gid != o.GID) {
+		if n.uid != o.UID || n.gid != o.GID {
 			c.WrongOwner++
 		}
-		if p != dir && info.Mode().Perm()&0o007 != 0 { // the folder itself may be a mount point, as its image made it
+		if n.rel != "" && n.perm&0o007 != 0 { // the folder itself may be a mount point, as its image made it
 			c.TooOpen++
 		}
 		return nil
@@ -178,27 +167,20 @@ func CheckFiles(ctx context.Context, dir string, o Owner, sample int) (FilesChec
 // RepairFiles gives every folder and file under dir (dir too) to o and takes
 // away other users' access, never making anything more open, and never
 // changing a file with another link (it would change that copy too). It
-// returns how many files were left alone for that reason.
+// returns how many files were left alone for that reason. Links are never
+// followed (walk), but stop the API and workers first: a file they write
+// meanwhile may be left as they made it.
 func RepairFiles(dir string, o Owner) (skipped int, err error) {
-	if skipped, err = giveFiles(dir, o, true); err != nil {
-		return skipped, err
-	}
-	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if p != dir && d.IsDir() && d.Name() == stageName {
-			return fs.SkipDir
-		}
-		if !d.IsDir() && !d.Type().IsRegular() {
+	err = walk(dir, func(n node) error {
+		if !n.dir && n.nlink > 1 {
+			skipped++
 			return nil
 		}
-		info, err := d.Info()
-		if err != nil {
+		if err := chown(n, o); err != nil {
 			return err
 		}
-		if perm := info.Mode().Perm(); p != dir && perm&0o007 != 0 && (d.IsDir() || links(info) == 1) {
-			return os.Chmod(p, perm&^0o007) //nolint:gosec // only ever narrower
+		if n.rel != "" && n.perm&0o007 != 0 {
+			return n.chmod(n.perm &^ 0o007) // only ever narrower
 		}
 		return nil
 	})

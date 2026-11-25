@@ -204,6 +204,76 @@ func TestRepairGivesUnreadableFilesBackWithoutTouchingLinkedCopies(t *testing.T)
 	assert.Equal(t, []string{filepath.Join("tnt_a", "3f", "a9", "doc_3")}, after.Unreadable)
 }
 
+// Review of 1.47.0: hp repair-files runs as root while the API may still
+// run (as 65532, owning the files folder): a folder or file it swapped for
+// a link between the walk listing it and changing it was followed, and
+// root changed what the link pointed to, outside the files folder. Links
+// are never followed now, whenever they appear.
+func TestRepairNeverFollowsALinkSwappedInWhileItRuns(t *testing.T) {
+	requireRoot(t)
+	dir := filesDir(t)
+	outside := t.TempDir()
+	secret, sub := filepath.Join(outside, "secret"), filepath.Join(outside, "sub")
+	require.NoError(t, os.Mkdir(sub, 0o755))
+	inner := filepath.Join(sub, "inner")
+	for _, p := range []string{secret, inner} {
+		require.NoError(t, os.WriteFile(p, []byte("not HiringPlug's"), 0o644))
+		require.NoError(t, os.Chmod(p, 0o644))
+	}
+	for _, p := range []string{secret, sub, inner} {
+		require.NoError(t, os.Lchown(p, 1234, 1234))
+	}
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "tnt_a", "3f"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "tnt_a", "3f", "doc_1"), []byte("cv"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "tnt_a", "doc_2"), []byte("cv"), 0o644))
+	require.NoError(t, os.Chmod(filepath.Join(dir, "tnt_a", "doc_2"), 0o644))
+	swap := func(p, to string) {
+		require.NoError(t, os.Rename(p, p+".moved"))
+		require.NoError(t, os.Symlink(to, p))
+	}
+	backup.BeforeOpen(t, func(d, name string) {
+		switch name {
+		case "3f": // a folder, listed, becomes a link to another folder
+			swap(filepath.Join(d, name), sub)
+		case "doc_2": // a file, listed, becomes a link to another file
+			swap(filepath.Join(d, name), secret)
+		}
+	})
+
+	_, err := backup.RepairFiles(dir, runtime)
+	require.NoError(t, err)
+	for _, p := range []string{secret, sub, inner} {
+		uid, gid := ownerOf(t, p)
+		assert.Equal(t, [2]uint32{1234, 1234}, [2]uint32{uid, gid}, "never followed: %s", p)
+	}
+	for _, p := range []string{secret, inner} {
+		info, err := os.Stat(p)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm(), p)
+	}
+	uid, _ := ownerOf(t, filepath.Join(dir, "tnt_a"))
+	assert.EqualValues(t, 65532, uid, "the rest is repaired")
+}
+
+// Review of 1.47.0: a file was opened as the runtime user with root's
+// supplementary groups kept (NoSetGroups), so a folder only root's group
+// may enter passed the check, while the API (65532 alone) cannot open it.
+func TestFilesAreOpenedAsTheRuntimeUserAloneWithoutRootsGroups(t *testing.T) {
+	requireRoot(t)
+	groups, err := syscall.Getgroups()
+	require.NoError(t, err)
+	require.NoError(t, syscall.Setgroups([]int{0})) // root in its own group, as under sudo
+	t.Cleanup(func() { _ = syscall.Setgroups(groups) })
+	dir := filesDir(t)
+	private := filepath.Join(dir, "tnt_g")
+	require.NoError(t, os.Mkdir(private, 0o750))
+	require.NoError(t, os.Chmod(private, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(private, "doc"), []byte("cv"), 0o640))
+	check, err := backup.CheckFiles(context.Background(), dir, runtime, 10)
+	require.NoError(t, err)
+	assert.Equal(t, []string{filepath.Join("tnt_g", "doc")}, check.Unreadable, "65532 alone cannot get in")
+}
+
 func TestOwnersAreReadAsUserAndGroupIDs(t *testing.T) {
 	o, err := backup.ParseOwner("65532:65533")
 	require.NoError(t, err)
