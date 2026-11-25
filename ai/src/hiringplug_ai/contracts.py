@@ -4256,7 +4256,6 @@ class MicrosoftSignInSettings(BaseModel):
 
 
 class MicrosoftReconnectLink(BaseModel):
-    link: Annotated[str, Field(description="The link (also emailed), to pass on another way if needed.")]
     expiresAt: AwareDatetime
     emailed: Annotated[
         bool, Field(description="Whether an email was queued (it fails later if no mail server is set up).")

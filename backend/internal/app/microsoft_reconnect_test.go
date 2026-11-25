@@ -19,7 +19,10 @@ func (f *msTest) sendReconnect(token, userID string) *response {
 	return f.a.request(http.MethodPost, "/v1/team/"+userID+"/microsoft/reconnect", token, nil)
 }
 
-// reconnectLink is the token of a reconnect link an owner (or admin) sent.
+var reconnectRe = regexp.MustCompile(`http://app\.test/#/reconnect/([0-9a-f]{64})`)
+
+// reconnectLink is the token of a reconnect link an owner (or admin) sent:
+// from the email to the person (whoever sends it never sees it).
 func (f *msTest) reconnectLink(token, userID string) string {
 	f.t.Helper()
 	res := f.sendReconnect(token, userID)
@@ -27,8 +30,13 @@ func (f *msTest) reconnectLink(token, userID string) string {
 	var l api.MicrosoftReconnectLink
 	res.JSON(&l)
 	assert.True(f.t, l.Emailed)
-	require.True(f.t, strings.HasPrefix(l.Link, "http://app.test/#/reconnect/"), l.Link)
-	return l.Link[strings.LastIndex(l.Link, "/")+1:]
+	assert.NotContains(f.t, string(res.Body), "reconnect/", "the link is not shown to whoever sends it")
+	var tenantID, email string
+	require.NoError(f.t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT tenant_id, email FROM app_user WHERE id = $1`, userID).Scan(&tenantID, &email))
+	mail := strings.ReplaceAll(f.lastMailTo(tenantID, email), "=\r\n", "") // quoted-printable
+	m := reconnectRe.FindAllStringSubmatch(mail, -1)
+	require.NotEmpty(f.t, m, "the link is emailed to them")
+	return m[len(m)-1][1]
 }
 
 // Someone whose Microsoft sign-in name is not their HiringPlug email (or
@@ -54,8 +62,9 @@ func TestReconnectLinks(t *testing.T) {
 	res := f.sendReconnect(admin.Token, owner.ID)
 	require.Equal(t, http.StatusUnprocessableEntity, res.Status, "%s", res.Body)
 	assert.Equal(t, api.ErrorCodeTEAMCHANGENOTALLOWED, res.Error().Error.Code)
+	res = f.sendReconnect(admin.Token, admin.ID)
+	require.Equal(t, http.StatusUnprocessableEntity, res.Status, "yourself: from Your account (with your password): %s", res.Body)
 	link := f.reconnectLink(admin.Token, recruiter.ID)
-	assert.Contains(t, strings.ReplaceAll(f.lastMailTo(tenant.ID, recruiterEmail), "=\r\n", ""), "#/reconnect/"+link) // quoted-printable
 	assert.Len(t, audited(t, tenant.ID, "user.microsoft_reconnect_sent"), 1)
 
 	// The link is for Microsoft only: no password is chosen with it.
@@ -102,12 +111,13 @@ func TestReconnectLinks(t *testing.T) {
 	assert.Equal(t, recruiter.ID, f.me(session(t, f.signInAs(flow, sam.claims(flow)))).User.Id)
 
 	// A link that expired, or is used meanwhile, does nothing.
-	link = f.reconnectLink(owner.Token, owner.ID)
+	link = f.reconnectLink(admin.Token, recruiter.ID)
+	require.Equal(t, http.StatusNoContent, f.unlink(owner.Token, recruiter.ID).Status)
 	flow, _ = f.start(map[string]any{"invite": link})
-	_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE user_link SET expires_at = now() - interval '1 minute' WHERE user_id = $1 AND kind = 'reconnect'`, owner.ID)
+	_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE user_link SET expires_at = now() - interval '1 minute' WHERE user_id = $1 AND kind = 'reconnect'`, recruiter.ID)
 	require.NoError(t, err)
-	msRefused(t, f.signInAs(flow, newAccount(org, "boss."+tenant.ID+"@contoso.test").claims(flow)), "failed")
-	assert.False(t, f.me(owner.Token).MicrosoftLinked)
+	msRefused(t, f.signInAs(flow, sam.claims(flow)), "failed")
+	assert.Empty(t, f.methodsOf(owner.Token, recruiter.ID))
 }
 
 // An invitation accepted with Microsoft links the account to the person

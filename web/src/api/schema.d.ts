@@ -3428,8 +3428,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners)
-         * @description For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
+         * Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners; not yourself)
+         * @description For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HiringPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
          */
         post: operations["sendMicrosoftReconnectLink"];
         delete?: never;
@@ -9698,9 +9698,8 @@ export interface components {
             /** @description The last Microsoft sign-in came without the optional acct claim: guests cannot be told from members, so no account is linked by its address until it is added in Entra (Token configuration). */
             acctClaimMissing: boolean;
         };
+        /** @description The link is emailed to the person only (it is not shown to whoever sends it). */
         MicrosoftReconnectLink: {
-            /** @description The link (also emailed), to pass on another way if needed. */
-            link: string;
             /** Format: date-time */
             expiresAt: string;
             /** @description Whether an email was queued (it fails later if no mail server is set up). */

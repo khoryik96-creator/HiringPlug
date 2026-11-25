@@ -81,7 +81,7 @@ func (h *HTTP) SendMicrosoftReconnectLink(ctx context.Context, req api.SendMicro
 	if err != nil {
 		return nil, err
 	}
-	return api.SendMicrosoftReconnectLink201JSONResponse{Link: l.Link, ExpiresAt: l.ExpiresAt, Emailed: l.Emailed}, nil
+	return api.SendMicrosoftReconnectLink201JSONResponse{ExpiresAt: l.ExpiresAt, Emailed: l.Emailed}, nil
 }
 
 func microsoftSignInToAPI(s MicrosoftSignIn) api.MicrosoftSignInSettings {

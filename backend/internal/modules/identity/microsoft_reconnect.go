@@ -73,16 +73,19 @@ func (m *Module) signInThroughLink(ctx context.Context, flow store.TakeMicrosoft
 	return out, err
 }
 
-// ReconnectLink is a link sent for someone to connect their Microsoft account.
+// ReconnectLink is a link sent for someone to connect their Microsoft
+// account: when it expires (the link itself goes only to their email).
 type ReconnectLink struct {
-	Link      string
 	ExpiresAt time.Time
 	Emailed   bool
 }
 
 // SendMicrosoftReconnectLink emails someone on the team a link to connect
 // their Microsoft account, whatever its address (replacing an older one).
-// Only owners send one to an owner.
+// Only to their email: whoever held the link could link an account of
+// theirs to that person, and sign in as them. Only owners send one to an
+// owner; nobody to themselves (they connect from Your account, with their
+// password).
 func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Principal, userID string) (ReconnectLink, error) {
 	var out ReconnectLink
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
@@ -95,6 +98,8 @@ func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Princip
 			return err
 		}
 		switch {
+		case u.ID == p.UserID:
+			return teamProblem("Connect your own Microsoft account from Your account.")
 		case u.Role == string(api.RoleOwner) && p.Role != api.RoleOwner:
 			return teamProblem("Only an owner can send an owner a link to connect Microsoft.")
 		case u.Invited:
@@ -118,7 +123,7 @@ func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Princip
 		if err := m.mailer.Notify(ctx, tx, p.TenantID, []string{u.Email}, "Connect Microsoft sign-in to HiringPlug at "+company.Name, body); err != nil {
 			return err
 		}
-		out = ReconnectLink{Link: link, ExpiresAt: expires, Emailed: true}
+		out = ReconnectLink{ExpiresAt: expires, Emailed: true}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.microsoft_reconnect_sent", EntityType: "user", EntityID: u.ID})
 	})
 	return out, err
