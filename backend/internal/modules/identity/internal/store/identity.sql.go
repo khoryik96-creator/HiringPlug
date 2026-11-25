@@ -461,7 +461,7 @@ func (q *Queries) HasPassword(ctx context.Context, id string) (bool, error) {
 }
 
 const holdLink = `-- name: HoldLink :one
-SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = $1 FOR UPDATE
+SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = $1 FOR NO KEY UPDATE
 `
 
 type HoldLinkRow struct {
@@ -472,6 +472,8 @@ type HoldLinkRow struct {
 
 // A link, held until the transaction ends (using it, or seeing it used,
 // waits for whoever holds it): whose, what for, and whether it still works.
+// FOR NO KEY UPDATE, not FOR UPDATE: a sign-in started from the link (its
+// microsoft_sign_in_flow names it) does not wait.
 func (q *Queries) HoldLink(ctx context.Context, id string) (HoldLinkRow, error) {
 	row := q.db.QueryRow(ctx, holdLink, id)
 	var i HoldLinkRow

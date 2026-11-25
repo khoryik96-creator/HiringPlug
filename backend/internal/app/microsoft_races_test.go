@@ -287,3 +287,37 @@ func TestAReconnectLinkWaitsForAChangeOfThePerson(t *testing.T) {
 	assert.Contains(t, res.Error().Error.Message, "deactivated")
 	assert.Empty(t, audited(t, tenant.ID, "user.microsoft_reconnect_sent"))
 }
+
+// A sign-in finishing with a link holds the link FOR NO KEY UPDATE: a new
+// sign-in started from the same link (which names it) does not wait for
+// it.
+func TestStartingFromALinkDoesNotWaitForOneFinishingWithIt(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	sam := newAccount(org, emailOf(api.RoleRecruiter, tenant.ID))
+	flow, _ := f.start(map[string]any{"company": f.me(owner.Token).Tenant.CareersSlug})
+	session(t, f.signInAs(flow, sam.claims(flow))) // linked
+	link := f.reconnectLink(owner.Token, recruiter.ID)
+	flow, _ = f.start(map[string]any{"invite": link})
+	ticket := f.ticketFor(flow, sam)
+
+	// The first holds the link, then waits (for their Microsoft link's row).
+	h := hold(t, `SELECT 1 FROM user_microsoft WHERE tenant_id = $1 AND user_id = $2 FOR UPDATE`, tenant.ID, recruiter.ID)
+	finished := make(chan *response, 1)
+	go func() { finished <- f.complete(ticket, flow.binding, "") }()
+	h.waitBlocked(1)
+	started := make(chan int, 1)
+	go func() { _, res := f.start(map[string]any{"invite": link}); started <- res.Status }()
+	select {
+	case status := <-started:
+		assert.Equal(t, http.StatusOK, status)
+	case <-time.After(5 * time.Second):
+		t.Error("starting from the link waited for the sign-in finishing with it")
+	}
+	h.release()
+	session(t, <-finished)
+}

@@ -325,8 +325,10 @@ SELECT user_id FROM user_microsoft WHERE ms_tenant_id = @ms_tenant_id AND ms_obj
 
 -- A link, held until the transaction ends (using it, or seeing it used,
 -- waits for whoever holds it): whose, what for, and whether it still works.
+-- FOR NO KEY UPDATE, not FOR UPDATE: a sign-in started from the link (its
+-- microsoft_sign_in_flow names it) does not wait.
 -- name: HoldLink :one
-SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = @id FOR UPDATE;
+SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = @id FOR NO KEY UPDATE;
 
 -- Holds the person's row (role, password, whether they may be linked by
 -- address) until the transaction ends: a change to it waits, and so does
