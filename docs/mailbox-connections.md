@@ -125,6 +125,12 @@ else cannot connect that person's mailbox to another account. A later disconnect
 in-flight callback before it can save credentials. An advisory lock serializes
 connection changes for one tenant/user, including initial concurrent creates.
 
+Emails about someone's account (invitations, password resets, reconnect
+links, "Microsoft sign-in connected") never use a connected mailbox: they are
+sent by nobody (`sent_by` `system`) from the server's mail, so no copy of a
+link lands in the Sent Items of whoever caused the email, and they show in no
+one's sent mail.
+
 Each queued message records its selected mailbox identity and test/live mode.
 Disconnecting/replacing the mailbox fails pending mail for that identity; it
 never silently switches sender or falls back to a local catcher. A message
@@ -165,7 +171,8 @@ to the ID token (and, if you like, `upn`). **`acct` is needed for a first
 sign-in to find its team member by address**: it marks guests, who are
 refused, and without it a guest (whose sign-in name is its home address)
 cannot be told from a member, so no account is linked by its address and
-Roles and access warns; people then connect from Your account or with an
+Roles and access warns (when the sign-in went through the company's own app:
+the claim is that app's setting); people then connect from Your account or with an
 invitation or reconnect link. With `xms_edov` an account's email counts too
 when Microsoft has verified its domain (otherwise only the sign-in name, the
 UPN, does). A `#EXT#` UPN is refused too. An owner turns it on in

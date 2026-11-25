@@ -13,14 +13,22 @@ common password), and attempts are limited per client address and per email.
 An unknown email and a wrong password get the same answer, taking the same
 time. An email with accounts at several companies chooses one. Changing or
 resetting a password, or being deactivated, ends every earlier session
-(tokens issued before it are refused).
+(tokens issued before it are refused). The password is checked before the
+sign-in's transaction, so the transaction holds the person's row and checks
+again that they are active and the password is still the one checked: a
+change, reset or deactivation committed meanwhile signs nobody in. Using a
+link holds it too, so a link used twice at once works once. The access log
+never shows a secret in a path (links, bookings, client shortlists: the
+contract's `…Token` parameters are logged by name).
 
 **Two-step sign-in** (✅): anyone can add an authenticator app under Your
 account (scan a QR code or type the key, then enter its first code); after
 that, a correct password gives a signed 10-minute challenge instead of a
 token, and the 6-digit code (RFC 6238: 30-second steps, one step of clock
 drift either way, each code once) or one of ten single-use recovery codes
-finishes signing in (`POST /v1/auth/two-step`). The secret is sealed with
+finishes signing in (`POST /v1/auth/two-step`). A challenge holds when the
+person's sessions were last ended: after a password change or reset (or a
+deactivation) it no longer works. The secret is sealed with
 AES-GCM under a key derived from `HP_AUTH_JWT_SECRET`; recovery codes are kept
 as SHA-256 hashes. Codes are rate-limited per address and per person. A reset
 or invitation link sets the password but still asks for the code. Turning it
@@ -46,36 +54,54 @@ its email only when Microsoft says the email's domain is verified
 nothing by itself. **Without the `acct` claim no account is linked by its
 address at all**: a guest's `preferred_username` is its home address, which
 may be a team member's, and only `acct` (or the optional `upn`) tells a guest
-apart. The last sign-in's claims are noted for the company, and Roles and
-access warns until `acct` is added in Entra (`acctClaimMissing`). Later
+apart. The claims of the last sign-in through the company's own Microsoft
+app are noted for the company (the claim is set on that app; sign-ins through
+the server's app say nothing about it), and Roles and access warns until
+`acct` is added in Entra (`acctClaimMissing`). Later
 sign-ins match the linked account, whatever its address has become. An
 account is **never linked by its address to an owner, nor to someone whose
 account was unlinked** (`app_user.microsoft_connect_only`): they link one on
 purpose. From Your account › Connect Microsoft sign-in while signed in
 (`POST /v1/me/microsoft/start` and `/complete`, the same tab, a session not an
 API key; starting asks for the current password and, with two-step sign-in
-on, its code or a recovery code, limited like changing the password; an
+on, its code or a recovery code, limited like changing the password, and
+codes tried count against the person's limit for codes as at sign-in; an
 account of the company's organisation, linked to nobody else there). Or from
 an invitation or a **reconnect link**: an owner or admin (only owners, for
-owners; nobody for themselves) sends one from the Team page
+owners; nobody for someone whose role is above their own, nor for themselves)
+sends one from the Team page
 (`POST /v1/team/{userId}/microsoft/reconnect`, `identity.team:manage`,
 audited `user.microsoft_reconnect_sent`); it is emailed to the person's
 HiringPlug address only, never shown to whoever sent it, works once for 7
 days, and signing in with Microsoft from it (or from an invitation) links the
 account to that person **whatever its address**: for someone whose UPN is not
 their HiringPlug email, who would otherwise be locked out once Microsoft is
-required. Every link is audited (`user.microsoft_linked`, `by`: `sign_in`,
+required. A sign-in started from a link keeps it (`microsoft_sign_in_flow.link_id`)
+and finishes only with that very link, held, unused, unexpired, of the same
+kind and theirs (an invitation accepted with a password meanwhile, or a link
+replaced, links nothing; two finishing at once: one works). A reconnect link
+ends when their account is unlinked, their role changes, or an account is
+linked to them. Every link is audited (`user.microsoft_linked`, `by`: `sign_in`,
 `invitation`, `self` or `reconnect_link`, kept as `user_microsoft.linked_by`)
-and the person is emailed ("not you? tell an owner"). Someone made an owner
+and the person is emailed ("not you? tell an owner"). Account emails
+(invitations, resets, reconnect links, "Microsoft linked") go from the
+server's mail only, sent by nobody (`email.sent_by` `system`): never from the
+connected mailbox of whoever caused them, whose Sent Items would keep the
+link. Someone made an owner
 loses a link made by a sign-in's address (`user.microsoft_unlinked`, reason
 `made_owner`) and their Microsoft sessions end: owners hold only links made on
-purpose. Owners (and admins, for everyone but owners) **unlink** an account on
+purpose, and from then on (owner or not) one is linked to them only on
+purpose. Owners (and admins, for everyone but owners; nobody for a role
+above their own) **unlink** an account on
 the Team page (`DELETE /v1/team/{userId}/microsoft`, `identity.team:manage`,
 `user.microsoft_unlinked`), which ends that person's Microsoft sessions; from
 then on one is linked to them only on purpose (Your account, or a reconnect
 link). A sign-in checks again, inside its transaction and with the person's
 row held, what it found before: that the account is still linked to them, or
-that they may still be linked by address. It goes through the company's own Microsoft app (Settings >
+that they may still be linked by address. The row is held FOR NO KEY UPDATE,
+and everything that changes a person's row and their Microsoft link (a
+sign-in, an unlink, a promotion, a change of organisation) holds the row
+first: they wait for each other and never deadlock. It goes through the company's own Microsoft app (Settings >
 Email connection) or the server's (`HP_MAIL_MICROSOFT_*`); while Microsoft
 sign-in is on, only owners may change or remove the company's Microsoft app
 (`MICROSOFT_APP_OWNERS_ONLY`).
@@ -140,7 +166,13 @@ sign-in is on, only owners may change or remove the company's Microsoft app
   issued, and ended (`tokens_valid_after`, `microsoft_sessions_after`), by the
   database's clock only, so an app server whose clock is off ends none too
   late; each end is after every earlier one, so a session dated the last end
-  (issued in the same second) is ended by the next.
+  (issued in the same second) is ended by the next. A session is issued as of
+  its transaction's start, never before the last end it read with the
+  person's row held; an end is cut off by the clock when it is made
+  (`clock_timestamp()`, the row held first), so one that waited for the row
+  still ends a session a sign-in issued meanwhile. Link expiry compares the
+  app server's clock (when a link is made) with the database's (when it is
+  used): a few seconds either way, on links that last an hour or 7 days.
 - *Who can always get in: Entra and Exchange administrators.* Single sign-on
   trusts the company's Microsoft organisation. Whoever administers it can
   reset the password of the Entra account linked to anyone (an owner too) and
