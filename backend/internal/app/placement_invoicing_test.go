@@ -181,6 +181,18 @@ func TestPlacementInvoicing(t *testing.T) {
 			`SELECT count(*) FROM job WHERE tenant_id = $1 AND kind = 'placement.invoice' AND status = 'pending' AND run_after > now() + interval '20 days'`,
 			tenant.ID).Scan(&waiting))
 		assert.Equal(t, 1, waiting, "queued again for the start date")
+
+		// Review of 1.47.0: held after a restore and cancelled, it stayed
+		// "emailed on the start date" with nothing queued to email it.
+		var jobID string
+		require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `UPDATE job SET status = 'held', held_at = now()
+			WHERE tenant_id = $1 AND kind = 'placement.invoice' AND status = 'pending' RETURNING id`, tenant.ID).Scan(&jobID))
+		res = a.request(http.MethodPost, "/v1/settings/system/jobs/"+jobID+"/cancel", owner, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		runCoreJobsUntilIdle(t, a, tenant.ID)
+		q = a.placements(recruiter, "?applicationId="+later.Id).Items[0]
+		assert.True(t, q.Invoicing.SendsAt.IsNull(), "no longer said to be emailed")
+		assert.Contains(t, q.Invoicing.SendError.MustGet(), "cancelled after the server was restored")
 	})
 }
 

@@ -232,3 +232,11 @@ UPDATE email SET cv_candidate_ids = @candidate_ids::text[] WHERE id = @id;
 SELECT sent_by, created_at, cv_candidate_ids FROM email
 WHERE cardinality(cv_candidate_ids) > 0 AND status <> 'failed' AND created_at >= @from_time AND created_at < @to_time
 LIMIT 20000;
+
+-- An email whose sending job ended without trying (cancelled after a
+-- restore, or stopped): not sent, saying why. One whose delivery was
+-- attempted may have gone, and is left as it is.
+-- name: FailUnsentEmail :one
+UPDATE email SET status = 'failed', error = @error
+WHERE id = @id AND status = 'queued' AND delivery_attempted_at IS NULL
+RETURNING id, fees_restricted;

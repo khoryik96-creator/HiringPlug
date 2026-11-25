@@ -774,6 +774,26 @@ func (q *Queries) FailOutlookRefresh(ctx context.Context, arg FailOutlookRefresh
 	return result.RowsAffected(), nil
 }
 
+const failPendingPush = `-- name: FailPendingPush :execrows
+UPDATE calendar_event SET sync_status = 'failed', sync_error = $1, updated_at = now()
+WHERE id = $2 AND sync_status = 'pending'
+`
+
+type FailPendingPushParams struct {
+	SyncError *string
+	ID        string
+}
+
+// An event whose push to the calendar ended without sending it (cancelled
+// after a restore, or stopped): failed, saying why (sending it again is offered).
+func (q *Queries) FailPendingPush(ctx context.Context, arg FailPendingPushParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failPendingPush, arg.SyncError, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const finishOutlookRefresh = `-- name: FinishOutlookRefresh :execrows
 UPDATE calendar_connection SET status='ok',synced_at=now(),sync_error=NULL,sync_sequence=sync_sequence+1 WHERE id= $1 AND sync_sequence= $2
 `

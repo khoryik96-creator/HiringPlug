@@ -370,3 +370,40 @@ func (s *Service) invoicingViews(ctx context.Context, tx pgx.Tx, tenantID string
 	}
 	return out, nil
 }
+
+// DeadJobHandlers say an invoice's email was not sent when its job ended
+// without running (cancelled after a restore, or stopped for good): due
+// for ever otherwise. Sending it from the placement is still offered.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindPlacementInvoice: m.service.invoiceDied}
+}
+
+func (s *Service) invoiceDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.PlacementInvoiceJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no placement
+	}
+	q := store.New(tx)
+	inv, err := q.LockPlacementInvoicing(ctx, payload.PlacementId)
+	if database.IsNoRows(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if inv.ScheduledFor == nil || (payload.SendAt != nil && !payload.SendAt.Equal(*inv.ScheduledFor)) || inv.SentAt != nil || inv.DeliveryEmail != nil {
+		return nil // moved to another time (another job), or sent
+	}
+	why := "The invoice was not emailed: its scheduled send stopped. Send it from the placement."
+	if jobqueue.WasCancelledAfterRestore(job) {
+		why = "The invoice was not emailed: its scheduled send was cancelled after the server was restored. Send it from the placement if it is still due."
+	}
+	if err := q.ClearInvoiceSchedule(ctx, payload.PlacementId); err != nil {
+		return err
+	}
+	if err := q.SetInvoiceError(ctx, store.SetInvoiceErrorParams{PlacementID: payload.PlacementId, SendError: &why}); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "placement.invoice_not_sent", EntityType: "placement", EntityID: payload.PlacementId,
+		Changes: map[string]any{"why": why}})
+}

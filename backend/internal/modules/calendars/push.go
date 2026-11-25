@@ -250,3 +250,26 @@ func (s *Service) pushFailure(ctx context.Context, conn *pgx.Conn, p authz.Princ
 	}
 	return nil
 }
+
+// DeadJobHandlers fail an event's push to the calendar whose job ended
+// without sending it (cancelled after a restore, or stopped for good):
+// pending for ever otherwise. A newer push of it decides instead.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindCalendarPush: m.service.pushDied}
+}
+
+func (s *Service) pushDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.CalendarPushJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no event
+	}
+	if active, err := jobqueue.Active(ctx, tx, []api.JobKind{api.JobKindCalendarPush}, "eventId", payload.EventId); err != nil || active {
+		return err
+	}
+	why := "Not sent to the calendar: sending it stopped. Send it again."
+	if jobqueue.WasCancelledAfterRestore(job) {
+		why = "Not sent to the calendar: cancelled after the server was restored. Send it again if it is still needed."
+	}
+	_, err := store.New(tx).FailPendingPush(ctx, store.FailPendingPushParams{ID: payload.EventId, SyncError: &why})
+	return err
+}

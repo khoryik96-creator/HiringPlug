@@ -186,6 +186,31 @@ func TestAutomations(t *testing.T) {
 		assert.False(t, done.DoneAt.IsNull())
 	})
 
+	// Review of 1.47.0: a run held after a restore and cancelled stayed
+	// "scheduled" for ever. It fails, saying why.
+	t.Run("a run cancelled after a restore says so", func(t *testing.T) {
+		mei := a.addToJob(recruiter, job.Id, a.createCandidate(recruiter, map[string]any{"firstName": "Mei", "email": "mei." + tenant.ID + "@candidates.test"}).Id)
+		require.Equal(t, http.StatusOK, a.move(recruiter, mei, map[string]any{"stage": "rejected", "reason": "failed_interview"}).Status)
+		runCoreJobsUntilIdle(t, a, tenant.ID)
+		scheduled := a.automationRuns(owner, "?status=scheduled")
+		require.Len(t, scheduled, 1)
+		var jobID string
+		require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `UPDATE job SET status = 'held', held_at = now()
+			WHERE tenant_id = $1 AND kind = 'automation.run' AND status = 'pending' AND payload->>'runId' = $2 RETURNING id`,
+			tenant.ID, scheduled[0].Id).Scan(&jobID))
+		res := a.request(http.MethodPost, "/v1/settings/system/jobs/"+jobID+"/cancel", owner, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		runCoreJobsUntilIdle(t, a, tenant.ID)
+		var failed *api.AutomationRun
+		for _, r := range a.automationRuns(owner, "?status=failed") {
+			if r.Id == scheduled[0].Id {
+				failed = &r
+			}
+		}
+		require.NotNil(t, failed, "not scheduled for ever")
+		assert.Equal(t, "Not run: cancelled after the server was restored (it was waiting in the backup).", failed.Detail.MustGet())
+	})
+
 	t.Run("switched off: what is scheduled is skipped", func(t *testing.T) {
 		l := a.automations(owner)
 		np := preset(t, l, "not_progressing")

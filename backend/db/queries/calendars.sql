@@ -233,3 +233,9 @@ UPDATE calendar_event SET title= @title,notes= @notes,location= @location,
  remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot,web_url=coalesce(sqlc.narg(web_url),web_url),
  outlook_changed_at=now(),version=version+1,sent_version=version+1,updated_at=now()
 WHERE id= @id AND version= @expected_version AND version=sent_version AND sync_status='synced' AND source IN ('interview','booking');
+
+-- An event whose push to the calendar ended without sending it (cancelled
+-- after a restore, or stopped): failed, saying why (sending it again is offered).
+-- name: FailPendingPush :execrows
+UPDATE calendar_event SET sync_status = 'failed', sync_error = @sync_error, updated_at = now()
+WHERE id = @id AND sync_status = 'pending';

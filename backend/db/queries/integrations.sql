@@ -66,3 +66,9 @@ WHERE id = @id AND status = 'pending' AND attempts = @attempts;
 -- A secret saved before secrets were sealed is sealed the next time it is used.
 -- name: SealWebhookSecret :exec
 UPDATE webhook SET secret = @sealed WHERE secret = @plain;
+
+-- A delivery whose job ended without posting it (cancelled after a restore,
+-- or stopped): failed, saying why.
+-- name: FailPendingDelivery :execrows
+UPDATE webhook_delivery SET status = 'failed', last_error = @last_error, next_attempt_at = NULL
+WHERE id = @id AND status = 'pending';

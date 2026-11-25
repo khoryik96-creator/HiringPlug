@@ -374,3 +374,9 @@ SELECT id, company_id, first_name, last_name, title, email FROM contact WHERE id
 -- duplicate would otherwise block deleting it).
 -- name: ShowBinnedForMerge :exec
 SELECT set_config('app.show_binned', 'on', true);
+
+-- A check whose job ended without checking (cancelled after a restore, or
+-- stopped): unknown, saying why (checking again is offered).
+-- name: EndMailboxCheck :execrows
+UPDATE contact_mailbox_check SET status = 'unknown', reason = @reason, recheck_at = NULL, checked_at = now()
+WHERE contact_id = @contact_id AND email = @email AND status = 'checking';

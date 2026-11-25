@@ -94,3 +94,40 @@ func dateOrNull(day *time.Time) pgtype.Date {
 	}
 	return pgtype.Date{Time: *day, Valid: true}
 }
+
+// DeadJobHandlers keep the morning email going when a morning's job ended
+// without running (cancelled after a restore, or stopped for good): each
+// job queues the next, so the chain stopped for good otherwise. That
+// morning is skipped; the next one is queued.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindNotificationsDigest: m.service.digestDied}
+}
+
+func (s *Service) digestDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.NotificationDigestJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no user
+	}
+	q := store.New(tx)
+	state, err := q.LockState(ctx, payload.UserId)
+	if database.IsNoRows(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !state.MorningEmail || int(state.DigestChain) != payload.Chain {
+		return nil // turned off, or a newer chain carries on
+	}
+	next := NextDayMorning(s.now(), s.cfg.TimeZone)
+	if err := q.DigestRan(ctx, store.DigestRanParams{UserID: payload.UserId, DueAt: &next}); err != nil {
+		return err
+	}
+	if err := audit.Record(ctx, tx, audit.Entry{Action: "notification.morning_email_ran", EntityType: "user", EntityID: payload.UserId,
+		Changes: map[string]any{"items": 0, "emailed": false, "skipped": "its job did not run: " + job.LastError}}); err != nil {
+		return err
+	}
+	_, err = jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindNotificationsDigest,
+		api.NotificationDigestJob{UserId: payload.UserId, Chain: payload.Chain}, next)
+	return err
+}

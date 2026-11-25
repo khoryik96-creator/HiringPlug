@@ -272,6 +272,32 @@ func (q *Queries) EmailCandidateIDs(ctx context.Context, emailIds []string) ([]E
 	return items, nil
 }
 
+const failUnsentEmail = `-- name: FailUnsentEmail :one
+UPDATE email SET status = 'failed', error = $1
+WHERE id = $2 AND status = 'queued' AND delivery_attempted_at IS NULL
+RETURNING id, fees_restricted
+`
+
+type FailUnsentEmailParams struct {
+	Error *string
+	ID    string
+}
+
+type FailUnsentEmailRow struct {
+	ID             string
+	FeesRestricted bool
+}
+
+// An email whose sending job ended without trying (cancelled after a
+// restore, or stopped): not sent, saying why. One whose delivery was
+// attempted may have gone, and is left as it is.
+func (q *Queries) FailUnsentEmail(ctx context.Context, arg FailUnsentEmailParams) (FailUnsentEmailRow, error) {
+	row := q.db.QueryRow(ctx, failUnsentEmail, arg.Error, arg.ID)
+	var i FailUnsentEmailRow
+	err := row.Scan(&i.ID, &i.FeesRestricted)
+	return i, err
+}
+
 const finishMailboxState = `-- name: FinishMailboxState :execrows
 DELETE FROM email_mailbox_state WHERE state_hash = $1 AND consumed
 `
