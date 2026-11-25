@@ -240,3 +240,29 @@ func TestMicrosoftSignInsAndUnlinksAtOnceNeverDeadlock(t *testing.T) {
 	session(t, signIn())
 	assert.Equal(t, http.StatusOK, <-changed)
 }
+
+// Connecting from Your account holds the person's row before it reads the
+// company's settings: an organisation changed while it waited for the row
+// connects nothing (no account of the old organisation is linked after
+// the change removed the links to them).
+func TestConnectingMicrosoftChecksTheOrganisationOnceHeld(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	owner, admin := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin]
+	setPassword(t, admin.ID, testPassword)
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	flow, res := f.startConnecting(admin.Token, map[string]any{"password": testPassword})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	ticket := f.ticketFor(flow, newAccount(org, "ada."+tenant.ID+"@contoso.test"))
+
+	res = meanwhile(t, `SELECT 1 FROM app_user WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE`, []any{tenant.ID, admin.ID},
+		func() *response { return f.finishConnecting(admin.Token, ticket, flow.binding) },
+		func(tx pgx.Tx) {
+			_, err := tx.Exec(context.Background(), `UPDATE tenant SET microsoft_tenant_id = $2 WHERE id = $1`, tenant.ID, newGUID())
+			require.NoError(t, err)
+		})
+	connectRefused(t, res, "failed")
+	assert.NotContains(t, f.methodsOf(owner.Token, admin.ID), api.SignInMethodMicrosoft, "nothing linked")
+}

@@ -224,16 +224,19 @@ func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principa
 	}
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		// Held first, like every change of their row and link; then the
+		// settings are read: a change of organisation that held them
+		// meanwhile (removing the links to the old one) is seen.
+		u, err := holdUser(ctx, q, p.UserID)
+		if err != nil {
+			return err
+		}
 		s, err := q.MicrosoftSettings(ctx)
 		if err != nil {
 			return err
 		}
 		if !s.MicrosoftSignIn || s.MicrosoftTenantID == nil || *s.MicrosoftTenantID != id.TenantID { // changed meanwhile
 			return connectFailed(ReasonFailed)
-		}
-		u, err := holdUser(ctx, q, p.UserID) // held first, like every change of their row and link
-		if err != nil {
-			return err
 		}
 		switch err := m.linkMicrosoft(ctx, tx, q, u, id, linkedBySelf); {
 		case errors.Is(err, errLinkTaken):
