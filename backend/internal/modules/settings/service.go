@@ -21,6 +21,7 @@ type Service struct {
 	industries IndustryCatalogue
 	uses       Uses
 	backups    BackupSetup
+	paidOff    bool // HP_AI_PAID=off
 }
 
 // Settings is every dropdown and every field's mandatory choice.

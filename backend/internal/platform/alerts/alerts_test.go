@@ -150,3 +150,64 @@ func TestABackupThatFailedOrStoppedIsAProblem(t *testing.T) {
 		assert.NotEqual(t, "backup-service", p.Key)
 	}
 }
+
+// IMP-002: a server restored (a staging copy of production) emails nobody
+// while the jobs its restore held wait for someone; then the problems go.
+func TestAlertsWaitWhileARestoreHoldsJobs(t *testing.T) {
+	ctx := context.Background()
+	admin := testutil.Current.Admin
+	tenant := testutil.Current.NewTenant(t)
+	_, err := admin.Exec(ctx, `INSERT INTO job (tenant_id, queue, kind, payload, status, finished_at) VALUES ($1, 'core', 'webhook.deliver', '{}', 'dead', now())`, tenant.ID)
+	require.NoError(t, err)
+	_, err = admin.Exec(ctx, `INSERT INTO restore_marker (backup_name, source_server, destination_server, held) VALUES ('hiringplug-20261125-023050', '1', '2', 3)`)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = admin.Exec(context.Background(), `DELETE FROM job WHERE tenant_id = $1`, tenant.ID)
+		_, _ = admin.Exec(context.Background(), `DELETE FROM restore_marker`)
+	})
+	box := &inbox{}
+	w := &alerts.Watcher{Checks: alerts.Checks{DB: testutil.Current.App, FilesDir: "/data/files",
+		Disk: func(string) (uint64, uint64, error) { return 50 << 30, 100 << 30, nil }},
+		Mail: box, To: []string{"it@agency.test"}, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	require.NoError(t, w.Check(ctx))
+	assert.Empty(t, box.got, "held after a restore: no email yet")
+
+	_, err = admin.Exec(ctx, `UPDATE restore_marker SET released_at = now()`)
+	require.NoError(t, err)
+	require.NoError(t, w.Check(ctx))
+	require.Len(t, box.got, 1, "released: the problems are emailed")
+	assert.Contains(t, box.got[0].Body, "failed")
+}
+
+// Review of 1.47.0: the alerts waited for ever after a restore nobody
+// settled, and after a restore of the server's own backup too. They wait
+// only for a restore from another server, and 72 hours at the most.
+func TestAlertsNeverWaitForeverAfterARestore(t *testing.T) {
+	ctx := context.Background()
+	admin := testutil.Current.Admin
+	tenant := testutil.Current.NewTenant(t)
+	_, err := admin.Exec(ctx, `INSERT INTO job (tenant_id, queue, kind, payload, status, finished_at) VALUES ($1, 'core', 'webhook.deliver', '{}', 'dead', now())`, tenant.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = admin.Exec(context.Background(), `DELETE FROM job WHERE tenant_id = $1`, tenant.ID)
+		_, _ = admin.Exec(context.Background(), `DELETE FROM restore_marker`)
+	})
+	now := time.Now()
+	check := func(source string, restoredAgo time.Duration) []mail.Message {
+		t.Helper()
+		_, err := admin.Exec(ctx, `DELETE FROM restore_marker`)
+		require.NoError(t, err)
+		_, err = admin.Exec(ctx, `INSERT INTO restore_marker (backup_name, source_server, destination_server, held, restored_at)
+			VALUES ('hiringplug-20261125-023050', $1, '2', 3, $2)`, source, now.Add(-restoredAgo))
+		require.NoError(t, err)
+		box := &inbox{}
+		w := &alerts.Watcher{Checks: alerts.Checks{DB: testutil.Current.App, FilesDir: "/data/files", Now: func() time.Time { return now },
+			Disk: func(string) (uint64, uint64, error) { return 50 << 30, 100 << 30, nil }},
+			Mail: box, To: []string{"it@agency.test"}, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+		require.NoError(t, w.Check(ctx))
+		return box.got
+	}
+	assert.Empty(t, check("1", time.Hour), "from another server, just restored: waits")
+	assert.Len(t, check("2", time.Hour), 1, "this server's own backup: never silenced")
+	assert.Len(t, check("1", 73*time.Hour), 1, "nobody settled it in 72 hours: emailed")
+}

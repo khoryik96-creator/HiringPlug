@@ -220,10 +220,11 @@ func TestAKeyCheckCountsInTheCompanysAIUse(t *testing.T) {
 	assert.Equal(t, owner.ID, who, "who asked for the check")
 }
 
-// A CV read again while its first reading is still with the AI is two AI
-// runs: both count, and the reading asked for last is the one kept (with
-// the hooks that run when a reading ends).
-func TestACVReadAgainWhileBeingReadCountsBothReadings(t *testing.T) {
+// A CV read again is a second AI run: both count, each once however often
+// its result is delivered, and the reading asked for last is the one kept
+// (with the hooks that run when a reading ends). Asked again while the
+// first is still with the AI, nothing more is queued (1.47.0).
+func TestACVReadAgainCountsBothReadingsButNeverTwoAtOnce(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t, bigAllowance)
 	aiConn := aiConnFor(t)
@@ -231,15 +232,11 @@ func TestACVReadAgainWhileBeingReadCountsBothReadings(t *testing.T) {
 	token := tenant.Users[api.RoleRecruiter].Token
 	doc, first, firstPayload := readCV(t, a, aiConn, token, "SITI AISYAH works at Contoh Sdn Bhd")
 
-	// Read again before the first reading's result lands.
+	// Asked again before the first reading's result lands: the reading under
+	// way answers both (1.47.0: never two readings of a CV at once).
 	res := a.request(http.MethodPost, "/v1/documents/"+doc.Id+"/parse", token, nil)
 	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
-	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, "SITI AISYAH works at Contoh Sdn Bhd"))
-	second := claimAIJobFor(t, aiConn, doc.Id)
-	require.Equal(t, "document.parse_cv", second.Kind)
-	var secondPayload api.DocumentParseCvJob
-	require.NoError(t, json.Unmarshal(second.Payload, &secondPayload))
-	require.NotEqual(t, *firstPayload.RunKey, *secondPayload.RunKey, "each reading has its own key")
+	assert.Equal(t, 1, activeReadingJobs(t, doc.Id), "no second reading queued")
 
 	reading := func(runKey *string, tokens int, parser string) api.DocumentCvParsedJob {
 		return api.DocumentCvParsedJob{
@@ -251,6 +248,16 @@ func TestACVReadAgainWhileBeingReadCountsBothReadings(t *testing.T) {
 		}
 	}
 	answerAIJob(t, a, aiConn, first, api.JobKindDocumentCvParsed, reading(firstPayload.RunKey, 1700, "rules@1+ai first"))
+
+	// Read again once read: a reading of its own.
+	res = a.request(http.MethodPost, "/v1/documents/"+doc.Id+"/parse", token, nil)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, "SITI AISYAH works at Contoh Sdn Bhd"))
+	second := claimAIJobFor(t, aiConn, doc.Id)
+	require.Equal(t, "document.parse_cv", second.Kind)
+	var secondPayload api.DocumentParseCvJob
+	require.NoError(t, json.Unmarshal(second.Payload, &secondPayload))
+	require.NotEqual(t, *firstPayload.RunKey, *secondPayload.RunKey, "each reading has its own key")
 	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300, "rules@1+ai second"))
 	answerAIJob(t, a, aiConn, second, api.JobKindDocumentCvParsed, reading(secondPayload.RunKey, 1300, "rules@1+ai second")) // delivered again
 	assert.EqualValues(t, 1700+1300, a.usedThisMonth(token), "both readings used the AI")

@@ -156,7 +156,12 @@ paths:
         tables), then the details are read. A text, RTF or ODT file's text is
         read on the server and only its details are read again. If taking the
         text out fails, the text read before is kept and read again. Returns
-        the document with parseStatus `queued`.
+        the document with parseStatus `queued`. A document whose text could not
+        be read (status `failed`) has its text taken out of the file again
+        (status `queued`). Asked while a reading of its details is under way,
+        it queues nothing more and returns the document as it is. If the new reading
+        fails for good, the details read before are kept (parseStatus `parsed`
+        with a parseError warning).
       x-permission: documents:create
       responses:
         '202':
@@ -216,9 +221,21 @@ paths:
     post:
       operationId: makeDocumentPdf
       tags: [documents]
-      summary: Make a Word document's PDF copy (for previewing it), if it has none yet
-      description: Word CVs uploaded since previews began get one at once; this makes one for older ones. A PDF, or a document whose copy is made or being made, is left as it is.
+      summary: Make a Word document's PDF copy (for previewing it), if it has none yet, or again after it failed
+      description: >-
+        Word CVs uploaded since previews began get one at once; this makes one for older ones. With again
+        (a person asked: "Make the PDF again"), a copy that failed is made again, from a newly signed link.
+        A PDF, or a document whose copy is made or being made, is left as it is.
       x-permission: documents:read
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                again: { type: boolean, description: Make a copy that failed again. }
       responses:
         '202':
           description: Being made (or already there)
@@ -422,7 +439,18 @@ components:
         parseError:
           type: string
           nullable: true
-          description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+          description: >-
+            Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading
+            them again failed (a warning: the details read before are kept). Never CV text. Null otherwise.
+        readingJob:
+          type: string
+          enum: [waiting, running, held]
+          nullable: true
+          description: >-
+            While the document is being read (status or parseStatus queued): its job is waiting for the
+            reader, running, or held after a restore of the server (Settings > System releases it); null
+            when no job is left for it (the reading stopped: reading it again is offered). Left out where
+            not worked out.
         readOutdated:
           type: boolean
           description: >-

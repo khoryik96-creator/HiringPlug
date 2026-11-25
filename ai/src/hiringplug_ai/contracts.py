@@ -124,6 +124,7 @@ class Permission(StrEnum):
 
 class ErrorCode(StrEnum):
     AI_KEYS_NOT_SET_UP = "AI_KEYS_NOT_SET_UP"
+    AI_PAID_PAUSED = "AI_PAID_PAUSED"
     AI_PROVIDER_NO_KEY = "AI_PROVIDER_NO_KEY"
     APOLLO_BROKER_UNAVAILABLE = "APOLLO_BROKER_UNAVAILABLE"
     APPLICATIONS_OVERLAP = "APPLICATIONS_OVERLAP"
@@ -225,6 +226,7 @@ class JobKind(StrEnum):
     assistant_emailed = "assistant.emailed"
     automation_event = "automation.event"
     automation_run = "automation.run"
+    background_job_ended = "background_job.ended"
     bin_purge = "bin.purge"
     bin_remove_files = "bin.remove_files"
     calendar_push = "calendar.push"
@@ -366,13 +368,21 @@ class Status(StrEnum):
     queued = "queued"
     ok = "ok"
     failed = "failed"
+    paused = "paused"
 
 
 class AiProviderCheck(BaseModel):
-    status: Status
+    status: Annotated[
+        Status,
+        Field(
+            description="paused: not checked, as paid AI was paused on the server (the key may well work: check it once it is back on)."
+        ),
+    ]
     message: Annotated[
         str | None,
-        Field(description="Why it failed: the key was refused, no credit left, an unknown model..."),
+        Field(
+            description="Why it failed (the key was refused, no credit left, an unknown model...), or why it was not checked."
+        ),
     ]
     checkedAt: AwareDatetime
 
@@ -430,6 +440,12 @@ class AiProviderCheckJob(BaseModel):
 
 
 class AiStatus(BaseModel):
+    paidPaused: Annotated[
+        bool,
+        Field(
+            description="Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off): no AI call is made, through a company's key or the server's own; CVs are read by the rules alone."
+        ),
+    ]
     down: Annotated[bool, Field(description="The latest call to the provider failed, within the last hour.")]
     provider: Annotated[
         str | None,
@@ -469,6 +485,12 @@ class AiProviderCheckedJob(BaseModel):
     ]
     ok: bool
     message: Annotated[str | None, Field(...)]
+    paused: Annotated[
+        bool | None,
+        Field(
+            description="The provider was not asked: paid AI is paused on the server (ok is false; the key is not failed)."
+        ),
+    ] = None
     checkId: Annotated[
         str | None, Field(description="The check job's checkId, unchanged.", max_length=200)
     ] = None
@@ -2942,6 +2964,12 @@ class DocumentParseStatus(StrEnum):
     queued = "queued"
     parsed = "parsed"
     failed = "failed"
+
+
+class ReadingJob(StrEnum):
+    waiting = "waiting"
+    running = "running"
+    held = "held"
 
 
 class SourcedText(BaseModel):
@@ -7246,6 +7274,70 @@ class SchedulingRefreshCalendarJob(BaseModel):
     userId: str
 
 
+class PaidAiSwitch(BaseModel):
+    paused: Annotated[
+        bool, Field(description="Paid AI is paused on the server (this switch, or HP_AI_PAID=off).")
+    ]
+    reason: Annotated[str | None, Field(...)]
+    changedAt: Annotated[AwareDatetime | None, Field(...)]
+    pausedByServer: Annotated[bool, Field(description="HP_AI_PAID=off: paused whatever the switch says.")]
+    canChange: Annotated[
+        bool, Field(description="The person may change it (an owner of the agency that runs the server).")
+    ]
+
+
+class HeldJob(BaseModel):
+    id: str
+    company: Annotated[
+        str | None,
+        Field(
+            description="The company's name, in the list of every company's (heldEveryCompany); null otherwise."
+        ),
+    ]
+    kind: Annotated[str, Field(description="e.g. email.send")]
+    attempts: Annotated[int, Field(description="Tries before it was held.")]
+    createdAt: Annotated[AwareDatetime, Field(description="When it was queued (before the backup was made).")]
+    heldAt: Annotated[AwareDatetime | None, Field(...)]
+    runAfter: Annotated[
+        AwareDatetime, Field(description="When it was due; released, one due later still waits for its time.")
+    ]
+
+
+class RestoreInfo(BaseModel):
+    everyCompany: Annotated[
+        bool,
+        Field(
+            description="The restore as the agency that runs the server sees it (every company's count, the backup's name). false: only that some of this company's jobs are held after a restore of the server, and how many."
+        ),
+    ]
+    backupName: Annotated[str | None, Field(description="Null unless everyCompany.")]
+    restoredAt: AwareDatetime
+    fromAnotherServer: Annotated[
+        bool | None,
+        Field(
+            description="The backup was made on another database server (or is too old to say); null unless everyCompany."
+        ),
+    ]
+    held: Annotated[
+        int,
+        Field(
+            description="Jobs the restore held in every company (everyCompany), or this company's still held."
+        ),
+    ]
+    resumed: Annotated[
+        bool,
+        Field(
+            description="Restored with -resume-outbound (no outbound job held); false unless everyCompany."
+        ),
+    ]
+    releasedAt: Annotated[
+        AwareDatetime | None,
+        Field(
+            description="When the last held job was released or cancelled (everyCompany); null while some wait (and for other companies). Alert emails wait while a restore from another server is unsettled, 72 hours at most."
+        ),
+    ]
+
+
 class JobKindStatus(BaseModel):
     kind: Annotated[str, Field(description="e.g. email.send")]
     waiting: Annotated[int, Field(description="Not started yet.")]
@@ -7255,6 +7347,16 @@ class JobKindStatus(BaseModel):
     oldestWaitingSince: Annotated[
         AwareDatetime | None, Field(description="When the longest-waiting one was queued.")
     ]
+
+
+class BackgroundJobEndedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jobId: Annotated[
+        str, Field(description="The AI-queue job that failed for good (it keeps its payload until pruned).")
+    ]
+    kind: Annotated[str, Field(description="Its kind.")]
 
 
 class FailedJob(BaseModel):
@@ -8663,9 +8765,15 @@ class Document(BaseModel):
     parseError: Annotated[
         str | None,
         Field(
-            description="Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+            description="Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise."
         ),
     ]
+    readingJob: Annotated[
+        ReadingJob | None,
+        Field(
+            description="While the document is being read (status or parseStatus queued): its job is waiting for the reader, running, or held after a restore of the server (Settings > System releases it); null when no job is left for it (the reading stopped: reading it again is offered). Left out where not worked out."
+        ),
+    ] = None
     readOutdated: Annotated[
         bool | None,
         Field(
@@ -9674,6 +9782,25 @@ class BookingLink(BaseModel):
 
 
 class SystemStatus(BaseModel):
+    paidAi: PaidAiSwitch
+    held: Annotated[
+        list[HeldJob],
+        Field(
+            description="Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany)."
+        ),
+    ]
+    heldEveryCompany: Annotated[
+        bool,
+        Field(
+            description="The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company."
+        ),
+    ]
+    restore: Annotated[
+        RestoreInfo | None,
+        Field(
+            description="The server's last restore; null when it was never restored. Other companies than the one that runs the server see it only while some of their own jobs are held, and only that."
+        ),
+    ]
     backupAuto: Annotated[
         bool,
         Field(

@@ -8,6 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..contracts import AiProviderCheckedJob, AiProviderCheckJob, JobKind
+from ..paid_switch import PaidAIPausedError
 from ..providers import ProviderError
 from ..queue import FollowUp
 
@@ -24,6 +25,7 @@ MAX_TOKENS = 16
 
 def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
     message: str | None = None
+    paused = False
     input_tokens = output_tokens = 0
     # Checking a key (often of a provider the company does not use yet) says
     # nothing about the AI in use: it is not reported as an outage.
@@ -36,9 +38,14 @@ def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
             done = ai.complete(SYSTEM, "Reply with OK.", max_tokens=MAX_TOKENS)
             # A check uses the provider too: counted in the company's AI use.
             input_tokens, output_tokens = max(done.input_tokens, 0), max(done.output_tokens, 0)
+    except PaidAIPausedError as exc:
+        # Queued before paid AI was paused: the key was not asked, so it is
+        # not failed; the app says it was not checked.
+        message, paused = str(exc), True
     except ProviderError as exc:
         message = str(exc)
-    log.info("ai provider checked", extra={"provider": payload.provider.value, "ok": message is None})
+    outcome = {"provider": payload.provider.value, "ok": message is None, "paused": paused}
+    log.info("ai provider checked", extra=outcome)
     return [
         FollowUp(
             queue=RESULT_QUEUE,
@@ -48,6 +55,7 @@ def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
                 sealedKey=payload.access.sealedKey,
                 ok=message is None,
                 message=message,
+                paused=paused or None,
                 checkId=payload.checkId,
                 askedBy=payload.askedBy,
                 inputTokens=input_tokens,

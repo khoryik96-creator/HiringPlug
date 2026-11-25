@@ -116,6 +116,7 @@ function ProviderCard({ entry, active, disabled, onSaved }: {
         <Status entry={entry} active={active} />
       </div>
       {entry.check?.status === "failed" && entry.check.message && <p className="warning small">{sentence(entry.check.message)}</p>}
+      {entry.check?.status === "paused" && entry.check.message && <p className="muted small">{sentence(entry.check.message)}</p>}
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <div className="field">
           <label htmlFor={`${listId}-model`}>Model</label>
@@ -163,6 +164,7 @@ function Status({ entry, active }: { entry: Entry; active: boolean }) {
       {c?.status === "queued" && <span className="badge queued" role="status">Checking…</span>}
       {c?.status === "ok" && <span className="badge valid" title={`Checked ${formatWhen(c.checkedAt)}`}>Working</span>}
       {c?.status === "failed" && <span className="badge invalid" title={c.message ?? ""}>Not working</span>}
+      {c?.status === "paused" && <span className="badge" title={c.message ?? ""}>Not checked</span>}
     </span>
   );
 }

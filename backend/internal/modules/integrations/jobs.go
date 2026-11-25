@@ -100,6 +100,26 @@ func (s *Service) record(ctx context.Context, tx pgx.Tx, job jobqueue.Job, paylo
 	return err
 }
 
+// DeadJobHandlers fail a webhook delivery whose job ended without posting
+// it (cancelled after a restore, or stopped for good): pending for ever
+// otherwise.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindWebhookDeliver: m.service.deliveryDied}
+}
+
+func (s *Service) deliveryDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.WebhookDeliverJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no delivery
+	}
+	why := "Not sent: its delivery stopped before it was posted."
+	if jobqueue.WasCancelledAfterRestore(job) {
+		why = "Not sent: cancelled after the server was restored (it was waiting in the backup)."
+	}
+	_, err := store.New(tx).FailPendingDelivery(ctx, store.FailPendingDeliveryParams{ID: payload.DeliveryId, LastError: &why})
+	return err
+}
+
 // post sends a delivery, signed, and returns the HTTP status (0 when there
 // was none) and an error unless the receiver answered 2xx.
 func (s *Service) post(ctx context.Context, d store.GetDeliveryToSendRow, now time.Time) (int, error) {

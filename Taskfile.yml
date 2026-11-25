@@ -131,7 +131,7 @@ tasks:
 
   test:go:
     dir: backend
-    cmds: [go test -race ./...]
+    cmds: [go test -race -timeout 25m ./...]
 
   test:py:
     dir: ai

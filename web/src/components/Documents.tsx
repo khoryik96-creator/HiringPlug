@@ -16,7 +16,7 @@ import { ErrorMessage } from "./ErrorMessage";
 import { fileKind } from "./fileKind";
 import { CvReplacement, replacementCount } from "./CvReplacement";
 import { FormatCv } from "./FormatCv";
-import { DetailsButton, isReading, ReadProgress } from "./ReadDetails";
+import { DetailsButton, isReading, pollEvery, ReadProgress } from "./ReadDetails";
 import { StudioProgress, useStudioRun } from "./StudioProgress";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
@@ -61,9 +61,8 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     queryKey: ["documents", candidateId],
     queryFn: async () =>
       unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
-    // Keep checking while any CV is still being read by the AI worker.
-    refetchInterval: (query) =>
-      query.state.data?.some((d) => d.status === "queued" || d.parseStatus === "queued" || d.pdfStatus === "queued") ? 2000 : false,
+    // Keep checking while a CV is being read by the AI worker, for so long only.
+    refetchInterval: (query) => pollEvery(query.state.data),
   });
 
   // A CV read since: its details may have brought the profile up to date (the newest CV does).
@@ -81,7 +80,8 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       unwrap(await api.POST("/v1/documents/{documentId}/parse", { params: { path: { documentId } } })),
     onSuccess: (d) => {
       // The list shows it being read at once (an earlier "read" must not open the old review).
-      queryClient.setQueryData<Document[]>(["documents", candidateId], (list) => list?.map((x) => (x.id === d.id ? { ...x, status: d.status, parseStatus: d.parseStatus, updatedAt: d.updatedAt } : x)));
+      queryClient.setQueryData<Document[]>(["documents", candidateId], (list) => list?.map((x) => (x.id === d.id
+        ? { ...x, status: d.status, parseStatus: d.parseStatus, updatedAt: d.updatedAt, readingJob: d.readingJob ?? "waiting" } : x)));
       setAsked(new Set([...asked, d.id]));
       setWatched(new Set([...watched, d.id]));
       setPicked(d.id);
@@ -89,6 +89,13 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       void queryClient.invalidateQueries({ queryKey: ["document", d.id] });
       return queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
     },
+  });
+
+  // A Word file's PDF copy that failed (its file unreadable then, say): made again on request.
+  const remakePdf = useMutation({
+    mutationFn: async (documentId: string) =>
+      unwrap(await api.POST("/v1/documents/{documentId}/pdf", { params: { path: { documentId } }, body: { again: true } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", candidateId] }),
   });
 
   const remove = useMutation({
@@ -210,7 +217,13 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               onClick={(e) => { parse.mutate(d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
               Read details again (for comparing)
             </button>}
-            {d.pdfStatus === "failed" && <p className="muted small">No PDF copy (the Word file is fine).</p>}
+            {d.pdfStatus === "failed" && <>
+              <p className="muted small">No PDF copy (the Word file is fine).</p>
+              <button type="button" role="menuitem" disabled={remakePdf.isPending}
+                onClick={(e) => { remakePdf.mutate(d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
+                Make the PDF again
+              </button>
+            </>}
             {canBin && <button type="button" role="menuitem" disabled={bin.isPending}
               onClick={(e) => {
                 e.currentTarget.closest("details")?.removeAttribute("open");
@@ -290,7 +303,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
       {canFormat && <StudioProgress run={studio} />}
-      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? remove.error ?? bin.error} />
+      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? remove.error ?? bin.error ?? remakePdf.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
       {selected && comparing && all.length >= 2 && <CvCompare docs={all} firstId={selected.id} />}
       {oneCv && selected.extractionWarnings.map((w) => <p key={w} className="warning small">{w}</p>)}
@@ -307,7 +320,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         </div>)}</nav>}
         <CandidateCv candidateId={candidateId} selectedId={selected.id} unified actions={actions(selected)} highlight={hashParam("hl")}
           toolbar={{ target: fileToolbar, details: <DetailsButton doc={selected} ready={finished(selected)} reviewing={reviewing === selected.id}
-            canReview={canEdit} canRead={canUpload && selected.status === "extracted"} busy={parse.isPending}
+            canReview={canEdit} canRead={canUpload && (selected.status === "extracted" || selected.status === "failed")} busy={parse.isPending}
             onRead={() => { parse.mutate(selected.id); }} onReview={() => { review(selected.id); }} /> }} />
       </div>}
     </section>

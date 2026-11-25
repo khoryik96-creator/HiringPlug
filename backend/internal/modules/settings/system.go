@@ -27,6 +27,14 @@ type SystemStatus struct {
 	Backup *backup.Last
 	// BackupAuto: the nightly backup is on (off, an old last backup is expected).
 	BackupAuto bool
+	// Held are the jobs a restore held: the company's, or every company's
+	// (HeldEveryCompany: p runs the server). Restore is the server's last
+	// restore as p may see it (only the date and their count, unless they
+	// run the server; nil when it does not concern them).
+	Held             []jobqueue.HeldJob
+	HeldEveryCompany bool
+	Restore          *jobqueue.Restored
+	PaidAI           PaidAI
 }
 
 // System returns the company's background jobs and the last backup.
@@ -34,15 +42,19 @@ func (s *Service) System(ctx context.Context, p authz.Principal) (SystemStatus, 
 	var out SystemStatus
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		out, err = systemStatus(ctx, tx, p.TenantID)
+		out, err = s.systemStatus(ctx, tx, p)
 		return err
 	})
 	return out, err
 }
 
-func systemStatus(ctx context.Context, tx pgx.Tx, tenantID string) (SystemStatus, error) {
+func (s *Service) systemStatus(ctx context.Context, tx pgx.Tx, p authz.Principal) (SystemStatus, error) {
 	var out SystemStatus
 	var err error
+	tenantID := p.TenantID
+	if out.PaidAI, err = s.paidAI(ctx, tx, p); err != nil {
+		return out, err
+	}
 	if out.Jobs, err = jobqueue.Summary(ctx, tx, tenantID); err != nil {
 		return out, err
 	}
@@ -55,6 +67,9 @@ func systemStatus(ctx context.Context, tx pgx.Tx, tenantID string) (SystemStatus
 	}
 	if ok {
 		out.Backup = &last
+	}
+	if err := s.heldStatus(ctx, tx, p, &out); err != nil {
+		return out, err
 	}
 	control, err := backup.ReadControl(ctx, tx)
 	out.BackupAuto = control.Auto
@@ -75,7 +90,7 @@ func (s *Service) RetryJob(ctx context.Context, p authz.Principal, jobID string)
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "settings.job_retried", EntityType: "job", EntityID: jobID}); err != nil {
 			return err
 		}
-		out, err = systemStatus(ctx, tx, p.TenantID)
+		out, err = s.systemStatus(ctx, tx, p)
 		return err
 	})
 	return out, err
@@ -112,6 +127,9 @@ func systemToAPI(st SystemStatus) api.SystemStatus {
 	if b := st.Backup; b != nil {
 		out.Backup.Set(backupStatusToAPI(*b))
 	}
+	heldToAPI(st, &out)
+	out.PaidAi = api.PaidAiSwitch{Paused: st.PaidAI.Paused || st.PaidAI.ByServer, Reason: c.OrNull(st.PaidAI.Reason),
+		ChangedAt: c.OrNull(st.PaidAI.ChangedAt), PausedByServer: st.PaidAI.ByServer, CanChange: st.PaidAI.CanChange}
 	return out
 }
 

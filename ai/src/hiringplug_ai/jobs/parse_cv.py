@@ -29,8 +29,8 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
         if payload.useAi and payload.aiText:
             try:
                 ai = deps.provider(payload.ai)
-            except ProviderError:
-                log.warning("ai key could not be opened", extra={"document_id": payload.documentId.root})
+            except ProviderError as exc:  # a key that cannot be opened, or paid AI paused
+                log.warning("the AI was not used: %s", exc, extra={"document_id": payload.documentId.root})
         if ai is not None and payload.aiText:
             try:
                 # The AI reads the work history whenever it is on (the rules confuse a

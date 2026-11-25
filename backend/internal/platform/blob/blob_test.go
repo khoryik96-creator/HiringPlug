@@ -1,19 +1,25 @@
 package blob
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 func newStore(t *testing.T) *Store {
@@ -96,4 +102,49 @@ func TestFilesSavedBeforeSubfoldersStillWork(t *testing.T) {
 	_, err = s.Open("tnt_a/doc_old")
 	require.ErrorIs(t, err, os.ErrNotExist)
 	assert.Equal(t, http.StatusNotFound, get(s, s.SignedURL("tnt_a/doc_old", time.Minute)).Code)
+}
+
+// A file that is there but cannot be opened (the restore left it to another
+// user) is not "not found": the worker would give up on a file that a
+// repair brings back. It is a 500, logged with the key's hash and the error
+// number, never the file's path or the link's signature.
+func TestAnUnreadableFileIsAServerErrorNotAMissingOne(t *testing.T) {
+	s := newStore(t)
+	require.NoError(t, s.Put("tnt_a/doc_b", []byte("cv")))
+	s.open = func(p string) (*os.File, error) { return nil, &fs.PathError{Op: "open", Path: p, Err: syscall.EACCES} }
+	var logged bytes.Buffer
+	link := s.SignedURL("tnt_a/doc_b", time.Minute)
+	u, _ := url.Parse(link)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, u.RequestURI(), nil)
+	req = req.WithContext(logx.Into(req.Context(), slog.New(slog.NewJSONHandler(&logged, nil))))
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Contains(t, logged.String(), `"errno":13`)
+	assert.Contains(t, logged.String(), `"key_hash":"`)
+	assert.NotContains(t, logged.String(), "doc_b", "never the key or path")
+	assert.NotContains(t, logged.String(), u.Query().Get("sig"))
+
+	_, err := s.Open("tnt_a/doc_b")
+	require.ErrorIs(t, err, os.ErrPermission)
+	assert.NotContains(t, err.Error(), s.dir, "the error names no path")
+	assert.NotContains(t, err.Error(), "tnt_a")
+}
+
+// Review of 1.47.0: the AI worker gave up on any 404 as "the file is gone,
+// upload it again", including one from something else on the way (a wrong
+// HP_INTERNAL_BASE_URL): fixing the setting brought nothing back. This
+// server's own "not found" says so in a header; a refused link does not.
+func TestOnlyAFileNotHereIsMarkedMissing(t *testing.T) {
+	s := newStore(t)
+	missing := get(s, s.SignedURL("tnt_a/doc_none", time.Minute))
+	assert.Equal(t, http.StatusNotFound, missing.Code)
+	assert.Equal(t, "missing", missing.Header().Get(MissingHeader))
+	require.NoError(t, s.Put("tnt_a/doc_b", []byte("cv")))
+	expired := get(s, s.SignedURL("tnt_a/doc_b", -time.Minute))
+	assert.Equal(t, http.StatusForbidden, expired.Code)
+	assert.Empty(t, expired.Header().Get(MissingHeader))
+	found := get(s, s.SignedURL("tnt_a/doc_b", time.Minute))
+	assert.Equal(t, http.StatusOK, found.Code)
+	assert.Empty(t, found.Header().Get(MissingHeader))
 }

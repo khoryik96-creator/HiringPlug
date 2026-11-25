@@ -10,6 +10,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/aipaid"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -144,7 +145,7 @@ func (s *Service) Save(ctx context.Context, p authz.Principal, provider, model s
 		if err := q.SaveProvider(ctx, store.SaveProviderParams{Provider: provider, Model: model, SealedKey: sealed, KeyHint: hint}); err != nil {
 			return err
 		}
-		if err := queueCheck(ctx, tx, p, provider, model, sealed); err != nil {
+		if err := s.queueCheck(ctx, tx, p, provider, model, sealed); err != nil {
 			return err
 		}
 		if choice, err := choiceIn(ctx, q); err != nil {
@@ -167,9 +168,24 @@ func (s *Service) Save(ctx context.Context, p authz.Principal, provider, model s
 	return out, err
 }
 
+// pausedMessage is why no key is checked while the server's paid AI is paused.
+const pausedMessage = "Paid AI is paused on this server, so no key is checked (Settings > System turns it back on)."
+
+// checkPaused is a key's check status when it could not be checked because
+// paid AI was paused: not failed (the key may well work).
+const checkPaused = "paused"
+
 // queueCheck queues a check of a key, with its own ID and who asked, sent
-// back with the result so its AI use is counted once, for them.
-func queueCheck(ctx context.Context, tx pgx.Tx, p authz.Principal, provider, model, sealed string) error {
+// back with the result so its AI use is counted once, for them. While the
+// server's paid AI is paused the key is saved unchecked ("paused"), saying why.
+func (s *Service) queueCheck(ctx context.Context, tx pgx.Tx, p authz.Principal, provider, model, sealed string) error {
+	if paused, err := s.paidPaused(ctx, tx); err != nil {
+		return err
+	} else if paused {
+		status, msg := checkPaused, pausedMessage
+		_, err := store.New(tx).SaveCheck(ctx, store.SaveCheckParams{Provider: provider, SealedKey: sealed, CheckStatus: &status, CheckMessage: &msg})
+		return err
+	}
 	name := api.AiProviderName(provider)
 	checkID, askedBy := "chk_"+rand.Text(), p.UserID
 	_, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindAiproviderCheck, api.AiProviderCheckJob{
@@ -216,10 +232,15 @@ func (s *Service) Check(ctx context.Context, p authz.Principal, provider string)
 		} else if err != nil {
 			return err
 		}
+		if paused, err := s.paidPaused(ctx, tx); err != nil {
+			return err
+		} else if paused {
+			return apperr.New(api.ErrorCodeAIPAIDPAUSED, pausedMessage)
+		}
 		if err := q.MarkChecking(ctx, provider); err != nil {
 			return err
 		}
-		if err := queueCheck(ctx, tx, p, provider, row.Model, row.SealedKey); err != nil {
+		if err := s.queueCheck(ctx, tx, p, provider, row.Model, row.SealedKey); err != nil {
 			return err
 		}
 		out, err = s.state(ctx, q)
@@ -236,7 +257,10 @@ func (s *Service) checked(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	}
 	status := "ok"
 	var message *string
-	if !r.Ok {
+	switch {
+	case r.Paused != nil && *r.Paused: // queued before paid AI was paused: not asked, not failed
+		status, message = checkPaused, ptr(pausedMessage)
+	case !r.Ok:
 		status = "failed"
 		m := "The provider did not answer."
 		if v, err := r.Message.Get(); err == nil && v != "" {
@@ -277,8 +301,14 @@ func deref(n *int64) int64 {
 	return *n
 }
 
-// access is the AI the company uses, for the modules that queue AI work.
+// access is the AI the company uses, for the modules that queue AI work:
+// none while the server's paid AI is paused (Settings > System, or
+// HP_AI_PAID=off), whatever the company chose; a CV is then read by the
+// rules alone.
 func (s *Service) access(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error) {
+	if paused, err := s.paidPaused(ctx, tx); err != nil || paused {
+		return nil, false, err
+	}
 	q := store.New(tx)
 	choice, err := choiceIn(ctx, q)
 	if err != nil {
@@ -300,3 +330,13 @@ func (s *Service) access(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, e
 	}
 	return &api.AiAccess{Provider: api.AiProviderName(entry.Provider), Model: entry.Model, SealedKey: entry.SealedKey}, true, nil
 }
+
+// paidPaused reports whether the server's paid AI is paused.
+func (s *Service) paidPaused(ctx context.Context, tx pgx.Tx) (bool, error) {
+	if s.settings.PaidOff {
+		return true, nil
+	}
+	return aipaid.Paused(ctx, tx)
+}
+
+func ptr(s string) *string { return &s }

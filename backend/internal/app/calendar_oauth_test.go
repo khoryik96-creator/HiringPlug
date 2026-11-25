@@ -164,3 +164,31 @@ func TestCalendarPartialPagesKeepBusyTimesAndCanBeScheduledOver(t *testing.T) {
 	r = a.request("POST", "/v1/applications/"+application.Id+"/interviews", token, body)
 	assert.Equal(t, 201, r.Status, "scheduled anyway: %s", r.Body)
 }
+
+// Review of 1.47.0: an event's push held after a restore and cancelled
+// stayed "pending" (being sent) for ever. It fails, saying why, and can be
+// sent again.
+func TestACalendarPushCancelledAfterARestoreSaysSo(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleOwner)
+	token := tenant.Users[api.RoleRecruiter].Token
+	setupOutlook(t, a)
+	connectOutlook(t, a, token)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	r := a.request("POST", "/v1/calendar/events", token, calendarInput(time.Now().UTC().Add(72*time.Hour).Truncate(time.Minute)))
+	require.Equal(t, 201, r.Status, "%s", r.Body)
+	var event api.CalendarEvent
+	r.JSON(&event)
+	var jobID string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), `UPDATE job SET status = 'held', held_at = now()
+		WHERE tenant_id = $1 AND kind = 'calendar.push' AND status = 'pending' RETURNING id`, tenant.ID).Scan(&jobID))
+	r = a.request("POST", "/v1/settings/system/jobs/"+jobID+"/cancel", tenant.Users[api.RoleOwner].Token, nil)
+	require.Equal(t, 200, r.Status, "%s", r.Body)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	_, status := calendarEventState(t, event.Id)
+	assert.Equal(t, "failed", status, "not being sent for ever")
+	var why string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), `SELECT sync_error FROM calendar_event WHERE id = $1`, event.Id).Scan(&why))
+	assert.Contains(t, why, "cancelled after the server was restored")
+}

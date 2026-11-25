@@ -268,3 +268,35 @@ func mailboxToAPI(m MailboxCheck) api.ContactMailboxCheck {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// DeadJobHandlers end what a contact job was for when it ended without
+// running (cancelled after a restore, or stopped for good): a mailbox
+// check stays "checking" for ever otherwise, and an Apollo lookup waiting.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindContactCheckMailbox: m.service.mailboxCheckDied, api.JobKindContactApolloLookup: apolloLookupDied}
+}
+
+func (s *Service) mailboxCheckDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.ContactCheckMailboxJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no contact
+	}
+	if active, err := jobqueue.Active(ctx, tx, []api.JobKind{api.JobKindContactCheckMailbox}, "contactId", payload.ContactId); err != nil || active {
+		return err // a newer check of it decides
+	}
+	why := "Not checked: the check stopped. Check it again."
+	if jobqueue.WasCancelledAfterRestore(job) {
+		why = "Not checked: cancelled after the server was restored. Check it again."
+	}
+	_, err := store.New(tx).EndMailboxCheck(ctx, store.EndMailboxCheckParams{ContactID: payload.ContactId, Email: payload.Email, Reason: &why})
+	return err
+}
+
+func apolloLookupDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var in api.ContactApolloLookupJob
+	if err := job.Decode(&in); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no lookup
+	}
+	_, err := expireQueuedApolloLookup(ctx, tx, in.LookupId) // only one never claimed: a claimed one may have been sent
+	return err
+}

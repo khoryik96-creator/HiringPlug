@@ -18,6 +18,7 @@ package documents
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -48,7 +49,7 @@ type Module struct {
 
 // New wires the module.
 func New(pool *pgxpool.Pool, files *blob.Store, candidates Candidates, maxUploadBytes int64) *Module {
-	svc := &Service{pool: pool, files: files, candidates: candidates}
+	svc := &Service{pool: pool, files: files, candidates: candidates, stuckFailed: map[string]time.Time{}}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }
 

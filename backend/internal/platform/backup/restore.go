@@ -53,7 +53,6 @@ func Restore(ctx context.Context, o Options, name string) (result error) {
 		return err
 	}
 	// Keep the volume root: it may be a Docker mount point.
-	const stageName = ".hp-restore"
 	source, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return err
@@ -95,6 +94,11 @@ func Restore(ctx context.Context, o Options, name string) (result error) {
 		return fmt.Errorf("staging backup files: %w", err)
 	}
 	if err := checkFileCount(filepath.Join(dir, "manifest.json"), next); err != nil {
+		return err
+	}
+	// The files go to the user the API and workers run as before they are
+	// put in place: should that fail, nothing has changed yet.
+	if err := o.giveRestored(next); err != nil {
 		return err
 	}
 	previous, err := os.ReadDir(o.FilesDir)
@@ -139,6 +143,24 @@ func Restore(ctx context.Context, o Options, name string) (result error) {
 	}
 	if err := restoreDatabase(ctx, o, major, filepath.Join(dir, "database.dump")); err != nil {
 		return undo(err)
+	}
+	return nil
+}
+
+// giveRestored gives the staged files, and the files folder itself (a new
+// Docker volume starts as root's), to Owner: the restore runs as root in
+// Docker, the API as another user. Nothing to do without an Owner, or when
+// this process already runs as that user (its files are its own).
+func (o Options) giveRestored(staged string) error {
+	if o.Owner == nil || os.Geteuid() == o.Owner.UID {
+		return nil
+	}
+	_, err := giveFiles(staged, *o.Owner, false) // copies of their own: one link each
+	if err == nil {
+		err = lchown(o.FilesDir, o.Owner.UID, o.Owner.GID)
+	}
+	if err != nil {
+		return fmt.Errorf("giving the restored files to %s (HP_FILES_OWNER; restore as root, as the backup service does, or leave it unset when the API runs as you): %w", o.Owner, err)
 	}
 	return nil
 }
@@ -222,4 +244,23 @@ func untar(path, dir string) error {
 			return err
 		}
 	}
+}
+
+// ManifestServer is the database server a backup was made on (its
+// manifest's server, see ServerID); "" for a backup too old to say.
+func ManifestServer(dir, name string) (string, error) {
+	if !nameRe.MatchString(name) {
+		return "", ErrNotFound
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, name, "manifest.json")) //nolint:gosec // a backup named by nameRe
+	if err != nil {
+		return "", err
+	}
+	var m struct {
+		Server string `json:"server"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return "", fmt.Errorf("backup %s: its manifest is not readable: %w", name, err)
+	}
+	return m.Server, nil
 }

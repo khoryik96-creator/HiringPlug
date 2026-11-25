@@ -36,6 +36,10 @@ x-error-codes:
     module: aiproviders
     status: 409
     description: The server cannot store API keys yet (HP_AI_KEYS_SECRET is not set).
+  AI_PAID_PAUSED:
+    module: aiproviders
+    status: 409
+    description: Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off); no key is checked until it is back on.
   AI_PROVIDER_NO_KEY:
     module: aiproviders
     status: 409
@@ -3503,7 +3507,7 @@ paths:
       tags: [documents]
       summary: Read the profile details out of a CV again
       description: >
-        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`.
+        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`. A document whose text could not be read (status `failed`) has its text taken out of the file again (status `queued`). Asked while a reading of its details is under way, it queues nothing more and returns the document as it is. If the new reading fails for good, the details read before are kept (parseStatus `parsed` with a parseError warning).
 
       x-permission: documents:create
       responses:
@@ -3562,9 +3566,19 @@ paths:
     post:
       operationId: makeDocumentPdf
       tags: [documents]
-      summary: Make a Word document's PDF copy (for previewing it), if it has none yet
-      description: Word CVs uploaded since previews began get one at once; this makes one for older ones. A PDF, or a document whose copy is made or being made, is left as it is.
+      summary: Make a Word document's PDF copy (for previewing it), if it has none yet, or again after it failed
+      description: >-
+        Word CVs uploaded since previews began get one at once; this makes one for older ones. With again (a person asked: "Make the PDF again"), a copy that failed is made again, from a newly signed link. A PDF, or a document whose copy is made or being made, is left as it is.
       x-permission: documents:read
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                again: {type: boolean, description: Make a copy that failed again.}
       responses:
         '202':
           description: Being made (or already there)
@@ -9113,6 +9127,100 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/settings/system/jobs/{jobId}/release:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^job_[0-9a-hjkmnp-tv-z]{26}$'}
+    post:
+      operationId: releaseHeldJob
+      tags: [settings]
+      summary: Let a job held after a restore run (it may have happened already, before the backup was restored)
+      x-permission: settings:manage
+      responses:
+        '200':
+          description: Released; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/settings/system/jobs/{jobId}/cancel:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^job_[0-9a-hjkmnp-tv-z]{26}$'}
+    post:
+      operationId: cancelHeldJob
+      tags: [settings]
+      summary: Cancel a job held after a restore (it never runs; it shows as failed)
+      x-permission: settings:manage
+      responses:
+        '200':
+          description: Cancelled; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/settings/system/held:
+    post:
+      operationId: settleHeldJobs
+      tags: [settings]
+      summary: Release, or cancel, every job of the company held after a restore
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: {type: string, enum: [release, cancel]}
+      responses:
+        '200':
+          description: Done; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/system/paid-ai:
+    put:
+      operationId: setPaidAi
+      tags: [settings]
+      summary: Pause every paid AI call on the server, or turn paid AI back on
+      description: >
+        The server-wide switch: paused, no AI call is made through any company's key or the server's own provider, for new work or work already queued; local work (reading text and scans, PDF copies, search by meaning, reading CVs by the rules) goes on. Only an owner of the agency that runs the server (HP_BACKUP_TENANT, or the only agency) may change it here; on the server, `hp paid-ai on|off` changes it too. HP_AI_PAID=off keeps it paused whatever this says.
+
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [paused]
+              properties:
+                paused: {type: boolean}
+                reason: {type: string, maxLength: 300, description: Why (shown in Settings > System).}
+      responses:
+        '200':
+          description: Changed; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/settings/backups:
     get:
       operationId: getBackups
@@ -9690,6 +9798,7 @@ components:
       type: string
       enum:
         - AI_KEYS_NOT_SET_UP
+        - AI_PAID_PAUSED
         - AI_PROVIDER_NO_KEY
         - APOLLO_BROKER_UNAVAILABLE
         - APPLICATIONS_OVERLAP
@@ -9791,6 +9900,7 @@ components:
         - assistant.emailed
         - automation.event
         - automation.run
+        - background_job.ended
         - bin.purge
         - bin.remove_files
         - calendar.push
@@ -9928,8 +10038,11 @@ components:
       type: object
       required: [status, message, checkedAt]
       properties:
-        status: {type: string, enum: [queued, ok, failed]}
-        message: {type: string, nullable: true, description: "Why it failed: the key was refused, no credit left, an unknown model..."}
+        status:
+          type: string
+          enum: [queued, ok, failed, paused]
+          description: "paused: not checked, as paid AI was paused on the server (the key may well work: check it once it is back on)."
+        message: {type: string, nullable: true, description: "Why it failed (the key was refused, no credit left, an unknown model...), or why it was not checked."}
         checkedAt: {type: string, format: date-time}
     AiProviderChoiceInput:
       type: object
@@ -9971,8 +10084,12 @@ components:
         askedBy: {type: string, maxLength: 200, description: "Who asked for the check (a user ID), sent back unchanged."}
     AiStatus:
       type: object
-      required: [down, provider, message, since, failedAt]
+      required: [down, provider, message, since, failedAt, paidPaused]
       properties:
+        paidPaused:
+          type: boolean
+          description: >-
+            Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off): no AI call is made, through a company's key or the server's own; CVs are read by the rules alone.
         down: {type: boolean, description: "The latest call to the provider failed, within the last hour."}
         provider: {type: string, nullable: true, description: "As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI."}
         message: {type: string, nullable: true, description: "Why, in words safe to show (never a key)."}
@@ -9996,6 +10113,7 @@ components:
         sealedKey: {type: string, description: The key checked (a check of a key since replaced is dropped).}
         ok: {type: boolean}
         message: {type: string, nullable: true}
+        paused: {type: boolean, description: "The provider was not asked: paid AI is paused on the server (ok is false; the key is not failed)."}
         checkId: {type: string, maxLength: 200, description: "The check job's checkId, unchanged."}
         askedBy: {type: string, maxLength: 200, description: "The check job's askedBy, unchanged."}
         inputTokens: {type: integer, format: int64, minimum: 0, description: "Tokens the check's request took (counted in the monthly AI use)."}
@@ -13456,7 +13574,14 @@ components:
         parseError:
           type: string
           nullable: true
-          description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
+          description: >-
+            Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise.
+        readingJob:
+          type: string
+          enum: [waiting, running, held]
+          nullable: true
+          description: >-
+            While the document is being read (status or parseStatus queued): its job is waiting for the reader, running, or held after a restore of the server (Settings > System releases it); null when no job is left for it (the reading stopped: reading it again is offered). Left out where not worked out.
         readOutdated:
           type: boolean
           description: >-
@@ -18538,8 +18663,23 @@ components:
         userId: {type: string}
     SystemStatus:
       type: object
-      required: [jobs, failed, backup, backupAuto]
+      required: [jobs, failed, backup, backupAuto, held, heldEveryCompany, restore, paidAi]
       properties:
+        paidAi: {$ref: '#/components/schemas/PaidAiSwitch'}
+        held:
+          type: array
+          description: >-
+            Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany).
+          items: {$ref: '#/components/schemas/HeldJob'}
+        heldEveryCompany:
+          type: boolean
+          description: >-
+            The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company.
+        restore:
+          description: >-
+            The server's last restore; null when it was never restored. Other companies than the one that runs the server see it only while some of their own jobs are held, and only that.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/RestoreInfo'}]
         backupAuto: {type: boolean, description: "The nightly backup is on (Settings > Backups): off, an old last backup is expected."}
         jobs:
           type: array
@@ -18553,6 +18693,45 @@ components:
           description: The server's last backup; null when none was ever made.
           nullable: true
           allOf: [{$ref: '#/components/schemas/BackupStatus'}]
+    PaidAiSwitch:
+      type: object
+      required: [paused, reason, changedAt, pausedByServer, canChange]
+      properties:
+        paused: {type: boolean, description: "Paid AI is paused on the server (this switch, or HP_AI_PAID=off)."}
+        reason: {type: string, nullable: true}
+        changedAt: {type: string, format: date-time, nullable: true}
+        pausedByServer: {type: boolean, description: "HP_AI_PAID=off: paused whatever the switch says."}
+        canChange: {type: boolean, description: "The person may change it (an owner of the agency that runs the server)."}
+    HeldJob:
+      type: object
+      required: [id, company, kind, attempts, createdAt, heldAt, runAfter]
+      properties:
+        id: {type: string}
+        company: {type: string, nullable: true, description: "The company's name, in the list of every company's (heldEveryCompany); null otherwise."}
+        kind: {type: string, description: "e.g. email.send"}
+        attempts: {type: integer, description: "Tries before it was held."}
+        createdAt: {type: string, format: date-time, description: "When it was queued (before the backup was made)."}
+        heldAt: {type: string, format: date-time, nullable: true}
+        runAfter: {type: string, format: date-time, description: "When it was due; released, one due later still waits for its time."}
+    RestoreInfo:
+      type: object
+      required: [everyCompany, backupName, restoredAt, fromAnotherServer, held, resumed, releasedAt]
+      properties:
+        everyCompany:
+          type: boolean
+          description: >-
+            The restore as the agency that runs the server sees it (every company's count, the backup's name). false: only that some of this company's jobs are held after a restore of the server, and how many.
+        backupName: {type: string, nullable: true, description: Null unless everyCompany.}
+        restoredAt: {type: string, format: date-time}
+        fromAnotherServer: {type: boolean, nullable: true, description: "The backup was made on another database server (or is too old to say); null unless everyCompany."}
+        held: {type: integer, description: "Jobs the restore held in every company (everyCompany), or this company's still held."}
+        resumed: {type: boolean, description: "Restored with -resume-outbound (no outbound job held); false unless everyCompany."}
+        releasedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When the last held job was released or cancelled (everyCompany); null while some wait (and for other companies). Alert emails wait while a restore from another server is unsettled, 72 hours at most.
     JobKindStatus:
       type: object
       required: [kind, waiting, running, retrying, failed, oldestWaitingSince]
@@ -18563,6 +18742,13 @@ components:
         retrying: {type: integer, description: Failed at least once; tried again later.}
         failed: {type: integer, description: Failed for good in the last 30 days.}
         oldestWaitingSince: {type: string, format: date-time, nullable: true, description: When the longest-waiting one was queued.}
+    BackgroundJobEndedJob:
+      type: object
+      additionalProperties: false
+      required: [jobId, kind]
+      properties:
+        jobId: {type: string, description: The AI-queue job that failed for good (it keeps its payload until pruned).}
+        kind: {type: string, description: Its kind.}
     FailedJob:
       type: object
       required: [id, kind, attempts, error, failedAt]
@@ -19636,6 +19822,13 @@ x-jobs:
     payload: AutomationRunJob
     priority: normal
     description: 'An automation run is due: check it still applies, then email or add the task, or put the email up for approval (Go worker).'
+  background_job.ended:
+    module: settings
+    queue: core
+    payload: BackgroundJobEndedJob
+    priority: normal
+    description: |
+      An AI-queue job failed for good (its last attempt failed, or the AI worker gave up on it). Queued by the database itself, in the transaction that ends the job (migration 00199): the Go worker runs that kind's dead-job handler, so what the job was for (a CV being read) is not left waiting.
   bin.purge:
     module: bin
     queue: core

@@ -1681,3 +1681,5 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
   .team-table .team-actions { position: absolute; top: 0.6rem; right: 0.5rem; width: auto; }
   .team-table tbody tr:hover td { background: transparent; }
 }
+.held-jobs .held-actions { white-space: nowrap; }
+.held-jobs .held-actions .link + .link { margin-left: 0.85rem; }

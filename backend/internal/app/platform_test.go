@@ -232,6 +232,9 @@ func TestEveryCoreJobHasAHandler(t *testing.T) {
 	require.NoError(t, err)
 	outside := a.modules.OutsideJobHandlers()
 	for _, kind := range jobqueue.KindsForQueue(jobqueue.QueueCore) {
+		if jobqueue.IsWorkerKind(kind) {
+			continue // the worker's own (a dead job's notice)
+		}
 		_, inside := handlers[kind]
 		_, out := outside[kind]
 		assert.True(t, inside || out, "job %q (queue core) has no Go handler; add it to the module's JobHandlers (or OutsideJobHandlers)", kind)

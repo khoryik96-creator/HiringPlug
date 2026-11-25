@@ -43,6 +43,7 @@ from ..contracts import (
 )
 from ..extraction import Limits, OcrEngine
 from ..meaning.model import MeaningModel
+from ..paid_switch import PAID_PAUSED, PaidAIPausedError
 from ..providers import Completion, Provider, ProviderError
 from ..queue import FollowUp
 from . import (
@@ -141,6 +142,22 @@ class _Watched:
 
 
 @dataclass(frozen=True)
+class _Paid:
+    """A provider that asks the server's paid-AI switch before every call
+    (PaidSwitch caches it for seconds), so a job of many calls (ranking a
+    long list, a batch) stops within seconds of a pause, not at its end.
+    Outermost: a paused call never reaches _Watched (never an outage)."""
+
+    inner: Provider
+    paused: Callable[[], bool]
+
+    def complete(self, system: str, user: str, *, max_tokens: int) -> Completion:
+        if self.paused():
+            raise PaidAIPausedError(PAID_PAUSED)
+        return self.inner.complete(system, user, max_tokens=max_tokens)
+
+
+@dataclass(frozen=True)
 class Deps:
     """What handlers may use; tests pass fakes."""
 
@@ -160,6 +177,8 @@ class Deps:
     log: ProviderLog | None = None
     # Search by meaning's model (loaded on first use); None when not installed.
     meaning: Callable[[], MeaningModel | None] = lambda: None
+    # Whether the server's paid AI is paused (paid_switch.PaidSwitch.paused).
+    paid_paused: Callable[[], bool] = lambda: False
 
     def _chosen(self, access: AiAccess | None) -> Provider | None:
         if access is None:
@@ -174,6 +193,9 @@ class Deps:
         (a whole CV as JSON). Raises ProviderError when the company's key
         cannot be opened."""
         name = access.provider.value if access is not None else "server"
+        if (access is not None or self.ai is not None) and self.paid_paused():
+            # Not the provider's failure: never reported as an outage.
+            raise PaidAIPausedError(PAID_PAUSED)
         try:
             chosen = self._chosen(access)
         except ProviderError as exc:
@@ -187,9 +209,11 @@ class Deps:
             and hasattr(chosen, "timeout_seconds")
         ):
             chosen = dataclasses.replace(chosen, timeout_seconds=self.long_timeout_seconds)
-        if chosen is not None and self.log is not None:
-            return _Watched(chosen, name, self.log)
-        return chosen
+        if chosen is None:
+            return None
+        if self.log is not None:
+            chosen = _Watched(chosen, name, self.log)
+        return _Paid(chosen, self.paid_paused)
 
 
 @dataclass(frozen=True)

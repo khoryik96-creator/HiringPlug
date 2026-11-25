@@ -458,6 +458,28 @@ usage replaces it. One final request can use a balance under 1,000 tokens.
 Actual token use is known after the model responds, so the allowance is an
 admission limit with estimates.
 
+## Paid AI paused, and failures for good (1.47.0)
+
+`Deps.provider()` asks the server's paid-AI switch (`ai_paid_paused()`,
+cached five seconds; `HP_AI_PAID=off` pauses it whatever the database says)
+before it hands a handler any provider, the company's or the server's, and
+the provider it hands asks again before every call, so a job of many calls
+stops within seconds of a pause. Paused, it raises `PaidAIPausedError`, a
+`ProviderError`: `parse_cv` and `read_jd` keep the rules' reading, the others
+answer with why, and nothing is reported as the provider being down. Jobs
+queued before the pause make no call either; a key check reports `paused`
+(the key is not failed).
+
+A download the file server answers with its own "not found" (404 with
+`X-HyPlug-File: missing`) raises `FileMissingError` ("file missing": upload
+it again); a 403 (the link expired, or was signed by another server) raises
+`LinkExpiredError` ("link expired": read it again; the file is fine); both
+are given up at once (`job_give_up`). A 404 or 410 from anything else (a
+wrong `HP_INTERNAL_BASE_URL`), 5xx and network errors are retried. No
+message carries the signed link. When an AI job is dead, the database tells the Go
+worker (`background_job.ended`), which ends what it was for: a document's
+reading or PDF copy (see architecture.md, Background jobs).
+
 ## Adding a job to the AI worker
 
 1. Declare it in the module contract: `x-jobs: { thing.do: { queue: ai, payload: ThingDoJob } }`

@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/backup"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 )
 
@@ -166,6 +167,17 @@ func (w *Watcher) Check(ctx context.Context) error {
 	}
 	for _, p := range due {
 		w.Log.Warn("server problem", "problem", p.Key, "text", p.Text)
+	}
+	// Restored from another server, with jobs held until someone settles
+	// them: a copy of production (staging) must not email its people either.
+	// The problems are emailed once the restore is settled, or after
+	// jobqueue.AlertsWaitFor at the latest. A restore of this server's own
+	// backup never silences them.
+	if r, ok, err := jobqueue.LastRestore(ctx, w.Checks.DB); err != nil {
+		return err
+	} else if ok && r.AlertsWait(now()) {
+		w.Log.Info("alert email waits: the server was restored from another server's backup and its held jobs are not settled yet (Settings > System, or hp jobs)")
+		return nil
 	}
 	if len(w.To) > 0 {
 		if err := w.Mail.Send(ctx, w.message(problems, due, over)); err != nil {

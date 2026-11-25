@@ -3,6 +3,7 @@ package documents
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -38,6 +39,9 @@ type Service struct {
 	ai             AIAllowance         // nil: the AI never fills in CV readings
 	salaryCVs      SalaryCVs           // formatted CVs made with the salary (CheckSalaryCVsWith)
 	salaryViews    salaryview.Recorder // who was shown a salary (RecordSalaryViewsWith)
+	// stuckFailed are the documents the upkeep could not set right lately (ReconcileReading).
+	stuckMu     sync.Mutex
+	stuckFailed map[string]time.Time
 }
 
 // AIAllowance says whether the AI may be used now (the company has one,
@@ -199,7 +203,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID strin
 		for i, r := range rows {
 			docs[i] = fromRow(store.Document(r))
 		}
-		return nil
+		return readingJobs(ctx, tx, docs)
 	})
 	return docs, err
 }
@@ -221,7 +225,10 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Docume
 		doc = fromRow(row)
 		doc.ExtractedText = row.ExtractedText
 		doc.ParsedProfile = row.ParsedProfile
-		return nil
+		one := []Document{doc}
+		err = readingJobs(ctx, tx, one)
+		doc = one[0]
+		return err
 	})
 	return doc, err
 }
@@ -234,42 +241,65 @@ func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Docu
 	var doc Document
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		row, err := q.GetDocument(ctx, id)
-		if database.IsNoRows(err) {
+		// Locked before looking for a reading under way: two asking at once,
+		// or a reading ending at that moment (endReading), wait for each other.
+		if _, err := q.LockDocument(ctx, id); database.IsNoRows(err) {
 			return apperr.NotFound("document")
+		} else if err != nil {
+			return err
 		}
+		row, err := q.GetDocument(ctx, id)
 		if err != nil {
 			return err
 		}
-		if !hasText(row.ExtractedText) {
+		retryText := row.Status == string(api.DocumentStatusFailed) && !filekind.ReadHere(row.ContentType)
+		if !hasText(row.ExtractedText) && !retryText {
 			return apperr.New(api.ErrorCodeDOCUMENTHASNOTEXT, "This document has no text to read yet.")
 		}
-		if filekind.ReadHere(row.ContentType) {
+		// Asked again while it is read (a second click, two people): the
+		// reading under way answers both, never a second job.
+		if active, err := jobqueue.Active(ctx, tx, readingKinds, "documentId", id); err != nil || active {
+			doc = fromRow(row)
+			return err
+		}
+		switch {
+		case retryText: // its text could not be read: from the file again
+			if err := s.queueExtraction(ctx, tx, p.TenantID, row); err != nil {
+				return err
+			}
+			if row, err = q.RequeueExtraction(ctx, id); err != nil {
+				return err
+			}
+			doc = fromRow(row)
+		case filekind.ReadHere(row.ContentType):
 			err = s.queueParse(ctx, tx, p.TenantID, row)
-		} else {
+		default:
 			err = s.queueExtraction(ctx, tx, p.TenantID, row)
+			if err == nil {
+				_, err = q.QueueParse(ctx, row.ID)
+			}
 		}
 		if err != nil {
 			return err
 		}
-		queued := string(api.DocumentParseStatusQueued)
-		doc = fromRow(row)
-		doc.ParseStatus = &queued
+		if !retryText {
+			queued := string(api.DocumentParseStatusQueued)
+			doc = fromRow(row)
+			doc.ParseStatus = &queued
+		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "document.parse_requested", EntityType: "document", EntityID: id})
 	})
 	return doc, err
 }
 
 // queueExtraction takes a stored file's text out again (then its details are
-// read, as after an upload); until then it shows as being read.
+// read, as after an upload), with a link signed now: one in an old job may
+// have expired, or come from another server.
 func (s *Service) queueExtraction(ctx context.Context, tx pgx.Tx, tenantID string, row store.Document) error {
-	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
+	_, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
 		DocumentId: row.ID, DownloadUrl: s.files.SignedURL(row.StorageKey, downloadLinkTTL),
 		ContentType: row.ContentType, FileName: row.FileName, SizeBytes: row.SizeBytes,
-	}); err != nil {
-		return err
-	}
-	_, err := store.New(tx).QueueParse(ctx, row.ID)
+	})
 	return err
 }
 

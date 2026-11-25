@@ -43,6 +43,8 @@ type Job struct {
 	Attempts    int
 	MaxAttempts int
 	RequestID   string
+	// LastError is why it failed, for a dead-job handler (OnDead); empty otherwise.
+	LastError string
 }
 
 // Decode parses the payload into v (the generated type for the job kind).
@@ -115,8 +117,10 @@ type Worker struct {
 	Handlers Handlers
 	// Outside are the kinds whose handlers run with no transaction open.
 	Outside OutsideHandlers
-	// OnDead updates related application state in the same transaction that
-	// exhausts a job's retries. Only declared kinds receive the callback.
+	// OnDead updates related application state when a job fails for good.
+	// Only declared kinds receive the callback. A core job's runs in the
+	// transaction that exhausts its retries; an AI-queue job's in the one
+	// that handles the database's notice of it (background_job.ended, see dead.go).
 	OnDead Handlers
 	Logger *slog.Logger
 	Lease  time.Duration // how long a claimed job is ours before others may retry it
@@ -215,6 +219,14 @@ func (w *Worker) handle(ctx context.Context, job Job) (err error) {
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
+	if IsWorkerKind(job.Kind) { // the database's own notice: no module handles it
+		return database.InTx(ctx, w.Pool, authz.System(job.TenantID), func(tx pgx.Tx) error {
+			if err := w.jobEnded(ctx, tx, job); err != nil {
+				return err
+			}
+			return w.complete(ctx, tx, job)
+		})
+	}
 	if outside, ok := w.Outside[job.Kind]; ok {
 		if err := outside(ctx, job); err != nil {
 			return err
@@ -307,6 +319,7 @@ func (w *Worker) fail(ctx context.Context, job Job, jobErr error) (string, error
 			return err
 		}
 		if handler := w.OnDead[job.Kind]; status == "dead" && handler != nil {
+			job.LastError = jobErr.Error()
 			return handler(ctx, tx, job)
 		}
 		return nil
@@ -355,6 +368,9 @@ func (w *Worker) waitForNotifications(ctx context.Context, wakes []chan struct{}
 // checkHandlers refuses to start if a job kind on this queue has no handler.
 func (w *Worker) checkHandlers() error {
 	for _, kind := range KindsForQueue(w.Queue) {
+		if IsWorkerKind(kind) {
+			continue
+		}
 		_, inside := w.Handlers[kind]
 		_, outside := w.Outside[kind]
 		if !inside && !outside {

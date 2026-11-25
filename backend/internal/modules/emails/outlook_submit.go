@@ -27,8 +27,47 @@ func (m *Module) OutsideJobHandlers() jobqueue.OutsideHandlers {
 	}
 }
 
+// DeadJobHandlers end what a sending job was for when it ends without
+// running (cancelled after a restore, or stopped for good).
 func (m *Module) DeadJobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindEmailOutlookScheduled: outlookSendDead}
+	return jobqueue.Handlers{
+		api.JobKindEmailOutlookScheduled:  outlookSendDead,
+		api.JobKindEmailSend:              m.service.sendDied,
+		api.JobKindEmailInterviewReminder: m.service.sendDied,
+	}
+}
+
+// Why an email whose job ended was not sent.
+const (
+	notSentRestore = "Not sent: cancelled after the server was restored (it was waiting in the backup)."
+	notSentStopped = "Not sent: sending it stopped before it was tried. Send it again if it is still needed."
+)
+
+// sendDied marks an email whose sending job ended without trying it as not
+// sent: queued for ever otherwise. One whose delivery was attempted may
+// have gone, and is left as it is (the job itself decided it).
+func (s *Service) sendDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.EmailSendJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no email to update
+	}
+	why := notSentStopped
+	if jobqueue.WasCancelledAfterRestore(job) {
+		why = notSentRestore
+	}
+	row, err := store.New(tx).FailUnsentEmail(ctx, store.FailUnsentEmailParams{ID: payload.EmailId, Error: &why})
+	if database.IsNoRows(err) {
+		return nil // sent, failed, tried, or gone
+	}
+	if err != nil {
+		return err
+	}
+	if row.FeesRestricted && s.deps.Invoices != nil { // an invoice's email: the invoice shows it was not sent
+		if err := s.deps.Invoices.Delivered(ctx, tx, row.ID, true); err != nil {
+			return err
+		}
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "email.failed", EntityType: "email", EntityID: row.ID, Changes: map[string]any{"error": why}})
 }
 
 func outlookSendDead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {

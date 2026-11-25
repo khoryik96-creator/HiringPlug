@@ -452,6 +452,27 @@ func (q *Queries) DeleteMergedContact(ctx context.Context, id string) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const endMailboxCheck = `-- name: EndMailboxCheck :execrows
+UPDATE contact_mailbox_check SET status = 'unknown', reason = $1, recheck_at = NULL, checked_at = now()
+WHERE contact_id = $2 AND email = $3 AND status = 'checking'
+`
+
+type EndMailboxCheckParams struct {
+	Reason    *string
+	ContactID string
+	Email     string
+}
+
+// A check whose job ended without checking (cancelled after a restore, or
+// stopped): unknown, saying why (checking again is offered).
+func (q *Queries) EndMailboxCheck(ctx context.Context, arg EndMailboxCheckParams) (int64, error) {
+	result, err := q.db.Exec(ctx, endMailboxCheck, arg.Reason, arg.ContactID, arg.Email)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const expireLinkedinCheck = `-- name: ExpireLinkedinCheck :exec
 UPDATE contact_linkedin_check SET status = 'expired' WHERE id = $1 AND status = 'pending'
 `

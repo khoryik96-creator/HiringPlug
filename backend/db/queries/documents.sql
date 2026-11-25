@@ -251,3 +251,42 @@ ORDER BY candidate_id, CASE source WHEN 'original' THEN 0 ELSE 1 END, id DESC;
 -- the salary is only theirs to open).
 -- name: MaySeeSalary :one
 SELECT app_has_permission('candidates.compensation:read')::boolean AS may;
+
+-- Reading a file's text again after it failed: shown as being read until
+-- the worker's result (the details are read after it, as on upload).
+-- name: RequeueExtraction :one
+UPDATE document SET status = 'queued', error_message = NULL, updated_at = now() WHERE id = @id AND status = 'failed' RETURNING *;
+
+-- The text could not be read, for good (the worker gave up, or it stopped
+-- and nothing is left to finish it): only while still shown as being read.
+-- name: FailExtraction :one
+UPDATE document SET status = 'failed', error_message = @error_message, updated_at = now()
+WHERE id = @id AND status = 'queued'
+RETURNING *;
+
+-- A reading of the details that ended without a result: back to the
+-- details read before (parsed, with why the new reading failed as a
+-- warning), or failed when there are none. Only while still being read.
+-- name: EndParse :one
+UPDATE document SET
+  parse_status = CASE WHEN parsed_profile IS NULL THEN 'failed' ELSE 'parsed' END,
+  parse_error = CASE WHEN parsed_profile IS NULL THEN @failed_error::text ELSE @kept_warning::text END,
+  updated_at = now()
+WHERE id = @id AND parse_status = 'queued'
+RETURNING *;
+
+-- A Word document's PDF copy made again after it failed (a person asked:
+-- "Make the PDF again"), from its file.
+-- name: QueuePdfAgain :one
+UPDATE document SET pdf_status = 'queued', pdf_error = NULL WHERE id = @id AND pdf_status = 'failed' RETURNING storage_key;
+
+-- The document, locked until the transaction ends: ending a reading waits
+-- for one asked for at the same moment (and then sees its job).
+-- name: LockDocument :one
+SELECT id FROM document WHERE id = @id FOR UPDATE;
+
+-- Documents left "being read" with no job to finish them, in every company,
+-- oldest first, leaving out skip (ones the upkeep could not set right lately).
+-- name: ReadingStuck :many
+SELECT tenant_id::text AS tenant_id, document_id::text AS document_id
+FROM document_reading_stuck(make_interval(secs => @older_seconds::float8), @max_count::integer, @skip::text[]);

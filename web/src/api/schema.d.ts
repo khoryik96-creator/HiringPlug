@@ -2133,7 +2133,7 @@ export interface paths {
         put?: never;
         /**
          * Read the profile details out of a CV again
-         * @description CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`.
+         * @description CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer reader: the text is taken out of the file again (a newer reader may see more, such as tables), then the details are read. A text, RTF or ODT file's text is read on the server and only its details are read again. If taking the text out fails, the text read before is kept and read again. Returns the document with parseStatus `queued`. A document whose text could not be read (status `failed`) has its text taken out of the file again (status `queued`). Asked while a reading of its details is under way, it queues nothing more and returns the document as it is. If the new reading fails for good, the details read before are kept (parseStatus `parsed` with a parseError warning).
          */
         post: operations["parseDocument"];
         delete?: never;
@@ -2177,8 +2177,8 @@ export interface paths {
         get: operations["getDocumentPdf"];
         put?: never;
         /**
-         * Make a Word document's PDF copy (for previewing it), if it has none yet
-         * @description Word CVs uploaded since previews began get one at once; this makes one for older ones. A PDF, or a document whose copy is made or being made, is left as it is.
+         * Make a Word document's PDF copy (for previewing it), if it has none yet, or again after it failed
+         * @description Word CVs uploaded since previews began get one at once; this makes one for older ones. With again (a person asked: "Make the PDF again"), a copy that failed is made again, from a newly signed link. A PDF, or a document whose copy is made or being made, is left as it is.
          */
         post: operations["makeDocumentPdf"];
         delete?: never;
@@ -5785,6 +5785,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/settings/system/jobs/{jobId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Let a job held after a restore run (it may have happened already, before the backup was restored) */
+        post: operations["releaseHeldJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system/jobs/{jobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a job held after a restore (it never runs; it shows as failed) */
+        post: operations["cancelHeldJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system/held": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release, or cancel, every job of the company held after a restore */
+        post: operations["settleHeldJobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system/paid-ai": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Pause every paid AI call on the server, or turn paid AI back on
+         * @description The server-wide switch: paused, no AI call is made through any company's key or the server's own provider, for new work or work already queued; local work (reading text and scans, PDF copies, search by meaning, reading CVs by the rules) goes on. Only an owner of the agency that runs the server (HP_BACKUP_TENANT, or the only agency) may change it here; on the server, `hp paid-ai on|off` changes it too. HP_AI_PAID=off keeps it paused whatever this says.
+         */
+        put: operations["setPaidAi"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings/backups": {
         parameters: {
             query?: never;
@@ -6015,9 +6090,9 @@ export interface components {
         /** @enum {string} */
         Permission: "aiproviders:manage" | "aiusage:manage" | "aiusage:read" | "assistant:use" | "auditlog.salary_views:read" | "auditlog:read" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:export" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims.storage:manage" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:export" | "companies:merge" | "companies:read" | "companies:update" | "contacts.apollo:use" | "contacts.role:update" | "contacts:create" | "contacts:export" | "contacts:merge" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interview_prep:manage" | "interview_prep:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:export" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "notifications:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:export" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports.forecast:read" | "reports.settings:manage" | "reports.team:read" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read" | "shortlists:share";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "MICROSOFT_APP_OWNERS_ONLY" | "MICROSOFT_CONNECT_FAILED" | "MICROSOFT_REQUIRED" | "MICROSOFT_SIGN_IN_FAILED" | "MICROSOFT_SIGN_IN_UNAVAILABLE" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PASSWORD_NOT_SET" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PAID_PAUSED" | "AI_PROVIDER_NO_KEY" | "APOLLO_BROKER_UNAVAILABLE" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_STORAGE_NOT_CONNECTED" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_LIMIT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "EXPORT_TOO_LARGE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "INTERVIEW_PREP_AI_OFF" | "INTERVIEW_PREP_NOT_WRITTEN" | "INTERVIEW_PREP_TOO_LITTLE" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "MEANING_READING" | "MEANING_UNAVAILABLE" | "METHOD_NOT_ALLOWED" | "MICROSOFT_APP_OWNERS_ONLY" | "MICROSOFT_CONNECT_FAILED" | "MICROSOFT_REQUIRED" | "MICROSOFT_SIGN_IN_FAILED" | "MICROSOFT_SIGN_IN_UNAVAILABLE" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_DRAFT_CHANGED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_RULES_ACCESS" | "OUTLOOK_SEND_IN_PROGRESS" | "OUTLOOK_UNAVAILABLE" | "PASSWORD_NOT_SET" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SHORTLIST_ALREADY_ANSWERED" | "SHORTLIST_CLOSED" | "SHORTLIST_CV_NOT_SHAREABLE" | "SHORTLIST_DO_NOT_CONTACT" | "SHORTLIST_TOO_MANY_TRIES" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "TWO_STEP_NOT_ENABLED" | "TWO_STEP_REQUIRED" | "TWO_STEP_SETUP_REQUIRED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "meaning.candidates_read" | "meaning.query_read" | "meaning.read_candidates" | "meaning.read_query" | "meaning.sweep" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "background_job.ended" | "bin.purge" | "bin.remove_files" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "claim.remove_upload" | "claim.upload" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.apollo_lookup" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_scheduled" | "email.outlook_sync" | "email.send" | "interview.remind" | "interview_prep.write" | "interview_prep.written" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "meaning.candidates_read" | "meaning.query_read" | "meaning.read_candidates" | "meaning.read_query" | "meaning.sweep" | "notifications.digest" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -6089,9 +6164,12 @@ export interface components {
             check: components["schemas"]["AiProviderCheck"] | null;
         };
         AiProviderCheck: {
-            /** @enum {string} */
-            status: "queued" | "ok" | "failed";
-            /** @description Why it failed: the key was refused, no credit left, an unknown model... */
+            /**
+             * @description paused: not checked, as paid AI was paused on the server (the key may well work: check it once it is back on).
+             * @enum {string}
+             */
+            status: "queued" | "ok" | "failed" | "paused";
+            /** @description Why it failed (the key was refused, no credit left, an unknown model...), or why it was not checked. */
             message: string | null;
             /** Format: date-time */
             checkedAt: string;
@@ -6120,6 +6198,8 @@ export interface components {
             askedBy?: string;
         };
         AiStatus: {
+            /** @description Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off): no AI call is made, through a company's key or the server's own; CVs are read by the rules alone. */
+            paidPaused: boolean;
             /** @description The latest call to the provider failed, within the last hour. */
             down: boolean;
             /** @description As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI. */
@@ -6152,6 +6232,8 @@ export interface components {
             sealedKey: string;
             ok: boolean;
             message: string | null;
+            /** @description The provider was not asked: paid AI is paused on the server (ok is false; the key is not failed). */
+            paused?: boolean;
             /** @description The check job's checkId, unchanged. */
             checkId?: string;
             /** @description The check job's askedBy, unchanged. */
@@ -8692,8 +8774,13 @@ export interface components {
             extractedText?: string | null;
             /** @description Null when the document was never parsed (formatted CVs, or uploaded before parsing existed). */
             parseStatus: components["schemas"]["DocumentParseStatus"] | null;
-            /** @description Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise. */
+            /** @description Why the details could not be read (parseStatus failed), or, with parseStatus parsed, why reading them again failed (a warning: the details read before are kept). Never CV text. Null otherwise. */
             parseError: string | null;
+            /**
+             * @description While the document is being read (status or parseStatus queued): its job is waiting for the reader, running, or held after a restore of the server (Settings > System releases it); null when no job is left for it (the reading stopped: reading it again is offered). Left out where not worked out.
+             * @enum {string|null}
+             */
+            readingJob?: "waiting" | "running" | "held" | null;
             /** @description A CV the candidate sent, read by older CV-reading rules than this server's: reading it again (POST .../parse) may find more. Reviewing its details reads it again first. */
             readOutdated?: boolean;
             /** @description Only included when fetching a single document. */
@@ -12368,6 +12455,13 @@ export interface components {
             userId: string;
         };
         SystemStatus: {
+            paidAi: components["schemas"]["PaidAiSwitch"];
+            /** @description Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany). */
+            held: components["schemas"]["HeldJob"][];
+            /** @description The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company. */
+            heldEveryCompany: boolean;
+            /** @description The server's last restore; null when it was never restored. Other companies than the one that runs the server see it only while some of their own jobs are held, and only that. */
+            restore: components["schemas"]["RestoreInfo"] | null;
             /** @description The nightly backup is on (Settings > Backups): off, an old last backup is expected. */
             backupAuto: boolean;
             /** @description The company's background jobs by kind, kinds with none left out. */
@@ -12376,6 +12470,57 @@ export interface components {
             failed: components["schemas"]["FailedJob"][];
             /** @description The server's last backup; null when none was ever made. */
             backup: components["schemas"]["BackupStatus"] | null;
+        };
+        PaidAiSwitch: {
+            /** @description Paid AI is paused on the server (this switch, or HP_AI_PAID=off). */
+            paused: boolean;
+            reason: string | null;
+            /** Format: date-time */
+            changedAt: string | null;
+            /** @description HP_AI_PAID=off: paused whatever the switch says. */
+            pausedByServer: boolean;
+            /** @description The person may change it (an owner of the agency that runs the server). */
+            canChange: boolean;
+        };
+        HeldJob: {
+            id: string;
+            /** @description The company's name, in the list of every company's (heldEveryCompany); null otherwise. */
+            company: string | null;
+            /** @description e.g. email.send */
+            kind: string;
+            /** @description Tries before it was held. */
+            attempts: number;
+            /**
+             * Format: date-time
+             * @description When it was queued (before the backup was made).
+             */
+            createdAt: string;
+            /** Format: date-time */
+            heldAt: string | null;
+            /**
+             * Format: date-time
+             * @description When it was due; released, one due later still waits for its time.
+             */
+            runAfter: string;
+        };
+        RestoreInfo: {
+            /** @description The restore as the agency that runs the server sees it (every company's count, the backup's name). false: only that some of this company's jobs are held after a restore of the server, and how many. */
+            everyCompany: boolean;
+            /** @description Null unless everyCompany. */
+            backupName: string | null;
+            /** Format: date-time */
+            restoredAt: string;
+            /** @description The backup was made on another database server (or is too old to say); null unless everyCompany. */
+            fromAnotherServer: boolean | null;
+            /** @description Jobs the restore held in every company (everyCompany), or this company's still held. */
+            held: number;
+            /** @description Restored with -resume-outbound (no outbound job held); false unless everyCompany. */
+            resumed: boolean;
+            /**
+             * Format: date-time
+             * @description When the last held job was released or cancelled (everyCompany); null while some wait (and for other companies). Alert emails wait while a restore from another server is unsettled, 72 hours at most.
+             */
+            releasedAt: string | null;
         };
         JobKindStatus: {
             /** @description e.g. email.send */
@@ -12392,6 +12537,12 @@ export interface components {
              * @description When the longest-waiting one was queued.
              */
             oldestWaitingSince: string | null;
+        };
+        BackgroundJobEndedJob: {
+            /** @description The AI-queue job that failed for good (it keeps its payload until pruned). */
+            jobId: string;
+            /** @description Its kind. */
+            kind: string;
         };
         FailedJob: {
             id: string;
@@ -17072,7 +17223,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Make a copy that failed again. */
+                    again?: boolean;
+                };
+            };
+        };
         responses: {
             /** @description Being made (or already there) */
             202: {
@@ -24274,6 +24432,117 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    releaseHeldJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Released; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    cancelHeldJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    settleHeldJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "release" | "cancel";
+                };
+            };
+        };
+        responses: {
+            /** @description Done; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setPaidAi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    paused: boolean;
+                    /** @description Why (shown in Settings > System). */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getBackups: {

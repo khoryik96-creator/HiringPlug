@@ -25,6 +25,8 @@ type Status struct {
 	Message  string
 	Since    *time.Time // when the failures began
 	FailedAt *time.Time // the latest one
+	// PaidPaused: no paid AI on the server (Settings > System, HP_AI_PAID=off).
+	PaidPaused bool
 }
 
 // ProviderLabel is how the notice everyone sees names a provider: by number,
@@ -84,6 +86,10 @@ func (s *Service) reported(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 func (s *Service) Status(ctx context.Context, p authz.Principal, now time.Time) (Status, error) {
 	var out Status
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		if out.PaidPaused, err = s.paidPaused(ctx, tx); err != nil || out.PaidPaused {
+			return err // paused: no provider is called, so none is down
+		}
 		q := store.New(tx)
 		row, err := q.ProviderStatus(ctx)
 		if database.IsNoRows(err) {
@@ -120,7 +126,7 @@ func (h *HTTP) GetAiStatus(ctx context.Context, _ api.GetAiStatusRequestObject) 
 		return nil, err
 	}
 	out := api.GetAiStatus200JSONResponse{
-		Down: st.Down, Provider: nullable.NewNullNullable[string](), Message: nullable.NewNullNullable[string](),
+		Down: st.Down, PaidPaused: st.PaidPaused, Provider: nullable.NewNullNullable[string](), Message: nullable.NewNullNullable[string](),
 		Since: nullable.NewNullNullable[time.Time](), FailedAt: nullable.NewNullNullable[time.Time](),
 	}
 	if st.Down {

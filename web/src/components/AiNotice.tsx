@@ -29,6 +29,7 @@ export function AiNotice({ permissions }: { permissions: Permission[] }) {
   });
   const [hidden, setHidden] = useState(hiddenSince);
   const s = status.data;
+  if (s?.paidPaused) return <PausedNotice permissions={permissions} />;
   if (!s?.down) return null;
   const since = s.since ?? s.failedAt ?? "";
   if (hidden && hidden === since) return null;
@@ -48,3 +49,25 @@ export function AiNotice({ permissions }: { permissions: Permission[] }) {
     </div>
   );
 }
+
+/** Paid AI paused on the server (Settings > System): said once a session, closable. */
+function PausedNotice({ permissions }: { permissions: Permission[] }) {
+  const [hidden, setHidden] = useState(() => hiddenSince() === PAUSED);
+  if (hidden) return null;
+  const close = () => {
+    setHidden(true);
+    try { sessionStorage.setItem(HIDDEN_KEY, PAUSED); } catch { /* private window: closed for now only */ }
+  };
+  return (
+    <div className="ai-notice" role="alert">
+      <div>
+        <strong>Paid AI is paused on this server.</strong>{" "}
+        CVs are read by the rules alone; fit scores, CV formatting and the assistant wait until it is turned back on. Nothing is lost.
+        {permissions.includes("settings:manage") && <> <a href="#/system">See Settings &gt; System</a></>}
+      </div>
+      <button type="button" className="link" onClick={close} aria-label="Close the AI notice">Close</button>
+    </div>
+  );
+}
+
+const PAUSED = "paid-ai-paused";

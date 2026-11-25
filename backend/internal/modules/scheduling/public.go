@@ -124,8 +124,14 @@ func (s *Service) page(ctx context.Context, tx pgx.Tx, company string, row store
 		}
 		out.Slots = Slots(settings, loc, length, earliest, latest, busy)
 	}
-	// A calendar not read for a while is read again for the next visitor.
-	if sched.CalendarUrl != nil {
+	// A calendar not read for a while is read again for the next visitor;
+	// not while a restore holds the jobs that reach other systems (a page
+	// view is nobody's choice to let them run).
+	held, err := jobqueue.HoldingAfterRestore(ctx, tx)
+	if err != nil {
+		return Page{}, err
+	}
+	if sched.CalendarUrl != nil && !held {
 		if n, err := store.New(tx).AskCalendarRead(ctx, row.HostUserID); err != nil {
 			return Page{}, err
 		} else if n > 0 && (sched.CalendarReadAt == nil || now.Sub(*sched.CalendarReadAt) > 15*time.Minute) {

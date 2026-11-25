@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { HeldJobs, RestoreNotice } from "../components/HeldJobs";
+import { PaidAi } from "../components/PaidAi";
 import { OffsiteCopy } from "../components/OffsiteCopy";
 import { formatWhen } from "../labels";
 
@@ -19,6 +21,7 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "claim.receipt_read": "Filling in a claim from its receipt",
   "claim.upload": "Uploading a claim's receipt to the claims storage",
   "claim.remove_upload": "Removing a deleted claim's receipt from the claims storage",
+  "background_job.ended": "Telling the app a job failed for good",
   "aiprovider.check": "Checking an AI key",
   "aiprovider.checked": "Saving an AI key check",
   "aiprovider.reported": "Noting whether the AI answered",
@@ -95,7 +98,9 @@ export function System() {
       <ErrorMessage error={status.error ?? retry.error} />
       {st && (
         <>
-          <Backup backup={st.backup} auto={st.backupAuto} />
+          <Backup backup={st.backup} auto={st.backupAuto} restore={st.restore} />
+          <HeldJobs held={st.held} everyCompany={st.heldEveryCompany} label={label} statusKey={systemKey} />
+          <PaidAi paidAi={st.paidAi} statusKey={systemKey} />
           <section className="panel" aria-label="Background jobs">
             <h3>Background jobs</h3>
             {st.jobs.length === 0 ? <p className="muted">Nothing waiting, nothing failed.</p> : (
@@ -141,7 +146,7 @@ export function System() {
   );
 }
 
-function Backup({ backup, auto }: { backup: Schemas["SystemStatus"]["backup"]; auto: boolean }) {
+function Backup({ backup, auto, restore }: { backup: Schemas["SystemStatus"]["backup"]; auto: boolean; restore: Schemas["SystemStatus"]["restore"] }) {
   const [now] = useState(Date.now); // when the page was opened
   // Old only matters while a backup is expected every night.
   const stale = auto && backup?.status === "done" && now - new Date(backup.startedAt).getTime() > 2 * 24 * 3600 * 1000;
@@ -157,6 +162,7 @@ function Backup({ backup, auto }: { backup: Schemas["SystemStatus"]["backup"]; a
         </p>
       )}
       <OffsiteCopy backup={backup} />
+      <RestoreNotice restore={restore} />
       {backup?.status === "running" && <p>A backup is being made (started {formatWhen(backup.startedAt)}).</p>}
       {backup?.status === "failed" && (
         <p className="warning" role="alert">The last backup failed ({formatWhen(backup.startedAt)}): {backup.error}</p>

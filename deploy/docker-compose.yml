@@ -55,6 +55,8 @@ x-backend-env: &backend-env
   HP_ALERT_EMAIL: ${HP_ALERT_EMAIL:-}
   # The AI assistant: off until a provider is set up (see docs/playbooks/run-locally.md).
   HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+  # off: no paid AI call at all, company keys too (Settings > System pauses it too).
+  HP_AI_PAID: ${HP_AI_PAID:-on}
   # Seals the AI keys companies enter in Settings > AI provider (the AI worker opens them).
   HP_AI_KEYS_SECRET: ${HP_AI_KEYS_SECRET:-dev-only-ai-keys-secret-change-me-0123456789}
   # Seals webhook signing secrets in the database (empty: kept as they are).
@@ -115,6 +117,7 @@ services:
       HP_AI_DATABASE_URL: postgres://hp_ai:${HP_DB_AI_PASSWORD:-hp_ai_dev}@postgres:5432/hiringplug?sslmode=disable
       HP_AI_OCR_LANGUAGES: eng
       HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+      HP_AI_PAID: ${HP_AI_PAID:-on}
       HP_AI_PROVIDER_URL: ${HP_AI_PROVIDER_URL:-}
       HP_AI_PROVIDER_KEY: ${HP_AI_PROVIDER_KEY:-}
       HP_AI_MODEL: ${HP_AI_MODEL:-}
@@ -128,7 +131,7 @@ services:
   # off this server when HP_OFFSITE_S3_* or HP_OFFSITE_DIR are set (deploy/.env). Settings > Backups turns the nightly
   # backup off or on, makes one now, and downloads one. Restore one with:
   #   docker compose -f deploy/docker-compose.yml stop api worker ai-worker
-  #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
+  #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore -yes hiringplug-YYYYMMDD-HHMMSS
   #   docker compose -f deploy/docker-compose.yml up -d
   # On a new server, bring the newest back from off the server first:
   #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp fetch
@@ -142,6 +145,9 @@ services:
       # The API runs as this user (not root): it is given the backups, so
       # Settings > Backups can list, download and delete them.
       HP_BACKUP_OWNER: "65532:65532"
+      # ...and the files a restore puts back (the API and worker read them as
+      # this user); `hp repair-files -apply` fixes a server restored before.
+      HP_FILES_OWNER: "65532:65532"
       # Each backup also copied off this server (see .env.example and
       # docs/playbooks/deploy-to-a-server.md); empty: not set up.
       HP_OFFSITE_S3_BUCKET: ${HP_OFFSITE_S3_BUCKET:-}

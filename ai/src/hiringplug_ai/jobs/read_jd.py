@@ -36,8 +36,8 @@ def run(payload: JobReadJdJob, deps: Deps) -> list[FollowUp]:
             if ai is not None:
                 read = jd_ai.read(result.text, ai)
                 found, tokens = read.details, read.tokens
-        except ProviderError:
-            log.warning("ai key could not be opened", extra={"jd_file_id": payload.jdFileId.root})
+        except ProviderError as exc:  # a key that cannot be opened, or paid AI paused
+            log.warning("the AI was not used: %s", exc, extra={"jd_file_id": payload.jdFileId.root})
         except Exception:  # an AI-step bug must not lose the rules' reading
             log.warning("ai jd read failed", exc_info=True, extra={"jd_file_id": payload.jdFileId.root})
     return [

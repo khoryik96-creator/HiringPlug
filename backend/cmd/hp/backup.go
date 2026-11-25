@@ -1,13 +1,12 @@
 package main
 
 // hp backup [-every 24h]   copy the database and files into HP_BACKUP_DIR (keeps HP_BACKUP_KEEP)
-// hp restore NAME -yes     put a backup back (stop the API and workers first)
+// hp restore -yes NAME     put a backup back (stop the API and workers first)
 // hp fetch [NAME]          bring a backup back from off the server (HP_OFFSITE_*) into HP_BACKUP_DIR
 
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -67,20 +66,41 @@ func offsiteOptions() (backup.Offsite, error) {
 // to, so the API (another user than the backup service, in Docker) can list,
 // send and delete them. Unset: they stay the backup service's own.
 func backupOwner() (uid, gid int, set bool, err error) {
-	v := os.Getenv("HP_BACKUP_OWNER")
+	o, err := ownerSetting("HP_BACKUP_OWNER")
+	if o == nil || err != nil {
+		return 0, 0, false, err
+	}
+	return o.UID, o.GID, true, nil
+}
+
+// filesOwner reads who the uploaded files belong to: the user the API and
+// workers run as (HP_FILES_OWNER, else HP_BACKUP_OWNER: in Docker both are
+// 65532:65532). nil: neither is set, and restored files stay this
+// process's own (running HiringPlug as yourself, without Docker).
+func filesOwner() (*backup.Owner, error) {
+	if os.Getenv("HP_FILES_OWNER") != "" {
+		return ownerSetting("HP_FILES_OWNER")
+	}
+	return ownerSetting("HP_BACKUP_OWNER")
+}
+
+func ownerSetting(name string) (*backup.Owner, error) {
+	v := os.Getenv(name)
 	if v == "" {
-		return 0, 0, false, nil
+		return nil, nil //nolint:nilnil // not set: nobody to give the files to
 	}
-	if _, scanErr := fmt.Sscanf(v, "%d:%d", &uid, &gid); scanErr != nil || uid < 0 || gid < 0 {
-		return 0, 0, false, fmt.Errorf("HP_BACKUP_OWNER must be a user and group id like 65532:65532, got %q", v)
+	o, err := backup.ParseOwner(v)
+	if err != nil {
+		return nil, fmt.Errorf("%s %w", name, err)
 	}
-	return uid, gid, true, nil
+	return &o, nil
 }
 
 func runBackup(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
+	c := command{name: "backup", synopsis: "[-every 24h]"}
+	fs := c.flags()
 	every := fs.Duration("every", 0, "keep running: a backup every this long while the nightly backup is on (Settings), and whenever one is asked for; 0 = one now")
-	if err := fs.Parse(args); err != nil {
+	if _, err := c.parse(fs, args); err != nil {
 		return err
 	}
 	o, err := backupOptions()
@@ -164,16 +184,21 @@ func backupTurn(ctx context.Context, pool *pgxpool.Pool, o backup.Options, every
 }
 
 func runRestore(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("restore", flag.ContinueOnError)
+	c := command{name: "restore", synopsis: "-yes [-resume-outbound] [-resume-paid-ai] hiringplug-YYYYMMDD-HHMMSS", min: 1, max: 1}
+	fs := c.flags()
 	yes := fs.Bool("yes", false, "replace the database and files with the backup's")
-	if err := fs.Parse(args); err != nil {
+	resume := fs.Bool("resume-outbound", false, "let the emails, calendar updates, webhooks and automations waiting in the backup run (they may have happened already); without it they are held until released in Settings > System or with hp jobs. Paid AI is not affected: see -resume-paid-ai")
+	resumeAI := fs.Bool("resume-paid-ai", false, "let the paid AI work waiting in the backup run (it may have been billed already), and leave paid AI on after a restore from another server; without it that work is held like the emails, and paid AI is paused until hp paid-ai on (or Settings > System)")
+	names, err := c.parse(fs, args)
+	if err != nil {
 		return err
 	}
-	if fs.NArg() != 1 {
-		return errors.New("usage: hp restore hiringplug-YYYYMMDD-HHMMSS -yes")
+	name := names[0]
+	if !backup.ValidName(name) {
+		return fmt.Errorf("%q is not a backup name: they look like hiringplug-YYYYMMDD-HHMMSS (the folders in HP_BACKUP_DIR; hp fetch brings one from off the server)", name)
 	}
 	if !*yes {
-		return errors.New("restoring replaces every company's data and files with the backup's: add -yes (and stop the API and workers first)")
+		return fmt.Errorf("restoring replaces every company's data and files with the backup's: stop the API and workers, then run hp restore -yes %s", name)
 	}
 	o, err := backupOptions()
 	if err != nil {
@@ -182,21 +207,35 @@ func runRestore(ctx context.Context, args []string) error {
 	if o.AdminURL == "" {
 		return errors.New("HP_DATABASE_ADMIN_URL is required")
 	}
-	if err := backup.Restore(ctx, o, fs.Arg(0)); err != nil {
+	if o.Owner, err = filesOwner(); err != nil {
+		return err
+	}
+	if err := backup.Restore(ctx, o, name); err != nil {
 		return err
 	}
 	// A restore recreates pg_trgm, whose functions then lose their mark.
 	if err := database.AllowSearchIndexes(ctx, o.AdminURL, os.Stderr); err != nil {
 		return err
 	}
-	fmt.Println("restored", fs.Arg(0), "- run `hp bootstrap` if this backup is from an older version, then start the API and workers")
+	if err := settleJobs(ctx, o, name, *resume, *resumeAI); err != nil {
+		return err
+	}
+	if err := verifyRestoredFiles(ctx, o); err != nil {
+		return err
+	}
+	fmt.Println("restored", name, "- start the API and workers")
 	return nil
 }
 
 func runFetch(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("fetch", flag.ContinueOnError)
-	if err := fs.Parse(args); err != nil {
+	c := command{name: "fetch", synopsis: "[hiringplug-YYYYMMDD-HHMMSS]", max: 1}
+	names, err := c.parse(c.flags(), args)
+	if err != nil {
 		return err
+	}
+	wanted := ""
+	if len(names) == 1 {
+		wanted = names[0]
 	}
 	o, err := backupOptions()
 	if err != nil {
@@ -207,10 +246,10 @@ func runFetch(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	name, err := backup.Fetch(ctx, o.Offsite, o.Dir, fs.Arg(0), server)
+	name, err := backup.Fetch(ctx, o.Offsite, o.Dir, wanted, server)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("fetched %s into %s - to put it back, stop the API and workers, then: hp restore %s -yes\n", name, o.Dir, name)
+	fmt.Printf("fetched %s into %s - to put it back, stop the API and workers, then: hp restore -yes %s\n", name, o.Dir, name)
 	return nil
 }

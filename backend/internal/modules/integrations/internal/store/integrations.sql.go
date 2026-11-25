@@ -78,6 +78,26 @@ func (q *Queries) DeleteWebhook(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const failPendingDelivery = `-- name: FailPendingDelivery :execrows
+UPDATE webhook_delivery SET status = 'failed', last_error = $1, next_attempt_at = NULL
+WHERE id = $2 AND status = 'pending'
+`
+
+type FailPendingDeliveryParams struct {
+	LastError *string
+	ID        string
+}
+
+// A delivery whose job ended without posting it (cancelled after a restore,
+// or stopped): failed, saying why.
+func (q *Queries) FailPendingDelivery(ctx context.Context, arg FailPendingDeliveryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failPendingDelivery, arg.LastError, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getDeliveryToSend = `-- name: GetDeliveryToSend :one
 SELECT d.id, d.payload, d.status, d.attempts, d.event, w.url, w.secret, w.active
 FROM webhook_delivery d JOIN webhook w ON w.tenant_id = d.tenant_id AND w.id = d.webhook_id

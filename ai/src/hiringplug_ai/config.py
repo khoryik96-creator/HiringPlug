@@ -44,6 +44,9 @@ class Config:
     ai_keys_secret: str = field(default="", repr=False)  # never printed
     # Search by meaning's model (HP_AI_MEANING_MODEL_DIR; empty: ai/.models in a checkout).
     meaning_model_dir: Path = field(default_factory=default_folder)
+    # HP_AI_PAID=off: no paid AI call at all (company keys too), whatever
+    # Settings > System says; local work goes on.
+    ai_paid: bool = True
 
 
 class ConfigError(ValueError):
@@ -73,6 +76,9 @@ def load_config(env: Mapping[str, str]) -> Config:
     if ocr not in {"on", "off"}:
         problems.append(f"HP_AI_OCR must be on or off, got {ocr!r}")
 
+    paid = env.get("HP_AI_PAID", "on").strip().lower() or "on"
+    if paid not in {"on", "off"}:
+        problems.append(f"HP_AI_PAID must be on or off, got {paid!r}")
     provider = env.get("HP_AI_PROVIDER", "off").strip().lower() or "off"
     if provider not in {"off", "openai_compatible"}:
         problems.append(f"HP_AI_PROVIDER must be off or openai_compatible, got {provider!r}")
@@ -104,6 +110,7 @@ def load_config(env: Mapping[str, str]) -> Config:
         ai_long_timeout_seconds=number("HP_AI_LONG_TIMEOUT_SECONDS", 300.0),
         ai_keys_secret=env.get("HP_AI_KEYS_SECRET", "").strip(),
         meaning_model_dir=default_folder(dict(env)),
+        ai_paid=paid != "off",
     )
     _check_limits(config, problems)
     if problems:

@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobJdReadJob, JobKind
-from hiringplug_ai.download import DownloadError, FileTooLargeError
+from hiringplug_ai.download import DownloadError, DownloadGoneError, FileTooLargeError
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import HANDLERS, Deps, Handler
 from hiringplug_ai.jobs import parse_cv as parse_job
@@ -128,6 +128,14 @@ def test_a_file_too_large_to_read_is_given_up_at_once() -> None:
     process(queue, job(), deps(error=FileTooLargeError("file is larger than 10000000 bytes")))  # type: ignore[arg-type]
     assert queue.failed == [], "not retried: it stays too large"
     assert queue.given_up == ["FileTooLargeError: file is larger than 10000000 bytes"]
+
+
+def test_a_file_gone_is_given_up_at_once() -> None:
+    queue = FakeQueue()
+    gone = DownloadGoneError("download failed with HTTP 404: the file is gone or its link no longer works")
+    process(queue, job(), deps(error=gone))  # type: ignore[arg-type]
+    assert queue.failed == [], "not retried five times: the app shows it failed at once"
+    assert queue.given_up == [f"DownloadGoneError: {gone}"]
 
 
 def test_a_download_that_failed_for_now_is_retried() -> None:
