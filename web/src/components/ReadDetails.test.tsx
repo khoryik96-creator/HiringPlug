@@ -98,4 +98,17 @@ describe("reading a CV's details", () => {
     await screen.findByText("Stopped text");
     expect(await screen.findByRole("button", { name: "Read details again" })).toBeTruthy();
   });
+
+  // Review of 1.47.0: a failed PDF copy said "No PDF copy" for good.
+  it("makes a failed PDF copy again when asked", async () => {
+    serve(doc({ id: "doc_w", fileName: "Siti CV.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfStatus: "failed" }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(doc({ id: "doc_w", pdfStatus: "queued" })));
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    fireEvent.click(await screen.findByLabelText("More for Siti CV.docx"));
+    expect(screen.getByText(/No PDF copy/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Make the PDF again" }));
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith("/v1/documents/{documentId}/pdf", { params: { path: { documentId: "doc_w" } }, body: { again: true } });
+    });
+  });
 });

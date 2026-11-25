@@ -34,13 +34,13 @@ var readingKinds = []api.JobKind{
 
 // What people are told (the column allows 300 characters for parse_error).
 const (
-	keptWarning   = "The CV could not be read again, so the details read before are kept. Read it again later."
-	noDetails     = "The details could not be read from this CV. Read it again, or fill them in by hand."
-	textStopped   = "The CV's text could not be read: the reader stopped after several tries. Read it again; if it fails again, upload the file again."
-	fileMissing   = "The file was not found on the server, so its text could not be read. Upload it again."
-	linkExpired   = "The file's link expired before the reader could fetch it (the file itself is fine). Read it again."
-	readingLost   = "Reading this file stopped before it finished (the server was restarted or restored). Read it again."
-	pdfNotMade    = "The PDF copy could not be made."
+	keptWarning = "The CV could not be read again, so the details read before are kept. Read it again later."
+	noDetails   = "The details could not be read from this CV. Read it again, or fill them in by hand."
+	textStopped = "The CV's text could not be read: the reader stopped after several tries. Read it again; if it fails again, upload the file again."
+	fileMissing = "The file was not found on the server, so its text could not be read. Upload it again."
+	linkExpired = "The file's link expired before the reader could fetch it (the file itself is fine). Read it again."
+	readingLost = "Reading this file stopped before it finished (the server was restarted or restored). Read it again."
+	pdfNotMade  = "The PDF copy could not be made."
 	// What the AI worker's download says (ai/.../download.py): the file
 	// server's own "not found", a refused link, and (before 1.47.0) any 404.
 	missingReason = "file missing"

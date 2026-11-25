@@ -108,7 +108,6 @@ func runRepairFiles(ctx context.Context, args []string) error {
 const remakePreviews = "PDF copies of Word CVs that failed while the files could not be opened stay failed: " +
 	"on each such CV (\"No PDF copy\"), choose ⋯ > Make the PDF again. A CV whose text could not be read: Read the CV again."
 
-
 func unreadableList(c backup.FilesCheck) string {
 	if len(c.Unreadable) == 0 {
 		return ""
@@ -135,4 +134,3 @@ func appConnected(ctx context.Context) (int, error) {
 		  AND (pg_has_role(r.oid, 'hiringplug_app', 'MEMBER') OR pg_has_role(r.oid, 'hiringplug_ai', 'MEMBER'))`).Scan(&n)
 	return n, err
 }
-

@@ -97,7 +97,7 @@ func jobsSummary(r jobqueue.Restored, after jobqueue.AfterRestore) string {
 		b.WriteString("jobs: -resume-paid-ai: paid AI work waiting in the backup will run\n")
 	}
 	switch {
-	case after.HeldTotal() == 0 && !(r.Resumed && r.ResumedPaidAI):
+	case after.HeldTotal() == 0 && (!r.Resumed || !r.ResumedPaidAI):
 		b.WriteString("jobs: none waiting acts outside HiringPlug or asks a paid AI: nothing held\n")
 	case after.HeldTotal() > 0:
 		parts := make([]string, len(after.Held))
