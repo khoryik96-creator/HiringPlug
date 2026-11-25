@@ -176,6 +176,17 @@ func LastRestore(ctx context.Context, db interface {
 	return r, err == nil, err
 }
 
+// HoldingAfterRestore reports whether the server's last restore still holds
+// jobs nobody has released or cancelled: work it does on its own (a page
+// view reading a calendar) then queues no job of the kinds held, so nothing
+// acts outside with the restored sign-ins behind the hold's back.
+func HoldingAfterRestore(ctx context.Context, db interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}) (bool, error) {
+	r, ok, err := LastRestore(ctx, db)
+	return ok && r.Holding(), err
+}
+
 // HeldJob is a job a restore held.
 type HeldJob struct {
 	ID, TenantID, Company, Kind string

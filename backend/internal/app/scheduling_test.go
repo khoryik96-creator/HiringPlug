@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -194,4 +195,52 @@ func TestBookingLinksBlockBothCalendars(t *testing.T) {
 		assert.Equal(t, api.BookingStatusCancelled, list.Items[0].Status)
 		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/public/bookings/"+strings.Repeat("x", 43), "", nil).Status)
 	})
+}
+
+// Review of 1.47.0: after a restore held the jobs that reach other systems,
+// any visitor of a booking page still queued a new read of the host's
+// calendar, behind the hold's back. Not until the restore is settled now.
+// Not parallel: the restore is the whole server's.
+func TestABookingPageReadsNoCalendarWhileARestoreHoldsJobs(t *testing.T) {
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	recruiter := tenant.Users[api.RoleRecruiter].Token
+	admin := testutil.Current.Admin
+	t.Cleanup(func() {
+		_, _ = admin.Exec(context.Background(), `DELETE FROM restore_marker`)
+		_, _ = admin.Exec(context.Background(), `DELETE FROM job WHERE tenant_id = $1`, tenant.ID)
+	})
+	cand := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "email": "siti." + tenant.ID + "@mail.test"})
+	cal := calendarServer(t, time.Now().Add(24*time.Hour))
+	res := a.request(http.MethodPut, "/v1/scheduling/me", recruiter, map[string]any{"timeZone": "Asia/Kuala_Lumpur",
+		"hours": []map[string]any{{"day": 1, "start": "08:00", "end": "18:00"}}, "bufferMinutes": 0, "minNoticeHours": 2, "maxDaysAhead": 3,
+		"calendarUrl": cal.URL + "/calendar/ical/me%40gmail.com/private-0123456789abcdef/basic.ics"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	link := a.bookingLink(recruiter, map[string]any{"candidateId": cand.Id, "title": "Call", "durationMinutes": 30})
+	token := tokenInURL.FindStringSubmatch(link.Url.MustGet())[1]
+	reads := func() int {
+		t.Helper()
+		var n int
+		require.NoError(t, admin.QueryRow(ctx, `SELECT count(*) FROM job WHERE tenant_id = $1 AND kind = 'scheduling.refresh_calendar'
+			AND status = 'pending'`, tenant.ID).Scan(&n))
+		return n
+	}
+	readLongAgo := func() {
+		t.Helper()
+		_, err := admin.Exec(ctx, `UPDATE schedule SET calendar_read_at = now() - interval '1 hour', calendar_asked_at = NULL WHERE tenant_id = $1`, tenant.ID)
+		require.NoError(t, err)
+	}
+	_, err := admin.Exec(ctx, `INSERT INTO restore_marker (backup_name, source_server, destination_server, held) VALUES ('hiringplug-20261125-023050', '1', '2', 1)`)
+	require.NoError(t, err)
+	readLongAgo()
+	a.publicBooking(token)
+	assert.Zero(t, reads(), "held after a restore: no calendar read for a visitor")
+
+	_, err = admin.Exec(ctx, `UPDATE restore_marker SET released_at = now()`)
+	require.NoError(t, err)
+	readLongAgo()
+	a.publicBooking(token)
+	assert.Equal(t, 1, reads(), "settled: read again for the next visitor")
 }
