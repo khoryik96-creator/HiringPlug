@@ -85,3 +85,40 @@ func TestAPIKeysDoNotConnectMicrosoft(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, res.Status, "%s", res.Body)
 	assert.Equal(t, api.ErrorCodeFORBIDDEN, res.Error().Error.Code)
 }
+
+// Connecting asks for the two-step code as signing in does: a code works
+// once (a code seen, or used to sign in, does not connect), and codes tried
+// here count against the person's limit for codes, so guessing here does
+// not add to guessing at sign-in.
+func TestConnectingTakesTwoStepCodesLikeSigningIn(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	f.enable(tenant.Users[api.RoleOwner].Token, newGUID(), false)
+	withTwoStep := func(role api.Role) (testutil.User, string) {
+		t.Helper()
+		u := tenant.Users[role]
+		setPassword(t, u.ID, testPassword)
+		var setup api.TwoStepSetup
+		f.a.request(http.MethodPost, "/v1/me/two-step/setup", u.Token, nil).JSON(&setup)
+		res := f.a.request(http.MethodPost, "/v1/me/two-step/confirm", u.Token, map[string]any{"code": nextCode(t, setup.Secret, 0)})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		return u, setup.Secret
+	}
+
+	owner, secret := withTwoStep(api.RoleOwner)
+	code := nextCode(t, secret, 1)
+	_, res := f.startConnecting(owner.Token, map[string]any{"password": testPassword, "code": code})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	_, res = f.startConnecting(owner.Token, map[string]any{"password": testPassword, "code": code})
+	startRefused(t, res, "code")
+
+	admin, secret := withTwoStep(api.RoleAdmin)
+	for range 9 { // with the code that confirmed the app: the limit for codes (10)
+		_, res = f.startConnecting(admin.Token, map[string]any{"password": testPassword, "code": "000000"})
+		startRefused(t, res, "code")
+	}
+	challenge := challengeOf(t, f.a.request(http.MethodPost, "/v1/auth/sign-in", "", map[string]any{"email": emailOf(api.RoleAdmin, tenant.ID), "password": testPassword}), api.ErrorCodeTWOSTEPREQUIRED)
+	res = f.a.request(http.MethodPost, "/v1/auth/two-step", "", map[string]any{"challenge": challenge, "code": nextCode(t, secret, 1)})
+	assert.Equal(t, http.StatusTooManyRequests, res.Status, "%s", res.Body)
+}

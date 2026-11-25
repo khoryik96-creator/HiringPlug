@@ -111,6 +111,9 @@ func (m *Module) CancelInvite(ctx context.Context, p authz.Principal, userID str
 		if problem := InviteProblem(string(p.Role), row.Role); problem != "" {
 			return teamProblem(problem)
 		}
+		if err := q.HoldUser(ctx, userID); err != nil { // before their link, as a sign-in with it holds them
+			return err
+		}
 		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "invite"}); err != nil {
 			return err
 		}
@@ -149,10 +152,14 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 	var out TeamMember
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		row, err := q.TeamMember(ctx, userID)
+		err := q.HoldUser(ctx, userID) // a sign-in of theirs under way finishes first (or waits, and sees the change)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("user")
 		}
+		if err != nil {
+			return err
+		}
+		row, err := q.TeamMember(ctx, userID)
 		if err != nil {
 			return err
 		}
@@ -194,6 +201,11 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 		out = TeamMember(updated)
 		if newRole == string(api.RoleOwner) && row.Role != newRole {
 			if err := m.dropAddressLinkOfNewOwner(ctx, tx, q, userID); err != nil {
+				return err
+			}
+		}
+		if newRole != row.Role { // a reconnect link was sent for who they were: whoever holds it no longer signs in as them
+			if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "reconnect"}); err != nil {
 				return err
 			}
 		}

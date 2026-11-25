@@ -144,12 +144,28 @@ func (q *Queries) CareersTenant(ctx context.Context, slug string) (CareersTenant
 	return i, err
 }
 
+const cutOffSecond = `-- name: CutOffSecond :one
+SELECT date_trunc('second', clock_timestamp())::timestamptz AS now
+`
+
+// The database's clock now, to the second (clock_timestamp: not the
+// transaction's start, which may be long before, if it waited for a row):
+// where an end of sessions is cut off (tokens_valid_after,
+// microsoft_sessions_after), so that a session issued before it, even by a
+// sign-in that committed while this transaction waited, is ended.
+func (q *Queries) CutOffSecond(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, cutOffSecond)
+	var now time.Time
+	err := row.Scan(&now)
+	return now, err
+}
+
 const databaseSecond = `-- name: DatabaseSecond :one
 SELECT date_trunc('second', now())::timestamptz AS now
 `
 
-// The database's clock, to the second: every session's issue time and
-// cut-off (tokens_valid_after, microsoft_sessions_after) is by it.
+// The database's clock, to the second, as of the transaction's start: when
+// a session is issued.
 func (q *Queries) DatabaseSecond(ctx context.Context) (time.Time, error) {
 	row := q.db.QueryRow(ctx, databaseSecond)
 	var now time.Time
@@ -257,7 +273,7 @@ func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 }
 
 const endMicrosoftSessions = `-- name: EndMicrosoftSessions :exec
-UPDATE app_user SET microsoft_sessions_after = greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
+UPDATE app_user SET microsoft_sessions_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE $1::text IS NULL OR id = $1::text
 `
 
@@ -271,7 +287,7 @@ func (q *Queries) EndMicrosoftSessions(ctx context.Context, userID *string) erro
 }
 
 const endSessionsWithoutTwoStep = `-- name: EndSessionsWithoutTwoStep :exec
-UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at IS NOT NULL)
 `
 
@@ -282,7 +298,7 @@ func (q *Queries) EndSessionsWithoutTwoStep(ctx context.Context) error {
 }
 
 const endUserSessions = `-- name: EndUserSessions :exec
-UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') WHERE id = $1
+UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') WHERE id = $1
 `
 
 // Ends every session of theirs: after this second by the database's clock,
@@ -434,29 +450,45 @@ func (q *Queries) HasPassword(ctx context.Context, id string) (bool, error) {
 	return has_password, err
 }
 
-const hasValidLink = `-- name: HasValidLink :one
-SELECT EXISTS (SELECT 1 FROM user_link WHERE user_id = $1 AND kind = $2 AND used_at IS NULL AND expires_at > now())::boolean
+const holdLink = `-- name: HoldLink :one
+SELECT user_id, kind, (used_at IS NULL AND expires_at > now())::boolean AS valid FROM user_link WHERE id = $1 FOR UPDATE
 `
 
-type HasValidLinkParams struct {
+type HoldLinkRow struct {
 	UserID string
 	Kind   string
+	Valid  bool
 }
 
-// Whether they have a link of kind still unused and unexpired.
-func (q *Queries) HasValidLink(ctx context.Context, arg HasValidLinkParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasValidLink, arg.UserID, arg.Kind)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
+// A link, held until the transaction ends (using it, or seeing it used,
+// waits for whoever holds it): whose, what for, and whether it still works.
+func (q *Queries) HoldLink(ctx context.Context, id string) (HoldLinkRow, error) {
+	row := q.db.QueryRow(ctx, holdLink, id)
+	var i HoldLinkRow
+	err := row.Scan(&i.UserID, &i.Kind, &i.Valid)
+	return i, err
+}
+
+const holdTeam = `-- name: HoldTeam :exec
+SELECT id FROM app_user ORDER BY id FOR NO KEY UPDATE
+`
+
+// Everyone in the company, held as HoldUser does (in the same order, by
+// id), before links of many people are removed and their sessions ended.
+func (q *Queries) HoldTeam(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, holdTeam)
+	return err
 }
 
 const holdUser = `-- name: HoldUser :exec
-SELECT id FROM app_user WHERE id = $1 FOR SHARE
+SELECT id FROM app_user WHERE id = $1 FOR NO KEY UPDATE
 `
 
-// Keeps the person's row (role, whether they may be linked by address)
-// from changing until the sign-in's transaction ends.
+// Holds the person's row (role, password, whether they may be linked by
+// address) until the transaction ends: a change to it waits, and so does
+// another sign-in of theirs. FOR NO KEY UPDATE, not FOR SHARE: the holder
+// updates the row afterwards (last sign-in, sessions ended), and two
+// holders sharing it would wait for each other.
 func (q *Queries) HoldUser(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, holdUser, id)
 	return err
@@ -788,12 +820,14 @@ func (q *Queries) ListTeamGroups(ctx context.Context) ([]ListTeamGroupsRow, erro
 }
 
 const lockMicrosoftSettings = `-- name: LockMicrosoftSettings :exec
-SELECT id FROM tenant WHERE id = app_current_tenant() FOR UPDATE
+SELECT id FROM tenant WHERE id = app_current_tenant() FOR NO KEY UPDATE
 `
 
 // The company's settings, kept from changing until the transaction ends:
-// changing them (FOR UPDATE), or the Microsoft app they rely on (FOR SHARE,
-// emails module), waits for the other.
+// changing them (FOR NO KEY UPDATE), or the Microsoft app they rely on (FOR
+// SHARE, emails module), waits for the other. Not FOR UPDATE: that would
+// also stop every row naming the company being added (an audit entry of a
+// sign-in holding a person's row, which this then waits for: a deadlock).
 func (q *Queries) LockMicrosoftSettings(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockMicrosoftSettings)
 	return err
@@ -870,7 +904,8 @@ const microsoftConnectOnly = `-- name: MicrosoftConnectOnly :exec
 UPDATE app_user SET microsoft_connect_only = true WHERE id = $1
 `
 
-// Their account was unlinked: one is linked again only on purpose.
+// Their account was unlinked, or they were made an owner: one is linked
+// again only on purpose.
 func (q *Queries) MicrosoftConnectOnly(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, microsoftConnectOnly, id)
 	return err
@@ -960,18 +995,20 @@ func (q *Queries) MyMicrosoft(ctx context.Context, userID string) (MyMicrosoftRo
 }
 
 const noteMicrosoftClaims = `-- name: NoteMicrosoftClaims :exec
-SELECT app_microsoft_note_claims($1::text, $2::boolean)
+UPDATE tenant SET microsoft_acct_missing = NOT $1::boolean
+WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = $2 AND microsoft_acct_missing <> NOT $1::boolean
 `
 
 type NoteMicrosoftClaimsParams struct {
-	MsTenantID string
 	Acct       bool
+	MsTenantID *string
 }
 
-// Microsoft vouched for an account of ms_tenant_id: whether its token said
-// member or guest (acct), for that organisation's companies.
+// Microsoft vouched, through the company's own app, for an account of its
+// organisation: whether the token said member or guest (acct), which that
+// app's settings in Entra decide.
 func (q *Queries) NoteMicrosoftClaims(ctx context.Context, arg NoteMicrosoftClaimsParams) error {
-	_, err := q.db.Exec(ctx, noteMicrosoftClaims, arg.MsTenantID, arg.Acct)
+	_, err := q.db.Exec(ctx, noteMicrosoftClaims, arg.Acct, arg.MsTenantID)
 	return err
 }
 
@@ -1074,7 +1111,8 @@ const saveMicrosoftFlow = `-- name: SaveMicrosoftFlow :exec
 
 
 SELECT app_microsoft_flow_save($1::text, $2::text, $3::text, $4::text, $5::text,
-  $6::text, $7::text, $8::text, $9::boolean, $10::text, $11::integer)
+  $6::text, $7::text, $8::text, $9::text, $10::text, $11::boolean,
+  $12::text, $13::integer)
 `
 
 type SaveMicrosoftFlowParams struct {
@@ -1083,6 +1121,8 @@ type SaveMicrosoftFlowParams struct {
 	TenantID    *string
 	Purpose     string
 	UserID      *string
+	LinkID      *string
+	LinkKind    *string
 	ClientID    string
 	Authority   string
 	Sealed      string
@@ -1101,6 +1141,8 @@ func (q *Queries) SaveMicrosoftFlow(ctx context.Context, arg SaveMicrosoftFlowPa
 		arg.TenantID,
 		arg.Purpose,
 		arg.UserID,
+		arg.LinkID,
+		arg.LinkKind,
 		arg.ClientID,
 		arg.Authority,
 		arg.Sealed,
@@ -1195,7 +1237,7 @@ func (q *Queries) SetMicrosoftSettings(ctx context.Context, arg SetMicrosoftSett
 }
 
 const setPassword = `-- name: SetPassword :exec
-UPDATE app_user SET password_hash = $1, tokens_valid_after = $2,
+UPDATE app_user SET password_hash = $1, tokens_valid_after = greatest($2::timestamptz, tokens_valid_after),
   active = CASE WHEN invited THEN true ELSE active END, invited = false,
   name = coalesce($3, name)
 WHERE id = $4
@@ -1208,7 +1250,8 @@ type SetPasswordParams struct {
 	ID           string
 }
 
-// A new password; sessions from before it are signed out.
+// A new password; sessions from before it are signed out (never moving an
+// end already later back).
 func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error {
 	_, err := q.db.Exec(ctx, setPassword,
 		arg.PasswordHash,
@@ -1302,7 +1345,8 @@ func (q *Queries) SignedIn(ctx context.Context, id string) error {
 
 const takeMicrosoftFlow = `-- name: TakeMicrosoftFlow :one
 SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id,
-  purpose::text AS purpose, coalesce(user_id, '')::text AS user_id, client_id::text AS client_id, authority::text AS authority,
+  purpose::text AS purpose, coalesce(user_id, '')::text AS user_id, coalesce(link_id, '')::text AS link_id,
+  coalesce(link_kind, '')::text AS link_kind, client_id::text AS client_id, authority::text AS authority,
   sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
 FROM app_microsoft_flow_take($1::text)
 `
@@ -1313,6 +1357,8 @@ type TakeMicrosoftFlowRow struct {
 	TenantID    string
 	Purpose     string
 	UserID      string
+	LinkID      string
+	LinkKind    string
 	ClientID    string
 	Authority   string
 	Sealed      string
@@ -1329,6 +1375,8 @@ func (q *Queries) TakeMicrosoftFlow(ctx context.Context, ticketHash string) (Tak
 		&i.TenantID,
 		&i.Purpose,
 		&i.UserID,
+		&i.LinkID,
+		&i.LinkKind,
 		&i.ClientID,
 		&i.Authority,
 		&i.Sealed,
@@ -1482,7 +1530,7 @@ func (q *Queries) UnlinkSignInLink(ctx context.Context, userID string) ([]string
 
 const updateMember = `-- name: UpdateMember :one
 UPDATE app_user SET role = $1, active = $2, team_id = $3,
-  tokens_valid_after = CASE WHEN active AND NOT $2 THEN greatest(date_trunc('second', now()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
+  tokens_valid_after = CASE WHEN active AND NOT $2 THEN greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
 WHERE id = $4
 RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at
 `
@@ -1509,6 +1557,10 @@ type UpdateMemberRow struct {
 // Deactivating signs the user out: tokens issued up to the end of this second
 // stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go),
 // and any issued at an earlier end (a session is never issued before one).
+// This second is the clock's now (clock_timestamp), not the transaction's
+// start: a sign-in that committed while this waited for the row is ended
+// too. The row is held first (HoldUser): an UPDATE that waits for a row
+// computes the new values before it waits.
 func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (UpdateMemberRow, error) {
 	row := q.db.QueryRow(ctx, updateMember,
 		arg.Role,

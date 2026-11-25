@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -110,9 +111,9 @@ func TestReconnectLinks(t *testing.T) {
 	flow, _ = f.start(map[string]any{"invite": link})
 	assert.Equal(t, recruiter.ID, f.me(session(t, f.signInAs(flow, sam.claims(flow)))).User.Id)
 
-	// A link that expired, or is used meanwhile, does nothing.
-	link = f.reconnectLink(admin.Token, recruiter.ID)
+	// A link that expired meanwhile does nothing.
 	require.Equal(t, http.StatusNoContent, f.unlink(owner.Token, recruiter.ID).Status)
+	link = f.reconnectLink(admin.Token, recruiter.ID)
 	flow, _ = f.start(map[string]any{"invite": link})
 	_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE user_link SET expires_at = now() - interval '1 minute' WHERE user_id = $1 AND kind = 'reconnect'`, recruiter.ID)
 	require.NoError(t, err)
@@ -174,4 +175,87 @@ func TestSomeoneMadeAnOwnerKeepsNoAddressLink(t *testing.T) {
 	assert.Equal(t, []api.SignInMethod{api.SignInMethodMicrosoft}, f.methodsOf(owner.Token, admin.ID), "connected on purpose: kept")
 	flow, _ = f.start(map[string]any{"company": slug})
 	assert.Equal(t, admin.ID, f.me(session(t, f.signInAs(flow, ada.claims(flow)))).User.Id)
+
+	// No longer an owner, they still link one only on purpose.
+	res := f.a.request(http.MethodPatch, "/v1/team/"+recruiter.ID, owner.Token, map[string]any{"role": "recruiter"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	flow, _ = f.start(map[string]any{"company": slug})
+	msRefused(t, f.signInAs(flow, sam.claims(flow)), "connect_first")
+	assert.Empty(t, f.methodsOf(owner.Token, recruiter.ID))
+}
+
+// Someone let to manage the team (not an admin) neither sends an admin a
+// reconnect link (whoever holds it signs in as the admin) nor unlinks an
+// admin's Microsoft account: nobody acts on a role above their own.
+func TestReconnectLinksAndUnlinksKeepToTheirRank(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter, api.RoleSourcer)
+	owner, admin, recruiter, sourcer := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin], tenant.Users[api.RoleRecruiter], tenant.Users[api.RoleSourcer]
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	perms := append(authz.PermissionsForRole(api.RoleRecruiter), api.PermissionIdentityTeamManage)
+	f.a.setRole(owner.Token, "recruiter", map[string]any{"version": 0, "permissions": perms, "candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+	for _, role := range []api.Role{api.RoleAdmin, api.RoleSourcer} { // both linked by their address
+		flow, _ := f.start(map[string]any{"company": slug})
+		session(t, f.signInAs(flow, newAccount(org, emailOf(role, tenant.ID)).claims(flow)))
+	}
+	teamRefused := func(res *response) {
+		t.Helper()
+		require.Equal(t, http.StatusUnprocessableEntity, res.Status, "%s", res.Body)
+		assert.Equal(t, api.ErrorCodeTEAMCHANGENOTALLOWED, res.Error().Error.Code)
+	}
+
+	teamRefused(f.sendReconnect(recruiter.Token, admin.ID))
+	teamRefused(f.unlink(recruiter.Token, admin.ID))
+	assert.Equal(t, []api.SignInMethod{api.SignInMethodMicrosoft}, f.methodsOf(owner.Token, admin.ID))
+	assert.Empty(t, audited(t, tenant.ID, "user.microsoft_reconnect_sent"))
+	// A teammate's: yes.
+	assert.Equal(t, http.StatusCreated, f.sendReconnect(recruiter.Token, sourcer.ID).Status)
+	assert.Equal(t, http.StatusNoContent, f.unlink(recruiter.Token, sourcer.ID).Status)
+}
+
+// A reconnect link is for who the person was when it was sent, until a
+// Microsoft account is linked to them: unlinking theirs, changing their role
+// (making them an owner too), or linking one ends it.
+func TestReconnectLinksEndWhenThingsChange(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
+	setPassword(t, recruiter.ID, testPassword)
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	sam := newAccount(org, emailOf(api.RoleRecruiter, tenant.ID))
+	flow, _ := f.start(map[string]any{"company": slug})
+	session(t, f.signInAs(flow, sam.claims(flow))) // linked
+	works := func(link string) int {
+		return f.a.request(http.MethodGet, "/v1/auth/links/"+link, "", nil).Status
+	}
+	role := func(r string) {
+		t.Helper()
+		res := f.a.request(http.MethodPatch, "/v1/team/"+recruiter.ID, owner.Token, map[string]any{"role": r})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+
+	link := f.reconnectLink(owner.Token, recruiter.ID)
+	require.Equal(t, http.StatusOK, works(link))
+	require.Equal(t, http.StatusNoContent, f.unlink(owner.Token, recruiter.ID).Status)
+	assert.Equal(t, http.StatusGone, works(link), "unlinked")
+
+	link = f.reconnectLink(owner.Token, recruiter.ID)
+	role("sourcer")
+	assert.Equal(t, http.StatusGone, works(link), "another role")
+
+	link = f.reconnectLink(owner.Token, recruiter.ID)
+	role("owner")
+	assert.Equal(t, http.StatusGone, works(link), "made an owner")
+	role("recruiter")
+
+	link = f.reconnectLink(owner.Token, recruiter.ID)
+	_, me := f.a.signIn(map[string]any{"email": sam.email, "password": testPassword})
+	require.Equal(t, http.StatusNoContent, f.connect(me, sam.claims, map[string]any{"password": testPassword}).Status)
+	assert.Equal(t, http.StatusGone, works(link), "connected from Your account")
 }

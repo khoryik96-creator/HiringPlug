@@ -199,13 +199,16 @@ func TestAnInvitationExpiresForMicrosoftToo(t *testing.T) {
 // Without the optional acct claim a guest cannot be told from a member (a
 // guest's preferred_username is its home address, which may be anyone's):
 // no account is linked by its address then, and Settings says to add the
-// claim. Accounts linked already, and connecting on purpose, still work.
+// claim (to the company's own app, where it is set). Accounts linked
+// already, and connecting on purpose, still work.
 func TestNoAddressLinksWithoutTheAcctClaim(t *testing.T) {
 	t.Parallel()
 	f := newMicrosoftTest(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
 	owner, admin := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin]
 	org := newGUID()
+	res := f.a.request(http.MethodPut, "/v1/settings/email-apps/microsoft", owner.Token, map[string]any{"clientId": "agency-client", "clientSecret": "agency-secret-value"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	f.enable(owner.Token, org, false)
 	slug := f.me(owner.Token).Tenant.CareersSlug
 	warned := func() bool {
@@ -236,4 +239,25 @@ func TestNoAddressLinksWithoutTheAcctClaim(t *testing.T) {
 	flow, _ = f.start(map[string]any{"company": slug})
 	session(t, f.signInAs(flow, sam.claims(flow)))
 	assert.False(t, warned())
+}
+
+// Whether Microsoft sends the acct claim is set on the app a sign-in goes
+// through: one through the server's app (set up by the server's
+// administrator, not the company) neither raises nor clears the company's
+// warning, whoever signs in through it.
+func TestOnlyTheCompanysOwnAppWarnsOfTheAcctClaim(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	owner := tenant.Users[api.RoleOwner]
+	org := newGUID()
+	s := f.enable(owner.Token, org, false)
+	require.Equal(t, api.MicrosoftSignInSettingsAppSourceServer, s.AppSource)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	flow, _ := f.start(map[string]any{"company": slug})
+	guest := newAccount(org, emailOf(api.RoleAdmin, tenant.ID))
+	msRefused(t, f.signInAs(flow, entratest.Guest(guest.claims(flow), false, false)), "not_on_team")
+	var got api.MicrosoftSignInSettings
+	f.a.request(http.MethodGet, "/v1/agency/microsoft-sign-in", owner.Token, nil).JSON(&got)
+	assert.False(t, got.AcctClaimMissing, "through the server's app: not the company's to fix")
 }

@@ -26,7 +26,11 @@ import (
 
 // signInThroughLink signs in the person whose invitation or reconnect link
 // started the sign-in, linking the Microsoft account to them (or using the
-// one linked already), while the link is still unused and unexpired.
+// one linked already), with that very link: held, it must still be unused,
+// unexpired, of the same kind and theirs, and it is used up here. A sign-in
+// started from an invitation they accepted with a password since, or from
+// a link replaced by a newer one, links nothing (even if another link of
+// theirs works now); two finishing with one link at once: one works.
 func (m *Module) signInThroughLink(ctx context.Context, flow store.TakeMicrosoftFlowRow, id entra.Identity) (Session, error) {
 	var out Session
 	err := database.InTx(ctx, m.pool, authz.NewPrincipal(flow.TenantID, flow.UserID, "", "", ""), func(tx pgx.Tx) error {
@@ -35,17 +39,14 @@ func (m *Module) signInThroughLink(ctx context.Context, flow store.TakeMicrosoft
 		if err != nil {
 			return err
 		}
-		kind, how := "reconnect", linkedByReconnect
-		if u.Invited {
-			kind, how = "invite", linkedByInvitation
+		l, err := q.HoldLink(ctx, flow.LinkID)
+		if database.IsNoRows(err) || (err == nil && (!l.Valid || l.Kind != flow.LinkKind || l.UserID != u.ID || (l.Kind == "invite") != u.Invited)) {
+			return microsoftFailed(ReasonFailed) // used, replaced or expired meanwhile
 		}
-		valid, err := q.HasValidLink(ctx, store.HasValidLinkParams{UserID: u.ID, Kind: kind})
 		if err != nil {
 			return err
 		}
-		if !valid { // used, replaced or expired meanwhile
-			return microsoftFailed(ReasonFailed)
-		}
+		how := map[string]string{"invite": linkedByInvitation, "reconnect": linkedByReconnect}[l.Kind]
 		holder, err := q.MicrosoftAccountHolder(ctx, store.MicrosoftAccountHolderParams{MsTenantID: id.TenantID, MsObjectID: id.ObjectID})
 		switch {
 		case err == nil && holder == u.ID: // linked to them already
@@ -64,7 +65,7 @@ func (m *Module) signInThroughLink(ctx context.Context, flow store.TakeMicrosoft
 		if err != nil {
 			return err
 		}
-		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: u.ID, Kind: kind}); err != nil {
+		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: u.ID, Kind: l.Kind}); err != nil {
 			return err
 		}
 		out, err = m.signedInWithMicrosoft(ctx, tx, q, u)
@@ -84,7 +85,8 @@ type ReconnectLink struct {
 // their Microsoft account, whatever its address (replacing an older one).
 // Only to their email: whoever held the link could link an account of
 // theirs to that person, and sign in as them. Only owners send one to an
-// owner; nobody to themselves (they connect from Your account, with their
+// owner, and nobody to someone whose role is above their own (a teammate let
+// to manage the team, to an admin); nobody to themselves (they connect from Your account, with their
 // password).
 func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Principal, userID string) (ReconnectLink, error) {
 	var out ReconnectLink
@@ -102,6 +104,8 @@ func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Princip
 			return teamProblem("Connect your own Microsoft account from Your account.")
 		case u.Role == string(api.RoleOwner) && p.Role != api.RoleOwner:
 			return teamProblem("Only an owner can send an owner a link to connect Microsoft.")
+		case RoleRank(u.Role) > RoleRank(string(p.Role)): // whoever holds it signs in as them
+			return teamProblem("Only an admin or owner can send an admin a link to connect Microsoft.")
 		case u.Invited:
 			return teamProblem("They have not joined yet: send a new invitation instead (they can accept it with Microsoft).")
 		case !u.Active:

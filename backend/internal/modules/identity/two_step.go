@@ -100,31 +100,44 @@ func wrongCode() error {
 
 // nextStep is what follows a right password: a session, or a challenge for
 // the code (or to set the app up first, when the company requires it).
-func (m *Module) nextStep(ctx context.Context, q *store.Queries, tenantID, userID string) (*apperr.Error, error) {
-	ts, err := q.GetTwoStep(ctx, userID)
+func (m *Module) nextStep(ctx context.Context, q *store.Queries, u store.UserAuthRow) (*apperr.Error, error) {
+	ts, err := q.GetTwoStep(ctx, u.ID)
 	if err != nil && !database.IsNoRows(err) {
 		return nil, err
 	}
 	if err == nil && ts.EnabledAt != nil {
-		return m.challengeError(api.ErrorCodeTWOSTEPREQUIRED, "Enter the code from your authenticator app.", tenantID, userID, false)
+		return m.challengeError(api.ErrorCodeTWOSTEPREQUIRED, "Enter the code from your authenticator app.", u, false)
 	}
 	required, err := q.TwoStepRequired(ctx)
 	if err != nil || !required {
 		return nil, err
 	}
-	return m.challengeError(api.ErrorCodeTWOSTEPSETUPREQUIRED, "Your company requires two-step sign-in: add an authenticator app.", tenantID, userID, true)
+	return m.challengeError(api.ErrorCodeTWOSTEPSETUPREQUIRED, "Your company requires two-step sign-in: add an authenticator app.", u, true)
 }
 
-func (m *Module) challengeError(code api.ErrorCode, message, tenantID, userID string, setup bool) (*apperr.Error, error) {
+// challengeError is a challenge for u's code. It holds when u's sessions
+// were last ended: a password changed or reset, or a deactivation, since
+// ends it (withChallenge).
+func (m *Module) challengeError(code api.ErrorCode, message string, u store.UserAuthRow, setup bool) (*apperr.Error, error) {
 	if len(m.twoStep.challenge) == 0 {
 		return nil, errTwoStepOff
 	}
-	token := SignChallenge(m.twoStep.challenge, Challenge{TenantID: tenantID, UserID: userID, Setup: setup, Expires: m.now().Add(challengeLife).Unix()})
+	token := SignChallenge(m.twoStep.challenge, Challenge{TenantID: u.TenantID, UserID: u.ID, Setup: setup,
+		ValidAfter: unixOrZero(u.TokensValidAfter), Expires: m.now().Add(challengeLife).Unix()})
 	return apperr.New(code, message).WithDetail("challenge", token), nil
 }
 
+func unixOrZero(t *time.Time) int64 {
+	if t == nil {
+		return 0
+	}
+	return t.Unix()
+}
+
 // withChallenge runs fn for the person a challenge names, in their company,
-// once the attempt is allowed.
+// once the attempt is allowed: their row held, while they are active and
+// their sessions were not ended since the challenge (their password was
+// changed or reset meanwhile, say).
 func (m *Module) withChallenge(ctx context.Context, clientAddr, token string, setup bool, fn func(tx pgx.Tx, q *store.Queries, u store.UserAuthRow) error) error {
 	c, err := ReadChallenge(m.twoStep.challenge, token, m.now())
 	if err != nil || c.Setup != setup {
@@ -135,8 +148,8 @@ func (m *Module) withChallenge(ctx context.Context, clientAddr, token string, se
 	}
 	return database.InTx(ctx, m.pool, authz.System(c.TenantID), func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, c.UserID)
-		if database.IsNoRows(err) || (err == nil && !u.Active) {
+		u, err := holdUser(ctx, q, c.UserID)
+		if database.IsNoRows(err) || (err == nil && (!u.Active || unixOrZero(u.TokensValidAfter) != c.ValidAfter)) {
 			return signInExpired()
 		}
 		if err != nil {
@@ -404,7 +417,9 @@ func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, passwo
 func (m *Module) ResetTwoStep(ctx context.Context, p authz.Principal, userID string) error {
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, userID)
+		// Held first: the end below is cut off once it is theirs (an
+		// UPDATE that waited for the row would be cut off before it waited).
+		u, err := holdUser(ctx, q, userID)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("team member")
 		}
@@ -442,6 +457,9 @@ func (m *Module) SetTwoStepRequired(ctx context.Context, p authz.Principal, requ
 			return err
 		}
 		if required {
+			if err := q.HoldTeam(ctx); err != nil { // everyone's row first (as in ResetTwoStep)
+				return err
+			}
 			if err := q.EndSessionsWithoutTwoStep(ctx); err != nil {
 				return err
 			}

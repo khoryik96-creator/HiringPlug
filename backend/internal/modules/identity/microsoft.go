@@ -194,6 +194,7 @@ func (m *Module) startFlow(ctx context.Context, route msRoute, purpose, bindingH
 	}
 	err = store.New(m.pool).SaveMicrosoftFlow(ctx, store.SaveMicrosoftFlowParams{
 		KeyHash: key, BindingHash: bindingHash, TenantID: orNil(route.tenantID), Purpose: purpose, UserID: orNil(route.userID),
+		LinkID: orNil(route.linkID), LinkKind: orNil(route.linkKind),
 		ClientID: route.app.ClientID, Authority: route.authority, Sealed: sealed, Seconds: microsoftFlowSeconds,
 	})
 	return target, err
@@ -213,9 +214,12 @@ func pkceChallenge(verifier string) string {
 
 // msRoute is where a sign-in goes: a company (its organisation, and its app
 // or the server's), or (tenantID "") any company, through the server's app;
-// userID is the person it is for, if known (their invitation, or connecting).
+// userID is the person it is for, if known (their invitation, or connecting);
+// linkID and linkKind, the invitation or reconnect link it was started from
+// (the sign-in finishes only with that very link: microsoft_reconnect.go).
 type msRoute struct {
 	tenantID, authority, userID string
+	linkID, linkKind            string
 	app                         MicrosoftApp
 }
 
@@ -238,7 +242,7 @@ func (m *Module) routeMicrosoft(ctx context.Context, company, link string) (msRo
 			return msRoute{}, err
 		}
 		route, err := m.tenantRoute(ctx, l.TenantID)
-		route.userID = l.UserID
+		route.userID, route.linkID, route.linkKind = l.UserID, l.LinkID, l.Kind
 		return route, err
 	case company != "":
 		rows, err := q.MicrosoftSignInTenants(ctx, &company)

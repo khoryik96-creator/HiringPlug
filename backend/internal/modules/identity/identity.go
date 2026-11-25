@@ -10,7 +10,8 @@
 //
 //	identity.go        the module's public API, used by internal/app and other modules
 //	domain.go          password and team rules, as pure functions (unit tested)
-//	auth.go            signing in, links (invitations, resets), changing a password
+//	auth.go            signing in, changing a password
+//	links.go           links emailed to people (invitations, resets)
 //	team.go            team admin: invitations, roles, deactivating
 //	microsoft*.go      signing in with Microsoft, and the company's settings for it
 //	http.go, team_http.go  HTTP handlers: contract types <-> service calls

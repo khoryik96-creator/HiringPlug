@@ -138,3 +138,105 @@ func TestTheMicrosoftAppAndSignInChangeOneAtATime(t *testing.T) {
 	a.request(http.MethodGet, "/v1/agency/microsoft-sign-in", owner, nil).JSON(&s)
 	assert.False(t, s.Enabled)
 }
+
+// held is a transaction of someone else's, holding rows (sql) until
+// release; blocked counts the requests waiting for it, directly or behind
+// another request that is.
+type held struct {
+	t   *testing.T
+	tx  pgx.Tx
+	pid int32
+}
+
+func hold(t *testing.T, sql string, args ...any) *held {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := testutil.Current.Admin.Begin(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tx.Rollback(ctx) })
+	h := &held{t: t, tx: tx}
+	require.NoError(t, tx.QueryRow(ctx, `SELECT pg_backend_pid()`).Scan(&h.pid))
+	_, err = tx.Exec(ctx, sql, args...)
+	require.NoError(t, err)
+	return h
+}
+
+// waitBlocked waits until n requests wait for the held rows.
+func (h *held) waitBlocked(n int) {
+	h.t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		var waiting int
+		require.NoError(h.t, testutil.Current.Admin.QueryRow(context.Background(), `
+			WITH RECURSIVE w(pid) AS (
+			  SELECT pid FROM pg_stat_activity WHERE $1::int = ANY (pg_blocking_pids(pid))
+			  UNION SELECT a.pid FROM pg_stat_activity a JOIN w ON w.pid = ANY (pg_blocking_pids(a.pid)))
+			SELECT count(*) FROM w`, h.pid).Scan(&waiting))
+		if waiting >= n {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	h.t.Fatalf("%d requests did not come to wait", n)
+}
+
+func (h *held) release() { require.NoError(h.t, h.tx.Commit(context.Background())) }
+
+// Two sign-ins of one person at once, and a sign-in as their account is
+// unlinked, wait for each other (their row first, then their link):
+// neither fails with a deadlock.
+func TestMicrosoftSignInsAndUnlinksAtOnceNeverDeadlock(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
+	org := newGUID()
+	f.enable(owner.Token, org, false)
+	slug := f.me(owner.Token).Tenant.CareersSlug
+	sam := newAccount(org, emailOf(api.RoleRecruiter, tenant.ID))
+	flow, _ := f.start(map[string]any{"company": slug})
+	session(t, f.signInAs(flow, sam.claims(flow))) // linked
+	finishing := func() func() *response {
+		flow, _ := f.start(map[string]any{"company": slug})
+		ticket := f.ticketFor(flow, sam)
+		var res *response
+		done := make(chan struct{})
+		go func() { res = f.complete(ticket, flow.binding, ""); close(done) }()
+		return func() *response { <-done; return res }
+	}
+
+	// Both sign-ins come to their link at the same moment.
+	h := hold(t, `SELECT 1 FROM user_microsoft WHERE tenant_id = $1 AND user_id = $2 FOR UPDATE`, tenant.ID, recruiter.ID)
+	first, second := finishing(), finishing()
+	h.waitBlocked(2)
+	h.release()
+	session(t, first())
+	session(t, second())
+
+	// A sign-in (first in line for their row) as an owner unlinks them.
+	h = hold(t, `SELECT 1 FROM app_user WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE`, tenant.ID, recruiter.ID)
+	signIn := finishing()
+	h.waitBlocked(1)
+	unlinked := make(chan int, 1)
+	go func() { unlinked <- f.unlink(owner.Token, recruiter.ID).Status }()
+	h.waitBlocked(2)
+	h.release()
+	session(t, signIn())
+	assert.Equal(t, http.StatusNoContent, <-unlinked)
+
+	// A sign-in as the company changes its organisation (every link goes).
+	link := f.reconnectLink(owner.Token, recruiter.ID)
+	flow, _ = f.start(map[string]any{"invite": link})
+	session(t, f.signInAs(flow, sam.claims(flow))) // linked again
+	h = hold(t, `SELECT 1 FROM app_user WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE`, tenant.ID, recruiter.ID)
+	signIn = finishing()
+	h.waitBlocked(1)
+	changed := make(chan int, 1)
+	go func() {
+		changed <- f.a.request(http.MethodPut, "/v1/agency/microsoft-sign-in", owner.Token, map[string]any{"enabled": true, "organisationId": newGUID(), "required": false}).Status
+	}()
+	h.waitBlocked(2)
+	h.release()
+	session(t, signIn())
+	assert.Equal(t, http.StatusOK, <-changed)
+}

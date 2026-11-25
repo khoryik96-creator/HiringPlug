@@ -1557,6 +1557,8 @@ type MicrosoftSignInFlow struct {
 	TenantID    *string
 	Purpose     string
 	UserID      *string
+	LinkID      *string
+	LinkKind    *string
 	ClientID    string
 	Authority   string
 	Sealed      string

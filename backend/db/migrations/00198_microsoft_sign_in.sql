@@ -2,17 +2,18 @@
 -- tenant: whether the company signs in with Microsoft, its own Microsoft
 --   organisation (Entra tenant ID; never personal accounts), and whether it
 --   requires Microsoft (password sign-in and resets then only for owners).
---   microsoft_acct_missing: the last Microsoft sign-in came without the
---   optional acct claim (member or guest), so no account was linked by its
---   address (Settings warns).
+--   microsoft_acct_missing: the last Microsoft sign-in through the company's
+--   own app came without the optional acct claim (member or guest), so no
+--   account was linked by its address (Settings warns: the claim is set on
+--   that app).
 -- user_microsoft: the Microsoft account (organisation + object ID) linked to
 --   a person, and how (linked_by): by their first sign-in (never for owners),
 --   their invitation, from Your account, or a reconnect link an owner sent;
 --   later sign-ins match it, whatever their email.
 -- app_user.microsoft_sessions_after: sessions signed in with Microsoft before
 --   it no longer work (the link was removed, or the organisation changed).
--- app_user.microsoft_connect_only: their Microsoft account was unlinked, so
---   one is linked again only on purpose (Your account, an invitation or a
+-- app_user.microsoft_connect_only: their Microsoft account was unlinked, or
+--   they were made an owner, so one is linked again only on purpose (Your account, an invitation or a
 --   reconnect link), never by a sign-in's address.
 -- user_link kind reconnect: an owner's link for someone to link their
 --   Microsoft account again, whatever its address (7 days, once).
@@ -20,6 +21,8 @@
 --   started before anyone is signed in, often before the company is known, so
 --   the app never reads it directly: only through the app_microsoft_flow_*
 --   functions below, by the SHA-256 of the state or of a one-time ticket.
+--   A sign-in started from an invitation or reconnect link keeps that link
+--   (link_id, link_kind): it finishes only while that very link is unused.
 -- Committed migrations are never edited (CI enforces this): add a new file.
 
 -- +goose Up
@@ -67,6 +70,10 @@ CREATE TABLE microsoft_sign_in_flow (
   purpose      text NOT NULL DEFAULT 'sign_in' CHECK (purpose IN ('sign_in', 'connect')),
   -- The person it is for: the one connecting, or the one whose invitation it accepts.
   user_id      text,
+  -- The invitation or reconnect link it was started from (it is used when
+  -- the sign-in finishes, and only if it is still unused, unexpired and theirs).
+  link_id      text REFERENCES user_link (id) ON DELETE CASCADE,
+  link_kind    text CHECK (link_kind IN ('invite', 'reconnect')),
   client_id    text NOT NULL CHECK (length(client_id) BETWEEN 1 AND 200),
   authority    text NOT NULL CHECK (authority = 'organizations' OR authority ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
   -- Sealed (AES-GCM, key from HP_AUTH_JWT_SECRET): the PKCE verifier and nonce,
@@ -80,6 +87,8 @@ CREATE TABLE microsoft_sign_in_flow (
   created_at   timestamptz NOT NULL DEFAULT now(),
   CHECK (expires_at <= created_at + interval '15 minutes'),
   CHECK (purpose = 'sign_in' OR (tenant_id IS NOT NULL AND user_id IS NOT NULL)),
+  CHECK ((link_id IS NULL) = (link_kind IS NULL)),
+  CHECK (link_id IS NULL OR (purpose = 'sign_in' AND tenant_id IS NOT NULL AND user_id IS NOT NULL)),
   FOREIGN KEY (tenant_id, user_id) REFERENCES app_user (tenant_id, id) ON DELETE CASCADE
 );
 CREATE INDEX microsoft_sign_in_flow_expires_idx ON microsoft_sign_in_flow (expires_at);
@@ -93,13 +102,14 @@ REVOKE ALL ON microsoft_sign_in_flow FROM hiringplug_app;
 -- database's clock (the one every check of it uses).
 -- +goose StatementBegin
 CREATE FUNCTION app_microsoft_flow_save(p_key_hash text, p_binding_hash text, p_tenant_id text, p_purpose text, p_user_id text,
-  p_client_id text, p_authority text, p_sealed text, p_verified boolean, p_ticket_hash text, p_seconds integer)
+  p_link_id text, p_link_kind text, p_client_id text, p_authority text, p_sealed text, p_verified boolean, p_ticket_hash text, p_seconds integer)
 RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   DELETE FROM microsoft_sign_in_flow WHERE expires_at < now();
-  INSERT INTO microsoft_sign_in_flow (key_hash, binding_hash, tenant_id, purpose, user_id, client_id, authority, sealed, verified, ticket_hash, expires_at)
-  VALUES (p_key_hash, p_binding_hash, p_tenant_id, p_purpose, p_user_id, p_client_id, p_authority, p_sealed, p_verified, p_ticket_hash,
+  INSERT INTO microsoft_sign_in_flow (key_hash, binding_hash, tenant_id, purpose, user_id, link_id, link_kind, client_id, authority, sealed,
+                                      verified, ticket_hash, expires_at)
+  VALUES (p_key_hash, p_binding_hash, p_tenant_id, p_purpose, p_user_id, p_link_id, p_link_kind, p_client_id, p_authority, p_sealed, p_verified, p_ticket_hash,
           now() + make_interval(secs => p_seconds));
 END
 $$;
@@ -122,11 +132,12 @@ $$;
 -- A ticket works once: the sign-in it names is removed as it is read.
 -- +goose StatementBegin
 CREATE FUNCTION app_microsoft_flow_take(p_ticket_hash text)
-RETURNS TABLE (key_hash text, binding_hash text, tenant_id text, purpose text, user_id text, client_id text, authority text,
-               sealed text, verified boolean, sealed_code text)
+RETURNS TABLE (key_hash text, binding_hash text, tenant_id text, purpose text, user_id text, link_id text, link_kind text,
+               client_id text, authority text, sealed text, verified boolean, sealed_code text)
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   DELETE FROM microsoft_sign_in_flow f WHERE f.ticket_hash = p_ticket_hash AND f.expires_at > now()
-  RETURNING f.key_hash, f.binding_hash, f.tenant_id, f.purpose, f.user_id, f.client_id, f.authority, f.sealed, f.verified, f.sealed_code
+  RETURNING f.key_hash, f.binding_hash, f.tenant_id, f.purpose, f.user_id, f.link_id, f.link_kind, f.client_id, f.authority, f.sealed,
+            f.verified, f.sealed_code
 $$;
 -- +goose StatementEnd
 
@@ -182,38 +193,23 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 $$;
 -- +goose StatementEnd
 
--- Microsoft has just vouched for an account of p_ms_tenant_id: whether its
--- token said member or guest (the optional acct claim), kept for the
--- companies of that organisation (Settings warns when it did not).
--- +goose StatementBegin
-CREATE FUNCTION app_microsoft_note_claims(p_ms_tenant_id text, p_acct boolean)
-RETURNS void
-LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  UPDATE tenant SET microsoft_acct_missing = NOT p_acct
-  WHERE microsoft_sign_in AND microsoft_tenant_id = p_ms_tenant_id AND microsoft_acct_missing <> NOT p_acct
-$$;
--- +goose StatementEnd
-
-REVOKE ALL ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, text, text, boolean, text, integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_flow_park(text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_flow_take(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_sign_in_tenants(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_microsoft_accounts(text, text, text[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app_microsoft_note_claims(text, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, integer) TO hiringplug_app;
+GRANT EXECUTE ON FUNCTION app_microsoft_flow_save(text, text, text, text, text, text, text, text, text, text, boolean, text, integer) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_park(text, text, text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_flow_take(text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_sign_in_tenants(text) TO hiringplug_app;
 GRANT EXECUTE ON FUNCTION app_microsoft_accounts(text, text, text[]) TO hiringplug_app;
-GRANT EXECUTE ON FUNCTION app_microsoft_note_claims(text, boolean) TO hiringplug_app;
 
 -- +goose Down
-DROP FUNCTION IF EXISTS app_microsoft_note_claims(text, boolean);
 DROP FUNCTION IF EXISTS app_microsoft_accounts(text, text, text[]);
 DROP FUNCTION IF EXISTS app_microsoft_sign_in_tenants(text);
 DROP FUNCTION IF EXISTS app_microsoft_flow_take(text);
 DROP FUNCTION IF EXISTS app_microsoft_flow_park(text, text, text);
-DROP FUNCTION IF EXISTS app_microsoft_flow_save(text, text, text, text, text, text, text, text, boolean, text, integer);
+DROP FUNCTION IF EXISTS app_microsoft_flow_save(text, text, text, text, text, text, text, text, text, text, boolean, text, integer);
 DROP TABLE IF EXISTS microsoft_sign_in_flow;
 DROP TABLE IF EXISTS user_microsoft;
 DELETE FROM user_link WHERE kind = 'reconnect';

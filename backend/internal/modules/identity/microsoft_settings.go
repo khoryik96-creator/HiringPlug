@@ -116,6 +116,13 @@ func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enab
 		}
 		changes := map[string]any{"enabled": enabled, "organisationId": org, "required": required,
 			"before": map[string]any{"enabled": before.Enabled, "organisationId": before.OrganisationID, "required": before.Required}}
+		if (before.Enabled && !out.Enabled) || (orgChanged && before.OrganisationID != nil) {
+			// Everyone's row first, then their links (the order a sign-in
+			// and an unlink take them in): the two wait, never deadlock.
+			if err := q.HoldTeam(ctx); err != nil {
+				return err
+			}
+		}
 		if orgChanged && before.OrganisationID != nil {
 			// Accounts of the old organisation no longer sign anyone in:
 			// their links go, and everyone links again at their next sign-in.

@@ -62,7 +62,7 @@ func (m *Module) CompleteMicrosoft(ctx context.Context, clientAddr string, in Mi
 	if err != nil {
 		return Session{}, err
 	}
-	if flow.UserID != "" && flow.TenantID != "" { // started from an invitation or reconnect link
+	if flow.LinkID != "" { // started from an invitation or reconnect link
 		return m.signInThroughLink(ctx, flow, id)
 	}
 	rows, err := store.New(m.pool).MicrosoftAccounts(ctx, store.MicrosoftAccountsParams{MsTenantID: id.TenantID, MsObjectID: id.ObjectID, Addresses: id.Addresses()})
@@ -112,9 +112,8 @@ func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoft
 	if err == nil {
 		id, err = m.ms.entra.Validate(ctx, raw, entra.Expect{ClientID: flow.ClientID, Nonce: secret.Nonce, Organisation: organisation})
 	}
-	if err == nil { // Settings warns while Microsoft leaves out acct (no account is linked by address then)
-		err = store.New(m.pool).NoteMicrosoftClaims(ctx, store.NoteMicrosoftClaimsParams{MsTenantID: id.TenantID, Acct: id.Member})
-		if err != nil {
+	if err == nil && app.Agency { // Settings warns while the company's app leaves out acct (no account is linked by address then)
+		if err := m.noteClaims(ctx, flow.TenantID, id); err != nil {
 			return id, err
 		}
 	}
@@ -129,6 +128,16 @@ func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoft
 		return id, microsoftFailed(ReasonFailed)
 	}
 	return id, nil
+}
+
+// noteClaims keeps, for the company whose own app a sign-in went through,
+// whether Microsoft said member or guest (acct): the claim is set on that
+// app in Entra, so only a sign-in through it says whether the company's
+// setting is missing (not one through the server's app, set up elsewhere).
+func (m *Module) noteClaims(ctx context.Context, tenantID string, id entra.Identity) error {
+	return database.InTx(ctx, m.pool, authz.System(tenantID), func(tx pgx.Tx) error {
+		return store.New(tx).NoteMicrosoftClaims(ctx, store.NoteMicrosoftClaimsParams{MsTenantID: &id.TenantID, Acct: id.Member})
+	})
 }
 
 // flowApp is the app a sign-in was started with, as it is now, and the

@@ -65,9 +65,10 @@ func asConnectFailed(err error) error {
 }
 
 // linkMicrosoft links a Microsoft account to u (replacing a link to another
-// organisation), audits it and emails them. errLinkTaken: the account is
-// linked to someone else here; errAlreadyLinked: u has one of this
-// organisation already.
+// organisation), ends any reconnect link of theirs (one is linked now: the
+// link has done its work), audits it and emails them. errLinkTaken: the
+// account is linked to someone else here; errAlreadyLinked: u has one of
+// this organisation already.
 func (m *Module) linkMicrosoft(ctx context.Context, tx pgx.Tx, q *store.Queries, u store.UserAuthRow, id entra.Identity, how string) error {
 	if err := q.DropStaleMicrosoftLink(ctx, store.DropStaleMicrosoftLinkParams{UserID: u.ID, MsTenantID: id.TenantID}); err != nil {
 		return err
@@ -79,6 +80,9 @@ func (m *Module) linkMicrosoft(ctx context.Context, tx pgx.Tx, q *store.Queries,
 	case database.IsUniqueViolation(err, "user_microsoft_pkey"):
 		return errAlreadyLinked
 	case err != nil:
+		return err
+	}
+	if err := q.EndLinks(ctx, store.EndLinksParams{UserID: u.ID, Kind: "reconnect"}); err != nil {
 		return err
 	}
 	if err := audit.Record(ctx, tx, audit.Entry{Action: "user.microsoft_linked", EntityType: "user", EntityID: u.ID,
@@ -163,7 +167,9 @@ func (m *Module) StartConnectingMicrosoft(ctx context.Context, p authz.Principal
 
 // proveItIsThem checks, before a Microsoft account is connected, the
 // person's current password (if they have one) and their two-step code or a
-// recovery code (if they use two-step sign-in).
+// recovery code (if they use two-step sign-in). Codes tried here count
+// against the person's limit for codes (as at sign-in): guessing here does
+// not add to guessing there.
 func (m *Module) proveItIsThem(ctx context.Context, q *store.Queries, u store.UserAuthRow, password, code *string) error {
 	var errs apperr.FieldErrors
 	if u.PasswordHash != nil && (password == nil || !CheckPassword(*u.PasswordHash, *password)) {
@@ -177,6 +183,8 @@ func (m *Module) proveItIsThem(ctx context.Context, q *store.Queries, u store.Us
 		switch {
 		case code == nil || *code == "":
 			errs.Add("code", "enter the code your authenticator app shows now, or a recovery code")
+		case !m.limits.twoStepUser.Allow(u.ID):
+			return tooMany()
 		default:
 			if _, err := m.checkCode(ctx, q, u.TenantID, u.ID, *code, true); err != nil {
 				errs.Add("code", "is not the code your app shows now, nor an unused recovery code")
@@ -223,7 +231,7 @@ func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principa
 		if !s.MicrosoftSignIn || s.MicrosoftTenantID == nil || *s.MicrosoftTenantID != id.TenantID { // changed meanwhile
 			return connectFailed(ReasonFailed)
 		}
-		u, err := q.UserAuth(ctx, p.UserID)
+		u, err := holdUser(ctx, q, p.UserID) // held first, like every change of their row and link
 		if err != nil {
 			return err
 		}
@@ -239,22 +247,28 @@ func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principa
 }
 
 // UnlinkMicrosoft removes the Microsoft account linked to someone and ends
-// their sessions signed in with it (password sessions go on). From then on
-// one is linked to them only on purpose (Your account, a reconnect link),
-// never by a sign-in's address: it was unlinked for a reason. Only owners
-// unlink owners.
+// their sessions signed in with it (password sessions go on), and any
+// reconnect link sent them. From then on one is linked to them only on
+// purpose (Your account, a new reconnect link), never by a sign-in's
+// address: it was unlinked for a reason. Only owners unlink owners, and
+// nobody someone whose role is above their own. Their row is held first
+// (as a sign-in holds it before their link): the two wait for each other,
+// never deadlock.
 func (m *Module) UnlinkMicrosoft(ctx context.Context, p authz.Principal, userID string) error {
 	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		u, err := q.UserAuth(ctx, userID)
+		u, err := holdUser(ctx, q, userID)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("team member")
 		}
 		if err != nil {
 			return err
 		}
-		if u.Role == string(api.RoleOwner) && p.Role != api.RoleOwner {
+		switch {
+		case u.Role == string(api.RoleOwner) && p.Role != api.RoleOwner:
 			return teamProblem("Only an owner can unlink an owner's Microsoft account.")
+		case RoleRank(u.Role) > RoleRank(string(p.Role)):
+			return teamProblem("Only an admin or owner can unlink an admin's Microsoft account.")
 		}
 		org, err := q.UnlinkMicrosoft(ctx, userID)
 		if database.IsNoRows(err) {
@@ -267,6 +281,9 @@ func (m *Module) UnlinkMicrosoft(ctx context.Context, p authz.Principal, userID 
 			return err
 		}
 		if err := q.EndMicrosoftSessions(ctx, &userID); err != nil {
+			return err
+		}
+		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "reconnect"}); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.microsoft_unlinked", EntityType: "user", EntityID: userID,
@@ -284,8 +301,12 @@ func (m *Module) MicrosoftSignInOn(ctx context.Context, tx pgx.Tx) (bool, error)
 
 // dropAddressLinkOfNewOwner removes, from someone made an owner, a Microsoft
 // account linked by a sign-in's address (owners link one only on purpose),
-// and ends their Microsoft sessions; audited.
+// and ends their Microsoft sessions; audited. From then on one is linked to
+// them only on purpose, even once they are no longer an owner.
 func (m *Module) dropAddressLinkOfNewOwner(ctx context.Context, tx pgx.Tx, q *store.Queries, userID string) error {
+	if err := q.MicrosoftConnectOnly(ctx, userID); err != nil {
+		return err
+	}
 	orgs, err := q.UnlinkSignInLink(ctx, userID)
 	if err != nil || len(orgs) == 0 {
 		return err
