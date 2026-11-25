@@ -37,7 +37,7 @@ type MicrosoftCompletion struct{ Ticket, Binding, Company string }
 // the ticket works once, with the tab's value only. The code is exchanged,
 // the ID token checked, and the account matched to a team member.
 func (m *Module) CompleteMicrosoft(ctx context.Context, clientAddr string, in MicrosoftCompletion) (Session, error) {
-	if !m.limits.signInAddr.Allow(clientAddr) {
+	if !m.limits.msComplete.Allow(clientAddr) {
 		return Session{}, tooMany()
 	}
 	if m.ms == nil {

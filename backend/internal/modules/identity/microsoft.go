@@ -151,7 +151,7 @@ type MicrosoftStart struct {
 // the browser to.
 func (m *Module) StartMicrosoft(ctx context.Context, clientAddr string, in MicrosoftStart) (string, error) {
 	email := normEmail(in.Email)
-	if !m.limits.signInAddr.Allow(clientAddr) || (email != "" && !m.limits.signInEmail.Allow(email)) {
+	if !m.limits.msStart.Allow(clientAddr) || (email != "" && !m.limits.signInEmail.Allow(email)) {
 		return "", tooMany()
 	}
 	if m.ms == nil {
@@ -286,7 +286,7 @@ func (m *Module) MicrosoftCallback(ctx context.Context, clientAddr, state, code,
 		return back + "error=cancelled"
 	case providerError != "" || state == "" || code == "" || m.ms == nil:
 		return back + "error=failed"
-	case !m.limits.links.Allow(clientAddr):
+	case !m.limits.msCallback.Allow(clientAddr):
 		return back + "error=failed"
 	}
 	key := hashLink(state)

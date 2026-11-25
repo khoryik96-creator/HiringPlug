@@ -33,6 +33,9 @@ const (
 type limits struct {
 	signInAddr, signInPair, signInEmail, resetAddr, resetEmail, links, change *ratelimit.Limiter
 	twoStep, twoStepUser                                                      *ratelimit.Limiter // codes, per address and per person
+	// Signing in with Microsoft, per address: its own limits, not the
+	// password's (no password is guessed; Microsoft checks the person).
+	msStart, msCallback, msComplete *ratelimit.Limiter
 }
 
 // signIn reports whether another sign-in attempt for email from addr is
@@ -53,6 +56,7 @@ func newLimits(now func() time.Time) limits {
 		resetAddr: l(10, 15*time.Minute, 50), resetEmail: l(3, time.Hour, 10),
 		links: l(30, 15*time.Minute, 200), change: l(10, 15*time.Minute, 50),
 		twoStep: l(30, 15*time.Minute, 300), twoStepUser: l(10, 15*time.Minute, 50),
+		msStart: l(120, 15*time.Minute, 1000), msCallback: l(300, 15*time.Minute, 3000), msComplete: l(300, 15*time.Minute, 3000),
 	}
 }
 
