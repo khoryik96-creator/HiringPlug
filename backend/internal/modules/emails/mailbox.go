@@ -189,6 +189,9 @@ func (s *Service) bindDelivery(ctx context.Context, tx pgx.Tx, emailID, userID s
 		mode = "unknown"
 	}
 	var ref *string
+	if userID == authz.SystemUserID { // the system has no mailbox: the server's mail
+		return mode, store.New(tx).BindEmailDelivery(ctx, store.BindEmailDeliveryParams{ID: emailID, DeliveryMode: mode})
+	}
 	row, err := store.New(tx).MailboxForDelivery(ctx, userID)
 	if err == nil {
 		mode = "live"

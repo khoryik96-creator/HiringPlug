@@ -215,7 +215,12 @@ type Notice struct {
 	// ShowsFees: it shows a fee (an invoice), so only roles that may see
 	// fees (placements.fees:read) see it, and its subject stays out of the
 	// audit log.
-	ShowsFees     bool
+	ShowsFees bool
+	// AccountNotice: about someone's account (an invitation, a password
+	// reset, a link to connect Microsoft, a Microsoft account linked). Sent
+	// only from the server's mail, by nobody: never from the mailbox of whoever
+	// caused it (a copy in their Sent Items would hand them the link), and in
+	// no one's sent mail here either.
 	AccountNotice bool
 	// SenderName is who it is from ("HiringPlug" when empty).
 	SenderName string

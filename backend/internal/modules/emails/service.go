@@ -367,10 +367,15 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 	if sender == "" {
 		sender = "HiringPlug"
 	}
+	sentBy := n.SentBy
+	if n.AccountNotice { // by the system, from the server's mail (Notice.AccountNotice)
+		system := authz.SystemUserID
+		sentBy = &system
+	}
 	q := store.New(tx)
 	row, err := q.InsertEmail(ctx, store.InsertEmailParams{
 		ApplicationID: n.ApplicationID, CandidateID: n.CandidateID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
-		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees, SentBy: n.SentBy,
+		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees, SentBy: sentBy,
 	})
 	if err != nil {
 		return "", err
