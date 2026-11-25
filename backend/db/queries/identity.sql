@@ -63,6 +63,10 @@ RETURNING id;
 -- name: EndLinks :exec
 UPDATE user_link SET used_at = now() WHERE user_id = @user_id AND kind = @kind AND used_at IS NULL;
 
+-- Everyone's unused links of a kind end (the company's rows are held first).
+-- name: EndLinksOfKind :exec
+UPDATE user_link SET used_at = now() WHERE kind = @kind AND used_at IS NULL;
+
 -- name: ListTeam :many
 SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000;
 

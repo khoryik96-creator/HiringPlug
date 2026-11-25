@@ -146,7 +146,8 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 }
 
 // UpdateMember changes someone's role or team, or deactivates or reactivates
-// them, by the team rules (ChangeProblem). Deactivating signs them out. team
+// them, by the team rules (ChangeProblem). Deactivating signs them out. A
+// change of role, or a deactivation, ends the reconnect link sent them. team
 // is nil to keep their team; a nil *string inside it means no team.
 func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID string, role *string, active *bool, team **string) (TeamMember, error) {
 	var out TeamMember
@@ -204,7 +205,7 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 				return err
 			}
 		}
-		if newRole != row.Role { // a reconnect link was sent for who they were: whoever holds it no longer signs in as them
+		if newRole != row.Role || !newActive { // a reconnect link was sent for who they were: whoever holds it no longer signs in as them
 			if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "reconnect"}); err != nil {
 				return err
 			}

@@ -218,7 +218,8 @@ func TestReconnectLinksAndUnlinksKeepToTheirRank(t *testing.T) {
 
 // A reconnect link is for who the person was when it was sent, until a
 // Microsoft account is linked to them: unlinking theirs, changing their role
-// (making them an owner too), or linking one ends it.
+// (making them an owner too), deactivating them, linking one, or the company
+// turning Microsoft sign-in off or changing its organisation ends it.
 func TestReconnectLinksEndWhenThingsChange(t *testing.T) {
 	t.Parallel()
 	f := newMicrosoftTest(t)
@@ -258,4 +259,21 @@ func TestReconnectLinksEndWhenThingsChange(t *testing.T) {
 	_, me := f.a.signIn(map[string]any{"email": sam.email, "password": testPassword})
 	require.Equal(t, http.StatusNoContent, f.connect(me, sam.claims, map[string]any{"password": testPassword}).Status)
 	assert.Equal(t, http.StatusGone, works(link), "connected from Your account")
+
+	link = f.reconnectLink(owner.Token, recruiter.ID)
+	for _, active := range []bool{false, true} {
+		res := f.a.request(http.MethodPatch, "/v1/team/"+recruiter.ID, owner.Token, map[string]any{"active": active})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+	assert.Equal(t, http.StatusGone, works(link), "deactivated (even if reactivated since)")
+
+	link = f.reconnectLink(owner.Token, recruiter.ID)
+	res := f.a.request(http.MethodPut, "/v1/agency/microsoft-sign-in", owner.Token, map[string]any{"enabled": false, "organisationId": org, "required": false})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	f.enable(owner.Token, org, false)
+	assert.Equal(t, http.StatusGone, works(link), "Microsoft sign-in turned off (even if on again since)")
+
+	link = f.reconnectLink(owner.Token, recruiter.ID)
+	f.enable(owner.Token, newGUID(), false)
+	assert.Equal(t, http.StatusGone, works(link), "another organisation")
 }

@@ -272,6 +272,16 @@ func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 	return err
 }
 
+const endLinksOfKind = `-- name: EndLinksOfKind :exec
+UPDATE user_link SET used_at = now() WHERE kind = $1 AND used_at IS NULL
+`
+
+// Everyone's unused links of a kind end (the company's rows are held first).
+func (q *Queries) EndLinksOfKind(ctx context.Context, kind string) error {
+	_, err := q.db.Exec(ctx, endLinksOfKind, kind)
+	return err
+}
+
 const endMicrosoftSessions = `-- name: EndMicrosoftSessions :exec
 UPDATE app_user SET microsoft_sessions_after = greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second')
 WHERE $1::text IS NULL OR id = $1::text

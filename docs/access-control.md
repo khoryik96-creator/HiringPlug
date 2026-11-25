@@ -80,8 +80,9 @@ required. A sign-in started from a link keeps it (`microsoft_sign_in_flow.link_i
 and finishes only with that very link, held, unused, unexpired, of the same
 kind and theirs (an invitation accepted with a password meanwhile, or a link
 replaced, links nothing; two finishing at once: one works). A reconnect link
-ends when their account is unlinked, their role changes, or an account is
-linked to them. Every link is audited (`user.microsoft_linked`, `by`: `sign_in`,
+ends when their account is unlinked, their role changes, they are
+deactivated, an account is linked to them, or the company turns Microsoft
+sign-in off or changes its organisation. Every link is audited (`user.microsoft_linked`, `by`: `sign_in`,
 `invitation`, `self` or `reconnect_link`, kept as `user_microsoft.linked_by`)
 and the person is emailed ("not you? tell an owner"). Account emails
 (invitations, resets, reconnect links, "Microsoft linked") go from the

@@ -63,10 +63,11 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 // SetMicrosoftSignIn lets the team sign in with Microsoft accounts of the
 // company's organisation (or stops it), and requires it of everyone but
 // owners (password sessions of the others stop working at once: see
-// Authenticate). Turning it off ends the sessions signed in with Microsoft;
-// changing the organisation ends them too and removes the links to the old
-// organisation's accounts (counted in the audit entry): everyone links an
-// account of the new one at their next sign-in (owners from Your account).
+// Authenticate). Turning it off ends the sessions signed in with Microsoft
+// and every reconnect link sent; changing the organisation ends them too
+// and removes the links to the old organisation's accounts (counted in the
+// audit entry): everyone links an account of the new one at their next
+// sign-in (owners from Your account).
 func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enabled bool, organisation *string, required bool) (MicrosoftSignIn, error) {
 	var org *string
 	if organisation != nil && *organisation != "" {
@@ -134,6 +135,11 @@ func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enab
 		}
 		if (before.Enabled && !out.Enabled) || (orgChanged && before.OrganisationID != nil) {
 			if err := q.EndMicrosoftSessions(ctx, nil); err != nil {
+				return err
+			}
+			// A reconnect link was sent for an account of the organisation
+			// then: it links none from now on, even if turned on again.
+			if err := q.EndLinksOfKind(ctx, "reconnect"); err != nil {
 				return err
 			}
 		}
