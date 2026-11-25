@@ -140,6 +140,15 @@ class _Watched:
         return done
 
 
+PAID_PAUSED = "paid AI is paused on this server (Settings > System), so the AI was not asked"
+
+
+class PaidAIPausedError(ProviderError):
+    """The server's paid AI is paused: a job queued before still makes no
+    paid call. Its handler treats it as the AI not answering: a CV is read by
+    the rules alone, an assistant question answered with why."""
+
+
 @dataclass(frozen=True)
 class Deps:
     """What handlers may use; tests pass fakes."""
@@ -160,6 +169,8 @@ class Deps:
     log: ProviderLog | None = None
     # Search by meaning's model (loaded on first use); None when not installed.
     meaning: Callable[[], MeaningModel | None] = lambda: None
+    # Whether the server's paid AI is paused (paid_switch.PaidSwitch.paused).
+    paid_paused: Callable[[], bool] = lambda: False
 
     def _chosen(self, access: AiAccess | None) -> Provider | None:
         if access is None:
@@ -174,6 +185,9 @@ class Deps:
         (a whole CV as JSON). Raises ProviderError when the company's key
         cannot be opened."""
         name = access.provider.value if access is not None else "server"
+        if (access is not None or self.ai is not None) and self.paid_paused():
+            # Not the provider's failure: never reported as an outage.
+            raise PaidAIPausedError(PAID_PAUSED)
         try:
             chosen = self._chosen(access)
         except ProviderError as exc:

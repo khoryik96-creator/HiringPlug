@@ -21,6 +21,9 @@ x-module:
     AI_PROVIDER_NO_KEY:
       status: 409
       description: That provider has no API key yet; save one first.
+    AI_PAID_PAUSED:
+      status: 409
+      description: Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off); no key is checked until it is back on.
   jobs:
     aiprovider.check:
       queue: ai
@@ -241,8 +244,13 @@ components:
         askedBy: { type: string, maxLength: 200, description: "Who asked for the check (a user ID), sent back unchanged." }
     AiStatus:
       type: object
-      required: [down, provider, message, since, failedAt]
+      required: [down, provider, message, since, failedAt, paidPaused]
       properties:
+        paidPaused:
+          type: boolean
+          description: >-
+            Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off): no AI call is made, through
+            a company's key or the server's own; CVs are read by the rules alone.
         down: { type: boolean, description: "The latest call to the provider failed, within the last hour." }
         provider: { type: string, nullable: true, description: "As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI." }
         message: { type: string, nullable: true, description: "Why, in words safe to show (never a key)." }

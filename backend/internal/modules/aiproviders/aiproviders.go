@@ -24,6 +24,7 @@ import (
 type Settings struct {
 	ServerOn   bool   // the server has its own provider (HP_AI_PROVIDER)
 	KeysSecret []byte // seals companies' keys (HP_AI_KEYS_SECRET); empty: none can be saved
+	PaidOff    bool   // HP_AI_PAID=off: no paid AI on the server, whatever Settings > System says
 }
 
 // Module is the aiproviders module.

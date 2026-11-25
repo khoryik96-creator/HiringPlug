@@ -270,6 +270,40 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/settings/system/paid-ai:
+    put:
+      operationId: setPaidAi
+      tags: [settings]
+      summary: Pause every paid AI call on the server, or turn paid AI back on
+      description: >
+        The server-wide switch: paused, no AI call is made through any
+        company's key or the server's own provider, for new work or work
+        already queued; local work (reading text and scans, PDF copies, search
+        by meaning, reading CVs by the rules) goes on. Only an owner of the
+        agency that runs the server (HP_BACKUP_TENANT, or the only agency)
+        may change it. HP_AI_PAID=off keeps it paused whatever this says.
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [paused]
+              properties:
+                paused: { type: boolean }
+                reason: { type: string, maxLength: 300, description: Why (shown in Settings > System). }
+      responses:
+        '200':
+          description: Changed; the new status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemStatus' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/settings/backups:
     get:
       operationId: getBackups
@@ -408,8 +442,9 @@ components:
   schemas:
     SystemStatus:
       type: object
-      required: [jobs, failed, backup, backupAuto, held, restore]
+      required: [jobs, failed, backup, backupAuto, held, restore, paidAi]
       properties:
+        paidAi: { $ref: '#/components/schemas/PaidAiSwitch' }
         held:
           type: array
           description: >-
@@ -433,6 +468,15 @@ components:
           description: The server's last backup; null when none was ever made.
           nullable: true
           allOf: [{ $ref: '#/components/schemas/BackupStatus' }]
+    PaidAiSwitch:
+      type: object
+      required: [paused, reason, changedAt, pausedByServer, canChange]
+      properties:
+        paused: { type: boolean, description: "Paid AI is paused on the server (this switch, or HP_AI_PAID=off)." }
+        reason: { type: string, nullable: true }
+        changedAt: { type: string, format: date-time, nullable: true }
+        pausedByServer: { type: boolean, description: "HP_AI_PAID=off: paused whatever the switch says." }
+        canChange: { type: boolean, description: "The person may change it (an owner of the agency that runs the server)." }
     HeldJob:
       type: object
       required: [id, kind, attempts, createdAt, heldAt, runAfter]

@@ -36,6 +36,10 @@ x-error-codes:
     module: aiproviders
     status: 409
     description: The server cannot store API keys yet (HP_AI_KEYS_SECRET is not set).
+  AI_PAID_PAUSED:
+    module: aiproviders
+    status: 409
+    description: Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off); no key is checked until it is back on.
   AI_PROVIDER_NO_KEY:
     module: aiproviders
     status: 409
@@ -9178,6 +9182,35 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/system/paid-ai:
+    put:
+      operationId: setPaidAi
+      tags: [settings]
+      summary: Pause every paid AI call on the server, or turn paid AI back on
+      description: >
+        The server-wide switch: paused, no AI call is made through any company's key or the server's own provider, for new work or work already queued; local work (reading text and scans, PDF copies, search by meaning, reading CVs by the rules) goes on. Only an owner of the agency that runs the server (HP_BACKUP_TENANT, or the only agency) may change it. HP_AI_PAID=off keeps it paused whatever this says.
+
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [paused]
+              properties:
+                paused: {type: boolean}
+                reason: {type: string, maxLength: 300, description: Why (shown in Settings > System).}
+      responses:
+        '200':
+          description: Changed; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/settings/backups:
     get:
       operationId: getBackups
@@ -9755,6 +9788,7 @@ components:
       type: string
       enum:
         - AI_KEYS_NOT_SET_UP
+        - AI_PAID_PAUSED
         - AI_PROVIDER_NO_KEY
         - APOLLO_BROKER_UNAVAILABLE
         - APPLICATIONS_OVERLAP
@@ -10037,8 +10071,12 @@ components:
         askedBy: {type: string, maxLength: 200, description: "Who asked for the check (a user ID), sent back unchanged."}
     AiStatus:
       type: object
-      required: [down, provider, message, since, failedAt]
+      required: [down, provider, message, since, failedAt, paidPaused]
       properties:
+        paidPaused:
+          type: boolean
+          description: >-
+            Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off): no AI call is made, through a company's key or the server's own; CVs are read by the rules alone.
         down: {type: boolean, description: "The latest call to the provider failed, within the last hour."}
         provider: {type: string, nullable: true, description: "As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), AI 4 (Qwen), or the server's AI."}
         message: {type: string, nullable: true, description: "Why, in words safe to show (never a key)."}
@@ -18605,8 +18643,9 @@ components:
         userId: {type: string}
     SystemStatus:
       type: object
-      required: [jobs, failed, backup, backupAuto, held, restore]
+      required: [jobs, failed, backup, backupAuto, held, restore, paidAi]
       properties:
+        paidAi: {$ref: '#/components/schemas/PaidAiSwitch'}
         held:
           type: array
           description: >-
@@ -18629,6 +18668,15 @@ components:
           description: The server's last backup; null when none was ever made.
           nullable: true
           allOf: [{$ref: '#/components/schemas/BackupStatus'}]
+    PaidAiSwitch:
+      type: object
+      required: [paused, reason, changedAt, pausedByServer, canChange]
+      properties:
+        paused: {type: boolean, description: "Paid AI is paused on the server (this switch, or HP_AI_PAID=off)."}
+        reason: {type: string, nullable: true}
+        changedAt: {type: string, format: date-time, nullable: true}
+        pausedByServer: {type: boolean, description: "HP_AI_PAID=off: paused whatever the switch says."}
+        canChange: {type: boolean, description: "The person may change it (an owner of the agency that runs the server)."}
     HeldJob:
       type: object
       required: [id, kind, attempts, createdAt, heldAt, runAfter]

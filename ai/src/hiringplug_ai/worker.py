@@ -27,6 +27,7 @@ from .download import GiveUpError, download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
 from .jobs import HANDLERS, MEANING_KINDS, Deps, ProviderLog, ReportGate
 from .meaning import model as meaning_model
+from .paid_switch import PaidSwitch
 from .providers import OpenAICompatible, connect
 from .queue import ClaimedJob, LeaseLostError, Queue
 
@@ -111,6 +112,7 @@ def main() -> None:
             else None
         ),
         meaning=lambda: meaning_model.load(config.meaning_model_dir),
+        paid_paused=PaidSwitch(config.database_url, env_off=not config.ai_paid).paused,
     )
     if not meaning_model.installed(config.meaning_model_dir):
         log.warning(
@@ -128,6 +130,7 @@ def main() -> None:
             "ocr": ocr.name if ocr else "off",
             "ai": config.ai_model or "off",
             "company_keys": "on" if config.ai_keys_secret else "off",
+            "paid_ai": "on" if config.ai_paid else "off (HP_AI_PAID)",
             "concurrency": config.concurrency,
         },
     )

@@ -100,6 +100,9 @@ type AI struct {
 	// KeysSecret seals the API keys companies enter in Settings (the AI
 	// worker has the same one to open them). Empty: keys cannot be saved.
 	KeysSecret []byte // HP_AI_KEYS_SECRET
+	// PaidOff pauses every paid AI call on the server, company keys too,
+	// whatever Settings > System says (HP_AI_PAID=off; on by default).
+	PaidOff bool
 }
 
 // SMTP is how to reach the mail server.
@@ -148,6 +151,7 @@ func Load(getenv func(string) string) (Config, error) {
 		Enabled:       r.oneOf("HP_AI_PROVIDER", "off", "off", "openai_compatible") != "off",
 		MonthlyTokens: r.int64("HP_AI_MONTHLY_TOKENS", 2_000_000),
 		KeysSecret:    []byte(r.str("HP_AI_KEYS_SECRET", "")),
+		PaidOff:       r.oneOf("HP_AI_PAID", "on", "on", "off") == "off",
 	}
 	if n := len(c.AI.KeysSecret); n > 0 && n < 32 {
 		r.fail("HP_AI_KEYS_SECRET must be at least 32 characters (or empty: companies cannot save AI keys)")

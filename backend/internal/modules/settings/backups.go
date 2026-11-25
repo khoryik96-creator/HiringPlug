@@ -67,16 +67,10 @@ func notOperator() error {
 
 // operator reports whether p's agency runs this server (and it keeps backups).
 func (s *Service) operator(ctx context.Context, tx pgx.Tx, p authz.Principal) (bool, error) {
-	b := s.backups
-	if b.Dir == "" {
+	if s.backups.Dir == "" {
 		return false, nil
 	}
-	if b.OperatorTenant != "" {
-		return p.TenantID == b.OperatorTenant, nil
-	}
-	var n int64
-	err := tx.QueryRow(ctx, `SELECT app_tenant_count()`).Scan(&n)
-	return n == 1, err
+	return s.runsServer(ctx, tx, p)
 }
 
 // Backups returns the server's backups, newest first, for the agency that runs it.

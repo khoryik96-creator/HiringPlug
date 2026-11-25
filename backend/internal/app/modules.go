@@ -107,8 +107,9 @@ func NewModules(d Deps) *Modules {
 	m.Identity.UseTwoStepKey(d.Config.AuthJWTSecret)
 	m.Settings = settings.New(d.Pool)
 	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant})
+	m.Settings.PaidAIOffByServer(d.Config.AI.PaidOff)
 	m.Industries = industries.New(d.Pool)
-	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
+	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret, PaidOff: d.Config.AI.PaidOff})
 	// The AI use ledger and each company's monthly AI limit (the server's as default).
 	m.AIUsage = aiusage.New(d.Pool, aiusage.Deps{Users: m.Identity},
 		aiusage.Config{DefaultTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})

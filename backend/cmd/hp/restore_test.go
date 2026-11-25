@@ -114,3 +114,25 @@ func TestHpRestoreCanResumeOutboundJobsOnPurpose(t *testing.T) {
 	require.NoError(t, pool.QueryRow(ctx, `SELECT status FROM job WHERE tenant_id = $1`, tenant.ID).Scan(&status))
 	assert.Equal(t, "pending", status)
 }
+
+// IMP-001/002: a backup made on another server (a staging copy of
+// production) is put back with paid AI paused, until the operator says so.
+func TestHpRestoreFromAnotherServerPausesPaidAI(t *testing.T) {
+	ctx := context.Background()
+	target, backups := restoreTarget(t)
+	made, err := backup.Run(ctx, testutil.Current.Admin, backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: t.TempDir(), Dir: backups, Keep: 2,
+		Server: "7311000000000000001"})
+	require.NoError(t, err)
+	require.NoError(t, run(ctx, "restore", []string{"-yes", filepath.Base(made)}))
+	pool, err := database.Connect(ctx, target)
+	require.NoError(t, err)
+	defer pool.Close()
+	var paused bool
+	var by string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT paused, changed_by FROM ai_paid_control`).Scan(&paused, &by))
+	assert.True(t, paused)
+	assert.Equal(t, "hp restore", by)
+	var from bool
+	require.NoError(t, pool.QueryRow(ctx, `SELECT source_server <> destination_server FROM restore_marker`).Scan(&from))
+	assert.True(t, from)
+}

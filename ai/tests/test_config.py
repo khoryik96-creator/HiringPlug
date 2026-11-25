@@ -31,3 +31,11 @@ def test_one_long_ai_answer_must_fit_in_a_lease() -> None:
     assert config.ai_long_timeout_seconds == 300, "a long CV, read or anonymised, takes minutes"
     with pytest.raises(ConfigError, match="HP_AI_LONG_TIMEOUT_SECONDS"):
         load_config({"HP_AI_DATABASE_URL": "postgresql://x@localhost/h", "HP_AI_LONG_TIMEOUT_SECONDS": "580"})
+
+
+def test_hp_ai_paid_off_pauses_paid_ai() -> None:
+    base = {"HP_AI_DATABASE_URL": "postgresql://ai@localhost/hp"}
+    assert load_config(base).ai_paid is True
+    assert load_config({**base, "HP_AI_PAID": "off"}).ai_paid is False
+    with pytest.raises(ConfigError, match="HP_AI_PAID must be on or off"):
+        load_config({**base, "HP_AI_PAID": "maybe"})

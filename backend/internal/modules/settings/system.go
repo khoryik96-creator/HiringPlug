@@ -30,6 +30,7 @@ type SystemStatus struct {
 	// Held are the company's jobs a restore held; Restore the server's last restore.
 	Held    []jobqueue.HeldJob
 	Restore *jobqueue.Restored
+	PaidAI  PaidAI
 }
 
 // System returns the company's background jobs and the last backup.
@@ -37,15 +38,19 @@ func (s *Service) System(ctx context.Context, p authz.Principal) (SystemStatus, 
 	var out SystemStatus
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		out, err = systemStatus(ctx, tx, p.TenantID)
+		out, err = s.systemStatus(ctx, tx, p)
 		return err
 	})
 	return out, err
 }
 
-func systemStatus(ctx context.Context, tx pgx.Tx, tenantID string) (SystemStatus, error) {
+func (s *Service) systemStatus(ctx context.Context, tx pgx.Tx, p authz.Principal) (SystemStatus, error) {
 	var out SystemStatus
 	var err error
+	tenantID := p.TenantID
+	if out.PaidAI, err = s.paidAI(ctx, tx, p); err != nil {
+		return out, err
+	}
 	if out.Jobs, err = jobqueue.Summary(ctx, tx, tenantID); err != nil {
 		return out, err
 	}
@@ -88,7 +93,7 @@ func (s *Service) RetryJob(ctx context.Context, p authz.Principal, jobID string)
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "settings.job_retried", EntityType: "job", EntityID: jobID}); err != nil {
 			return err
 		}
-		out, err = systemStatus(ctx, tx, p.TenantID)
+		out, err = s.systemStatus(ctx, tx, p)
 		return err
 	})
 	return out, err
@@ -126,6 +131,8 @@ func systemToAPI(st SystemStatus) api.SystemStatus {
 		out.Backup.Set(backupStatusToAPI(*b))
 	}
 	heldToAPI(st, &out)
+	out.PaidAi = api.PaidAiSwitch{Paused: st.PaidAI.Paused || st.PaidAI.ByServer, Reason: c.OrNull(st.PaidAI.Reason),
+		ChangedAt: c.OrNull(st.PaidAI.ChangedAt), PausedByServer: st.PaidAI.ByServer, CanChange: st.PaidAI.CanChange}
 	return out
 }
 

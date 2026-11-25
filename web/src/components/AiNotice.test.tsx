@@ -7,9 +7,9 @@ import { AiNotice, sentence } from "./AiNotice";
 
 const down: Schemas["AiStatus"] = {
   down: true, provider: "AI 1", message: "the AI provider could not be reached",
-  since: "2026-11-13T02:40:00Z", failedAt: "2026-11-13T02:45:00Z",
+  since: "2026-11-13T02:40:00Z", failedAt: "2026-11-13T02:45:00Z", paidPaused: false,
 };
-const fine: Schemas["AiStatus"] = { down: false, provider: null, message: null, since: null, failedAt: null };
+const fine: Schemas["AiStatus"] = { down: false, provider: null, message: null, since: null, failedAt: null, paidPaused: false };
 
 beforeEach(() => { sessionStorage.clear(); });
 afterEach(() => {
@@ -18,6 +18,18 @@ afterEach(() => {
 });
 
 describe("the notice when the AI is not answering", () => {
+  // IMP-001: paid AI paused on the server says so, not "not answering".
+  it("says paid AI is paused on the server, and where it is turned back on", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ ...fine, paidPaused: true }));
+    renderWithClient(<AiNotice permissions={["settings:manage"]} />);
+    const notice = await screen.findByRole("alert");
+    expect(notice.textContent).toContain("Paid AI is paused on this server.");
+    expect(notice.textContent).toContain("read by the rules alone");
+    expect(screen.getByRole("link", { name: "See Settings > System" }).getAttribute("href")).toBe("#/system");
+    fireEvent.click(screen.getByRole("button", { name: "Close the AI notice" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("says the AI is down, why, and what will not work", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(down));
     renderWithClient(<AiNotice permissions={[]} />);

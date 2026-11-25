@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { HeldJobs, RestoreNotice } from "../components/HeldJobs";
+import { PaidAi } from "../components/PaidAi";
 import { OffsiteCopy } from "../components/OffsiteCopy";
 import { formatWhen } from "../labels";
 
@@ -99,6 +100,7 @@ export function System() {
         <>
           <Backup backup={st.backup} auto={st.backupAuto} restore={st.restore} />
           <HeldJobs held={st.held} label={label} statusKey={systemKey} />
+          <PaidAi paidAi={st.paidAi} statusKey={systemKey} />
           <section className="panel" aria-label="Background jobs">
             <h3>Background jobs</h3>
             {st.jobs.length === 0 ? <p className="muted">Nothing waiting, nothing failed.</p> : (

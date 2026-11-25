@@ -23,6 +23,14 @@ type ActivityTarget struct {
 	UpdatedAt  time.Time
 }
 
+type AiPaidControl struct {
+	ID        bool
+	Paused    bool
+	Reason    *string
+	ChangedAt *time.Time
+	ChangedBy *string
+}
+
 type AiProvider struct {
 	TenantID     string
 	Provider     string

@@ -124,6 +124,7 @@ class Permission(StrEnum):
 
 class ErrorCode(StrEnum):
     AI_KEYS_NOT_SET_UP = "AI_KEYS_NOT_SET_UP"
+    AI_PAID_PAUSED = "AI_PAID_PAUSED"
     AI_PROVIDER_NO_KEY = "AI_PROVIDER_NO_KEY"
     APOLLO_BROKER_UNAVAILABLE = "APOLLO_BROKER_UNAVAILABLE"
     APPLICATIONS_OVERLAP = "APPLICATIONS_OVERLAP"
@@ -431,6 +432,12 @@ class AiProviderCheckJob(BaseModel):
 
 
 class AiStatus(BaseModel):
+    paidPaused: Annotated[
+        bool,
+        Field(
+            description="Paid AI is paused on this server (Settings > System, or HP_AI_PAID=off): no AI call is made, through a company's key or the server's own; CVs are read by the rules alone."
+        ),
+    ]
     down: Annotated[bool, Field(description="The latest call to the provider failed, within the last hour.")]
     provider: Annotated[
         str | None,
@@ -7247,6 +7254,18 @@ class SchedulingRefreshCalendarJob(BaseModel):
     userId: str
 
 
+class PaidAiSwitch(BaseModel):
+    paused: Annotated[
+        bool, Field(description="Paid AI is paused on the server (this switch, or HP_AI_PAID=off).")
+    ]
+    reason: Annotated[str | None, Field(...)]
+    changedAt: Annotated[AwareDatetime | None, Field(...)]
+    pausedByServer: Annotated[bool, Field(description="HP_AI_PAID=off: paused whatever the switch says.")]
+    canChange: Annotated[
+        bool, Field(description="The person may change it (an owner of the agency that runs the server).")
+    ]
+
+
 class HeldJob(BaseModel):
     id: str
     kind: Annotated[str, Field(description="e.g. email.send")]
@@ -9712,6 +9731,7 @@ class BookingLink(BaseModel):
 
 
 class SystemStatus(BaseModel):
+    paidAi: PaidAiSwitch
     held: Annotated[
         list[HeldJob],
         Field(

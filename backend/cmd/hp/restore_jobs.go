@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/khoryik96-creator/hiringplug/backend/db"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/aipaid"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/backup"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
@@ -49,12 +50,26 @@ func settleJobs(ctx context.Context, o backup.Options, name string, resume bool)
 	if err != nil {
 		return fmt.Errorf("restored %s, but its jobs were not held; do not start the workers, run this restore again: %w", name, err)
 	}
+	// A copy of another server (a staging copy of production) spends no
+	// one's AI credit until the agency running it says so.
+	pausedAI := r.FromAnotherServer() && !resume
+	if pausedAI {
+		if err := aipaid.Set(ctx, tx, true, restoredPaused, "hp restore"); err != nil {
+			return fmt.Errorf("restored %s, but paid AI could not be paused; do not start the workers, run this restore again: %w", name, err)
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	fmt.Print(jobsSummary(r, after))
+	if pausedAI {
+		fmt.Println("paid AI: paused, as the backup is from another server; an owner of the agency that runs this one turns it back on in Settings > System")
+	}
 	return nil
 }
+
+// restoredPaused is why paid AI is paused after a restore from another server.
+const restoredPaused = "Restored from another server: paid AI stays paused until the agency that runs this server turns it back on."
 
 // jobsSummary says what the restore did with the jobs, for the person restoring.
 func jobsSummary(r jobqueue.Restored, after jobqueue.AfterRestore) string {

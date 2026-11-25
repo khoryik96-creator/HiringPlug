@@ -45,7 +45,7 @@ func (s *Service) settleHeld(ctx context.Context, p authz.Principal, jobID strin
 				return err
 			}
 		}
-		out, err = systemStatus(ctx, tx, p.TenantID)
+		out, err = s.systemStatus(ctx, tx, p)
 		return err
 	})
 	return out, err

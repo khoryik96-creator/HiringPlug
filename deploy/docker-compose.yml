@@ -55,6 +55,8 @@ x-backend-env: &backend-env
   HP_ALERT_EMAIL: ${HP_ALERT_EMAIL:-}
   # The AI assistant: off until a provider is set up (see docs/playbooks/run-locally.md).
   HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+  # off: no paid AI call at all, company keys too (Settings > System pauses it too).
+  HP_AI_PAID: ${HP_AI_PAID:-on}
   # Seals the AI keys companies enter in Settings > AI provider (the AI worker opens them).
   HP_AI_KEYS_SECRET: ${HP_AI_KEYS_SECRET:-dev-only-ai-keys-secret-change-me-0123456789}
   # Seals webhook signing secrets in the database (empty: kept as they are).
@@ -115,6 +117,7 @@ services:
       HP_AI_DATABASE_URL: postgres://hp_ai:${HP_DB_AI_PASSWORD:-hp_ai_dev}@postgres:5432/hiringplug?sslmode=disable
       HP_AI_OCR_LANGUAGES: eng
       HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+      HP_AI_PAID: ${HP_AI_PAID:-on}
       HP_AI_PROVIDER_URL: ${HP_AI_PROVIDER_URL:-}
       HP_AI_PROVIDER_KEY: ${HP_AI_PROVIDER_KEY:-}
       HP_AI_MODEL: ${HP_AI_MODEL:-}

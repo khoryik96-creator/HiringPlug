@@ -19,6 +19,7 @@ const status = (over: Partial<Schemas["SystemStatus"]> = {}): Schemas["SystemSta
   jobs: [{ kind: "email.send", waiting: 2, running: 1, retrying: 0, failed: 1, oldestWaitingSince: "2026-11-07T06:00:00Z" }],
   failed: [{ id: "job_1", kind: "email.send", attempts: 5, error: "smtp: 550 mailbox unavailable", failedAt: "2026-11-07T05:00:00Z" }],
   backup: lastBackup, backupAuto: true, held: [], restore: null,
+  paidAi: { paused: false, reason: null, changedAt: null, pausedByServer: false, canChange: true },
   ...over,
 });
 
@@ -98,6 +99,28 @@ describe("System", () => {
     await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/jobs/{jobId}/cancel", { params: { path: { jobId: "job_h2" } } }); });
     fireEvent.click(screen.getByRole("button", { name: /^Release all/ }));
     await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/settings/system/held", { body: { action: "release" } }); });
+  });
+
+  // IMP-001: the server's paid-AI switch, for the agency that runs it.
+  it("pauses paid AI for the whole server, and says what still works", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status()));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const paused = { paused: true, reason: "Paused in Settings > System by Aisyah.", changedAt: "2026-11-25T04:00:00Z", pausedByServer: false, canChange: true };
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(status({ paidAi: paused })));
+    renderWithClient(<System />);
+    fireEvent.click(await screen.findByRole("button", { name: "Pause paid AI" }));
+    await waitFor(() => { expect(put).toHaveBeenCalledWith("/v1/settings/system/paid-ai", { body: { paused: true } }); });
+    const panel = await screen.findByRole("region", { name: "Paid AI" });
+    await waitFor(() => { expect(panel.textContent).toContain("Paused on this server"); });
+    expect(panel.textContent).toContain("read by the rules alone");
+    expect(screen.getByRole("button", { name: "Turn paid AI back on" })).toBeTruthy();
+  });
+
+  it("shows the switch to other agencies without letting them turn it", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ paidAi: { paused: false, reason: null, changedAt: null, pausedByServer: false, canChange: false } })));
+    renderWithClient(<System />);
+    expect(await screen.findByText(/Only an owner of the agency that runs this server/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pause paid AI" })).toBeNull();
   });
 
   it("writes sizes people read", () => {
