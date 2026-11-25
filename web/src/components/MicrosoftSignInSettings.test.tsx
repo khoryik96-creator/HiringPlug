@@ -58,6 +58,17 @@ describe("Roles and access › Microsoft sign-in", () => {
     expect(await screen.findByText(/this server's Microsoft app/)).toBeTruthy();
   });
 
+  it("warns that Microsoft refuses a plain http address other than localhost", async () => {
+    serve(settings({ callbackUrl: "http://ats.contoh.my/v1/auth/microsoft/callback" }));
+    renderWithClient(<Access owner />);
+    expect(await screen.findByText(/Microsoft accepts only https addresses/)).toBeTruthy();
+    cleanup();
+    serve(settings({ callbackUrl: "http://localhost:5173/v1/auth/microsoft/callback" }));
+    renderWithClient(<Access owner />);
+    await screen.findByRole("button", { name: "Save" });
+    expect(screen.queryByText(/Microsoft accepts only https addresses/)).toBeNull();
+  });
+
   it("saves the team's sign-in, asking before requiring Microsoft, and says it is recorded", async () => {
     serve(settings());
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(settings({ enabled: true, organisationId: ORG, required: true })));

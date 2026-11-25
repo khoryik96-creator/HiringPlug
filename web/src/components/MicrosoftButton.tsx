@@ -44,5 +44,5 @@ export function MicrosoftButton({ label = "Sign in with Microsoft", from }: {
 
 /** The line between Microsoft and the email form: "or with your email". */
 export function OrDivider({ children = "or with your email" }: { children?: string }) {
-  return <p className="ms-or" role="separator" aria-label={children}><span>{children}</span></p>;
+  return <p className="ms-or"><span>{children}</span></p>;
 }

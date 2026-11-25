@@ -74,6 +74,9 @@ function SettingsForm({ saved }: { saved: Settings }) {
         <code>{saved.callbackUrl}</code>
         <CopyButton text={saved.callbackUrl} what="redirect address" />
       </div>
+      {/^http:\/\/(?!localhost[:/])/.test(saved.callbackUrl) && (
+        <p className="ms-https">Microsoft accepts only https addresses (localhost aside): HiringPlug needs its https address (HP_PUBLIC_URL) first.</p>
+      )}
       {saved.clientId && <p className="muted small">Application (client) ID: <code>{saved.clientId}</code></p>}
       <label className="check">
         <input type="checkbox" checked={form.enabled} onChange={(e) => { edit({ enabled: e.target.checked }); }} />
