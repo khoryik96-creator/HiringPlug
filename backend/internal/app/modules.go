@@ -148,6 +148,8 @@ func NewModules(d Deps) *Modules {
 		Microsoft: emails.OAuthApplication{ClientID: d.Config.MailConnections.MicrosoftClientID, ClientSecret: d.Config.MailConnections.MicrosoftClientSecret},
 		Google:    emails.OAuthApplication{ClientID: d.Config.MailConnections.GoogleClientID, ClientSecret: d.Config.MailConnections.GoogleClientSecret},
 	})
+	// Signing in with Microsoft uses the same app registrations.
+	m.Identity.UseMicrosoft(identity.MicrosoftSettings{Apps: identityMicrosoftApps{m.Emails}, Secret: d.Config.AuthJWTSecret})
 	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity, interviewMailer{m.Identity, m.Emails},
 		interviews.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	m.Placements = placements.New(d.Pool, placementApplications{m.Pipeline, m.Jobs}, m.Identity, placements.Invoicing{

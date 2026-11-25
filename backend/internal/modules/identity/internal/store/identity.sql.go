@@ -378,6 +378,17 @@ func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 	return i, err
 }
 
+const hasPassword = `-- name: HasPassword :one
+SELECT (password_hash IS NOT NULL)::boolean AS has_password FROM app_user WHERE id = $1
+`
+
+func (q *Queries) HasPassword(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, hasPassword, id)
+	var has_password bool
+	err := row.Scan(&has_password)
+	return has_password, err
+}
+
 const insertLink = `-- name: InsertLink :one
 INSERT INTO user_link (tenant_id, user_id, kind, token_hash, expires_at, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
@@ -500,6 +511,16 @@ func (q *Queries) InviteUser(ctx context.Context, arg InviteUserParams) (InviteU
 	return i, err
 }
 
+const joinWithMicrosoft = `-- name: JoinWithMicrosoft :exec
+UPDATE app_user SET active = true, invited = false WHERE id = $1 AND invited
+`
+
+// Accepting an invitation with Microsoft: active, without a password.
+func (q *Queries) JoinWithMicrosoft(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, joinWithMicrosoft, id)
+	return err
+}
+
 const linkByHash = `-- name: LinkByHash :one
 SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS user_id, kind::text AS kind
 FROM app_user_link($1::text)
@@ -522,6 +543,22 @@ func (q *Queries) LinkByHash(ctx context.Context, tokenHash string) (LinkByHashR
 		&i.Kind,
 	)
 	return i, err
+}
+
+const linkMicrosoft = `-- name: LinkMicrosoft :exec
+INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id)
+VALUES (app_current_tenant(), $1, $2, $3)
+`
+
+type LinkMicrosoftParams struct {
+	UserID     string
+	MsTenantID string
+	MsObjectID string
+}
+
+func (q *Queries) LinkMicrosoft(ctx context.Context, arg LinkMicrosoftParams) error {
+	_, err := q.db.Exec(ctx, linkMicrosoft, arg.UserID, arg.MsTenantID, arg.MsObjectID)
+	return err
 }
 
 const listActiveUsers = `-- name: ListActiveUsers :many
@@ -671,6 +708,157 @@ func (q *Queries) ListTeamGroups(ctx context.Context) ([]ListTeamGroupsRow, erro
 	return items, nil
 }
 
+const microsoftAccounts = `-- name: MicrosoftAccounts :many
+SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
+  user_id::text AS user_id, linked::boolean AS linked
+FROM app_microsoft_accounts($1::text, $2::text, $3::text[])
+`
+
+type MicrosoftAccountsParams struct {
+	MsTenantID string
+	MsObjectID string
+	Emails     []string
+}
+
+type MicrosoftAccountsRow struct {
+	TenantID    string
+	TenantName  string
+	CareersSlug string
+	UserID      string
+	Linked      bool
+}
+
+func (q *Queries) MicrosoftAccounts(ctx context.Context, arg MicrosoftAccountsParams) ([]MicrosoftAccountsRow, error) {
+	rows, err := q.db.Query(ctx, microsoftAccounts, arg.MsTenantID, arg.MsObjectID, arg.Emails)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MicrosoftAccountsRow
+	for rows.Next() {
+		var i MicrosoftAccountsRow
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.TenantName,
+			&i.CareersSlug,
+			&i.UserID,
+			&i.Linked,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const microsoftLink = `-- name: MicrosoftLink :one
+SELECT ms_tenant_id, ms_object_id FROM user_microsoft WHERE user_id = $1
+`
+
+type MicrosoftLinkRow struct {
+	MsTenantID string
+	MsObjectID string
+}
+
+func (q *Queries) MicrosoftLink(ctx context.Context, userID string) (MicrosoftLinkRow, error) {
+	row := q.db.QueryRow(ctx, microsoftLink, userID)
+	var i MicrosoftLinkRow
+	err := row.Scan(&i.MsTenantID, &i.MsObjectID)
+	return i, err
+}
+
+const microsoftSettings = `-- name: MicrosoftSettings :one
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required FROM tenant WHERE id = app_current_tenant()
+`
+
+type MicrosoftSettingsRow struct {
+	MicrosoftSignIn   bool
+	MicrosoftTenantID *string
+	MicrosoftRequired bool
+}
+
+// The company's Microsoft sign-in settings.
+func (q *Queries) MicrosoftSettings(ctx context.Context) (MicrosoftSettingsRow, error) {
+	row := q.db.QueryRow(ctx, microsoftSettings)
+	var i MicrosoftSettingsRow
+	err := row.Scan(&i.MicrosoftSignIn, &i.MicrosoftTenantID, &i.MicrosoftRequired)
+	return i, err
+}
+
+const microsoftSignInTenants = `-- name: MicrosoftSignInTenants :many
+SELECT tenant_id::text AS tenant_id, microsoft_tenant_id::text AS microsoft_tenant_id
+FROM app_microsoft_sign_in_tenants($1::text)
+`
+
+type MicrosoftSignInTenantsRow struct {
+	TenantID          string
+	MicrosoftTenantID string
+}
+
+func (q *Queries) MicrosoftSignInTenants(ctx context.Context, slug *string) ([]MicrosoftSignInTenantsRow, error) {
+	rows, err := q.db.Query(ctx, microsoftSignInTenants, slug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MicrosoftSignInTenantsRow
+	for rows.Next() {
+		var i MicrosoftSignInTenantsRow
+		if err := rows.Scan(&i.TenantID, &i.MicrosoftTenantID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const microsoftTenantsByEmail = `-- name: MicrosoftTenantsByEmail :many
+SELECT tenant_id::text AS tenant_id FROM app_microsoft_tenants_by_email($1::text)
+`
+
+func (q *Queries) MicrosoftTenantsByEmail(ctx context.Context, email string) ([]string, error) {
+	rows, err := q.db.Query(ctx, microsoftTenantsByEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var tenant_id string
+		if err := rows.Scan(&tenant_id); err != nil {
+			return nil, err
+		}
+		items = append(items, tenant_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const parkMicrosoftFlow = `-- name: ParkMicrosoftFlow :one
+SELECT app_microsoft_flow_park($1::text, $2::text, $3::text)::integer AS parked
+`
+
+type ParkMicrosoftFlowParams struct {
+	KeyHash    string
+	SealedCode string
+	TicketHash string
+}
+
+func (q *Queries) ParkMicrosoftFlow(ctx context.Context, arg ParkMicrosoftFlowParams) (int32, error) {
+	row := q.db.QueryRow(ctx, parkMicrosoftFlow, arg.KeyHash, arg.SealedCode, arg.TicketHash)
+	var parked int32
+	err := row.Scan(&parked)
+	return parked, err
+}
+
 const pruneRevokedSessions = `-- name: PruneRevokedSessions :exec
 DELETE FROM revoked_session WHERE expires_at < now()
 `
@@ -749,6 +937,43 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) er
 	return err
 }
 
+const saveMicrosoftFlow = `-- name: SaveMicrosoftFlow :exec
+
+
+SELECT app_microsoft_flow_save($1::text, $2::text, $3::text, $4::text,
+  $5::text, $6::text, $7::boolean, $8::text, $9::timestamptz)
+`
+
+type SaveMicrosoftFlowParams struct {
+	KeyHash     string
+	BindingHash string
+	TenantID    *string
+	ClientID    string
+	Authority   string
+	Sealed      string
+	Verified    bool
+	TicketHash  *string
+	ExpiresAt   time.Time
+}
+
+// Sign in with Microsoft ------------------------------------------------------
+// Before anyone is signed in (no company scope yet): app_microsoft_* return
+// only what routing and finishing a sign-in need (migration 00198).
+func (q *Queries) SaveMicrosoftFlow(ctx context.Context, arg SaveMicrosoftFlowParams) error {
+	_, err := q.db.Exec(ctx, saveMicrosoftFlow,
+		arg.KeyHash,
+		arg.BindingHash,
+		arg.TenantID,
+		arg.ClientID,
+		arg.Authority,
+		arg.Sealed,
+		arg.Verified,
+		arg.TicketHash,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
 const sessionRevoked = `-- name: SessionRevoked :one
 SELECT EXISTS (SELECT 1 FROM revoked_session WHERE id = $1)
 `
@@ -804,6 +1029,31 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET guide_dismissed = EXCLUDED.guide_
 func (q *Queries) SetGuideDismissed(ctx context.Context, guideDismissed bool) error {
 	_, err := q.db.Exec(ctx, setGuideDismissed, guideDismissed)
 	return err
+}
+
+const setMicrosoftSettings = `-- name: SetMicrosoftSettings :one
+UPDATE tenant SET microsoft_sign_in = $1, microsoft_tenant_id = $2, microsoft_required = $3
+WHERE id = app_current_tenant()
+RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required
+`
+
+type SetMicrosoftSettingsParams struct {
+	Enabled           bool
+	MicrosoftTenantID *string
+	Required          bool
+}
+
+type SetMicrosoftSettingsRow struct {
+	MicrosoftSignIn   bool
+	MicrosoftTenantID *string
+	MicrosoftRequired bool
+}
+
+func (q *Queries) SetMicrosoftSettings(ctx context.Context, arg SetMicrosoftSettingsParams) (SetMicrosoftSettingsRow, error) {
+	row := q.db.QueryRow(ctx, setMicrosoftSettings, arg.Enabled, arg.MicrosoftTenantID, arg.Required)
+	var i SetMicrosoftSettingsRow
+	err := row.Scan(&i.MicrosoftSignIn, &i.MicrosoftTenantID, &i.MicrosoftRequired)
+	return i, err
 }
 
 const setPassword = `-- name: SetPassword :exec
@@ -870,6 +1120,39 @@ func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) error {
 	return err
 }
 
+const signInMethods = `-- name: SignInMethods :many
+SELECT u.id, (u.password_hash IS NOT NULL)::boolean AS has_password,
+  EXISTS (SELECT 1 FROM user_microsoft m WHERE m.user_id = u.id)::boolean AS microsoft
+FROM app_user u
+`
+
+type SignInMethodsRow struct {
+	ID          string
+	HasPassword bool
+	Microsoft   bool
+}
+
+// How each person can sign in (for the team list).
+func (q *Queries) SignInMethods(ctx context.Context) ([]SignInMethodsRow, error) {
+	rows, err := q.db.Query(ctx, signInMethods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SignInMethodsRow
+	for rows.Next() {
+		var i SignInMethodsRow
+		if err := rows.Scan(&i.ID, &i.HasPassword, &i.Microsoft); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const signedIn = `-- name: SignedIn :exec
 UPDATE app_user SET last_sign_in_at = now() WHERE id = $1
 `
@@ -877,6 +1160,39 @@ UPDATE app_user SET last_sign_in_at = now() WHERE id = $1
 func (q *Queries) SignedIn(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, signedIn, id)
 	return err
+}
+
+const takeMicrosoftFlow = `-- name: TakeMicrosoftFlow :one
+SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id, client_id::text AS client_id, authority::text AS authority,
+  sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
+FROM app_microsoft_flow_take($1::text)
+`
+
+type TakeMicrosoftFlowRow struct {
+	KeyHash     string
+	BindingHash string
+	TenantID    string
+	ClientID    string
+	Authority   string
+	Sealed      string
+	Verified    bool
+	SealedCode  string
+}
+
+func (q *Queries) TakeMicrosoftFlow(ctx context.Context, ticketHash string) (TakeMicrosoftFlowRow, error) {
+	row := q.db.QueryRow(ctx, takeMicrosoftFlow, ticketHash)
+	var i TakeMicrosoftFlowRow
+	err := row.Scan(
+		&i.KeyHash,
+		&i.BindingHash,
+		&i.TenantID,
+		&i.ClientID,
+		&i.Authority,
+		&i.Sealed,
+		&i.Verified,
+		&i.SealedCode,
+	)
+	return i, err
 }
 
 const teamMember = `-- name: TeamMember :one
@@ -1100,23 +1416,36 @@ func (q *Queries) UseTwoStepStep(ctx context.Context, arg UseTwoStepStepParams) 
 	return result.RowsAffected(), nil
 }
 
+const usedMicrosoft = `-- name: UsedMicrosoft :exec
+UPDATE user_microsoft SET last_used_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) UsedMicrosoft(ctx context.Context, userID string) error {
+	_, err := q.db.Exec(ctx, usedMicrosoft, userID)
+	return err
+}
+
 const userAuth = `-- name: UserAuth :one
-SELECT id, tenant_id, email, name, role, team_id, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = $1
+SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
+  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required
+FROM app_user u WHERE u.id = $1
 `
 
 type UserAuthRow struct {
-	ID               string
-	TenantID         string
-	Email            string
-	Name             string
-	Role             string
-	TeamID           *string
-	Active           bool
-	Invited          bool
-	PasswordHash     *string
-	TokensValidAfter *time.Time
+	ID                string
+	TenantID          string
+	Email             string
+	Name              string
+	Role              string
+	TeamID            *string
+	Active            bool
+	Invited           bool
+	PasswordHash      *string
+	TokensValidAfter  *time.Time
+	MicrosoftRequired bool
 }
 
+// microsoft_required: the company requires Microsoft (passwords only for owners).
 func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) {
 	row := q.db.QueryRow(ctx, userAuth, id)
 	var i UserAuthRow
@@ -1131,6 +1460,7 @@ func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) 
 		&i.Invited,
 		&i.PasswordHash,
 		&i.TokensValidAfter,
+		&i.MicrosoftRequired,
 	)
 	return i, err
 }

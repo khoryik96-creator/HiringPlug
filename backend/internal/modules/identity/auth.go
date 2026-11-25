@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ratelimit"
@@ -70,10 +71,15 @@ type Session struct {
 // seconds) is before it, and the new session, issued at it, is not.
 func sessionsEndedAt() time.Time { return time.Now().Truncate(time.Second).Add(time.Second) }
 
-// session mints a token issued at now.
-func (m *Module) session(tenantID, userID string, now time.Time) (Session, error) {
-	token, err := m.verifier.MintAt(tenantID, userID, now, SessionLength)
+// session mints a token issued at now, saying how the person signed in
+// (authn.MethodPassword or authn.MethodMicrosoft).
+func (m *Module) session(tenantID, userID, method string, now time.Time) (Session, error) {
+	token, err := m.verifier.MintSession(tenantID, userID, method, now, SessionLength)
 	return Session{Token: token, ExpiresAt: now.Add(SessionLength)}, err
+}
+
+func microsoftRequired() error {
+	return apperr.New(api.ErrorCodeMICROSOFTREQUIRED, "Your company signs in with Microsoft: use Sign in with Microsoft.")
 }
 
 func normEmail(email string) string { return strings.ToLower(strings.TrimSpace(email)) }
@@ -103,8 +109,15 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 	if !checked {
 		CheckPassword(dummyHash(), password) // as slow as a real check
 	}
+	matches, refused, err := m.passwordAllowed(ctx, matches)
+	if err != nil {
+		return Session{}, err
+	}
 	switch len(matches) {
 	case 0:
+		if refused { // the password was right: say what to do instead
+			return Session{}, microsoftRequired()
+		}
 		return Session{}, apperr.New(api.ErrorCodeSIGNINFAILED, "The email or password is wrong.")
 	case 1:
 	default:
@@ -134,7 +147,29 @@ func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, compan
 	if next != nil {
 		return Session{}, next
 	}
-	return m.session(a.TenantID, a.UserID, now)
+	return m.session(a.TenantID, a.UserID, authn.MethodPassword, now)
+}
+
+// passwordAllowed leaves out the accounts whose company requires Microsoft
+// (unless they are its owners); refused says whether any was.
+func (m *Module) passwordAllowed(ctx context.Context, accounts []store.AccountsByEmailRow) ([]store.AccountsByEmailRow, bool, error) {
+	var out []store.AccountsByEmailRow
+	refused := false
+	for _, a := range accounts {
+		err := database.InTx(ctx, m.pool, authz.TenantOnly(a.TenantID), func(tx pgx.Tx) error {
+			u, err := store.New(tx).UserAuth(ctx, a.UserID)
+			if err == nil && PasswordRefused(u.MicrosoftRequired, u.Role) {
+				refused = true
+			} else if err == nil {
+				out = append(out, a)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, false, err
+		}
+	}
+	return out, refused, nil
 }
 
 // newLinkToken returns a random link token and the hash that is stored.
@@ -186,7 +221,22 @@ func (m *Module) RequestReset(ctx context.Context, clientAddr, email string) err
 			continue
 		}
 		err := database.InTx(ctx, m.pool, authz.System(a.TenantID), func(tx pgx.Tx) error {
-			link, _, err := m.link(ctx, store.New(tx), a.UserID, "reset", ResetValid)
+			q := store.New(tx)
+			u, err := q.UserAuth(ctx, a.UserID)
+			if err != nil {
+				return err
+			}
+			if PasswordRefused(u.MicrosoftRequired, u.Role) { // no link: how to sign in instead
+				body := "Hello " + a.UserName + ",\n\nSomeone (hopefully you) asked to reset your HiringPlug password at " + a.TenantName +
+					".\n\n" + a.TenantName + " signs in with Microsoft, so there is no password to reset: choose Sign in with Microsoft at\n" +
+					m.publicURL + "\n\nHiringPlug"
+				if err := m.mailer.Notify(ctx, tx, a.TenantID, []string{email}, "Signing in to HiringPlug", body); err != nil {
+					return err
+				}
+				return audit.Record(ctx, tx, audit.Entry{Action: "user.reset_refused", EntityType: "user", EntityID: a.UserID,
+					Changes: map[string]any{"reason": "microsoft_required"}})
+			}
+			link, _, err := m.link(ctx, q, a.UserID, "reset", ResetValid)
 			if err != nil {
 				return err
 			}
@@ -205,9 +255,10 @@ func (m *Module) RequestReset(ctx context.Context, clientAddr, email string) err
 	return nil
 }
 
-// LinkInfo is what a link is for.
+// LinkInfo is what a link is for, and whether the person can (or must)
+// use it with Microsoft instead of a password (MicrosoftLinkState).
 type LinkInfo struct {
-	Kind, Email, Name, CompanyName string
+	Kind, Email, Name, CompanyName, Microsoft string
 }
 
 func linkGone() error {
@@ -244,7 +295,12 @@ func (m *Module) Link(ctx context.Context, clientAddr, token string) (LinkInfo, 
 	var out LinkInfo
 	err := m.lookupLink(ctx, clientAddr, token, func(tx pgx.Tx, q *store.Queries, l store.LinkByHashRow, u store.UserAuthRow) error {
 		t, err := q.GetTenant(ctx, l.TenantID)
-		out = LinkInfo{Kind: l.Kind, Email: u.Email, Name: u.Name, CompanyName: t.Name}
+		if err != nil {
+			return err
+		}
+		s, err := q.MicrosoftSettings(ctx)
+		out = LinkInfo{Kind: l.Kind, Email: u.Email, Name: u.Name, CompanyName: t.Name,
+			Microsoft: MicrosoftLinkState(s.MicrosoftSignIn && m.ms != nil, s.MicrosoftRequired, u.Role)}
 		return err
 	})
 	return out, err
@@ -265,6 +321,9 @@ func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string
 			if n == "" {
 				name = nil
 			}
+		}
+		if PasswordRefused(u.MicrosoftRequired, u.Role) { // they accept an invitation with Microsoft
+			return microsoftRequired()
 		}
 		if problem := PasswordProblem(password, u.Email, u.Name); problem != "" {
 			return apperr.Validation(apperr.FieldErrors{{Field: "password", Message: problem}})
@@ -290,7 +349,7 @@ func (m *Module) UseLink(ctx context.Context, clientAddr, token, password string
 		if next, err = m.nextStep(ctx, q, l.TenantID, u.ID); err != nil || next != nil {
 			return err
 		}
-		out, err = m.session(l.TenantID, u.ID, now)
+		out, err = m.session(l.TenantID, u.ID, authn.MethodPassword, now)
 		return err
 	})
 	if err == nil && next != nil {
@@ -312,7 +371,13 @@ func (m *Module) ChangePassword(ctx context.Context, p authz.Principal, current,
 		if err != nil {
 			return err
 		}
-		if u.PasswordHash == nil || !CheckPassword(*u.PasswordHash, current) {
+		if PasswordRefused(u.MicrosoftRequired, u.Role) {
+			return microsoftRequired()
+		}
+		if u.PasswordHash == nil {
+			return passwordNotSet()
+		}
+		if !CheckPassword(*u.PasswordHash, current) {
 			return apperr.Validation(apperr.FieldErrors{{Field: "currentPassword", Message: "is not your current password"}})
 		}
 		if problem := PasswordProblem(next, u.Email, u.Name); problem != "" {
@@ -329,10 +394,14 @@ func (m *Module) ChangePassword(ctx context.Context, p authz.Principal, current,
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "user.password_changed", EntityType: "user", EntityID: u.ID}); err != nil {
 			return err
 		}
-		out, err = m.session(p.TenantID, p.UserID, now)
+		out, err = m.session(p.TenantID, p.UserID, authn.MethodPassword, now)
 		return err
 	})
 	return out, err
+}
+
+func passwordNotSet() error {
+	return apperr.New(api.ErrorCodePASSWORDNOTSET, "You sign in with Microsoft and have no HiringPlug password. To add one, use Forgot password on the sign-in page.")
 }
 
 // PasswordLink makes a link for a user to choose a password, valid for

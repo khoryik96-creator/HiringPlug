@@ -37,7 +37,8 @@ func (h *HTTP) GetAuthLink(ctx context.Context, req api.GetAuthLinkRequestObject
 	if err != nil {
 		return nil, err
 	}
-	return api.GetAuthLink200JSONResponse{Kind: api.AuthLinkKind(l.Kind), Email: l.Email, Name: l.Name, CompanyName: l.CompanyName}, nil
+	return api.GetAuthLink200JSONResponse{Kind: api.AuthLinkKind(l.Kind), Email: l.Email, Name: l.Name, CompanyName: l.CompanyName,
+		Microsoft: api.AuthLinkMicrosoft(l.Microsoft)}, nil
 }
 
 // UseAuthLink handles POST /v1/auth/links/{linkToken}.
@@ -69,10 +70,15 @@ func (h *HTTP) ListTeam(ctx context.Context, _ api.ListTeamRequestObject) (api.L
 	if err != nil {
 		return nil, err
 	}
+	methods, err := h.m.SignInMethods(ctx, p)
+	if err != nil {
+		return nil, err
+	}
 	out := api.ListTeam200JSONResponse{Items: make([]api.TeamMember, len(rows))}
 	for i, r := range rows {
 		out.Items[i] = memberToAPI(r)
 		out.Items[i].TwoStep = twoStep[r.ID]
+		out.Items[i].SignInMethods = methodsToAPI(methods[r.ID])
 	}
 	return out, nil
 }
@@ -112,17 +118,32 @@ func (h *HTTP) UpdateTeamMember(ctx context.Context, req api.UpdateTeamMemberReq
 		t := c.ValueOrNil(b.TeamId)
 		team = &t
 	}
-	row, err := h.m.UpdateMember(ctx, authz.MustFromContext(ctx), req.UserId, c.Convert[string](b.Role), b.Active, team)
+	p := authz.MustFromContext(ctx)
+	row, err := h.m.UpdateMember(ctx, p, req.UserId, c.Convert[string](b.Role), b.Active, team)
 	if err != nil {
 		return nil, err
 	}
-	return api.UpdateTeamMember200JSONResponse(memberToAPI(row)), nil
+	methods, err := h.m.SignInMethods(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := memberToAPI(row)
+	out.SignInMethods = methodsToAPI(methods[row.ID])
+	return api.UpdateTeamMember200JSONResponse(out), nil
+}
+
+func methodsToAPI(methods []string) []api.SignInMethod {
+	out := make([]api.SignInMethod, len(methods))
+	for i, m := range methods {
+		out[i] = api.SignInMethod(m)
+	}
+	return out
 }
 
 func memberToAPI(r TeamMember) api.TeamMember {
 	return api.TeamMember{
 		Id: r.ID, Name: r.Name, Email: r.Email, Role: api.Role(r.Role), TeamId: c.OrNull(r.TeamID), Status: api.TeamStatus(Status(r)),
-		LastSignInAt: c.OrNull(r.LastSignInAt), CreatedAt: r.CreatedAt,
+		LastSignInAt: c.OrNull(r.LastSignInAt), CreatedAt: r.CreatedAt, SignInMethods: []api.SignInMethod{},
 	}
 }
 

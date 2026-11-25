@@ -1549,6 +1549,20 @@ type MeaningSweep struct {
 	CountedAt        *time.Time
 }
 
+type MicrosoftSignInFlow struct {
+	KeyHash     string
+	BindingHash string
+	TenantID    *string
+	ClientID    string
+	Authority   string
+	Sealed      string
+	Verified    bool
+	SealedCode  *string
+	TicketHash  *string
+	ExpiresAt   time.Time
+	CreatedAt   time.Time
+}
+
 type Note struct {
 	ID          string
 	TenantID    string
@@ -1859,11 +1873,14 @@ type TeamGroup struct {
 }
 
 type Tenant struct {
-	ID              string
-	Name            string
-	CreatedAt       time.Time
-	CareersSlug     *string
-	TwoStepRequired bool
+	ID                string
+	Name              string
+	CreatedAt         time.Time
+	CareersSlug       *string
+	TwoStepRequired   bool
+	MicrosoftSignIn   bool
+	MicrosoftTenantID *string
+	MicrosoftRequired bool
 }
 
 type TenantPolicy struct {
@@ -1882,6 +1899,15 @@ type UserLink struct {
 	UsedAt    *time.Time
 	CreatedBy string
 	CreatedAt time.Time
+}
+
+type UserMicrosoft struct {
+	TenantID   string
+	UserID     string
+	MsTenantID string
+	MsObjectID string
+	LinkedAt   time.Time
+	LastUsedAt time.Time
 }
 
 type UserPreference struct {

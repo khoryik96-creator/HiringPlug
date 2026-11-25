@@ -22,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
@@ -183,9 +184,13 @@ func (m *Module) checkCode(ctx context.Context, q *store.Queries, tenantID, user
 	return "app", nil
 }
 
-// signedIn records the sign-in and mints its session (never before the
-// user's sessions were last ended).
+// signedIn records a password sign-in and mints its session (never before
+// the user's sessions were last ended; refused once the company requires
+// Microsoft, unless they are an owner).
 func (m *Module) signedIn(ctx context.Context, tx pgx.Tx, q *store.Queries, u store.UserAuthRow, how string) (Session, error) {
+	if PasswordRefused(u.MicrosoftRequired, u.Role) {
+		return Session{}, microsoftRequired()
+	}
 	if err := q.SignedIn(ctx, u.ID); err != nil {
 		return Session{}, err
 	}
@@ -196,7 +201,7 @@ func (m *Module) signedIn(ctx context.Context, tx pgx.Tx, q *store.Queries, u st
 	if u.TokensValidAfter != nil && now.Before(*u.TokensValidAfter) {
 		now = *u.TokensValidAfter
 	}
-	return m.session(u.TenantID, u.ID, now)
+	return m.session(u.TenantID, u.ID, authn.MethodPassword, now)
 }
 
 // SignInTwoStep finishes a sign-in with the app's code or a recovery code.
@@ -359,9 +364,10 @@ func (m *Module) NewRecoveryCodes(ctx context.Context, p authz.Principal, code s
 	return codes, err
 }
 
-// DisableMyTwoStep turns it off with the password, unless the company
+// DisableMyTwoStep turns it off with the password (or, for someone who signs
+// in with Microsoft and has none, the app's code), unless the company
 // requires it.
-func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, password string) (TwoStepStatus, error) {
+func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, password, code *string) (TwoStepStatus, error) {
 	if !m.limits.change.Allow(p.UserID) {
 		return TwoStepStatus{}, tooMany()
 	}
@@ -372,8 +378,8 @@ func (m *Module) DisableMyTwoStep(ctx context.Context, p authz.Principal, passwo
 		if err != nil {
 			return err
 		}
-		if u.PasswordHash == nil || !CheckPassword(*u.PasswordHash, password) {
-			return apperr.Validation(apperr.FieldErrors{{Field: "password", Message: "is not your current password"}})
+		if err := m.provePerson(ctx, q, u, password, code); err != nil {
+			return err
 		}
 		if required, err := q.TwoStepRequired(ctx); err != nil || required {
 			return firstErr(err, teamProblem("Your company requires two-step sign-in; only an owner can stop requiring it."))

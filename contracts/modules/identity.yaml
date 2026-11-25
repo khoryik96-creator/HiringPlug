@@ -19,7 +19,24 @@ x-module:
       description: The email or password is wrong (which is not said), or the account is not active.
     SIGN_IN_CHOOSE_COMPANY:
       status: 409
-      description: The email and password match accounts at several companies; send one of `details.companies` (slug) as `company`.
+      description: The email and password (or the Microsoft account) match accounts at several companies; send one of `details.companies` (slug) as `company`. After Microsoft, send it with `details.ticket` (a new one-time ticket) to /v1/auth/microsoft/complete.
+    MICROSOFT_SIGN_IN_FAILED:
+      status: 401
+      description: >-
+        Signing in with Microsoft did not work. `details.reason` says why:
+        `not_on_team` (the Microsoft account is not on the team of a company that signs in with Microsoft, or was deactivated: an owner invites them),
+        `other_organisation` (an account of another Microsoft organisation than the company's),
+        `personal_account` (a personal Microsoft account: use the work account),
+        `failed` (the sign-in expired, was used already or finished in another browser, or Microsoft's answer could not be checked: start again).
+    MICROSOFT_SIGN_IN_UNAVAILABLE:
+      status: 422
+      description: Signing in with Microsoft is not set up for this company (or, when no company is named, on this server).
+    MICROSOFT_REQUIRED:
+      status: 403
+      description: The company requires signing in with Microsoft. Passwords (signing in, password resets and links, sessions signed in with a password) then work only for owners.
+    PASSWORD_NOT_SET:
+      status: 422
+      description: You sign in with Microsoft and have no HiringPlug password to check or change. A password reset link sets one, unless the company requires Microsoft.
     TOO_MANY_ATTEMPTS:
       status: 429
       description: Too many attempts from this address or for this email; wait and try again.
@@ -112,6 +129,7 @@ paths:
               schema: { $ref: '#/components/schemas/Session' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/SignInFailed' }
+        '403': { $ref: '#/components/responses/MicrosoftRequired' }
         '409': { $ref: '#/components/responses/ChooseCompany' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
@@ -134,6 +152,7 @@ paths:
               schema: { $ref: '#/components/schemas/Session' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/SignInFailed' }
+        '403': { $ref: '#/components/responses/MicrosoftRequired' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
   /v1/auth/two-step/setup:
@@ -176,6 +195,7 @@ paths:
               schema: { $ref: '#/components/schemas/TwoStepEnabled' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/SignInFailed' }
+        '403': { $ref: '#/components/responses/MicrosoftRequired' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
   /v1/me/two-step:
@@ -252,7 +272,7 @@ paths:
     post:
       operationId: disableMyTwoStep
       tags: [identity]
-      summary: Turn your two-step sign-in off, with your password (not while your company requires it)
+      summary: Turn your two-step sign-in off, with your password, or the app's code if you have no password (not while your company requires it)
       x-permission: authenticated
       requestBody:
         required: true
@@ -306,6 +326,127 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/TwoStepNotEnabled' }
 
+  /v1/auth/microsoft/start:
+    post:
+      operationId: startMicrosoftSignIn
+      tags: [identity]
+      summary: Start signing in with Microsoft (send the browser to the returned address)
+      description: >-
+        The company is found from, in order: the invitation, the careers page
+        address (company), the email (when exactly one company that signs in
+        with Microsoft has it on its team), the only company on the server
+        that signs in with Microsoft, or else the server's own Microsoft app
+        for any company (matched after sign-in by organisation and account).
+        Keep a random value (at least 32 characters) in this browser tab's
+        sessionStorage, send its SHA-256 here, and the value itself to finish:
+        a sign-in can be finished only in the tab that started it.
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MicrosoftSignInStart' }
+      responses:
+        '200':
+          description: Where to send the browser (Microsoft's sign-in page)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicrosoftSignInRedirect' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '410': { $ref: '#/components/responses/LinkNotValid' }
+        '422': { $ref: '#/components/responses/MicrosoftSignInUnavailable' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/auth/microsoft/callback:
+    get:
+      operationId: microsoftSignInCallback
+      tags: [identity]
+      summary: Where Microsoft sends the browser back (register this address as the app's redirect URI)
+      description: >-
+        Nothing is signed in here: the code is kept for the sign-in that sent
+        the browser, and the browser goes back to the app
+        (/#/sign-in/microsoft) with a one-time ticket, or with error=cancelled
+        or error=failed. Microsoft's own error text is never passed on.
+      x-permission: public
+      security: []
+      parameters:
+      - { in: query, name: code, schema: { type: string, maxLength: 4096 } }
+      - { in: query, name: state, schema: { type: string, maxLength: 4096 } }
+      - { in: query, name: error, schema: { type: string, maxLength: 4096 } }
+      responses:
+        '303':
+          description: Back to the app's Microsoft sign-in page
+          headers:
+            Cache-Control: { schema: { type: string } }
+            Referrer-Policy: { schema: { type: string } }
+            Location:
+              schema:
+                type: string
+
+  /v1/auth/microsoft/complete:
+    post:
+      operationId: completeMicrosoftSignIn
+      tags: [identity]
+      summary: Finish signing in with Microsoft, in the browser tab that started it
+      description: >-
+        Send the ticket from the address Microsoft's sign-in came back to, and
+        the value whose SHA-256 the start sent. A ticket works once.
+        Microsoft sign-ins skip the two-step code.
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MicrosoftSignInComplete' }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/MicrosoftSignInFailed' }
+        '409': { $ref: '#/components/responses/ChooseCompany' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/agency/microsoft-sign-in:
+    get:
+      operationId: getMicrosoftSignIn
+      tags: [identity]
+      summary: The company's sign-in with Microsoft settings, and the address to register with the app
+      x-permission: identity.roles:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicrosoftSignInSettings' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: setMicrosoftSignIn
+      tags: [identity]
+      summary: Let the team sign in with Microsoft (accounts of the company's own organisation only), and require it
+      description: >-
+        Requiring Microsoft refuses passwords to everyone but owners at once:
+        signing in, password resets and links, and sessions signed in with a
+        password.
+      x-permission: identity.roles:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MicrosoftSignInInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicrosoftSignInSettings' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/auth/sign-out:
     post:
       operationId: signOut
@@ -321,6 +462,7 @@ paths:
       operationId: requestPasswordReset
       tags: [identity]
       summary: Email a password reset link (the answer is the same whether or not the email is known)
+      description: Someone whose company requires Microsoft (and who is not an owner there) is emailed how to sign in instead of a link.
       x-permission: public
       requestBody:
         required: true
@@ -352,7 +494,7 @@ paths:
       operationId: useAuthLink
       tags: [identity]
       summary: Choose a password with an invitation or reset link, and sign in
-      description: An invitation activates the account; a reset signs out every other session.
+      description: An invitation activates the account; a reset signs out every other session. Not for anyone but owners while the company requires Microsoft (they accept an invitation with Microsoft).
       x-permission: public
       requestBody:
         required: true
@@ -367,6 +509,7 @@ paths:
               schema: { $ref: '#/components/schemas/Session' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/SignInFailed' }
+        '403': { $ref: '#/components/responses/MicrosoftRequired' }
         '410': { $ref: '#/components/responses/LinkNotValid' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
@@ -421,6 +564,8 @@ paths:
               schema: { $ref: '#/components/schemas/Session' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MicrosoftRequired' }
+        '422': { $ref: '#/components/responses/PasswordNotSet' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
   /v1/team:
@@ -678,6 +823,26 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    MicrosoftSignInFailed:
+      description: Signing in with Microsoft did not work (MICROSOFT_SIGN_IN_FAILED; details.reason says why).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    MicrosoftSignInUnavailable:
+      description: Signing in with Microsoft is not set up (MICROSOFT_SIGN_IN_UNAVAILABLE).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    MicrosoftRequired:
+      description: The company requires signing in with Microsoft (MICROSOFT_REQUIRED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PasswordNotSet:
+      description: You sign in with Microsoft and have no password (PASSWORD_NOT_SET).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
     CandidateScope:
@@ -842,8 +1007,12 @@ components:
       enum: [currentRole, status, noticePeriod, currentSalary, expectedSalary, workAuthorization, nationality, residence, location, source, industry, tags, email, phone, updated]
     Me:
       type: object
-      required: [user, tenant, role, permissions]
+      required: [user, tenant, role, permissions, hasPassword]
       properties:
+        signInMethod:
+          description: How this session was signed in (left out for sessions from before 1.46.0).
+          allOf: [{ $ref: '#/components/schemas/SignInMethod' }]
+        hasPassword: { type: boolean, description: "False for people who sign in with Microsoft only: there is no password to change." }
         user: { $ref: '#/components/schemas/User' }
         tenant: { $ref: '#/components/schemas/Tenant' }
         role: { $ref: '#/components/schemas/Role' }
@@ -908,9 +1077,10 @@ components:
     TwoStepDisable:
       type: object
       additionalProperties: false
-      required: [password]
+      description: Your password; or, if you sign in with Microsoft and have none, the app's current code.
       properties:
         password: { type: string, minLength: 1, maxLength: 200 }
+        code: { type: string, minLength: 1, maxLength: 20 }
     TwoStepSetup:
       type: object
       required: [secret, uri]
@@ -947,6 +1117,59 @@ components:
       required: [required]
       properties:
         required: { type: boolean }
+    SignInMethod:
+      type: string
+      description: password, or microsoft (Sign in with Microsoft).
+      enum: [password, microsoft]
+    MicrosoftSignInStart:
+      type: object
+      additionalProperties: false
+      required: [bindingHash]
+      properties:
+        bindingHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.
+        email: { type: string, format: email, maxLength: 254, description: "The email they typed: finds their company, and is suggested to Microsoft." }
+        company: { type: string, maxLength: 100, description: "The company's careers page address (slug)." }
+        invite: { type: string, minLength: 20, maxLength: 200, description: "An invitation link's token: accept it with Microsoft instead of choosing a password." }
+    MicrosoftSignInRedirect:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, description: "Microsoft's sign-in page; it comes back to /v1/auth/microsoft/callback." }
+    MicrosoftSignInComplete:
+      type: object
+      additionalProperties: false
+      required: [ticket, binding]
+      properties:
+        ticket: { type: string, minLength: 20, maxLength: 200, description: "From the app address Microsoft's sign-in came back to (or details.ticket of SIGN_IN_CHOOSE_COMPANY)." }
+        binding: { type: string, minLength: 32, maxLength: 200, description: "The value whose SHA-256 the start sent." }
+        company: { type: string, maxLength: 100, description: "The company's careers page address, when the account is at several." }
+    MicrosoftSignInSettings:
+      type: object
+      required: [enabled, organisationId, required, callbackUrl, appSource, clientId]
+      properties:
+        enabled: { type: boolean, description: The team may sign in with Microsoft accounts of the organisation. }
+        organisationId:
+          type: string
+          nullable: true
+          description: "The company's Microsoft organisation (Entra tenant ID, e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47): only its accounts are accepted."
+        required: { type: boolean, description: "Passwords work only for owners: everyone else signs in with Microsoft." }
+        callbackUrl: { type: string, description: "The redirect URI to register with the Microsoft app (Web platform)." }
+        appSource:
+          type: string
+          enum: [agency, server, none]
+          description: "Whose Microsoft app is used: the company's (Settings > Email connection), the server's, or none yet."
+        clientId: { type: string, nullable: true }
+    MicrosoftSignInInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, organisationId, required]
+      properties:
+        enabled: { type: boolean }
+        organisationId: { type: string, nullable: true, maxLength: 64 }
+        required: { type: boolean }
     PasswordResetRequest:
       type: object
       additionalProperties: false
@@ -955,8 +1178,12 @@ components:
         email: { type: string, format: email, maxLength: 254 }
     AuthLink:
       type: object
-      required: [kind, email, name, companyName]
+      required: [kind, email, name, companyName, microsoft]
       properties:
+        microsoft:
+          type: string
+          enum: [none, available, required]
+          description: "Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused)."
         kind: { type: string, enum: [invite, reset] }
         email: { type: string }
         name: { type: string }
@@ -981,8 +1208,12 @@ components:
       enum: [invited, active, deactivated]
     TeamMember:
       type: object
-      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep]
+      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep, signInMethods]
       properties:
+        signInMethods:
+          type: array
+          description: "How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited)."
+          items: { $ref: '#/components/schemas/SignInMethod' }
         twoStep: { type: boolean, description: Signs in with a code from an authenticator app too. }
         id: { $ref: '#/components/schemas/UserId' }
         name: { type: string }

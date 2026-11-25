@@ -34,8 +34,11 @@ FROM app_accounts_by_email(sqlc.arg(email)::text);
 SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS user_id, kind::text AS kind
 FROM app_user_link(sqlc.arg(token_hash)::text);
 
+-- microsoft_required: the company requires Microsoft (passwords only for owners).
 -- name: UserAuth :one
-SELECT id, tenant_id, email, name, role, team_id, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = @id;
+SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
+  coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required
+FROM app_user u WHERE u.id = @id;
 
 -- name: SignedIn :exec
 UPDATE app_user SET last_sign_in_at = now() WHERE id = @id;
@@ -220,3 +223,64 @@ WHERE active AND id NOT IN (SELECT user_id FROM user_two_step WHERE enabled_at I
 
 -- name: EndUserSessions :exec
 UPDATE app_user SET tokens_valid_after = date_trunc('second', now()) + interval '1 second' WHERE id = @id;
+
+-- Sign in with Microsoft ------------------------------------------------------
+
+-- Before anyone is signed in (no company scope yet): app_microsoft_* return
+-- only what routing and finishing a sign-in need (migration 00198).
+
+-- name: SaveMicrosoftFlow :exec
+SELECT app_microsoft_flow_save(@key_hash::text, @binding_hash::text, sqlc.narg(tenant_id)::text, @client_id::text,
+  @authority::text, @sealed::text, @verified::boolean, sqlc.narg(ticket_hash)::text, @expires_at::timestamptz);
+
+-- name: ParkMicrosoftFlow :one
+SELECT app_microsoft_flow_park(@key_hash::text, @sealed_code::text, @ticket_hash::text)::integer AS parked;
+
+-- name: TakeMicrosoftFlow :one
+SELECT key_hash::text AS key_hash, binding_hash::text AS binding_hash, coalesce(tenant_id, '')::text AS tenant_id, client_id::text AS client_id, authority::text AS authority,
+  sealed::text AS sealed, verified::boolean AS verified, coalesce(sealed_code, '')::text AS sealed_code
+FROM app_microsoft_flow_take(@ticket_hash::text);
+
+-- name: MicrosoftSignInTenants :many
+SELECT tenant_id::text AS tenant_id, microsoft_tenant_id::text AS microsoft_tenant_id
+FROM app_microsoft_sign_in_tenants(sqlc.narg(slug)::text);
+
+-- name: MicrosoftTenantsByEmail :many
+SELECT tenant_id::text AS tenant_id FROM app_microsoft_tenants_by_email(@email::text);
+
+-- name: MicrosoftAccounts :many
+SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug,
+  user_id::text AS user_id, linked::boolean AS linked
+FROM app_microsoft_accounts(@ms_tenant_id::text, @ms_object_id::text, @emails::text[]);
+
+-- The company's Microsoft sign-in settings.
+-- name: MicrosoftSettings :one
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required FROM tenant WHERE id = app_current_tenant();
+
+-- name: SetMicrosoftSettings :one
+UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(microsoft_tenant_id), microsoft_required = @required
+WHERE id = app_current_tenant()
+RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
+
+-- name: LinkMicrosoft :exec
+INSERT INTO user_microsoft (tenant_id, user_id, ms_tenant_id, ms_object_id)
+VALUES (app_current_tenant(), @user_id, @ms_tenant_id, @ms_object_id);
+
+-- name: MicrosoftLink :one
+SELECT ms_tenant_id, ms_object_id FROM user_microsoft WHERE user_id = @user_id;
+
+-- name: UsedMicrosoft :exec
+UPDATE user_microsoft SET last_used_at = now() WHERE user_id = @user_id;
+
+-- Accepting an invitation with Microsoft: active, without a password.
+-- name: JoinWithMicrosoft :exec
+UPDATE app_user SET active = true, invited = false WHERE id = @id AND invited;
+
+-- How each person can sign in (for the team list).
+-- name: SignInMethods :many
+SELECT u.id, (u.password_hash IS NOT NULL)::boolean AS has_password,
+  EXISTS (SELECT 1 FROM user_microsoft m WHERE m.user_id = u.id)::boolean AS microsoft
+FROM app_user u;
+
+-- name: HasPassword :one
+SELECT (password_hash IS NOT NULL)::boolean AS has_password FROM app_user WHERE id = @id;

@@ -174,6 +174,9 @@ class ErrorCode(StrEnum):
     MEANING_READING = "MEANING_READING"
     MEANING_UNAVAILABLE = "MEANING_UNAVAILABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+    MICROSOFT_REQUIRED = "MICROSOFT_REQUIRED"
+    MICROSOFT_SIGN_IN_FAILED = "MICROSOFT_SIGN_IN_FAILED"
+    MICROSOFT_SIGN_IN_UNAVAILABLE = "MICROSOFT_SIGN_IN_UNAVAILABLE"
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
     OUTLOOK_ATTACHMENT_TOO_LARGE = "OUTLOOK_ATTACHMENT_TOO_LARGE"
@@ -182,6 +185,7 @@ class ErrorCode(StrEnum):
     OUTLOOK_RULES_ACCESS = "OUTLOOK_RULES_ACCESS"
     OUTLOOK_SEND_IN_PROGRESS = "OUTLOOK_SEND_IN_PROGRESS"
     OUTLOOK_UNAVAILABLE = "OUTLOOK_UNAVAILABLE"
+    PASSWORD_NOT_SET = "PASSWORD_NOT_SET"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
     ROLE_NOT_EDITABLE = "ROLE_NOT_EDITABLE"
@@ -4071,7 +4075,8 @@ class TwoStepDisable(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    password: Annotated[str, Field(max_length=200, min_length=1)]
+    password: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    code: Annotated[str | None, Field(max_length=20, min_length=1)] = None
 
 
 class TwoStepSetup(BaseModel):
@@ -4104,11 +4109,122 @@ class TwoStepPolicy(BaseModel):
     required: bool
 
 
+class SignInMethod(StrEnum):
+    password = "password"
+    microsoft = "microsoft"
+
+
+class MicrosoftSignInStart(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    bindingHash: Annotated[
+        str,
+        Field(
+            description="SHA-256 (hex) of a random value (at least 32 characters) this browser tab keeps in sessionStorage until it finishes.",
+            pattern="^[0-9a-f]{64}$",
+        ),
+    ]
+    email: Annotated[
+        EmailStr | None,
+        Field(
+            description="The email they typed: finds their company, and is suggested to Microsoft.",
+            max_length=254,
+        ),
+    ] = None
+    company: Annotated[
+        str | None, Field(description="The company's careers page address (slug).", max_length=100)
+    ] = None
+    invite: Annotated[
+        str | None,
+        Field(
+            description="An invitation link's token: accept it with Microsoft instead of choosing a password.",
+            max_length=200,
+            min_length=20,
+        ),
+    ] = None
+
+
+class MicrosoftSignInRedirect(BaseModel):
+    url: Annotated[
+        str, Field(description="Microsoft's sign-in page; it comes back to /v1/auth/microsoft/callback.")
+    ]
+
+
+class MicrosoftSignInComplete(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ticket: Annotated[
+        str,
+        Field(
+            description="From the app address Microsoft's sign-in came back to (or details.ticket of SIGN_IN_CHOOSE_COMPANY).",
+            max_length=200,
+            min_length=20,
+        ),
+    ]
+    binding: Annotated[
+        str, Field(description="The value whose SHA-256 the start sent.", max_length=200, min_length=32)
+    ]
+    company: Annotated[
+        str | None,
+        Field(
+            description="The company's careers page address, when the account is at several.", max_length=100
+        ),
+    ] = None
+
+
+class AppSource(StrEnum):
+    agency = "agency"
+    server = "server"
+    none = "none"
+
+
+class MicrosoftSignInSettings(BaseModel):
+    enabled: Annotated[
+        bool, Field(description="The team may sign in with Microsoft accounts of the organisation.")
+    ]
+    organisationId: Annotated[
+        str | None,
+        Field(
+            description="The company's Microsoft organisation (Entra tenant ID, e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47): only its accounts are accepted."
+        ),
+    ]
+    required: Annotated[
+        bool, Field(description="Passwords work only for owners: everyone else signs in with Microsoft.")
+    ]
+    callbackUrl: Annotated[
+        str, Field(description="The redirect URI to register with the Microsoft app (Web platform).")
+    ]
+    appSource: Annotated[
+        AppSource,
+        Field(
+            description="Whose Microsoft app is used: the company's (Settings > Email connection), the server's, or none yet."
+        ),
+    ]
+    clientId: Annotated[str | None, Field(...)]
+
+
+class MicrosoftSignInInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    enabled: bool
+    organisationId: Annotated[str | None, Field(max_length=64)]
+    required: bool
+
+
 class PasswordResetRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     email: Annotated[EmailStr, Field(max_length=254)]
+
+
+class Microsoft(StrEnum):
+    none = "none"
+    available = "available"
+    required = "required"
 
 
 class Kind3(StrEnum):
@@ -4117,6 +4233,12 @@ class Kind3(StrEnum):
 
 
 class AuthLink(BaseModel):
+    microsoft: Annotated[
+        Microsoft,
+        Field(
+            description="Whether this person can accept with Microsoft instead (/v1/auth/microsoft/start with invite), or must (the company requires Microsoft and they are not an owner: choosing a password is refused)."
+        ),
+    ]
     kind: Kind3
     email: str
     name: str
@@ -4149,6 +4271,12 @@ class TeamStatus(StrEnum):
 
 
 class TeamMember(BaseModel):
+    signInMethods: Annotated[
+        list[SignInMethod],
+        Field(
+            description="How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited)."
+        ),
+    ]
     twoStep: Annotated[bool, Field(description="Signs in with a code from an authenticator app too.")]
     id: UserId
     name: str
@@ -8763,6 +8891,16 @@ class Favourites(BaseModel):
 
 
 class Me(BaseModel):
+    signInMethod: Annotated[
+        SignInMethod | None,
+        Field(description="How this session was signed in (left out for sessions from before 1.46.0)."),
+    ] = None
+    hasPassword: Annotated[
+        bool,
+        Field(
+            description="False for people who sign in with Microsoft only: there is no password to change."
+        ),
+    ]
     user: User
     tenant: Tenant
     role: Role

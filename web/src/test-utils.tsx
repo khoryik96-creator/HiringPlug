@@ -25,6 +25,7 @@ export function testMe(permissions: Permission[]): Me {
     tenant: { id: "ten_01jbz6w0m0k8q9x2r3s4t5v6w7", name: "Demo company", careersSlug: "demo-company" },
     role: "recruiter",
     permissions,
+    hasPassword: true,
   };
 }
 

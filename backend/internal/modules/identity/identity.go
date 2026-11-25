@@ -4,7 +4,7 @@
 // turning a bearer token into a Principal (tenant, user, role, permissions),
 // and the team admin rules (nobody locks themselves out; the last owner
 // stays). Changing a password or deactivating someone signs out their
-// sessions.
+// sessions. People can also sign in with Microsoft (microsoft*.go).
 //
 // Layout (the same in every module):
 //
@@ -12,6 +12,7 @@
 //	domain.go          password and team rules, as pure functions (unit tested)
 //	auth.go            signing in, links (invitations, resets), changing a password
 //	team.go            team admin: invitations, roles, deactivating
+//	microsoft*.go      signing in with Microsoft, and the company's settings for it
 //	http.go, team_http.go  HTTP handlers: contract types <-> service calls
 //	internal/store     generated SQL (db/queries/identity.sql); private to this module
 package identity
@@ -45,6 +46,7 @@ type Module struct {
 	publicURL string
 	limits    limits
 	twoStep   twoStepKeys
+	ms        *microsoftSignIn // nil until UseMicrosoft
 	HTTP      *HTTP
 }
 
@@ -78,6 +80,10 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 		if u.TokensValidAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.TokensValidAfter) {
 			return fmt.Errorf("%w: token issued before the user's sessions were ended", authn.ErrInvalidToken)
 		}
+		// The company requires Microsoft: password sessions work only for owners.
+		if PasswordRefused(u.MicrosoftRequired, u.Role) && claims.Method() != authn.MethodMicrosoft {
+			return fmt.Errorf("%w: the company requires signing in with Microsoft", authn.ErrInvalidToken)
+		}
 		// Signed out on the server (this token only).
 		if claims.ID != "" {
 			revoked, err := store.New(tx).SessionRevoked(ctx, claims.ID)
@@ -93,7 +99,7 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 			return err
 		}
 		if claims.ID != "" && claims.ExpiresAt != nil {
-			principal = principal.WithSession(authz.Session{ID: claims.ID, Expires: claims.ExpiresAt.Time})
+			principal = principal.WithSession(authz.Session{ID: claims.ID, Expires: claims.ExpiresAt.Time, Method: claims.Method()})
 		}
 		return nil
 	})
