@@ -137,7 +137,8 @@ func (s *Server) HoldKeys(tenantID string) (release func()) {
 }
 
 // Claims are a valid token's claims for an account, to change as a test
-// needs: issued now, for an hour; a member of the organisation (acct 0)
+// needs: issued now, for an hour; a member of the organisation (the
+// optional claim acct, 0)
 // whose sign-in name is email, and whose email Microsoft does not vouch for
 // (no xms_edov: see VerifiedEmail).
 func Claims(tenantID, objectID, email, clientID, nonce string) jwt.MapClaims {
@@ -157,18 +158,29 @@ func VerifiedEmail(c jwt.MapClaims, verified bool) jwt.MapClaims {
 	return c
 }
 
-// Guest makes claims a guest's: an account of another organisation invited
-// in. acct is the optional claim (1: guest); without it, the guest's
-// sign-in name (name_home.domain#EXT#@...) says so too.
-func Guest(c jwt.MapClaims, withAcct bool) jwt.MapClaims {
+// Guest makes claims a guest's, as Microsoft sends them: an account of
+// another organisation invited in. Its preferred_username is its home
+// address (its email, here); its UPN (the optional claim upn) is
+// name_home.domain#EXT#@... acct is the optional claim (1: guest); upn
+// says whether the upn claim is sent.
+func Guest(c jwt.MapClaims, withAcct, upn bool) jwt.MapClaims {
 	if withAcct {
 		c["acct"] = 1
 	} else {
 		delete(c, "acct")
 	}
-	if email, _ := c["email"].(string); email != "" {
-		c["preferred_username"] = GuestUPN(email, "fabrikam.onmicrosoft.com")
+	email, _ := c["email"].(string)
+	c["preferred_username"] = email
+	if upn && email != "" {
+		c["upn"] = GuestUPN(email, "contoso.onmicrosoft.com")
 	}
+	return c
+}
+
+// WithoutAcct leaves the optional claim acct out, as Microsoft does until
+// it is added in Entra (Token configuration).
+func WithoutAcct(c jwt.MapClaims) jwt.MapClaims {
+	delete(c, "acct")
 	return c
 }
 

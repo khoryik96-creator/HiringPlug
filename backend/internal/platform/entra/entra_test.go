@@ -73,7 +73,7 @@ func TestValidTokensGiveTheAccount(t *testing.T) {
 	require.NoError(t, err)
 	id, err := validate(t, c, raw, entra.Expect{ClientID: client, Nonce: nonce, Organisation: org})
 	require.NoError(t, err)
-	assert.Equal(t, entra.Identity{TenantID: org, ObjectID: oid, Email: "sam@contoso.test", Username: "sam.upn@contoso.test", Name: "Test Person"}, id)
+	assert.Equal(t, entra.Identity{TenantID: org, ObjectID: oid, Email: "sam@contoso.test", Username: "sam.upn@contoso.test", Member: true, Name: "Test Person"}, id)
 	assert.Equal(t, []string{"sam.upn@contoso.test"}, id.Addresses(), "the email is not vouched for: the sign-in name only")
 
 	_, err = validate(t, c, raw, entra.Expect{ClientID: client, Nonce: nonce}) // any organisation
@@ -205,8 +205,22 @@ func TestTheEmailCountsOnlyWhenMicrosoftVouchesForIt(t *testing.T) {
 		require.NoError(t, err, tc.name)
 		assert.Equal(t, tc.addrs, id.Addresses(), tc.name)
 	}
-	same := entra.Identity{Email: "sam@contoso.test", Username: "sam@contoso.test", EmailVerified: true}
+	same := entra.Identity{Email: "sam@contoso.test", Username: "sam@contoso.test", EmailVerified: true, Member: true}
 	assert.Equal(t, []string{"sam@contoso.test"}, same.Addresses(), "each once")
+}
+
+// Without the acct claim a guest cannot be told from a member (its
+// preferred_username is its home address): no address counts then.
+func TestNoAddressCountsWithoutTheAcctClaim(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	want := entra.Expect{ClientID: client, Nonce: nonce, Organisation: org}
+	claims := entratest.VerifiedEmail(entratest.WithoutAcct(entratest.Claims(org, oid, "sam@contoso.test", client, nonce)), true)
+	id, err := validate(t, c, entratest.Sign(t, ms.SigningKey(), claims), want)
+	require.NoError(t, err, "the account itself is valid")
+	assert.False(t, id.Member)
+	assert.Empty(t, id.Addresses())
+	assert.Equal(t, "sam@contoso.test", id.Username, "still said (for the email telling them)")
 }
 
 func TestGuestsAreRefused(t *testing.T) {
@@ -219,13 +233,19 @@ func TestGuestsAreRefused(t *testing.T) {
 	require.NoError(t, err, "acct 0: a member")
 
 	cases := map[string]jwt.MapClaims{
-		"acct 1": entratest.Guest(entratest.Claims(org, oid, "sam@contoso.test", client, nonce), true),
+		"acct 1":         entratest.Guest(entratest.Claims(org, oid, "sam@fabrikam.test", client, nonce), true, false),
+		"acct 1 and upn": entratest.Guest(entratest.Claims(org, oid, "sam@fabrikam.test", client, nonce), true, true),
 		"acct \"1\"": func() jwt.MapClaims {
 			cl := entratest.Claims(org, oid, "sam@contoso.test", client, nonce)
 			cl["acct"] = "1"
 			return cl
 		}(),
-		"a guest's sign-in name, no acct": entratest.Guest(entratest.Claims(org, oid, "sam@contoso.test", client, nonce), false),
+		"a guest's UPN, no acct": entratest.Guest(entratest.Claims(org, oid, "sam@fabrikam.test", client, nonce), false, true),
+		"a guest's UPN as sign-in name": func() jwt.MapClaims {
+			cl := entratest.Claims(org, oid, "sam@contoso.test", client, nonce)
+			cl["preferred_username"] = entratest.GuestUPN("sam@fabrikam.test", "contoso.onmicrosoft.com")
+			return cl
+		}(),
 		"a guest's name as email": func() jwt.MapClaims {
 			cl := entratest.Claims(org, oid, "sam@contoso.test", client, nonce)
 			cl["email"] = entratest.GuestUPN("sam@contoso.test", "Fabrikam.onmicrosoft.com")
@@ -236,6 +256,12 @@ func TestGuestsAreRefused(t *testing.T) {
 		_, err := validate(t, c, sign(claims), want)
 		assert.ErrorIs(t, err, entra.ErrGuestAccount, name)
 	}
+	// Neither acct nor upn sent: nothing tells it is a guest; it is accepted,
+	// but recognised by no address (see TestNoAddressCountsWithoutTheAcctClaim).
+	id, err := validate(t, c, sign(entratest.Guest(entratest.Claims(org, oid, "sam@fabrikam.test", client, nonce), false, false)), want)
+	require.NoError(t, err)
+	assert.Equal(t, "sam@fabrikam.test", id.Username, "a guest's preferred_username is its home address")
+	assert.Empty(t, id.Addresses())
 	assert.Empty(t, entra.Identity{Username: entratest.GuestUPN("sam@contoso.test", "f.onmicrosoft.com")}.Addresses())
 }
 
@@ -299,10 +325,42 @@ func TestManyAtOnceFetchAnOrganisationsKeysOnce(t *testing.T) {
 	for ms.KeyFetchesWaiting() == 0 {
 		time.Sleep(time.Millisecond)
 	}
-	time.Sleep(50 * time.Millisecond) // the others ask meanwhile
+	// Released at once: whoever has not asked yet finds the keys kept, or
+	// fetched by the first meanwhile; never a second fetch.
 	release()
 	for range 8 {
 		require.NoError(t, <-errs)
 	}
+	assert.Equal(t, 1, ms.KeyFetches())
+}
+
+// A request that ends (the browser went away) stops waiting for keys
+// another request is fetching.
+func TestWaitingForKeysEndsWithTheRequest(t *testing.T) {
+	ms := entratest.New(t)
+	c := entra.New(ms.URL, ms.Client())
+	release := ms.HoldKeys(org)
+	defer release()
+	raw := entratest.Sign(t, ms.SigningKey(), entratest.Claims(org, oid, "sam@contoso.test", client, nonce))
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.Validate(ctx, raw, entra.Expect{ClientID: client, Nonce: nonce, Organisation: org})
+		done <- err
+	}()
+	for ms.KeyFetchesWaiting() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.ErrorIs(t, err, entra.ErrInvalid)
+	case <-time.After(5 * time.Second):
+		t.Fatal("still waiting for the keys after the request ended")
+	}
+	release()
+	_, err := c.Validate(context.Background(), raw, entra.Expect{ClientID: client, Nonce: nonce, Organisation: org})
+	require.NoError(t, err, "the fetch went on for whoever asks next")
 	assert.Equal(t, 1, ms.KeyFetches())
 }

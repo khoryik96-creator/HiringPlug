@@ -61,7 +61,7 @@ func TestMicrosoftTrustsTheSignInNameNotAnyEmail(t *testing.T) {
 	guest := newAccount(org, emailOf(api.RoleOwner, tenant.ID))
 	for _, withAcct := range []bool{true, false} {
 		flow, _ = f.start(map[string]any{"company": slug})
-		msRefused(t, f.signInAs(flow, entratest.Guest(guest.claims(flow), withAcct)), "other_organisation")
+		msRefused(t, f.signInAs(flow, entratest.Guest(guest.claims(flow), withAcct, true)), "other_organisation")
 	}
 	assert.Len(t, audited(t, tenant.ID, "user.microsoft_linked"), 1)
 }
@@ -95,7 +95,7 @@ func TestOwnersConnectMicrosoftFromTheirAccount(t *testing.T) {
 		c["iss"] = entra.Issuer(other.org)
 		return c
 	}), "other_organisation")
-	connectRefused(t, f.connect(owner.Token, func(fl msFlow) jwt.MapClaims { return entratest.Guest(ana.claims(fl), true) }), "other_organisation")
+	connectRefused(t, f.connect(owner.Token, func(fl msFlow) jwt.MapClaims { return entratest.Guest(ana.claims(fl), true, true) }), "other_organisation")
 
 	// Connected from Your account: any address, audited, emailed.
 	res := f.connect(owner.Token, func(fl msFlow) jwt.MapClaims {

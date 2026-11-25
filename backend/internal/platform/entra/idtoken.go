@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/sync/singleflight"
 )
 
 // Why a token is refused. ErrInvalid covers everything that is not about
@@ -24,7 +25,8 @@ var (
 	ErrPersonalAccount   = errors.New("entra: a personal Microsoft account")
 	ErrOtherOrganisation = errors.New("entra: an account of another organisation")
 	// ErrGuestAccount: a guest in the organisation (acct 1, or a guest's
-	// sign-in name): an account of another organisation, invited in.
+	// UPN, name_home.domain#EXT#@...): an account of another organisation,
+	// invited in.
 	ErrGuestAccount = errors.New("entra: a guest account")
 )
 
@@ -56,14 +58,25 @@ type Identity struct {
 	// organisation verified (the optional claim xms_edov). Without it the
 	// email is whatever an administrator typed, and proves nothing.
 	EmailVerified bool
-	Name          string
+	// Member: Microsoft says the account is a member of the organisation,
+	// not a guest (the optional claim acct, 0). False when the token has no
+	// acct claim: a guest then cannot be told apart, since a guest's
+	// preferred_username is its home address (the #EXT# name is in upn, an
+	// optional claim too).
+	Member bool
+	Name   string
 }
 
 // Addresses are the addresses a team member may be recognised by: the
 // sign-in name (preferred_username: the UPN, in a domain the organisation
-// verified), and the email only when its domain is verified too. Lower
+// verified), and the email only when its domain is verified too. None
+// unless Microsoft says the account is a member (acct 0): a guest's
+// preferred_username is its home address, which may be anyone's. Lower
 // case, each once.
 func (i Identity) Addresses() []string {
+	if !i.Member {
+		return nil
+	}
 	var out []string
 	add := func(e string) {
 		if strings.Contains(e, "@") && !isGuestName(e) && (len(out) == 0 || out[0] != e) {
@@ -102,9 +115,11 @@ type idClaims struct {
 	Username string `json:"preferred_username"`
 	Name     string `json:"name"`
 	// Optional claims (Entra › Token configuration): the email's domain is
-	// verified, and the account is a member (0) or a guest (1).
-	EmailVerified flag `json:"xms_edov"`
-	Account       flag `json:"acct"`
+	// verified, the account is a member (0) or a guest (1; nil: not sent),
+	// and its UPN (a guest's has #EXT#).
+	EmailVerified flag   `json:"xms_edov"`
+	Account       *flag  `json:"acct"`
+	UPN           string `json:"upn"`
 	jwt.RegisteredClaims
 }
 
@@ -157,13 +172,13 @@ func (c *Client) Validate(ctx context.Context, raw string, want Expect) (Identit
 		return Identity{}, fmt.Errorf("%w: no object ID", ErrInvalid)
 	case len(claims.Audience) != 1:
 		return Identity{}, fmt.Errorf("%w: several audiences", ErrInvalid)
-	case bool(claims.Account) || isGuestName(claims.Username) || isGuestName(claims.Email):
+	case (claims.Account != nil && bool(*claims.Account)) || isGuestName(claims.UPN) || isGuestName(claims.Username) || isGuestName(claims.Email):
 		return Identity{}, ErrGuestAccount
 	}
 	return Identity{
 		TenantID: tid, ObjectID: oid, Name: strings.TrimSpace(claims.Name),
 		Email: strings.ToLower(strings.TrimSpace(claims.Email)), Username: strings.ToLower(strings.TrimSpace(claims.Username)),
-		EmailVerified: bool(claims.EmailVerified),
+		EmailVerified: bool(claims.EmailVerified), Member: claims.Account != nil,
 	}, nil
 }
 
@@ -188,6 +203,7 @@ func (c *Client) key(ctx context.Context, tid, kid string) (*rsa.PublicKey, erro
 	c.mu.Lock()
 	now := c.now()
 	set, ok := c.keys[tid]
+	seen := set.fetched // the keys looked at (zero: none)
 	if ok && now.Sub(set.fetched) < keysFor {
 		if k := set.keys[kid]; k != nil {
 			c.mu.Unlock()
@@ -199,10 +215,18 @@ func (c *Client) key(ctx context.Context, tid, kid string) (*rsa.PublicKey, erro
 		}
 	}
 	c.mu.Unlock()
-	// Whoever asks first fetches; the others wait for that answer. The
-	// fetch is not cancelled with the first asker (the HTTP client's timeout
-	// bounds it).
-	got, err, _ := c.fetching.Do(tid, func() (any, error) {
+	// Whoever asks first fetches; the others wait for that answer, each as
+	// long as its own request lasts. The fetch is not cancelled with the
+	// first asker (the HTTP client's timeout bounds it).
+	flight := c.fetching.DoChan(tid, func() (any, error) {
+		c.mu.Lock()
+		if cur, had := c.keys[tid]; had && cur.fetched.After(seen) {
+			// Fetched by another request since these were looked at (it
+			// finished just before this one asked): no need to fetch again.
+			c.mu.Unlock()
+			return cur.keys, nil
+		}
+		c.mu.Unlock()
 		keys, err := c.fetchKeys(context.WithoutCancel(ctx), tid)
 		if err != nil {
 			return nil, err
@@ -220,10 +244,16 @@ func (c *Client) key(ctx context.Context, tid, kid string) (*rsa.PublicKey, erro
 		c.keys[tid] = keySet{keys: keys, fetched: at, missed: missed}
 		return keys, nil
 	})
-	if err != nil {
-		return nil, err
+	var got singleflight.Result
+	select {
+	case got = <-flight:
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	if k := got.(map[string]*rsa.PublicKey)[kid]; k != nil {
+	if got.Err != nil {
+		return nil, got.Err
+	}
+	if k := got.Val.(map[string]*rsa.PublicKey)[kid]; k != nil {
 		return k, nil
 	}
 	c.mu.Lock()
