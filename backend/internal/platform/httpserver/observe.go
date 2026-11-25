@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -104,7 +105,8 @@ func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 // named ...Token: an invitation or reset link, a booking or shortlist
 // link), each up to its last secret: whoever reads the logs must not be able
 // to use them. Any path starting like one (whatever method, or even no
-// route) is logged with the secret replaced by the parameter's name.
+// route; written with empty segments, dots or other letter case too) is
+// logged, cleaned, with the secret replaced by the parameter's name.
 type secretPaths [][]string
 
 func secretPathsOf(paths []string) secretPaths {
@@ -128,15 +130,15 @@ func isSecretParam(segment string) bool {
 	return strings.HasPrefix(segment, "{") && strings.HasSuffix(strings.ToLower(segment), "token}")
 }
 
-func (s secretPaths) redact(path string) string {
-	segments := strings.Split(path, "/")
+func (s secretPaths) redact(raw string) string {
+	segments := strings.Split(path.Clean("/"+raw), "/")
 	for _, route := range s {
 		if len(segments) < len(route) {
 			continue
 		}
 		matches := true
 		for i, r := range route {
-			if !strings.HasPrefix(r, "{") && r != segments[i] {
+			if !strings.HasPrefix(r, "{") && !strings.EqualFold(r, segments[i]) {
 				matches = false
 				break
 			}
@@ -152,5 +154,5 @@ func (s secretPaths) redact(path string) string {
 		}
 		return strings.Join(out, "/")
 	}
-	return path
+	return raw
 }

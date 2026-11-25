@@ -19,7 +19,8 @@ again that they are active and the password is still the one checked: a
 change, reset or deactivation committed meanwhile signs nobody in. Using a
 link holds it too, so a link used twice at once works once. The access log
 never shows a secret in a path (links, bookings, client shortlists: the
-contract's `…Token` parameters are logged by name).
+contract's `…Token` parameters are logged by name, however the path is
+written: doubled slashes, dots or other letter case).
 
 **Two-step sign-in** (✅): anyone can add an authenticator app under Your
 account (scan a QR code or type the key, then enter its first code); after

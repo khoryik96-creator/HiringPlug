@@ -32,6 +32,12 @@ func TestTheAccessLogLeavesSecretsOutOfPaths(t *testing.T) {
 		"/v1/public/client-shortlists/" + secret + "/candidates/x/cv": "/v1/public/client-shortlists/{shortlistToken}/candidates/x/cv",
 		"/v1/auth/links/" + secret + "/no-such-route":                 "/v1/auth/links/{linkToken}/no-such-route",
 		"/v1/candidates/cand_1":                                       "/v1/candidates/cand_1", // ids stay, for finding a request
+		// Written another way (empty segments, dots, letter case): the secret is left out too.
+		"//v1/auth/links/" + secret:        "/v1/auth/links/{linkToken}",
+		"/v1//auth/links/" + secret:        "/v1/auth/links/{linkToken}",
+		"/v1/auth/./links/" + secret + "/": "/v1/auth/links/{linkToken}",
+		"/v1/x/../auth/links//" + secret:   "/v1/auth/links/{linkToken}",
+		"/V1/Auth/Links/" + secret:         "/V1/Auth/Links/{linkToken}",
 	} {
 		log.Reset()
 		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
