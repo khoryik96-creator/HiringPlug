@@ -20,10 +20,19 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Post-migration fixes (owner's report): P0
+### Post-migration fixes and the HyPlug rename (paused)
 - Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v (one pull request per group)
-- Touches: backup/restore (platform/backup, cmd/hp), deploy Dockerfiles and compose, documents module (state on failed jobs), jobqueue (dead AI jobs, held jobs after a restore), aiproviders (paid-AI kill switch) and the AI worker, Settings › System, docs/playbooks
+- Branch: claude/relaxed-hopper-ex7y3v (in step with main; nothing unmerged)
+- Touches: jobqueue (held jobs), the dead-job handlers of recurring kinds; later every user-visible "HiringPlug" string
 - Started: 25 Nov 2026    Last update: 25 Nov 2026
-- State: in progress
-- Next: restored files owned by the runtime user; terminal AI-job failure updates the document; outbound jobs held after a restore from another server; global paid-AI switch; hp restore flags in any order. Then the HyPlug rename, then P1 and P2 of the report
+- State: stopped (owner's call, usage limit). 1.47.0 (P0 of the owner's post-migration report) is merged.
+- Next:
+  1. Known gap: cancelling a HELD recurring job after a restore (email.outlook_sync, email.bounce_scan, calendar.refresh,
+     scheduling.refresh_calendar, lead_source.check, any self-rescheduling kind) ends its chain for good; only
+     notifications.digest is re-armed. Make cancel (and final death) schedule the next normal run, one per chain, with tests.
+     Also audit operator settles of another company's held jobs in that company's log; tests through cancel for
+     contact.check_mailbox and contact.apollo_lookup.
+  2. Rename the product to HyPlug in everything people see (not formatted CVs or the agency's own branding; keep hidden
+     technical names: Go module, database, HP_* settings, Python package, storage keys).
+  3. P1 of the report: download links re-signed when jobs are retried; backup verify/preflight; AI daily and per-feature
+     limits and retry billing. P2: Codespaces startup, admin diagnostics. Then the stale-record sweep.
