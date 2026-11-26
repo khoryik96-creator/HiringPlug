@@ -20,26 +20,13 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Owner's list of 26 Nov: CV reading, email, client link, small fixes
-- Who: Claude (account B), session on branch claude/brave-thompson-k08hlg
+### Post-migration fixes and the HyPlug rename (taken over)
+- Who: Claude (account B), taken over from Claude (account A) on 26 Nov at the owner's request
 - Branch: claude/brave-thompson-k08hlg
-- Touches: CV reading (ai/ parser: names, current job title and employer), Outlook mail screens (forward with
-  attachments and an editable body, remembered recipients, last place visited, docking right, Send always in view),
-  client shortlist link (notify the recruiter on an answer, fields in our comment, the CV viewable on a phone),
-  booking links (Teams link / phone, or ask for theirs), company country tag after the name, Team page
-  (Cancel invitation button), dropping CVs anywhere on the candidate list, removing a candidate from a job,
-  "Your sign-in is invalid or has expired" while working
-- Started: 26 Nov 2026    Last update: 26 Nov 2026
-- State: in progress. Merged: CV reading (1.47.1), small fixes, booking links and sign-in renewal (1.48.0);
-  Outlook Mail (1.49.0) verifying on the branch
-- Next: the client shortlist link (notify on an answer, fields in our comment, the CV on a phone)
-
-### Post-migration fixes and the HyPlug rename (paused)
-- Who: Claude (account A), session "Hiring Plug"
-- Branch: claude/relaxed-hopper-ex7y3v (in step with main; nothing unmerged)
 - Touches: jobqueue (held jobs), the dead-job handlers of recurring kinds; later every user-visible "HiringPlug" string
-- Started: 25 Nov 2026    Last update: 25 Nov 2026
-- State: stopped (owner's call, usage limit). 1.47.0 (P0 of the owner's post-migration report) is merged.
+- Started: 25 Nov 2026    Last update: 26 Nov 2026
+- State: in progress, in the owner's order: 1, then 3, then the stale-record sweep; 2 (the rename) waits for the owner's go-ahead.
+  Operator settles of held jobs are already audited in each company's own log (cmd/hp/jobs.go settleCompany).
 - Next:
   1. Known gap: cancelling a HELD recurring job after a restore (email.outlook_sync, email.bounce_scan, calendar.refresh,
      scheduling.refresh_calendar, lead_source.check, any self-rescheduling kind) ends its chain for good; only
