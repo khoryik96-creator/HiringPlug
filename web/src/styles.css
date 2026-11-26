@@ -1615,6 +1615,13 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 /* Something finished on it (a CV formatted): green until opened. */
 .open-tab.done { background: #f0fdf4; box-shadow: 0 0 0 2px #22c55e; }
 .open-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex: 0 0 auto; }
+/* Opened behind the page and not looked at yet: tinted, bold, a dot in its kind's colour. */
+.open-tab.unseen { background: color-mix(in srgb, var(--kind) 14%, #fff); box-shadow: 0 0 0 1px color-mix(in srgb, var(--kind) 45%, #fff); }
+.open-tab.unseen .open-tab-name { font-weight: 700; }
+.open-tab-dot.new { background: var(--kind); animation: tab-new 1.6s ease-in-out 3; }
+.open-tab-more > summary.unseen { box-shadow: 0 0 0 2px var(--kind); }
+@keyframes tab-new { 50% { transform: scale(1.6); opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .open-tab-dot.new { animation: none; } }
 .open-tab-close { flex: 0 0 auto; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; box-shadow: none;
   color: var(--muted, #6b6680); font-size: 1rem; line-height: 1; cursor: pointer; }
 .open-tab-close:hover, .open-tab-close:focus-visible { background: #fee2e2; color: #b91c1c; }
@@ -1700,6 +1707,7 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 
 /* Booking links: how the meeting happens, and what to ask for. */
 .chip-button { min-height: 0; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.85rem; }
-.booking-how > span:first-child { font-size: 0.85rem; font-weight: 600; }
-.booking-ask label.row { font-weight: 500; gap: 0.4rem; }
+.booking-how > .row { min-height: 2.6rem; flex-wrap: nowrap; }
+.booking-ask { justify-content: flex-end; }
+.booking-ask input[type="checkbox"] { width: auto; margin: 0; }
 .booking-asks { display: grid; gap: 0.6rem; margin: 0.75rem 0; }

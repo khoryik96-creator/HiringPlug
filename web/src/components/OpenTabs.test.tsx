@@ -98,6 +98,22 @@ describe("open records", () => {
     expect(screen.queryByRole("navigation", { name: "Open records" })).toBeNull();
   });
 
+  it("marks a record opened behind the page until it is looked at", () => {
+    bell();
+    const view = renderWithClient(<><OpenTabs hash="#/candidates/cand_01here" /><a href="#/candidates/cand_01aina">Aina Lee</a></>);
+    act(() => { nameTab("#/candidates/cand_01here", "Siti"); });
+    const ctrl = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    act(() => { screen.getByText("Aina Lee").dispatchEvent(ctrl); });
+    const tab = (id: string) => screen.getByRole("navigation", { name: "Open records" }).querySelector(`a[href="#/candidates/${id}"]`)?.closest(".open-tab");
+    expect(tab("cand_01aina")?.className).toContain("unseen");
+    expect(screen.getByLabelText("not opened yet")).toBeTruthy();
+    expect(tab("cand_01here")?.className, "a record you went to is not marked").not.toContain("unseen");
+    view.rerender(<><OpenTabs hash="#/candidates/cand_01aina" /><a href="#/candidates/cand_01aina">Aina Lee</a></>);
+    view.rerender(<><OpenTabs hash="#/candidates/cand_01here" /><a href="#/candidates/cand_01aina">Aina Lee</a></>);
+    expect(tab("cand_01aina")?.className, "looked at: no longer marked").not.toContain("unseen");
+    expect(screen.queryByLabelText("not opened yet")).toBeNull();
+  });
+
   it("lights a tab green when its CV is formatted, until it is opened", async () => {
     bell([{ id: "cv_formatted:scv_1", kind: "cv_formatted", title: "CV formatted: Aina", detail: "", href: "#/candidates/cand_01a", at: "2026-11-23T01:00:00Z", new: true }]);
     const view = openAll([["#/candidates/cand_01a", "Aina"], ["#/jobs/jo_01j", "Accountant"]]);

@@ -142,7 +142,8 @@ none, ↑/↓ to move between rows (Shift+↑/↓ chooses while moving), Space t
 choose the row you are on.
 CVs dropped anywhere on the Candidates page are imported; clicking "Drop
 CVs anywhere to upload" picks files instead (keyboards, touch screens).
-While an import is open, more CVs go on its own drop box. Typing boolean rules in the search bar (`AND`, `OR`, `NOT`,
+While an import is open, more CVs dropped anywhere on the page join it (the same file
+twice is added once). Typing boolean rules in the search bar (`AND`, `OR`, `NOT`,
 `NEAR/n`, quotes, `word*`, `-word` or `!word`; the operators in capitals, so
 "Johnson and Johnson" stays a name search, and brackets alone do not count,
 so "(03) 2345 6789" stays a phone search) shows them in blue with a BOOLEAN
@@ -667,7 +668,9 @@ for each of their jobs, with **Score fit** / **Score again**.
   city, country, registration number (e.g. SSM) and notes. Search by name or
   website (ignoring case and accents), filter by type. Names are unique per
   company (`Nestlé Malaysia` and `nestle malaysia` are the same), and edits use
-  the same lost-update protection as candidates.
+  the same lost-update protection as candidates. A company with a country shows
+  its code after its name, `Contoh Berhad [MY]`, in the list, on its page and
+  in company pickers.
 - **Duplicate companies and contacts** ✅ (1.32.0): a company's page warns
   about possible duplicates (the same website or LinkedIn page, or the same
   name without Sdn Bhd, Berhad and the like, or a name much alike); a
@@ -1338,7 +1341,9 @@ running.
   **Steps**, the stages as a funnel (each flags how many have waited 7+ days;
   it opens where most wait) with that stage's people below, longest waiting
   first, each with the button for the usual next step (Screen, Submit to
-  client, Interview, Offer, Placed) and a "Move to" menu; and the **Board**, a
+  client, Interview, Offer, Placed) and a "Move to" menu (whose "Take off this job…" removes a person added by
+  mistake, unless they already have an interview, offer, placement or client
+  link on it); and the **Board**, a
   column per stage with one line per person (longest waiting first, red edge
   after 14 days, 8 shown then "+N more", "›" for the next step; drag a line
   to another column). Clicking a person chooses them for emailing or moving
@@ -1369,9 +1374,12 @@ running.
   and cancelled events, all-day events and Outlook's Windows time-zone names
   are understood (`platform/ical`). The address is never shown back (only its
   host) nor written to the audit log.
-- **In an email to a candidate**: "+ Booking link" (title, length, where:
-  a meeting link, a phone number or an address) puts "Please pick a time
-  that suits you: …/book/<link>" in the message. One link, one meeting;
+- **In an email to a candidate**: "+ Booking link" (title, length, how and
+  where: Teams, a phone call or in person fill the place to start from; a
+  meeting link, a phone number or an address) puts "Please pick a time
+  that suits you: …/book/<link>" in the message. The link can ask them for
+  their phone number (a phone call asks it at once) or their email; what they
+  give shows on the candidate's bookings and in the Outlook meeting's place. One link, one meeting;
   links last 30 days; only a hash of the link's secret is stored.
 - **The booking page** (`/book/<link>`, no sign-in) shows your free times in
   the candidate's own time zone: your hours, less your calendar's busy times,
@@ -2033,7 +2041,8 @@ tab lights **green** when work on its record finishes while you are elsewhere
 (a CV formatted), until you open it. The tabs stay at the top as the page
 scrolls (1.40.3). Ctrl-, Shift- or middle-click on a link to a candidate,
 contact, company or job anywhere opens it as a tab here, behind the page you
-are on, not as a browser tab; middle-click on a tab goes to it. Drag a tab
+are on, not as a browser tab, tinted and in bold with a dot in its colour
+until you look at it (1.48.0); middle-click on a tab goes to it. Drag a tab
 (or a link) to the browser's tab bar to open the record in a new browser tab: a new tab takes the
 sign-in of a HiringPlug tab already open (with none open, it asks to sign in;
 closing every tab still signs out). The tabs are the signed-in user's own,
@@ -2132,7 +2141,9 @@ Roles have permissions per area: **view** (`:read`), **write** (`:create`),
 contract. ✅ People sign in with email and password; owners and admins invite
 them, change roles and deactivate them on the **Team** page; "Forgot your
 password?" emails a reset link; everyone changes their password under their
-name. ✅ **Two-step sign-in**: a code from an authenticator app after the
+name. ✅ A sign-in lasts 12 hours and is renewed quietly (the same session)
+while someone is using HiringPlug; after they have been away, the last five
+minutes count down with **Stay signed in** before they are signed out. ✅ **Two-step sign-in**: a code from an authenticator app after the
 password (set up under Your account with a QR code, ten recovery codes);
 owners can require it for everyone, and owners and admins reset it for
 someone who lost their phone. 🟡 **Sign in with Microsoft** (1.46.0, the

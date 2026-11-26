@@ -60,8 +60,8 @@ export function BookingLinkForm({ candidateId, applicationId, onInsert, onCancel
       <label className="field">Where (Teams link, phone or address)<input value={form.location} maxLength={500}
         placeholder="Paste your Teams meeting link, or your number" onChange={(e) => { setForm({ ...form, location: e.target.value }); }} /></label>
       <div className="field booking-ask" role="group" aria-label="Ask them for">
-        <label className="row"><input type="checkbox" checked={ask.includes("phone")} onChange={(e) => { toggle("phone", e.target.checked); }} /> Ask for their phone number</label>
-        <label className="row"><input type="checkbox" checked={ask.includes("email")} onChange={(e) => { toggle("email", e.target.checked); }} /> Ask for their email</label>
+        <label className="check"><input type="checkbox" checked={ask.includes("phone")} onChange={(e) => { toggle("phone", e.target.checked); }} /> Ask for their phone number</label>
+        <label className="check"><input type="checkbox" checked={ask.includes("email")} onChange={(e) => { toggle("email", e.target.checked); }} /> Ask for their email</label>
       </div>
       <span className="row">
         <button type="button" className="primary" disabled={create.isPending} onClick={() => { if (filledIn(box.current)) create.mutate(); }}>Insert link</button>

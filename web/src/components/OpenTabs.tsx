@@ -4,7 +4,8 @@
 // Mac) picks several; then close them, or close all. With many open, each
 // kind shows its latest few and "+N" lists the rest, and "All open" finds
 // any by name. A tab lights green
-// when something finished on its record (a CV formatted), until you open it.
+// when something finished on its record (a CV formatted), until you open it;
+// one opened behind the page is marked (a dot, in bold) until you look at it.
 // Ctrl-, Shift- or middle-click on a link to a record anywhere opens it as a
 // tab here, behind the page you are on, never as a browser tab; middle-click
 // on a tab here goes to it (dragging a link or a tab out of the window still
@@ -70,7 +71,7 @@ export function OpenTabs({ hash }: { hash: string }) {
       const record = recordOf(link.getAttribute("href") ?? "");
       if (!record) return;
       e.preventDefault();
-      openTab(record.href, record.kind);
+      openTab(record.href, record.kind, record.href !== recordOf(window.location.hash)?.href);
       nameTab(record.href, link.textContent);
     };
     document.addEventListener("click", inBackground, true);
@@ -135,12 +136,15 @@ export function OpenTabs({ hash }: { hash: string }) {
     const current = here?.href === t.href;
     const name = t.label || `${KIND[t.kind].word}…`;
     const isPicked = picked.includes(t.href);
+    const done = t.done && !current;
+    const unseen = t.unseen && !current && !done;
     return (
-      <span key={t.href} className={`open-tab${current ? " current" : ""}${isPicked ? " picked" : ""}${t.done && !current ? " done" : ""}`}>
+      <span key={t.href} className={`open-tab${current ? " current" : ""}${isPicked ? " picked" : ""}${done ? " done" : ""}${unseen ? " unseen" : ""}`}>
         <a href={t.href} aria-current={current ? "page" : undefined}
           onClick={(e) => { click(e, t.href); if (inMenu && !e.defaultPrevented) e.currentTarget.closest("details")?.removeAttribute("open"); }}
-          title={t.done && !current ? `${name}: finished (a CV is formatted)` : `${KIND[t.kind].word}: ${name}`}>
-          {t.done && !current && <span className="open-tab-dot" aria-label="finished" />}
+          title={done ? `${name}: finished (a CV is formatted)` : unseen ? `${name}: not opened yet` : `${KIND[t.kind].word}: ${name}`}>
+          {done && <span className="open-tab-dot" aria-label="finished" />}
+          {unseen && <span className="open-tab-dot new" aria-label="not opened yet" />}
           <span className="open-tab-name">{name}</span>
           {isPicked && <span className="visually-hidden"> (selected)</span>}
         </a>
@@ -164,7 +168,7 @@ export function OpenTabs({ hash }: { hash: string }) {
               {inline.map((t) => tabEl(t))}
               {more.length > 0 && (
                 <details className="open-tab-more">
-                  <summary className={more.some((t) => t.done) ? "done" : undefined} aria-label={`${String(more.length)} more ${KIND[k].plural.toLowerCase()}`}
+                  <summary className={more.some((t) => t.done) ? "done" : more.some((t) => t.unseen) ? "unseen" : undefined} aria-label={`${String(more.length)} more ${KIND[k].plural.toLowerCase()}`}
                     title={`${String(more.length)} more ${KIND[k].plural.toLowerCase()}`}>+{more.length}</summary>
                   <div className="open-tab-menu" role="dialog" aria-label={`More ${KIND[k].plural.toLowerCase()}`}>{more.map((t) => tabEl(t, true))}</div>
                 </details>

@@ -96,7 +96,7 @@ function LinkedCompany({ id, permissions }: { id: string; permissions: Permissio
       <p className="lead-hr-company small">
         <span className="muted">Company: </span>
         <a href={`#/companies/${c.id}`} title="Opens as a tab here; the panel stays"
-          onClick={(e) => { e.preventDefault(); openTab(`#/companies/${c.id}`, "company"); nameTab(`#/companies/${c.id}`, c.name); }}>{c.name}</a>
+          onClick={(e) => { e.preventDefault(); openTab(`#/companies/${c.id}`, "company", true); nameTab(`#/companies/${c.id}`, c.name); }}>{c.name}</a>
         {c.city && <span className="muted"> · {c.city}</span>}
       </p>
       {!hasPage && <CompanyLinkedin company={c} canUpdate={permissions.includes("companies:update")} />}

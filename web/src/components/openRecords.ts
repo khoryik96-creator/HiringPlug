@@ -6,8 +6,9 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 export type TabKind = "candidate" | "contact" | "company" | "job";
-/** done: something finished on it (a CV formatted) since you last had it open. */
-export type OpenTab = { href: string; kind: TabKind; label: string; done?: boolean };
+/** done: something finished on it (a CV formatted) since you last had it open.
+ * unseen: opened behind the page you were on, and not looked at yet. */
+export type OpenTab = { href: string; kind: TabKind; label: string; done?: boolean; unseen?: boolean };
 
 /** At most this many tabs: opening another closes the one least recently opened. */
 export const MAX_TABS = 30;
@@ -77,10 +78,11 @@ export function forgetTabs() {
   notify();
 }
 
-/** Opens a record's tab (at the end), or keeps it where it is if open already. */
-export function openTab(href: string, kind: TabKind) {
+/** Opens a record's tab (at the end), or keeps it where it is if open already.
+ * behind: opened without going to it, so it is marked until it is looked at. */
+export function openTab(href: string, kind: TabKind, behind = false) {
   if (tabs.some((t) => t.href === href)) return;
-  set([...tabs, { href, kind, label: "" }].slice(-MAX_TABS));
+  set([...tabs, { href, kind, label: "", ...(behind && { unseen: true }) }].slice(-MAX_TABS));
 }
 
 /** Names a record's tab once its page knows the name. */
@@ -113,9 +115,9 @@ export function markTabDone(href: string, event: string, looking = false) {
   set(tabs.map((t) => (t.href === href ? { ...t, done: true } : t)));
 }
 
-/** The record is open again: its tab is no longer lit. */
+/** The record is open again: its tab is no longer lit, nor marked as not looked at. */
 export function seenTab(href: string) {
-  if (tabs.some((t) => t.href === href && t.done)) set(tabs.map((t) => (t.href === href ? { ...t, done: false } : t)));
+  if (tabs.some((t) => t.href === href && (t.done || t.unseen))) set(tabs.map((t) => (t.href === href ? { ...t, done: false, unseen: false } : t)));
 }
 
 // Another window opened or closed a tab: these follow.
