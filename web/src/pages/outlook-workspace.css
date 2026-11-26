@@ -287,3 +287,14 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
 .outlook-dialog.docked .outlook-dialog-edge.start { left: -5px; top: 0; bottom: 0; }
 /* The page leaves room for the docked editor. */
 main.outlook-page { padding-right: calc(1.25rem + var(--outlook-docked, 0px)); }
+
+/* To, Cc and Bcc: the people in your mail, suggested as you type. */
+.address-input { position: relative; display: block; }
+.address-input > input { width: 100%; box-sizing: border-box; }
+.address-suggestions {
+  position: absolute; z-index: 45; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: .3rem; list-style: none;
+  background: var(--surface, #fff); border: 1px solid var(--line, #ded8eb); border-radius: 10px; box-shadow: 0 10px 28px #20172b26;
+}
+.address-suggestions li { padding: .45rem .6rem; border-radius: 7px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.address-suggestions li[aria-selected="true"], .address-suggestions li:hover { background: color-mix(in srgb, var(--accent, #6d4ae0) 12%, #fff); }
+.address-suggestions .muted { font-size: .88em; }

@@ -330,6 +330,51 @@ func (q *Queries) OutlookActiveSend(ctx context.Context, arg OutlookActiveSendPa
 	return i, err
 }
 
+const outlookAddressSuggestions = `-- name: OutlookAddressSuggestions :many
+SELECT a.address::text AS address,
+  coalesce((array_agg(m.sender_name ORDER BY m.received_at DESC) FILTER (WHERE lower(m.sender) = a.address AND m.sender_name <> ''))[1], '')::text AS name
+FROM email_outlook_message m CROSS JOIN LATERAL unnest(m.participants) AS a(address)
+WHERE m.mailbox_id = $1 AND a.address <> lower($2::text)
+GROUP BY a.address
+HAVING $3::text = '' OR strpos(a.address, lower($3::text)) > 0
+  OR bool_or(lower(m.sender) = a.address AND strpos(lower(m.sender_name), lower($3::text)) > 0)
+ORDER BY count(*) DESC, max(m.received_at) DESC, a.address
+LIMIT 8
+`
+
+type OutlookAddressSuggestionsParams struct {
+	MailboxID string
+	Own       string
+	Typed     string
+}
+
+type OutlookAddressSuggestionsRow struct {
+	Address string
+	Name    string
+}
+
+// Addresses in this mailbox's mail (from, to, cc), most used first, for To and Cc
+// as Outlook suggests them; the name is the one their own mail gave last.
+func (q *Queries) OutlookAddressSuggestions(ctx context.Context, arg OutlookAddressSuggestionsParams) ([]OutlookAddressSuggestionsRow, error) {
+	rows, err := q.db.Query(ctx, outlookAddressSuggestions, arg.MailboxID, arg.Own, arg.Typed)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OutlookAddressSuggestionsRow
+	for rows.Next() {
+		var i OutlookAddressSuggestionsRow
+		if err := rows.Scan(&i.Address, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const outlookByRemoteID = `-- name: OutlookByRemoteID :one
 SELECT id, mailbox_id, tenant_id, user_id, folder_id, remote_id, conversation, subject, sender, participants, received_at, changed_at, is_read, is_draft, has_attachments, web_url, sender_name, flagged FROM email_outlook_message WHERE mailbox_id = $1 AND remote_id = $2
 `

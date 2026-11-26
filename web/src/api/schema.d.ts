@@ -2405,6 +2405,23 @@ export interface paths {
         patch: operations["setOutlookRuleEnabled"];
         trace?: never;
     };
+    "/v1/outlook/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Addresses you have emailed or heard from, to fill To and Cc as Outlook does */
+        get: operations["suggestOutlookAddresses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/outlook/mail": {
         parameters: {
             query?: never;
@@ -8942,6 +8959,14 @@ export interface components {
             aiTokens?: number;
             /** @description The parse job's runKey, unchanged. */
             runKey?: string;
+        };
+        OutlookAddressList: {
+            items: components["schemas"]["OutlookAddress"][];
+        };
+        OutlookAddress: {
+            address: string;
+            /** @description How their mail names them, when they have written to you. */
+            name: string | null;
         };
         OutlookDraftInput: {
             subject?: string;
@@ -17926,6 +17951,32 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    suggestOutlookAddresses: {
+        parameters: {
+            query?: {
+                /** @description What has been typed (part of an address or a name); empty for the most used. */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The most used first, at most 8 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlookAddressList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listOutlookMail: {

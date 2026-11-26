@@ -13,6 +13,7 @@ import { RichEditor } from "../clientEmail/RichEditor";
 import { editorText, fillTokens, plainToHtml, withoutCaretMarks } from "../clientEmail/richText";
 import { mentionsField } from "../clientEmail/useFieldValues";
 import { useCandidatePackages } from "../clientEmail/useCandidatePackages";
+import { OutlookAddressInput } from "./OutlookAddressInput";
 import { OutlookCandidateDetails } from "./OutlookCandidateDetails";
 import { type ComposeContext, OutlookComposeTools, useComposeData } from "./OutlookComposeTools";
 import { OutlookDialog, useOutlookDock } from "./OutlookDialog";
@@ -228,11 +229,11 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
     </div>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); run("save"); }}>
       <fieldset disabled={locked || action.isPending} className="full outlook-draft-fields">
-        <Field label="To" error={errorFor("to")}><input value={form.to} onChange={(e) => { update("to", e.target.value); }}/></Field>
+        <Field label="To" error={errorFor("to")}><OutlookAddressInput value={form.to} onChange={(v) => { update("to", v); }}/></Field>
         {!copies && <button type="button" className="link" onClick={() => { setCopies(true); }}>Cc / Bcc</button>}
         {copies && <div className="outlook-copy-fields">
-          <Field label="Cc" error={errorFor("cc")}><input value={form.cc} onChange={(e) => { update("cc", e.target.value); }}/></Field>
-          <Field label="Bcc" error={errorFor("bcc")}><input value={form.bcc} onChange={(e) => { update("bcc", e.target.value); }}/></Field>
+          <Field label="Cc" error={errorFor("cc")}><OutlookAddressInput value={form.cc} onChange={(v) => { update("cc", v); }}/></Field>
+          <Field label="Bcc" error={errorFor("bcc")}><OutlookAddressInput value={form.bcc} onChange={(v) => { update("bcc", v); }}/></Field>
         </div>}
         <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
         {!draft?.bodyTruncated && <OutlookComposeTools data={tools} html={form.html} subject={subject} permissions={permissions}

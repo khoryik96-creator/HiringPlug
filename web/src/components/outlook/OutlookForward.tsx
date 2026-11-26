@@ -6,6 +6,7 @@ import { ErrorMessage } from "../ErrorMessage";
 import { Field } from "../Field";
 import { fieldErrors } from "../forms";
 import { outlookAddresses } from "./outlookAddresses";
+import { OutlookAddressInput } from "./OutlookAddressInput";
 
 export function OutlookForward({ messageId, onOpen, onClose }: {
   messageId: string; onOpen: (draftId: string) => void; onClose: () => void;
@@ -29,7 +30,7 @@ export function OutlookForward({ messageId, onOpen, onClose }: {
   }}>
     <fieldset className="outlook-draft-fields" disabled={forward.isPending}>
       <Field label="To" error={recipientError}>
-        <input autoFocus required value={to} onChange={(event) => { setTo(event.target.value); }} />
+        <OutlookAddressInput autoFocus required value={to} onChange={setTo} />
       </Field>
       <Field label="Note (optional)" error={errors.note}>
         <textarea rows={3} maxLength={10000} value={note} onChange={(event) => { setNote(event.target.value); }} />

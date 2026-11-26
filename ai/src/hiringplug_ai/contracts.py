@@ -3184,6 +3184,14 @@ class DocumentCvParsedJob(BaseModel):
     )
 
 
+class OutlookAddress(BaseModel):
+    address: Annotated[str, Field(max_length=254)]
+    name: Annotated[
+        str | None,
+        Field(description="How their mail names them, when they have written to you.", max_length=200),
+    ]
+
+
 class ToItem(RootModel[EmailStr]):
     root: Annotated[EmailStr, Field(max_length=254)]
 
@@ -8790,6 +8798,10 @@ class Document(BaseModel):
 
 class DocumentList(BaseModel):
     items: list[Document]
+
+
+class OutlookAddressList(BaseModel):
+    items: Annotated[list[OutlookAddress], Field(max_length=8)]
 
 
 class OutlookDraft(BaseModel):

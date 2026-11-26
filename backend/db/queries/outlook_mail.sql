@@ -170,3 +170,16 @@ RETURNING *;
 
 -- name: TryLockOutlookSendMailbox :one
 SELECT pg_try_advisory_lock(hashtextextended(@tenant_id::text || ':' || @user_id::text,0)) AS acquired;
+
+-- Addresses in this mailbox's mail (from, to, cc), most used first, for To and Cc
+-- as Outlook suggests them; the name is the one their own mail gave last.
+-- name: OutlookAddressSuggestions :many
+SELECT a.address::text AS address,
+  coalesce((array_agg(m.sender_name ORDER BY m.received_at DESC) FILTER (WHERE lower(m.sender) = a.address AND m.sender_name <> ''))[1], '')::text AS name
+FROM email_outlook_message m CROSS JOIN LATERAL unnest(m.participants) AS a(address)
+WHERE m.mailbox_id = @mailbox_id AND a.address <> lower(@own::text)
+GROUP BY a.address
+HAVING @typed::text = '' OR strpos(a.address, lower(@typed::text)) > 0
+  OR bool_or(lower(m.sender) = a.address AND strpos(lower(m.sender_name), lower(@typed::text)) > 0)
+ORDER BY count(*) DESC, max(m.received_at) DESC, a.address
+LIMIT 8;

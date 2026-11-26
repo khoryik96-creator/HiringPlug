@@ -579,6 +579,33 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /v1/outlook/addresses:
+    get:
+      operationId: suggestOutlookAddresses
+      tags:
+      - emails
+      summary: Addresses you have emailed or heard from, to fill To and Cc as Outlook does
+      x-permission: emails:send
+      parameters:
+      - name: q
+        in: query
+        description: What has been typed (part of an address or a name); empty for the most used.
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        '200':
+          description: The most used first, at most 8
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookAddressList'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /v1/outlook/mail:
     get:
       operationId: listOutlookMail
@@ -1672,6 +1699,20 @@ components:
       schema: { $ref: '#/components/schemas/EmailTemplateId' }
 
   schemas:
+    OutlookAddressList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 8
+          items: {$ref: '#/components/schemas/OutlookAddress'}
+    OutlookAddress:
+      type: object
+      required: [address, name]
+      properties:
+        address: {type: string, maxLength: 254}
+        name: {type: string, nullable: true, maxLength: 200, description: 'How their mail names them, when they have written to you.'}
     OutlookDraftInput:
       type: object
       properties:
