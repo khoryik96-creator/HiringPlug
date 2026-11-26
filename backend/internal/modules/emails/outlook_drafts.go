@@ -91,27 +91,32 @@ func draftPatch(in api.OutlookDraftInput) map[string]any {
 	return out
 }
 
+// maxDraftHTML is the longest formatted draft edited here (a long forwarded
+// thread), within the API's 1 MB request limit; the contract says the same.
+const maxDraftHTML = 500000
+
 func draftView(row store.EmailOutlookMessage, remote outlookRemoteMessage, active *store.EmailOutlookSend) api.OutlookDraft {
 	body := remote.Body.Content
 	var rich *string
-	truncated := false
 	if strings.EqualFold(remote.Body.ContentType, "html") {
 		clean := sanitizeOutlookHTML(body)
 		body = TextFromHTML(clean)
-		if utf8.RuneCountInString(clean) <= 100000 {
+		if utf8.RuneCountInString(clean) <= maxDraftHTML {
 			rich = &clean
-		} else {
-			truncated = true
 		}
 	}
 	shown := truncate(body, 40000)
+	// Locked (edited in Outlook only) when what is edited here would lose part
+	// of it: the formatted message when there is one, else the plain text.
+	// A long forwarded thread's text alone is no reason: its formatting is edited.
+	truncated := rich == nil && (strings.EqualFold(remote.Body.ContentType, "html") || shown != body)
 	var schedule *api.OutlookScheduledSend
 	if active != nil {
 		v := scheduledAPI(*active)
 		schedule = &v
 	}
 	return api.OutlookDraft{
-		MessageId: row.ID, Version: draftVersion(remote), Subject: remote.Subject, Body: shown, BodyHtml: rich, BodyTruncated: truncated || shown != body,
+		MessageId: row.ID, Version: draftVersion(remote), Subject: remote.Subject, Body: shown, BodyHtml: rich, BodyTruncated: truncated,
 		To: draftRecipientAddresses(remote.ToRecipients), Cc: draftRecipientAddresses(remote.CcRecipients), Bcc: draftRecipientAddresses(remote.BccRecipients),
 		HasAttachments: remote.HasAttachments, WebUrl: apiconv.OrNull(outlookWebLink(remote.WebLink)), Schedule: apiconv.OrNull(schedule),
 		ScheduleNeedsReview: active != nil && (active.Status == "needs_review" || active.Status == "scheduled" && active.DraftVersion != draftVersion(remote)),

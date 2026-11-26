@@ -67,7 +67,8 @@ it("keeps the editor open when Escape is pressed during submission", async () =>
     to: ["nadia@example.test"], cc: [], bcc: [], hasAttachments: false, bodyTruncated: false,
     schedule: null, scheduleNeedsReview: false, webUrl: null,
   };
-  vi.spyOn(api, "GET").mockResolvedValue(ok(draft));
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/outlook/messages/{messageId}/attachments"
+    ? ok({ items: [], more: false }) : ok(draft))) as never);
   let finish = () => {};
   const put = vi.spyOn(api, "PUT").mockImplementation(() => new Promise((resolve) => {
     finish = () => { resolve(ok(schedule)); };
@@ -109,11 +110,12 @@ it("creates a draft on the first attachment and keeps unsaved text when removing
     path === "/v1/email-previews" ? ok({ subject: "", bodyHtml: "", missing: [], fieldValues: {} }) : ok(draft)));
   const upload = vi.fn<(url: string, options: RequestInit) => Promise<Response>>().mockResolvedValue(new Response(JSON.stringify({ ...draft, hasAttachments: true, version: "attached" })));
   vi.stubGlobal("fetch", upload);
+  let removed = false; // Outlook lists the file until it is removed
   vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
-    path === "/v1/outlook/messages/{messageId}/attachments" ? ok({ items: [{
+    path === "/v1/outlook/messages/{messageId}/attachments" ? ok({ items: removed ? [] : [{
       id: "test-file", fileName: file.name, sizeBytes: file.size, downloadable: true, savable: true,
     }], more: false }) : path === "/v1/email-signature" ? ok({ bodyHtml: "", version: 0, updatedAt: null }) : ok({ items: [], fields: [] })));
-  const remove = vi.spyOn(api, "DELETE").mockResolvedValue(ok({ ...draft, version: "removed" }));
+  const remove = vi.spyOn(api, "DELETE").mockImplementation(() => { removed = true; return Promise.resolve(ok({ ...draft, version: "removed" })); });
   vi.spyOn(window, "confirm").mockReturnValue(true);
   const send = vi.spyOn(api, "PUT");
   renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} />);
@@ -153,4 +155,18 @@ it("opens a new message with the caret in the message, not on a resize bar", () 
   expect(bars.map((b) => b.getAttribute("aria-label"))).toEqual(["Editor width, left edge", "Editor width, right edge"]);
   expect(bars[0]?.compareDocumentPosition(screen.getByRole("textbox", { name: "Message" })) ?? 0, "after the content")
     .toBe(Node.DOCUMENT_POSITION_PRECEDING);
+});
+
+it("lists a forward's files even while Outlook says it has none", async () => {
+  // Outlook copies a forward's attachments after making it: its flag can still say none.
+  const draft: Schemas["OutlookDraft"] = {
+    messageId: "omg_fw", version: "created", subject: "FW: Resume", body: "", to: [], cc: [], bcc: [], hasAttachments: false,
+    bodyTruncated: false, schedule: null, scheduleNeedsReview: false, webUrl: null,
+  };
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/outlook/messages/{messageId}/attachments"
+    ? ok({ items: [{ id: "f1", fileName: "Aina-Resume.pdf", sizeBytes: 2048, downloadable: true, savable: true }], more: false })
+    : path === "/v1/outlook/drafts/{messageId}" ? ok(draft) : ok({ items: [], fields: [] }))) as never);
+  renderWithClient(<OutlookDraftEditor id="omg_fw" onClose={vi.fn()} />);
+  expect(await screen.findByText("Aina-Resume.pdf")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Remove Aina-Resume.pdf" })).toBeTruthy();
 });

@@ -18,8 +18,10 @@ function attachmentSize(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-export function OutlookAttachments({ messageId, canImportCv = false, userId, remove, tools }: {
+export function OutlookAttachments({ messageId, canImportCv = false, userId, remove, tools, quietWhenEmpty = false }: {
   messageId: string;
+  /** A draft: no "No files attached." line when it has none. */
+  quietWhenEmpty?: boolean;
   canImportCv?: boolean;
   /** Who imports a CV (Import CV shows only with one). */
   userId?: string;
@@ -47,7 +49,7 @@ export function OutlookAttachments({ messageId, canImportCv = false, userId, rem
       <button type="button" onClick={() => { void attachments.refetch(); }} disabled={attachments.isFetching}>Try again</button>
     </ErrorMessage>
     <ErrorMessage error={download.error} />
-    {attachments.data?.items.length === 0 && !attachments.data.more && <p className="muted">No files attached.</p>}
+    {!quietWhenEmpty && attachments.data?.items.length === 0 && !attachments.data.more && <p className="muted">No files attached.</p>}
     {!!attachments.data?.items.length && <ul>
       {attachments.data.items.map((file) => <li key={file.id}>
         <span><strong>{file.fileName}</strong> <small className="muted">{attachmentSize(file.sizeBytes)}</small></span>

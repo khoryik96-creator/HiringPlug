@@ -3203,7 +3203,7 @@ class OutlookDraftInput(BaseModel):
         str | None,
         Field(
             description="Formatted message. This takes precedence over plain text when provided.",
-            max_length=100000,
+            max_length=500000,
         ),
     ] = None
     to: Annotated[list[ToItem] | None, Field(max_length=100)] = None
@@ -3218,7 +3218,7 @@ class OutlookDraftUpdate(BaseModel):
         str | None,
         Field(
             description="Formatted message. This takes precedence over plain text when provided.",
-            max_length=100000,
+            max_length=500000,
         ),
     ] = None
     to: Annotated[list[ToItem] | None, Field(max_length=100)] = None

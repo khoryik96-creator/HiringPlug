@@ -19,8 +19,10 @@ export function OutlookDraftFiles({ draft, disabled, onAdd, onRemove }: {
       if (file) onAdd(file);
     }} />
   </>;
+  // Listed whenever the draft exists: Outlook can say a forward has no attachments
+  // while it is still copying them, so the flag alone would hide them.
   return <section className="full outlook-draft-files" aria-label="Draft attachments">
-    {draft?.hasAttachments ? <OutlookAttachments messageId={draft.messageId} tools={picker} remove={{
+    {draft ? <OutlookAttachments messageId={draft.messageId} tools={picker} quietWhenEmpty remove={{
       disabled, onPick: (file) => { if (window.confirm(`Remove ${file.fileName} from this Outlook draft?`)) onRemove(file); },
     }} /> : <div className="row outlook-draft-file-head">{picker}</div>}
   </section>;

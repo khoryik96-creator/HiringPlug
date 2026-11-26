@@ -13838,7 +13838,7 @@ components:
           maxLength: 40000
         bodyHtml:
           type: string
-          maxLength: 100000
+          maxLength: 500000
           description: Formatted message. This takes precedence over plain text when provided.
         to:
           type: array
@@ -13874,7 +13874,7 @@ components:
           maxLength: 40000
         bodyHtml:
           type: string
-          maxLength: 100000
+          maxLength: 500000
           description: Formatted message. This takes precedence over plain text when provided.
         to:
           type: array
