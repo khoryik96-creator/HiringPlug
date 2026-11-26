@@ -1411,7 +1411,10 @@ answers on a page of their own (module `shortlists`, permission
 - **Making a link** (a job's page): tick cards on the pipeline and press
   **Client link for N**, or **New link for those at Submitted** under
   **Client links**. For each candidate choose one of their formatted CVs
-  (blind ones first) and, if you like, a note for the client; add a message
+  (blind ones first) and, if you like, a note for the client (**+ Add a
+  detail…** puts in their notice period, expected salary, current title and
+  the like, a line each; never their name, so a blind CV stays blind; a salary
+  is asked for only when chosen and logged as shown, as in an email); add a message
   for the top of the page, and how long the link works (7 to 90 days, 14
   unless chosen). The link is shown once, to copy (only a hash of its secret
   is kept). With `emails:send`, **Also email it to <hiring contact>** sends it
@@ -1419,14 +1422,15 @@ answers on a page of their own (module `shortlists`, permission
 - **Only what you chose reaches the client**: the label (a blind CV shows
   "Candidate C-4F2K9Q", a formatted one the name), your note and the CV, as a
   PDF when it has one (named after the label, never the stored file name).
-  Never salary, email or phone: a CV made with salary, or one whose text still
+  Never email or phone, nor salary unless you add it to your note: a CV made with salary, or one whose text still
   shows the candidate's email or phone, is refused, saying which and why
   (cvformats keeps how each formatted CV was made in `formatted_cv`; CVs made
   before are filled in from the audit log). Uploaded CVs cannot be shared.
 - **Consent**: a candidate who withdrew consent (Data protection) cannot be put
   on a link, and one who withdraws later drops off every link at once.
 - **The client's page** (`/shortlist/<link>`, no sign-in, fits a phone): the
-  CV opens on the page (or downloads), then **Approve for interview** or
+  CV opens on the page (on a phone, which shows no PDF inside a page, in a tab
+  of its own; a Word CV downloads), then **Approve for interview** or
   **Reject**, with an optional comment, once per candidate. Approving moves the
   application to Interview (the job's first interview stage with custom
   stages; one that is already further along stays); rejecting closes it as
@@ -1435,7 +1439,9 @@ answers on a page of their own (module `shortlists`, permission
   hour).
 - **What the recruiter sees** (Client links on the job): each link's status
   (open, expired, revoked), whether and when the client opened it, and each
-  candidate's answer and comment. **Revoke** stops a link at once.
+  candidate's answer and comment. **Revoke** stops a link at once. Whoever
+  sent the link gets each answer in the bell, with the client's comment, for
+  seven days, and in the morning email (1.50.0).
 - **Activity**: making a link (job, and each candidate), the client's first
   visit, every answer (job and candidate, "The client approved …") and
   revoking are in the audit log and on the timelines; salary never is.
