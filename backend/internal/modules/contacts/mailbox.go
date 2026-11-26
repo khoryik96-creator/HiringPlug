@@ -284,6 +284,12 @@ func (s *Service) mailboxCheckDied(ctx context.Context, tx pgx.Tx, job jobqueue.
 	if active, err := jobqueue.Active(ctx, tx, []api.JobKind{api.JobKindContactCheckMailbox}, "contactId", payload.ContactId); err != nil || active {
 		return err // a newer check of it decides
 	}
+	if payload.Refresh != nil && *payload.Refresh {
+		// The monthly check again: the last answer stands, and the next month's is queued
+		// (each queues the next, so the checks would stop for good).
+		_, err := jobqueue.ContinueChain(ctx, tx, job, "contactId", payload.ContactId, time.Now().Add(refreshAfter))
+		return err
+	}
 	why := "Not checked: the check stopped. Check it again."
 	if jobqueue.WasCancelledAfterRestore(job) {
 		why = "Not checked: cancelled after the server was restored. Check it again."

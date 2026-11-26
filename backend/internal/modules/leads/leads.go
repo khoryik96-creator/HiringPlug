@@ -56,6 +56,13 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindLeadSourceCheck: m.service.check}
 }
 
+// DeadJobHandlers keep a source's daily checks going when one ended without
+// running (cancelled after a restore, or stopped for good): each check
+// queues the next, so they would stop for good.
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindLeadSourceCheck: checkDied}
+}
+
 // Names returns job leads' names, "Accountant · Maju Bhd" (missing ones are
 // left out), in the caller's transaction.
 func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {

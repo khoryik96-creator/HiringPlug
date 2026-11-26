@@ -420,6 +420,7 @@ func (m *Modules) DeadJobHandlers() jobqueue.Handlers {
 		m.Emails.DeadJobHandlers(), m.Claims.DeadJobHandlers(), m.Documents.DeadJobHandlers(),
 		m.Integrations.DeadJobHandlers(), m.Calendars.DeadJobHandlers(), m.Placements.DeadJobHandlers(),
 		m.Automations.DeadJobHandlers(), m.Notifications.DeadJobHandlers(), m.Contacts.DeadJobHandlers(),
+		m.Leads.DeadJobHandlers(),
 	} {
 		maps.Copy(all, handlers)
 	}

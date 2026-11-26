@@ -214,7 +214,10 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   records the restore (`restore_marker`). Each company releases or cancels
   its own in Settings > System; the agency that runs the server sees and
   settles every company's there, and `hp jobs list|release|cancel` does it on
-  the server. Other companies learn only that some of theirs are held, and
+  the server. A repeating kind (each run queues the next) has a dead-job
+  handler that queues its next normal run when one is cancelled or stops for
+  good (`jobqueue.ContinueChain`: one per chain, keyed by its mailbox,
+  calendar, source or contact), or the chain would end there. Other companies learn only that some of theirs are held, and
   how many. After a restore from another server the alert email waits until
   none is held, 72 hours at most; a public booking page reads no calendar
   meanwhile.

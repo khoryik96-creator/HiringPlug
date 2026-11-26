@@ -253,9 +253,21 @@ func (s *Service) pushFailure(ctx context.Context, conn *pgx.Conn, p authz.Princ
 
 // DeadJobHandlers fail an event's push to the calendar whose job ended
 // without sending it (cancelled after a restore, or stopped for good):
-// pending for ever otherwise. A newer push of it decides instead.
+// pending for ever otherwise. A newer push of it decides instead. A
+// calendar's refresh carries on (each refresh queues the next).
 func (m *Module) DeadJobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindCalendarPush: m.service.pushDied}
+	return jobqueue.Handlers{api.JobKindCalendarPush: m.service.pushDied, api.JobKindCalendarRefresh: refreshDied}
+}
+
+// refreshDied queues a calendar's next refresh, five minutes on, when one
+// ended without running: its sequence did not move, so it is the chain's.
+func refreshDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.CalendarRefreshJob
+	if err := job.Decode(&payload); err != nil || payload.ConnectionId == "" {
+		return nil //nolint:nilerr // an unreadable job names no calendar
+	}
+	_, err := jobqueue.ContinueChain(ctx, tx, job, "connectionId", payload.ConnectionId, time.Now().Add(5*time.Minute))
+	return err
 }
 
 func (s *Service) pushDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {

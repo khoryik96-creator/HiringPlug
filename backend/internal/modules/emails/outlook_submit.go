@@ -28,9 +28,11 @@ func (m *Module) OutsideJobHandlers() jobqueue.OutsideHandlers {
 }
 
 // DeadJobHandlers end what a sending job was for when it ends without
-// running (cancelled after a restore, or stopped for good).
+// running (cancelled after a restore, or stopped for good), and keep a
+// mailbox's Outlook sync going (each run queues the next).
 func (m *Module) DeadJobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{
+		api.JobKindEmailOutlookSync:       outlookSyncDied,
 		api.JobKindEmailOutlookScheduled:  outlookSendDead,
 		api.JobKindEmailSend:              m.service.sendDied,
 		api.JobKindEmailInterviewReminder: m.service.sendDied,

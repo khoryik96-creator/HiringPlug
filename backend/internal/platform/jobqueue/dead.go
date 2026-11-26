@@ -9,6 +9,7 @@ package jobqueue
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -85,4 +86,23 @@ func ActiveFor(ctx context.Context, db Querier, kinds []api.JobKind, key string,
 		out[value] = state
 	}
 	return out, rows.Err()
+}
+
+// ContinueChain queues the next run of a repeating job that ended without
+// running (cancelled after a restore, or stopped for good): each run queues
+// the next, so its chain would end there. The next run is the dead job's own
+// kind and payload, due at; nothing is queued when a run of the same chain
+// (the same key = value, such as a mailboxId) is already waiting, running or
+// held, so a chain has one next run however often this is called. It
+// reports whether it queued one.
+func ContinueChain(ctx context.Context, tx pgx.Tx, dead Job, key, value string, at time.Time) (bool, error) {
+	// One at a time per chain, so two notices of one death cannot both queue a run.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "chain:"+string(dead.Kind)+"/"+key+"="+value); err != nil {
+		return false, err
+	}
+	if active, err := Active(ctx, tx, []api.JobKind{dead.Kind}, key, value); err != nil || active {
+		return false, err
+	}
+	_, err := EnqueueAt(ctx, tx, dead.TenantID, dead.Kind, dead.Payload, at)
+	return err == nil, err
 }

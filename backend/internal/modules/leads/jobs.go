@@ -87,6 +87,33 @@ func (s *Service) check(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error 
 	return audit.Record(ctx, tx, audit.Entry{Action: "lead_source.checked", EntityType: "lead_source", EntityID: src.ID, Changes: changes})
 }
 
+// checkDied schedules a source's next check a day on (CheckEvery) when the
+// check it was scheduled for ended without running. A check for another
+// time (replaced by "check now", or the source turned off) leaves it be, so
+// a source has one next check.
+func checkDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.LeadSourceCheckJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // an unreadable job names no source
+	}
+	q := store.New(tx)
+	src, err := q.GetSource(ctx, payload.SourceId)
+	if database.IsNoRows(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !src.Active || src.NextCheckAt == nil || !src.NextCheckAt.Equal(payload.RunAt) {
+		return nil
+	}
+	next := now().Add(CheckEvery)
+	if _, err := q.ScheduleCheck(ctx, store.ScheduleCheckParams{ID: src.ID, NextCheckAt: &next}); err != nil {
+		return err
+	}
+	return queueCheck(ctx, tx, job.TenantID, src.ID, next)
+}
+
 func defaultName(identifier string) string {
 	_, name, _ := NormalizeSource(CareersPage, identifier, "")
 	return name

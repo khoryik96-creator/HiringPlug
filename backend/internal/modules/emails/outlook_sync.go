@@ -22,6 +22,20 @@ func enqueueOutlook(ctx context.Context, tx pgx.Tx, payload api.OutlookMailSyncJ
 	return err
 }
 
+// outlookSyncDied queues a mailbox's next sync, a minute on, when a run ended
+// without running (cancelled after a restore, or stopped for good): each
+// run queues the next, so its sync would stop for good. The mailbox's
+// generation did not move, so that run is the chain's; a sync turned off
+// since finds no state and does nothing.
+func outlookSyncDied(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.OutlookMailSyncJob
+	if err := job.Decode(&payload); err != nil || payload.MailboxId == "" {
+		return nil //nolint:nilerr // an unreadable job names no mailbox
+	}
+	_, err := jobqueue.ContinueChain(ctx, tx, job, "mailboxId", payload.MailboxId, time.Now().Add(time.Minute))
+	return err
+}
+
 func (s *Service) syncOutlook(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
 	var payload api.OutlookMailSyncJob
 	if err := job.Decode(&payload); err != nil {

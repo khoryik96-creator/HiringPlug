@@ -2085,7 +2085,11 @@ or all at once, after a confirmation (audited). The agency that runs the
 server sees every company's held jobs, with a Company column, and settles
 them for all; other companies see only that some of theirs are held after a
 restore of the server, and how many. A cancelled job's record says it was not
-done (an email "Not sent: cancelled after the server was restored"). After a
+done (an email "Not sent: cancelled after the server was restored"); a
+repeating one skips that run and carries on at its next normal time (the
+Outlook sync a minute on, a calendar's refresh five minutes on, a job-ads
+source the next day, a contact's monthly email check next month, the morning
+email the next morning; 1.50.1). After a
 restore from another server the server's alert email waits until none is
 held, 72 hours at most. **Paid AI** shows whether paid AI is paused on the
 server; an owner of the agency that runs the server pauses it for every
