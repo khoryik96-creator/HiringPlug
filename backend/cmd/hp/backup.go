@@ -1,6 +1,7 @@
 package main
 
 // hp backup [-every 24h]   copy the database and files into HP_BACKUP_DIR (keeps HP_BACKUP_KEEP)
+// hp backup verify NAME    check a backup reads back (database copy and files), without restoring it
 // hp restore -yes NAME     put a backup back (stop the API and workers first)
 // hp fetch [NAME]          bring a backup back from off the server (HP_OFFSITE_*) into HP_BACKUP_DIR
 
@@ -97,7 +98,10 @@ func ownerSetting(name string) (*backup.Owner, error) {
 }
 
 func runBackup(ctx context.Context, args []string) error {
-	c := command{name: "backup", synopsis: "[-every 24h]"}
+	if len(args) > 0 && args[0] == "verify" {
+		return runVerify(ctx, args[1:])
+	}
+	c := command{name: "backup", synopsis: "[-every 24h] | verify NAME"}
 	fs := c.flags()
 	every := fs.Duration("every", 0, "keep running: a backup every this long while the nightly backup is on (Settings), and whenever one is asked for; 0 = one now")
 	if _, err := c.parse(fs, args); err != nil {
@@ -251,5 +255,27 @@ func runFetch(ctx context.Context, args []string) error {
 		return err
 	}
 	fmt.Printf("fetched %s into %s - to put it back, stop the API and workers, then: hp restore -yes %s\n", name, o.Dir, name)
+	return nil
+}
+
+// runVerify checks a backup reads back without restoring it (the API and
+// workers keep running): every backup is checked as it is made, and this
+// checks one again, after copying it or bringing it back (hp fetch).
+func runVerify(ctx context.Context, args []string) error {
+	c := command{name: "backup verify", synopsis: "NAME", min: 1, max: 1}
+	fs := c.flags()
+	names, err := c.parse(fs, args)
+	if err != nil {
+		return err
+	}
+	o, err := backupOptions()
+	if err != nil {
+		return err
+	}
+	got, err := backup.Verify(ctx, o, names[0])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s reads back: its database copy (%d tables with data) and %d files\n", names[0], got.Tables, got.Files)
 	return nil
 }

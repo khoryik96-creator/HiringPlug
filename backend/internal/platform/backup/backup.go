@@ -110,6 +110,11 @@ func Run(ctx context.Context, admin *pgxpool.Pool, o Options) (string, error) {
 	if err == nil {
 		dir, size, err = write(ctx, o, name)
 	}
+	if err == nil { // read back now, not on the day it is needed
+		if _, verr := Verify(ctx, o, name); verr != nil {
+			err = fmt.Errorf("the backup was made but does not read back: %w", verr)
+		}
+	}
 	finish := `UPDATE backup_run SET finished_at = now(), status = 'done', size_bytes = $2 WHERE id = $1`
 	args := []any{runID, size}
 	if err != nil {

@@ -146,6 +146,13 @@ one): do steps 3–5 there with the same off-site settings, then:
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml run --rm backup /app/hp fetch
 ```
 
+Check the copy reads back before stopping anything (every backup is checked
+as it is made; this checks the one brought back):
+
+```bash
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml run --rm backup /app/hp backup verify hiringplug-YYYYMMDD-HHMMSS
+```
+
 ```bash
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml stop api worker ai-worker
 ```
