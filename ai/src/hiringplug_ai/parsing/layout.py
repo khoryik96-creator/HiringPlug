@@ -218,7 +218,7 @@ def section_of(text: str) -> str | None:
 
 
 # What a heading over projects (not jobs) is about.
-_PROJECT_WORDS = frozenset(["project", "projects", "engagement", "engagements", "portfolio", "assignments delivered"])
+_PROJECT_WORDS = frozenset(["project", "projects", "engagement", "engagements", "portfolio"])
 
 
 def _project_heading(text: str, words: list[str]) -> bool:

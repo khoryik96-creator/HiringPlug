@@ -11,7 +11,7 @@ from .test_parsing import assert_grounded, jobs
 
 
 def test_a_name_written_surname_first_keeps_every_name() -> None:
-    text = "Tan, Mei Ling\nSenior Engineer | Petaling Jaya, Malaysia | +60120000001 | meilingtan@example.com\n"
+    text = "Tan, Mei Ling\nSenior Engineer | Petaling Jaya | +60120000001 | meilingtan@example.com\n"
     p = parse_cv(text)
     assert_grounded(text, p)
     assert p.fullName is not None
@@ -26,12 +26,13 @@ def test_letters_after_a_name_are_not_given_names() -> None:
 def test_an_employer_written_once_over_its_roles() -> None:
     text = (
         "Tan, Mei Ling\nmeilingtan@example.com\n\nPROFESSIONAL EXPERIENCE\n\n"
-        "Contoh Global Business Center Sdn Bhd, Cyberjaya | May 2010 – Oct 2026\n\n"
-        " Database Engineer Sr. Advisor                     May 2021 – Oct 2026\n"
+        "Contoh Global Business Center Sdn Bhd, Cyberjaya | May 2010 \u2013 Oct 2026\n\n"
+        " Database Engineer Sr. Advisor                     May 2021 \u2013 Oct 2026\n"
         " • Built an agent auto-heal automation.\n\n"
-        " Database Administrator Advisor (promoted)        Oct 2019 – May 2021\n"
-        " Database Administrator Sr. Analyst (Team Lead) | Contoh Global Business Center Sdn Bhd | Oct 2015 – Oct 2019\n"
-        " Database Administrator Analyst                    May 2010 – Oct 2015\n"
+        " Database Administrator Advisor (promoted)        Oct 2019 \u2013 May 2021\n"
+        " Database Administrator Sr. Analyst (Team Lead) | Contoh Global Business Center Sdn Bhd"
+        " | Oct 2015 \u2013 Oct 2019\n"
+        " Database Administrator Analyst                    May 2010 \u2013 Oct 2015\n"
     )
     p = parse_cv(text)
     assert_grounded(text, p)

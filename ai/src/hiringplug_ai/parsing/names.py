@@ -84,7 +84,7 @@ _SURNAME_FIRST = re.compile(
 
 
 def _surname_first(text: str) -> str | None:
-    """"Koh, Siew Yee" -> "Siew Yee Koh"; None when text is not written that way."""
+    """ "Koh, Siew Yee" -> "Siew Yee Koh"; None when text is not written that way."""
     m = _SURNAME_FIRST.match(text.strip())
     if not m:
         return None
