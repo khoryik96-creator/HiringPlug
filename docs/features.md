@@ -2312,6 +2312,17 @@ tabs links private threads after the recruiter confirms an exact email match.
 on the sender address or words in the subject.
 See [Outlook Mail setup](mailbox-connections.md#outlook-mail).
 
+Since 1.49.0: Outlook Mail opens where it was left (the folder, the message,
+an open draft; kept per person in this browser). **To**, **Cc** and **Bcc**
+suggest the people in your own mail as you type part of an address or a name,
+most written to first. **Save draft**, **Send now** and **Send later** stay in
+view at the bottom of the editor however long the reply, and **Dock right**
+puts the editor on the right, below the top bar, so mail can be read beside it
+(it opens there again). A forward of a long thread stays editable, so its
+quoted part can be cut (only a draft over 500,000 characters of formatting is
+edited in Outlook), and a forward's attachments are listed while Outlook is
+still copying them.
+
 Use **New message** or **Drafts** in Outlook Mail to edit a personal draft or
 queue it for immediate or scheduled send. **Scheduled** shows send status,
 lets the owner cancel pending delivery, and opens the reviewed draft for edits
