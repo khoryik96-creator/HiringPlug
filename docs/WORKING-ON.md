@@ -20,6 +20,19 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
+### Owner's list of 26 Nov: CV reading, email, client link, small fixes
+- Who: Claude (account B), session on branch claude/brave-thompson-k08hlg
+- Branch: claude/brave-thompson-k08hlg
+- Touches: CV reading (ai/ parser: names, current job title and employer), Outlook mail screens (forward with
+  attachments and an editable body, remembered recipients, last place visited, docking right, Send always in view),
+  client shortlist link (notify the recruiter on an answer, fields in our comment, the CV viewable on a phone),
+  booking links (Teams link / phone, or ask for theirs), company country tag after the name, Team page
+  (Cancel invitation button), dropping CVs anywhere on the candidate list, removing a candidate from a job,
+  "Your sign-in is invalid or has expired" while working
+- Started: 26 Nov 2026    Last update: 26 Nov 2026
+- State: in progress
+- Next: the list above, CV reading first; each part merged on its own
+
 ### Post-migration fixes and the HyPlug rename (paused)
 - Who: Claude (account A), session "Hiring Plug"
 - Branch: claude/relaxed-hopper-ex7y3v (in step with main; nothing unmerged)
