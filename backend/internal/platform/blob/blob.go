@@ -105,6 +105,33 @@ func (s *Store) SignedURL(key string, ttl time.Duration) string {
 	return s.baseURL + PathPrefix + key + "?" + q.Encode()
 }
 
+// Renew returns a new link (lasting ttl) for the file of an old one that no
+// longer works here: expired, or signed by another server (a backup restored
+// from it). It returns false for a link that still works here (whatever
+// refused it, a new one would be refused too) or that is not one of these
+// file links.
+func (s *Store) Renew(link string, ttl time.Duration) (string, bool) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return "", false
+	}
+	at := strings.Index(u.Path, PathPrefix)
+	if at < 0 {
+		return "", false
+	}
+	key := u.Path[at+len(PathPrefix):]
+	if !keyRe.MatchString(key) {
+		return "", false
+	}
+	exp, sig := u.Query().Get("exp"), u.Query().Get("sig")
+	until, err := strconv.ParseInt(exp, 10, 64)
+	works := err == nil && hmac.Equal([]byte(sig), []byte(s.sign(key, exp))) && s.now().Unix() < until
+	if works {
+		return "", false
+	}
+	return s.SignedURL(key, ttl), true
+}
+
 // Open returns the stored file for reading; the caller closes it. A file
 // saved before subfolders is found where it was.
 func (s *Store) Open(key string) (*os.File, error) {

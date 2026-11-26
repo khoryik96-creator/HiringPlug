@@ -56,6 +56,34 @@ func TestLinksStopWorking(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, get(s, link).Code, "expired")
 }
 
+// A link that stopped working here (expired, or signed by another server
+// whose backup was restored here) is renewed; one that still works is not,
+// so a refusal for another reason cannot go round for ever.
+func TestALinkThatNoLongerWorksIsRenewed(t *testing.T) {
+	s := newStore(t)
+	require.NoError(t, s.Put("tnt_a/doc_b", []byte("cv")))
+	link := s.SignedURL("tnt_a/doc_b", time.Minute)
+	_, ok := s.Renew(link, time.Hour)
+	assert.False(t, ok, "it still works")
+
+	other, err := New(t.TempDir(), []byte("another-servers-secret-0123456789"), "http://old-server.test")
+	require.NoError(t, err)
+	renewed, ok := s.Renew(other.SignedURL("tnt_a/doc_b", time.Minute), time.Hour)
+	require.True(t, ok, "signed by another server")
+	assert.Equal(t, http.StatusOK, get(s, renewed).Code)
+	assert.True(t, strings.HasPrefix(renewed, "http://api.test"+PathPrefix+"tnt_a/doc_b?"), "this server's address")
+
+	s.now = func() time.Time { return time.Now().Add(2 * time.Minute) }
+	renewed, ok = s.Renew(link, time.Hour)
+	require.True(t, ok, "expired")
+	assert.Equal(t, http.StatusOK, get(s, renewed).Code)
+
+	for _, bad := range []string{"https://example.test/cv.pdf", "http://api.test" + PathPrefix + "../etc/passwd?exp=1&sig=x", "::"} {
+		_, ok := s.Renew(bad, time.Hour)
+		assert.False(t, ok, bad)
+	}
+}
+
 func TestKeysCannotEscapeTheStorageDirectory(t *testing.T) {
 	s := newStore(t)
 	for _, key := range []string{"../etc/passwd", "/abs", "a/../../b", "A/B", ""} {

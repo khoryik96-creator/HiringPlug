@@ -113,6 +113,10 @@ func NewHTTPHandler(d Deps, m *Modules) (http.Handler, error) {
 	})
 }
 
+// relinkTTL is how long a renewed file link for an AI-queue job lasts: as
+// long as the first (the AI worker may be busy or down for a while).
+const relinkTTL = 7 * 24 * time.Hour
+
 // NewWorker builds the Go worker for the core job queue.
 func NewWorker(d Deps, m *Modules) (*jobqueue.Worker, error) {
 	handlers, err := m.JobHandlers()
@@ -127,6 +131,7 @@ func NewWorker(d Deps, m *Modules) (*jobqueue.Worker, error) {
 		Handlers: handlers,
 		Outside:  m.OutsideJobHandlers(),
 		OnDead:   m.DeadJobHandlers(),
+		Relink:   func(link string) (string, bool) { return d.Files.Renew(link, relinkTTL) },
 		Logger:   d.Logger,
 		Lease:    5 * time.Minute,
 		Idle:     2 * time.Second,

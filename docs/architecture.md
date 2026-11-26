@@ -193,7 +193,11 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   (`background_job.ended`) in the very transaction that ends the job,
   whatever ended it (and for a held job cancelled), and the Go worker runs the
   kind's handler with the dead job: a CV whose reading died is marked failed,
-  or goes back to the details read before, never "being read" forever. The
+  or goes back to the details read before, never "being read" forever. One
+  given up because its file link no longer works here (it waited past the
+  link's life, or was signed by the server a backup came from) is queued
+  again with a new link instead (`Worker.Relink`, `blob.Store.Renew`); a link
+  that still works here is never renewed, so this cannot go round. The
   worker's hourly upkeep also ends readings left with no job at all
   (`document_reading_stuck`: a crash, a restore, older data), oldest first,
   leaving out for a day those it could not set right. Ending a reading locks

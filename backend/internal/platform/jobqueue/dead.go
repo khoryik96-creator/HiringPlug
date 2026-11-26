@@ -9,6 +9,8 @@ package jobqueue
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -47,7 +49,39 @@ func (w *Worker) jobEnded(ctx context.Context, tx pgx.Tx, notice Job) error {
 		return err
 	}
 	dead.Kind = api.JobKind(kind)
+	if again, err := w.relinked(ctx, tx, dead); err != nil || again {
+		return err
+	}
 	return handler(ctx, tx, dead)
+}
+
+// LinkExpired starts the reason an AI-queue job gives up when the file
+// server refused its link (the Python worker records its error's name first:
+// "LinkExpiredError: link expired (HTTP 403): ...").
+const LinkExpired = "LinkExpiredError:"
+
+// relinked queues an AI-queue job again with a new link to its file when it
+// died because its link no longer works (it waited past the link's life, in
+// the queue or held after a restore, or the backup came from another
+// server): the file is still there, so the work is not lost. A link that
+// still works here is not renewed, so a refusal for another reason cannot
+// go round for ever.
+func (w *Worker) relinked(ctx context.Context, tx pgx.Tx, dead Job) (bool, error) {
+	if w.Relink == nil || dead.Queue != QueueAI || !strings.HasPrefix(dead.LastError, LinkExpired) {
+		return false, nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(dead.Payload, &payload); err != nil {
+		return false, nil //nolint:nilerr // not a payload with a link
+	}
+	old, _ := payload["downloadUrl"].(string)
+	link, ok := w.Relink(old)
+	if !ok {
+		return false, nil
+	}
+	payload["downloadUrl"] = link
+	_, err := Enqueue(ctx, tx, dead.TenantID, dead.Kind, payload)
+	return err == nil, err
 }
 
 // Active reports whether the caller's company (the transaction's tenant)

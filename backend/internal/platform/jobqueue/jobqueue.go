@@ -122,6 +122,10 @@ type Worker struct {
 	// transaction that exhausts its retries; an AI-queue job's in the one
 	// that handles the database's notice of it (background_job.ended, see dead.go).
 	OnDead Handlers
+	// Relink gives a new link for a file link that no longer works here
+	// (expired, or signed by another server): an AI-queue job that died of
+	// one is queued again with it, not ended (see dead.go). Nil: never.
+	Relink func(link string) (string, bool)
 	Logger *slog.Logger
 	Lease  time.Duration // how long a claimed job is ours before others may retry it
 	Idle   time.Duration // how long to wait for new jobs when the queue is empty
