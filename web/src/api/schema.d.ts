@@ -7999,6 +7999,8 @@ export interface components {
             category: string | null;
             industry: string | null;
             city: string | null;
+            /** @description Two-letter code, e.g. MY: shown as [MY] after the company's name. */
+            country: string | null;
             website: string | null;
             linkedinUrl: string | null;
             /** Format: date-time */

@@ -31,7 +31,7 @@ func (h *HTTP) ListCompanies(ctx context.Context, req api.ListCompaniesRequestOb
 	for i, s := range page.Items {
 		out.Items[i] = api.CompanySummary{
 			Id: s.ID, Name: s.Name, Type: api.CompanyType(s.Type), Category: c.OrNull(s.Category), Industry: c.OrNull(s.Industry),
-			City: c.OrNull(s.City), Website: c.OrNull(s.Website), LinkedinUrl: c.OrNull(s.LinkedinURL), UpdatedAt: s.UpdatedAt,
+			City: c.OrNull(s.City), Country: c.OrNull(s.Country), Website: c.OrNull(s.Website), LinkedinUrl: c.OrNull(s.LinkedinURL), UpdatedAt: s.UpdatedAt,
 		}
 	}
 	return out, nil

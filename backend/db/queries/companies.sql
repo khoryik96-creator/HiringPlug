@@ -44,7 +44,7 @@ RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- name: ListCompanies :many
-SELECT id, name, type, category, industry, city, website, linkedin_url, updated_at
+SELECT id, name, type, category, industry, city, country, website, linkedin_url, updated_at
 FROM company
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(type)::text IS NULL OR type = sqlc.narg(type)::text)

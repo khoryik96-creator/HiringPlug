@@ -1693,3 +1693,7 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 /* A red action in a row's menu (Cancel invitation): red words, not a solid red button. */
 .menu-list button.danger { background: none; border: 0; color: #b91c1c; }
 .menu-list button.danger:hover, .menu-list button.danger:focus-visible { background: #fee2e2; filter: none; }
+
+/* A company's country after its name: [MY]. */
+.country-tag { font-size: 0.78em; font-weight: 700; color: var(--muted); letter-spacing: 0.03em; white-space: nowrap; font-family: "Inter Variable", system-ui, sans-serif; }
+.banner-name .country-tag { font-size: 0.5em; vertical-align: middle; }

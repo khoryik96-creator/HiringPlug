@@ -1,6 +1,7 @@
 import { api, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
 import { type Picked, SearchPicker } from "./SearchPicker";
+import { withCountry } from "./CountryTag";
 
 export type PickedCompany = Picked;
 
@@ -19,7 +20,7 @@ export function CompanyPicker(props: {
       placeholder="Search companies"
       noMatch="No company matches. Add it under Companies first."
       search={async (q) =>
-        unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: 8 } } })).items.map((c) => ({ id: c.id, name: c.name, detail: c.city }))}
+        unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: 8 } } })).items.map((c) => ({ id: c.id, name: withCountry(c.name, c.country), detail: c.city }))}
     />
   );
 }

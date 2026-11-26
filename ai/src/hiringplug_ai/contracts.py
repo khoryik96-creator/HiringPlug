@@ -2174,6 +2174,9 @@ class CompanySummary(BaseModel):
     category: Annotated[str | None, Field(...)]
     industry: Annotated[str | None, Field(...)]
     city: Annotated[str | None, Field(...)]
+    country: Annotated[
+        str | None, Field(description="Two-letter code, e.g. MY: shown as [MY] after the company's name.")
+    ]
     website: Annotated[str | None, Field(...)]
     linkedinUrl: Annotated[str | None, Field(...)]
     updatedAt: AwareDatetime

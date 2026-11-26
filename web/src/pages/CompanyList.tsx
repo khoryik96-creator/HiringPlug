@@ -19,6 +19,7 @@ import { hashParam } from "../hashQuery";
 import { PinnedScroll } from "../components/StickyScrollbar";
 import { useColumnMove, useStoredOrder } from "../components/useColumnMove";
 import { useColumnWidths } from "../components/useColumnWidths";
+import { CountryTag } from "../components/CountryTag";
 
 type TypeFilter = "" | Schemas["CompanyType"];
 
@@ -149,7 +150,7 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
           {items?.map((c) => (
             <tr key={c.id} {...picking.rowProps(c.id)}>
               <td {...folders.drag(c.id, chosen)}>
-                <a href={`#/companies/${c.id}`}>{c.name}</a>
+                <a href={`#/companies/${c.id}`}>{c.name}</a> <CountryTag country={c.country} />
                 {chosen.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
               </td>
               {columns.order.map((k) => <td key={k}>{CELLS[k].cell(c, fs)}</td>)}

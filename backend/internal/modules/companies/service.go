@@ -280,7 +280,7 @@ func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f Li
 	}
 	page.Items = make([]Summary, len(rows))
 	for i, r := range rows {
-		page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Website: r.Website, LinkedinURL: r.LinkedinUrl, UpdatedAt: r.UpdatedAt}
+		page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Country: r.Country, Website: r.Website, LinkedinURL: r.LinkedinUrl, UpdatedAt: r.UpdatedAt}
 	}
 	return page, nil
 }

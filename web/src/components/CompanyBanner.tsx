@@ -12,6 +12,7 @@ import { cardGradient, UNKNOWN_CATEGORY } from "./companyCategory";
 import { ErrorMessage } from "./ErrorMessage";
 import { bySalary, guaranteeLabel } from "./termsTiers";
 import { useFieldSettings } from "./useFieldSettings";
+import { CountryTag } from "./CountryTag";
 
 type Company = Schemas["Company"];
 
@@ -68,7 +69,7 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
         <div className="banner-top">
           <div className="banner-who">
             <div className="row">
-              <h2 className="banner-name">{c.name}</h2>
+              <h2 className="banner-name">{c.name} <CountryTag country={c.country} /></h2>
               <span className="banner-status" style={{ color: color === "#6b7280" ? undefined : color }}>{fs.label("company_category", category)}</span>
             </div>
             <p className="banner-job">{[COMPANY_TYPE[c.type], c.industry].filter(Boolean).join(" · ")}</p>

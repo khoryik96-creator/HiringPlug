@@ -787,7 +787,7 @@ func (q *Queries) LegacyIndustries(ctx context.Context) ([]LegacyIndustriesRow, 
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT id, name, type, category, industry, city, website, linkedin_url, updated_at
+SELECT id, name, type, category, industry, city, country, website, linkedin_url, updated_at
 FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
@@ -825,6 +825,7 @@ type ListCompaniesRow struct {
 	Category    *string
 	Industry    *string
 	City        *string
+	Country     *string
 	Website     *string
 	LinkedinUrl *string
 	UpdatedAt   time.Time
@@ -856,6 +857,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.Category,
 			&i.Industry,
 			&i.City,
+			&i.Country,
 			&i.Website,
 			&i.LinkedinUrl,
 			&i.UpdatedAt,

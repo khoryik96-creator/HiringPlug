@@ -12533,7 +12533,7 @@ components:
         items: {type: array, items: {$ref: '#/components/schemas/CompanyDuplicateGroup'}}
     CompanySummary:
       type: object
-      required: [id, name, type, category, industry, city, website, linkedinUrl, updatedAt]
+      required: [id, name, type, category, industry, city, country, website, linkedinUrl, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/CompanyId'}
         name: {type: string}
@@ -12541,6 +12541,7 @@ components:
         category: {type: string, nullable: true}
         industry: {type: string, nullable: true}
         city: {type: string, nullable: true}
+        country: {type: string, nullable: true, description: "Two-letter code, e.g. MY: shown as [MY] after the company's name."}
         website: {type: string, nullable: true}
         linkedinUrl: {type: string, nullable: true}
         updatedAt: {type: string, format: date-time}

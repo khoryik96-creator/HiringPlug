@@ -62,6 +62,7 @@ type Summary struct {
 	Industry           *string
 	IndustrySelections *classification.Selections
 	City               *string
+	Country            *string
 	Website            *string
 	LinkedinURL        *string
 	UpdatedAt          time.Time
