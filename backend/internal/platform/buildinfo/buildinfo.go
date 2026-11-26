@@ -41,7 +41,7 @@ func fromCheckout() string {
 		return "unknown"
 	}
 	for range 6 {
-		if b, err := os.ReadFile(filepath.Join(dir, "VERSION")); err == nil {
+		if b, err := os.ReadFile(filepath.Join(dir, "VERSION")); err == nil { //nolint:gosec // the checkout's own VERSION file, above the working directory
 			if v := strings.TrimSpace(string(b)); plain.MatchString(v) {
 				return v
 			}
