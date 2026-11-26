@@ -15,6 +15,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   window.location.hash = "";
+  localStorage.clear(); // where each test's mail was left
 });
 
 it("finds mail from the candidate context and explicitly links the selected conversation", async () => {
@@ -162,4 +163,31 @@ it("keeps the message list to about half of what the folders leave, so dragging 
   expect(listLimit(900, 200)).toBe(341);
   expect(listLimit(600, 200), "never narrower than the list's least").toBe(260);
   expect(listLimit(4000, 200), "nor wider than its most").toBe(760);
+});
+
+it("opens again where the person left it: their folder, message and open draft", async () => {
+  window.location.hash = "#/outlook";
+  const folders = [{ id: "omf_inbox", name: "Inbox", kind: "inbox" }, { id: "omf_drafts", name: "Drafts", kind: "drafts" }];
+  const inbox = { id: "omg_in", folderId: "omf_inbox", conversation: "t1", subject: "Interview on Tuesday", sender: "nadia@example.test", receivedAt: "2026-11-18T01:00:00Z", isRead: true, isDraft: false };
+  const drafted = { id: "omg_d", folderId: "omf_drafts", conversation: "t2", subject: "Shortlist for Grab", sender: "me@example.test", receivedAt: "2026-11-18T02:00:00Z", isRead: true, isDraft: true };
+  const draft: Schemas["OutlookDraft"] = { messageId: "omg_d", version: "v", subject: "Shortlist for Grab", body: "Three profiles.", to: [], cc: [], bcc: [],
+    hasAttachments: false, bodyTruncated: false, schedule: null, scheduleNeedsReview: false, webUrl: null };
+  const get = vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: { folder?: string } } }) => Promise.resolve(
+    path === "/v1/outlook/mail" ? ok({ connected: true, enabled: true, folders,
+      items: init?.params?.query?.folder === "omf_drafts" ? [drafted] : [inbox] })
+      : path === "/v1/outlook/drafts/{messageId}" ? ok(draft) : ok({ items: [], more: false, fields: [] }))) as never);
+  renderWithClient(<OutlookMail userId="usr_1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Drafts" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Shortlist for Grab/ }));
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+  cleanup(); // away to another page
+  get.mockClear();
+  renderWithClient(<OutlookMail userId="usr_1" />);
+  expect(await screen.findByRole("dialog")).toBeTruthy(); // the draft, open again
+  const listed = (get.mock.calls as unknown[][]).find((c) => c[0] === "/v1/outlook/mail");
+  expect(listed?.[1]).toMatchObject({ params: { query: { folder: "omf_drafts" } } });
+  cleanup();
+  renderWithClient(<OutlookMail userId="usr_2" />); // someone else's mail starts at their inbox
+  await screen.findByRole("button", { name: /Interview on Tuesday/ });
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

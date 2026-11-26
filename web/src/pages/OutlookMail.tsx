@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, useState, useSyncExternalStore } from "react";
+import { type CSSProperties, useEffect, useState, useSyncExternalStore } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { ClockIcon, FileIcon, IconActions, IconButton, IconLink, PowerIcon, RefreshIcon, StepsIcon } from "../components/ActionIcons";
@@ -21,6 +21,21 @@ type Folder = Schemas["OutlookMailFolder"];
 function watchWidth(change: () => void) {
   window.addEventListener("resize", change);
   return () => { window.removeEventListener("resize", change); };
+}
+
+/** Where the person last was in their mail (folder, thread, message, open draft), kept in this browser. */
+type Place = { folder: string; thread: string; selected: string; draft: string };
+const placeKey = (userId?: string) => `hiringplug.outlook.place:${userId ?? ""}`;
+export function loadPlace(userId?: string): Place | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(placeKey(userId)) ?? "null") as Partial<Place> | null;
+    if (!v || typeof v !== "object") return null;
+    const text = (x: unknown) => (typeof x === "string" ? x : "");
+    return { folder: text(v.folder), thread: text(v.thread), selected: text(v.selected), draft: text(v.draft) };
+  } catch { return null; }
+}
+function savePlace(userId: string | undefined, place: Place) {
+  try { localStorage.setItem(placeKey(userId), JSON.stringify(place)); } catch { /* private window: not kept */ }
 }
 
 /** The widest the message list may be: about half of what the folders leave, so the reading pane keeps room. */
@@ -51,13 +66,17 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
   userId?: string;
 }) {
   const client = useQueryClient();
+  // Opened plainly (not for a profile, a search or a thread): back where they last were.
+  const [last] = useState(() => (!profile && !initialSearch && !initialThread ? loadPlace(userId) : null));
   const [search, setSearch] = useState(initialSearch);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [linked, setLinked] = useState(!!profile && !initialSearch);
-  const [folder, setFolder] = useState("");
-  const [thread, setThread] = useState(initialThread);
+  const [folder, setFolder] = useState(last?.folder ?? "");
+  const [thread, setThread] = useState(last?.thread || initialThread);
   const [offset, setOffset] = useState(0);
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<string | undefined>(last?.selected || undefined);
+  // The draft that was open: opened again once the mail shows it is still there.
+  const [draftToReopen, setDraftToReopen] = useState(last?.draft ?? "");
   const [scheduled, setScheduled] = useState(false);
   const [atsComposer, setATSComposer] = useState(false);
   // A null message starts a new draft.
@@ -95,6 +114,14 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
     },
   });
   const data = result.data;
+  if (draftToReopen && data) {
+    setDraftToReopen("");
+    if (data.items.some((m) => m.id === draftToReopen && m.isDraft)) setDraft({ id: draftToReopen, focusMessage: false, fresh: false });
+  }
+  useEffect(() => {
+    if (profile || search) return; // a profile's or a search's mail is not where they work from
+    savePlace(userId, { folder, thread, selected: selected ?? "", draft: draft?.id ?? "" });
+  }, [profile, search, userId, folder, thread, selected, draft?.id]);
   const folders = data?.folders ?? [];
   const active = data?.items.find((item) => item.id === selected);
   const inbox = folders.find((item) => item.kind === "inbox")?.id;
