@@ -35,7 +35,7 @@ describe("company pages", () => {
   it("shows a company in words, with an edit button for those who may edit", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER.concat("companies:update")} />);
-    await screen.findByRole("heading", { name: "Grab" });
+    expect((await screen.findByRole("heading", { name: /^Grab\b/ })).textContent).toBe("Grab [SG]"); // its country after its name
     const card = screen.getByRole("region", { name: "Company" });
     expect(within(card).getByText("Prospect · Technology")).toBeTruthy();
     expect(within(card).getByText("Singapore, Singapore (SG)")).toBeTruthy();
@@ -75,7 +75,7 @@ describe("company pages", () => {
         allTime: [{ currency: "MYR", total: "30000.00", notInvoiced: "30000.00", invoiced: "0.00", paid: "0.00" }] }
       : answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER.concat("placements:read", "placements.fees:read")} />);
-    await screen.findByRole("heading", { name: "Grab" });
+    await screen.findByRole("heading", { name: /^Grab\b/ });
     const card = screen.getByRole("region", { name: "Company" });
     expect(await within(card).findByText("RM 20,000")).toBeTruthy();
     expect(within(card).getByText("Billing 2026"), "the agency's year, from the server").toBeTruthy();
@@ -98,7 +98,7 @@ describe("company pages", () => {
   it("leaves the billing out for those who may not see fees", async () => {
     const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER} />);
-    await screen.findByRole("heading", { name: "Grab" });
+    await screen.findByRole("heading", { name: /^Grab\b/ });
     expect(screen.queryByText(/^Billing/)).toBeNull();
     expect(get.mock.calls.some((call) => (call as unknown[])[0] === "/v1/companies/{companyId}/billing")).toBe(false);
   });
@@ -113,7 +113,7 @@ describe("company pages", () => {
   it("gives viewers no edit or add buttons", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={["companies:read"]} />);
-    await screen.findByRole("heading", { name: "Grab" });
+    await screen.findByRole("heading", { name: /^Grab\b/ });
     expect(screen.queryByRole("button", { name: "Edit company" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Category" }), "changing the category is an edit").toBeNull();
     expect(screen.queryByRole("region", { name: "From the website" })).toBeNull();
