@@ -20,7 +20,7 @@ const dropOn = (el: Element, files: File[]) => {
 };
 
 describe("CVs dropped while an import is open", () => {
-  it("never replace the import: a drop elsewhere says to use its box", async () => {
+  it("join the open import, wherever on the page they are dropped", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
       path === "/v1/candidates" ? ok({ items: [summary], nextCursor: null })
         : path === "/v1/settings/fields" ? ok(testFieldSettings())
@@ -32,9 +32,11 @@ describe("CVs dropped while an import is open", () => {
     const panel = await screen.findByRole("region", { name: "CV import" });
     expect(screen.queryByText(/Drop CVs anywhere to upload/), "no second way in while one is open").toBeNull();
     dropOn(screen.getByText("Siti Aisyah"), [pdf("second-cv.pdf")]);
-    expect(screen.getByRole("region", { name: "CV import" })).toBe(panel);
-    expect(panel.textContent, "the first import stays as it was").toContain("first-cv.pdf");
-    expect(panel.textContent).not.toContain("second-cv.pdf");
-    expect(screen.getByText("To add more CVs to this import, drop them on its box below.")).toBeTruthy();
+    dropOn(screen.getByText("Siti Aisyah"), [pdf("third-cv.pdf"), pdf("first-cv.pdf")]);
+    expect(screen.getByRole("region", { name: "CV import" }), "the same import").toBe(panel);
+    expect(panel.textContent).toContain("first-cv.pdf");
+    expect(panel.textContent, "the second drop joins it").toContain("second-cv.pdf");
+    expect(panel.textContent, "and the third").toContain("third-cv.pdf");
+    expect(panel.textContent.split("first-cv.pdf").length, "a CV dropped again is not added twice").toBe(2);
   });
 });

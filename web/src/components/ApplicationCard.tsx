@@ -1,12 +1,29 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { Application, Schemas } from "../api/client";
+import { api, type Application, type Schemas, unwrap } from "../api/client";
+import { applicationsKey } from "../api/keys";
+import { ErrorMessage } from "./ErrorMessage";
 import { CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
 import { type Column, columnOf } from "./stages/columns";
 import type { MoveRequest } from "./useMoveApplication";
 
 type Stage = Schemas["Stage"];
 const isClosed = (s: Stage) => s === "rejected" || s === "withdrawn";
+const REMOVE = "__remove";
+
+/** Takes a candidate off a job they were put on by mistake (not one with an interview, offer, placement or client link). */
+function useRemoveApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (app: Application) => {
+      unwrap(await api.DELETE("/v1/applications/{applicationId}", {
+        params: { path: { applicationId: app.id }, query: { version: app.version } },
+      }));
+    },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: applicationsKey }); },
+  });
+}
 
 /** Where an application can be moved: the job's own stages when known, else the standard ones. */
 function targets(columns?: Column[]): Column[] {
@@ -22,6 +39,7 @@ export function MoveMenu({ app, onMove, busy, columns }: {
   const [closing, setClosing] = useState<Stage | null>(null);
   const [reason, setReason] = useState<"" | Schemas["CloseReason"]>("");
   const [note, setNote] = useState("");
+  const remove = useRemoveApplication();
   const here = columns ? columnOf(app, columns) : undefined;
   const open = targets(columns).filter((c) => (columns ? c.key !== here?.key : c.stage !== app.stage));
   const closes = (["rejected", "withdrawn"] as Stage[]).filter((s) => s !== app.stage);
@@ -49,12 +67,18 @@ export function MoveMenu({ app, onMove, busy, columns }: {
     );
   }
   return (
+    <>
     <select
       aria-label={`Move ${app.candidateName} on ${app.jobTitle}`}
       value=""
-      disabled={busy}
+      disabled={busy || remove.isPending}
       onChange={(e) => {
         const value = e.target.value;
+        if (value === REMOVE) {
+          if (window.confirm(`Take ${app.candidateName} off ${app.jobTitle}? Use this for a candidate put on the job by mistake: `
+            + "their stage history on it goes. The candidate stays.")) remove.mutate(app);
+          return;
+        }
         if (value === "rejected" || value === "withdrawn") { setClosing(value); return; }
         const to = open.find((c) => c.key === value);
         if (to) onMove({ app, stage: to.stage, step: to.step });
@@ -63,7 +87,10 @@ export function MoveMenu({ app, onMove, busy, columns }: {
       <option value="">{isClosed(app.stage) ? "Reopen at…" : "Move to…"}</option>
       {open.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
       {closes.map((s) => <option key={s} value={s}>{STAGE[s]}</option>)}
+      <option value={REMOVE}>Take off this job…</option>
     </select>
+    <ErrorMessage error={remove.error} />
+    </>
   );
 }
 

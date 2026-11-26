@@ -1689,3 +1689,7 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
   padding: 1rem 1.1rem; background: var(--surface); border: 1px solid #fcd34d; border-left: 4px solid #f59e0b; border-radius: 12px;
   box-shadow: 0 12px 32px rgba(40, 20, 90, 0.18); }
 .session-countdown { font-variant-numeric: tabular-nums; }
+
+/* A red action in a row's menu (Cancel invitation): red words, not a solid red button. */
+.menu-list button.danger { background: none; border: 0; color: #b91c1c; }
+.menu-list button.danger:hover, .menu-list button.danger:focus-visible { background: #fee2e2; filter: none; }

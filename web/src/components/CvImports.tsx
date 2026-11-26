@@ -51,14 +51,21 @@ async function sendFile(importId: string, file: File, token: string | null): Pro
  * first ("" when it must be picked: files dropped elsewhere were dropped
  * without seeing it).
  */
-export function CvImports({ foldedHistory = false, initialFiles, initialSource = "linkedin" }: {
+export function CvImports({ foldedHistory = false, initialFiles, initialSource = "linkedin", moreFiles }: {
   foldedHistory?: boolean; initialFiles?: File[]; initialSource?: string;
+  /** More CVs dropped on the page while this import is open: added to it. */
+  moreFiles?: { files: File[]; at: number };
 } = {}) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
   const [source, setSource] = useState(initialSource);
   const [tried, setTried] = useState(false); // Import was pressed: a missing source is outlined
   const [files, setFiles] = useState<File[]>(initialFiles ?? []);
+  const [addedAt, setAddedAt] = useState(moreFiles?.at);
+  if (moreFiles && moreFiles.at !== addedAt) { // a new drop on the page: its CVs join the import
+    setAddedAt(moreFiles.at);
+    setFiles((had) => [...had, ...moreFiles.files.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);
+  }
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [review, setReview] = useState<Review | null>(null);

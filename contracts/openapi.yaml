@@ -57,6 +57,11 @@ x-error-codes:
     module: pipeline
     status: 409
     description: The candidate is already on this job. `details.existingApplicationId` points to it.
+  APPLICATION_NOT_REMOVABLE:
+    module: pipeline
+    status: 409
+    description: |
+      The application has an interview, an offer, a placement or a client link: it is kept (move it to Withdrawn instead). The message says which.
   ASSISTANT_LIMIT_REACHED:
     module: assistant
     status: 429
@@ -8067,6 +8072,33 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/applications/{applicationId}:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationIdPath'
+    delete:
+      operationId: removeApplication
+      tags: [pipeline]
+      summary: Take a candidate off a job (added by mistake)
+      description: >
+        The application and its stage history go; the candidate and the job stay. Refused (APPLICATION_NOT_REMOVABLE) when it has an interview, an offer, a placement or a client link: move it to Withdrawn instead. `version` must be the version you loaded.
+
+      x-permission: pipeline:update
+      parameters:
+        - name: version
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1}
+      responses:
+        '204': {description: Taken off the job}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Changed since loaded (CONFLICT), or kept for its records (APPLICATION_NOT_REMOVABLE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/applications/{applicationId}/move:
     parameters:
       - $ref: '#/components/parameters/ApplicationIdPath'
@@ -9820,6 +9852,7 @@ components:
         - APOLLO_BROKER_UNAVAILABLE
         - APPLICATIONS_OVERLAP
         - APPLICATION_EXISTS
+        - APPLICATION_NOT_REMOVABLE
         - ASSISTANT_LIMIT_REACHED
         - ASSISTANT_OFF
         - AUTOMATION_NOT_ALLOWED

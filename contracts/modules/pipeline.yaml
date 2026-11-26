@@ -23,6 +23,11 @@ x-module:
         Two candidates being merged are on the same job, and both applications there carry interviews, offers or a
         placement: nothing is deleted. Remove one of the two applications by hand, then merge. `details.jobId`
         names the job.
+    APPLICATION_NOT_REMOVABLE:
+      status: 409
+      description: >
+        The application has an interview, an offer, a placement or a client link: it is kept (move it to
+        Withdrawn instead). The message says which.
     STAGE_MOVE_NOT_ALLOWED:
       status: 422
       description: The move breaks a pipeline rule (the message says which), e.g. rejecting without a reason.
@@ -105,6 +110,36 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/applications/{applicationId}:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationIdPath'
+    delete:
+      operationId: removeApplication
+      tags: [pipeline]
+      summary: Take a candidate off a job (added by mistake)
+      description: >
+        The application and its stage history go; the candidate and the job
+        stay. Refused (APPLICATION_NOT_REMOVABLE) when it has an interview, an
+        offer, a placement or a client link: move it to Withdrawn instead.
+        `version` must be the version you loaded.
+      x-permission: pipeline:update
+      parameters:
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '204': { description: Taken off the job }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Changed since loaded (CONFLICT), or kept for its records (APPLICATION_NOT_REMOVABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /v1/applications/{applicationId}/move:
     parameters:

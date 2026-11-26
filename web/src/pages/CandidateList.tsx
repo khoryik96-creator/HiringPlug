@@ -43,11 +43,11 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
   const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page
-  // While an import is open, its own box takes more files: a drop elsewhere
-  // says so (it never replaces the import, nor lets the browser open the file).
-  const [dropElsewhere, setDropElsewhere] = useState(false);
+  // While an import is open, CVs dropped anywhere on the page join it (never
+  // replacing it, nor letting the browser open the file).
+  const [moreCvs, setMoreCvs] = useState<{ files: File[]; at: number }>();
   const drop = usePageDrop(CV_TYPES, (files) => {
-    if (dropped) setDropElsewhere(true);
+    if (dropped) setMoreCvs({ files, at: Date.now() });
     else setDropped({ files, at: Date.now() });
   }, canImport);
   const cols = useCandidateColumns();
@@ -164,9 +164,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
       <h2 className="visually-hidden">Candidates</h2>
       {canImport && dropped && (
         <div className="dropped-cvs">
-          {dropElsewhere && <p className="warning small" role="status">To add more CVs to this import, drop them on its box below.</p>}
-          <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} initialSource="" />
-          <button type="button" className="link small" onClick={() => { setDropped(null); setDropElsewhere(false); }}>Close</button>
+          <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} initialSource="" moreFiles={moreCvs} />
+          <button type="button" className="link small" onClick={() => { setDropped(null); setMoreCvs(undefined); }}>Close</button>
         </div>
       )}
       <div className="list-top">
