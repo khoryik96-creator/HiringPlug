@@ -117,7 +117,7 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 				JdFileId: id, DownloadUrl: s.files.SignedURL(key, jdLinkTTL), ContentType: ctype, FileName: name, SizeBytes: int64(len(data)),
 			}
 			if s.ai != nil { // the AI reads the details too, in the monthly allowance
-				access, on, err := s.ai.Allowed(ctx, tx, p.TenantID)
+				access, on, err := s.ai.Allowed(ctx, tx, p.TenantID, "jd_reading")
 				if err != nil {
 					return err
 				}

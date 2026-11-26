@@ -66,7 +66,7 @@ func (s *Service) StartStudioBatch(ctx context.Context, p authz.Principal, candi
 	o.Replace = nil
 	// No AI at all: say so before anything, whatever else each candidate lacks.
 	if err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		_, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID)
+		_, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID, "cv_studio")
 		if err == nil && !on {
 			err = apperr.New(api.ErrorCodeSTUDIOCVOFF,
 				"CV Studio formatting needs the AI: set up an AI provider in Settings, or wait for next month's allowance.")

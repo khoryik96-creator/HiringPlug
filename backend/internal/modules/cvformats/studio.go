@@ -107,7 +107,7 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 		if err := s.deps.Documents.CheckFormattedCapacity(ctx, tx, candidateID, o.Replace); err != nil {
 			return err
 		}
-		access, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID)
+		access, on, err := s.deps.AI.Allowed(ctx, tx, p.TenantID, "cv_studio")
 		if err != nil {
 			return err
 		}

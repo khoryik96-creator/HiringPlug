@@ -1,8 +1,9 @@
 package aiusage
 
 import (
-	"context"
 	"fmt"
+	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -77,7 +78,9 @@ func (s *Service) month(ctx context.Context, tx pgx.Tx, tenantID string) (Settin
 	return set, spent, err
 }
 
-func (s *Service) remaining(ctx context.Context, tx pgx.Tx, tenantID string) (int64, error) {
+// remaining is what is left for feature ("": no feature's own limit):
+// the month's limit, the daily limit and the feature's own (limits.go).
+func (s *Service) remaining(ctx context.Context, tx pgx.Tx, tenantID, feature string) (int64, error) {
 	// Pending first: it takes the company's allowance lock, so a result
 	// landing between the two reads can only overestimate the use.
 	pending, err := jobqueue.PendingAI(ctx, tx, tenantID)
@@ -88,7 +91,32 @@ func (s *Service) remaining(ctx context.Context, tx pgx.Tx, tenantID string) (in
 	if err != nil {
 		return 0, err
 	}
-	return Remaining(set.Limit(s.config.DefaultTokens), spent, pending), nil
+	var today, featureMonth Spent
+	if set.Daily != nil || set.PerFeature[feature] > 0 {
+		err = database.AsSystem(ctx, tx, tenantID, func() error {
+			q := store.New(tx)
+			use, err := q.UseSince(ctx, DayStart(s.now(), s.loc()))
+			today = Spent{Input: use.InputTokens, Output: use.OutputTokens}
+			if err != nil || set.PerFeature[feature] == 0 {
+				return err
+			}
+			f, err := q.FeatureUseSince(ctx, store.FeatureUseSinceParams{Since: MonthStart(s.now(), s.loc()), Feature: feature})
+			featureMonth = Spent{Input: f.InputTokens, Output: f.OutputTokens}
+			return err
+		})
+		if err != nil {
+			return 0, err
+		}
+	}
+	return Within(Remaining(set.Limit(s.config.DefaultTokens), spent, pending), set, feature, today, featureMonth, pending), nil
+}
+
+// featureMap is never nil, so it is saved as {} rather than null.
+func featureMap(m map[string]int64) map[string]int64 {
+	if m == nil {
+		return map[string]int64{}
+	}
+	return m
 }
 
 func (s *Service) status(ctx context.Context, tx pgx.Tx, tenantID string) (Status, error) {
@@ -143,8 +171,16 @@ func readSettings(ctx context.Context, q *store.Queries) (Settings, error) {
 	if out.PriceInput, err = numericValue(row.PriceInputPerMillion, PricePlaces); err != nil {
 		return Settings{}, err
 	}
-	out.PriceOutput, err = numericValue(row.PriceOutputPerMillion, PricePlaces)
-	return out, err
+	if out.PriceOutput, err = numericValue(row.PriceOutputPerMillion, PricePlaces); err != nil {
+		return Settings{}, err
+	}
+	out.Daily = row.DailyTokens
+	if len(row.FeatureTokens) > 0 {
+		if err := json.Unmarshal(row.FeatureTokens, &out.PerFeature); err != nil {
+			return Settings{}, err
+		}
+	}
+	return out, nil
 }
 
 // SettingsView is the settings as shown: the saved ones and the server's default.
@@ -194,7 +230,7 @@ func auditFields(s Settings) map[string]any {
 	return map[string]any{
 		"limitKind": s.Kind, "limitTokens": s.Tokens, "limitMoney": text(s.Money, AmountPlaces), "currency": s.Currency,
 		"priceInputPerMillion": text(s.PriceInput, PricePlaces), "priceOutputPerMillion": text(s.PriceOutput, PricePlaces),
-		"warnPercent": s.WarnPercent,
+		"warnPercent": s.WarnPercent, "dailyTokens": s.Daily, "featureTokens": s.PerFeature,
 	}
 }
 
@@ -213,15 +249,28 @@ func (s *Service) SaveSettings(ctx context.Context, p authz.Principal, in Settin
 			return err
 		}
 		money, priceIn, priceOut := text(next.Money, AmountPlaces), text(next.PriceInput, PricePlaces), text(next.PriceOutput, PricePlaces)
+		next.Daily, next.PerFeature = before.Daily, before.PerFeature // left out: kept
+		if l := in.Limits; l != nil && !l.KeepDaily {
+			next.Daily = l.Daily
+		}
+		if l := in.Limits; l != nil && !l.KeepPerFeature {
+			next.PerFeature = l.PerFeature
+		}
+		perFeature, err := json.Marshal(featureMap(next.PerFeature))
+		if err != nil {
+			return err
+		}
 		if version == 0 {
 			_, err = q.InsertSetting(ctx, store.InsertSettingParams{
 				LimitKind: next.Kind, LimitTokens: next.Tokens, LimitMoney: money, Currency: next.Currency,
 				PriceInputPerMillion: priceIn, PriceOutputPerMillion: priceOut, WarnPercent: int16(next.WarnPercent), //nolint:gosec // checked: 1..99
+				DailyTokens: next.Daily, FeatureTokens: perFeature,
 			})
 		} else {
 			_, err = q.UpdateSetting(ctx, store.UpdateSettingParams{
 				LimitKind: next.Kind, LimitTokens: next.Tokens, LimitMoney: money, Currency: next.Currency,
 				PriceInputPerMillion: priceIn, PriceOutputPerMillion: priceOut, WarnPercent: int16(next.WarnPercent), //nolint:gosec // checked: 1..99
+				DailyTokens: next.Daily, FeatureTokens: perFeature,
 				Version: int32(version), //nolint:gosec // a version number
 			})
 		}

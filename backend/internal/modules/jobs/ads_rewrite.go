@@ -28,7 +28,7 @@ import (
 // month, and the company's AI use, where each run's tokens are recorded
 // (aiusage).
 type AI interface {
-	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx, tenantID, feature string) (*api.AiAccess, bool, error)
 	RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 }
 
@@ -75,7 +75,7 @@ func (s *Service) startRewrite(ctx context.Context, tx pgx.Tx, p authz.Principal
 	on := false
 	if s.ai != nil {
 		var err error
-		if access, on, err = s.ai.Allowed(ctx, tx, p.TenantID); err != nil {
+		if access, on, err = s.ai.Allowed(ctx, tx, p.TenantID, "jd_blind"); err != nil {
 			return BlindRewrite{}, err
 		}
 	}

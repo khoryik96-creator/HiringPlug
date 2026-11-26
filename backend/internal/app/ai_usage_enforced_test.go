@@ -41,7 +41,7 @@ func TestTheCompanysOwnAILimitStopsEveryAIFeature(t *testing.T) {
 	res = a.ask(token, summary)
 	assert.Equal(t, http.StatusTooManyRequests, res.Status, "%s", res.Body)
 	assert.Equal(t, api.ErrorCodeASSISTANTLIMITREACHED, res.Error().Error.Code)
-	assert.Equal(t, "This month's AI allowance is used or reserved by work in progress. Try again after it completes or next month.",
+	assert.Equal(t, "The AI allowance (this month's, today's, or this feature's own in Settings › AI usage) is used or reserved by work in progress. Try again after it completes, tomorrow, or next month.",
 		res.Error().Error.Message)
 	res = a.request(http.MethodPost, "/v1/matches", token, map[string]any{"applicationId": appl.Id})
 	assert.Equal(t, http.StatusTooManyRequests, res.Status, "%s", res.Body)

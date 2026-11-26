@@ -74,7 +74,7 @@ type Deps struct {
 	// month, and the company's AI use, where each run's tokens are recorded
 	// (aiusage).
 	AI interface {
-		Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+		Allowed(ctx context.Context, tx pgx.Tx, tenantID, feature string) (*api.AiAccess, bool, error)
 		RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 	}
 }

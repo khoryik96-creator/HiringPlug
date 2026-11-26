@@ -9968,6 +9968,7 @@ components:
     JobKind:
       type: string
       enum:
+        - ai.attempt_spent
         - aiprovider.check
         - aiprovider.checked
         - aiprovider.reported
@@ -10219,7 +10220,7 @@ components:
       example: '1.2345'
     AiUsageSettings:
       type: object
-      required: [limitKind, limitTokens, serverDefaultTokens, limitMoney, currency, priceInputPerMillion, priceOutputPerMillion, warnPercent, version, updatedAt]
+      required: [limitKind, limitTokens, serverDefaultTokens, limitMoney, currency, priceInputPerMillion, priceOutputPerMillion, warnPercent, dailyTokens, featureTokens, version, updatedAt]
       properties:
         limitKind: {$ref: '#/components/schemas/AiUsageLimitKind'}
         limitTokens: {type: integer, format: int64, nullable: true, description: "Tokens a month (null: the server's default, serverDefaultTokens)."}
@@ -10238,6 +10239,11 @@ components:
           allOf: [{$ref: '#/components/schemas/AiPrice'}]
           nullable: true
         warnPercent: {type: integer, minimum: 1, maximum: 99, description: "Warn when this share of the month's limit is used."}
+        dailyTokens: {type: integer, format: int64, nullable: true, description: "The most tokens a day, all features together (null: no daily limit)."}
+        featureTokens:
+          type: object
+          description: The most tokens a month for a feature (features not listed have no limit of their own; the month's limit covers them).
+          additionalProperties: {type: integer, format: int64}
         version: {type: integer, description: "0 until first saved."}
         updatedAt: {type: string, format: date-time, nullable: true}
     AiUsageSettingsUpdate:
@@ -10260,7 +10266,23 @@ components:
           allOf: [{$ref: '#/components/schemas/AiPrice'}]
           nullable: true
         warnPercent: {type: integer, minimum: 1, maximum: 99}
+        dailyTokens: {type: integer, format: int64, nullable: true, minimum: 1, maximum: 1000000000000, description: "null: no daily limit. Left out: kept as it is."}
+        featureTokens:
+          type: object
+          description: "A feature's own monthly limit in tokens, by feature (AiFeature); a feature left out has none. Left out altogether: kept as they are."
+          maxProperties: 20
+          additionalProperties: {type: integer, format: int64, minimum: 1, maximum: 1000000000000}
         version: {type: integer, minimum: 0, description: The version you loaded (0 before the settings were first saved).}
+    AiAttemptSpentJob:
+      type: object
+      additionalProperties: false
+      required: [jobId, jobKind, attempt, inputTokens, outputTokens]
+      properties:
+        jobId: {type: string, maxLength: 40, description: The AI job whose attempt failed.}
+        jobKind: {type: string, maxLength: 60}
+        attempt: {type: integer, minimum: 1, maximum: 100}
+        inputTokens: {type: integer, format: int64, minimum: 0}
+        outputTokens: {type: integer, format: int64, minimum: 0}
     AiUsageFeature:
       type: object
       required: [feature, uses, inputTokens, outputTokens, cost]
@@ -19880,6 +19902,12 @@ x-permissions:
     sensitive: false
     roles: [owner, admin, recruiter]
 x-jobs:
+  ai.attempt_spent:
+    module: aiusage
+    queue: core
+    payload: AiAttemptSpentJob
+    priority: normal
+    description: Record the tokens an AI job's attempt spent before it failed (the provider charged them), so a retry or a job given up is counted (Go worker).
   aiprovider.check:
     module: aiproviders
     queue: ai

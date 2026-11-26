@@ -126,12 +126,12 @@ func (s *Service) ready(ctx context.Context, tx pgx.Tx, tenant string) (*api.AiA
 	if !on {
 		return nil, apperr.New(api.ErrorCodeASSISTANTOFF, "The AI assistant is switched off: no AI provider is set up yet.")
 	}
-	left, err := s.deps.Usage.Remaining(ctx, tx, tenant) // work in progress held
+	left, err := s.deps.Usage.Remaining(ctx, tx, tenant, "assistant_email") // work in progress held
 	if err != nil {
 		return nil, err
 	}
 	if left <= 0 {
-		return nil, apperr.New(api.ErrorCodeASSISTANTLIMITREACHED, "This month's AI allowance is used or reserved by work in progress. Try again after it completes or next month.")
+		return nil, apperr.New(api.ErrorCodeASSISTANTLIMITREACHED, "The AI allowance (this month's, today's, or this feature's own in Settings › AI usage) is used or reserved by work in progress. Try again after it completes, tomorrow, or next month.")
 	}
 	return ai, nil
 }

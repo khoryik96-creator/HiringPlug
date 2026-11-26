@@ -66,7 +66,7 @@ type Deps struct {
 	Usage interface {
 		// Remaining is this month's allowance left in tokens, work in
 		// progress held (0 or less: used up).
-		Remaining(ctx context.Context, tx pgx.Tx, tenantID string) (int64, error)
+		Remaining(ctx context.Context, tx pgx.Tx, tenantID, feature string) (int64, error)
 		// ThisMonth is what the company used of this month's limit.
 		ThisMonth(ctx context.Context, tx pgx.Tx, tenantID string) (MonthUse, error)
 		// RecordAI records one AI run's tokens (feature, the record it was

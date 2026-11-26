@@ -69,7 +69,8 @@ func settingsToAPI(v SettingsView) api.AiUsageSettings {
 		LimitKind: api.AiUsageLimitKind(v.Kind), LimitTokens: c.OrNull(v.Tokens), ServerDefaultTokens: v.ServerDefaultTokens,
 		LimitMoney: c.OrNull(text(v.Money, AmountPlaces)), Currency: v.Currency,
 		PriceInputPerMillion: c.OrNull(text(v.PriceInput, PricePlaces)), PriceOutputPerMillion: c.OrNull(text(v.PriceOutput, PricePlaces)),
-		WarnPercent: v.WarnPercent, Version: v.Version, UpdatedAt: c.OrNull(v.UpdatedAt),
+		WarnPercent: v.WarnPercent, DailyTokens: c.OrNull(v.Daily), FeatureTokens: featureMap(v.PerFeature),
+		Version: v.Version, UpdatedAt: c.OrNull(v.UpdatedAt),
 	}
 }
 
@@ -88,7 +89,7 @@ func (h *HTTP) PutAiUsageSettings(ctx context.Context, req api.PutAiUsageSetting
 	v, err := h.svc.SaveSettings(ctx, authz.MustFromContext(ctx), SettingsInput{
 		LimitKind: string(b.LimitKind), LimitTokens: c.ValueOrNil(b.LimitTokens), LimitMoney: c.ValueOrNil(b.LimitMoney), Currency: b.Currency,
 		PriceInputPerMillion: c.ValueOrNil(b.PriceInputPerMillion), PriceOutputPerMillion: c.ValueOrNil(b.PriceOutputPerMillion),
-		WarnPercent: b.WarnPercent,
+		WarnPercent: b.WarnPercent, Limits: limitsFrom(b),
 	}, b.Version)
 	if err != nil {
 		return nil, err
@@ -106,4 +107,17 @@ func (h *HTTP) GetAiUsageStatus(ctx context.Context, _ api.GetAiUsageStatusReque
 		UsedPercent: int(st.UsedPercent), Warn: st.Warn, //nolint:gosec // capped by UsedPercent
 		Reached: st.Reached, ResetsAt: st.ResetsAt,
 	}), nil
+}
+
+// limitsFrom is the daily and per-feature limits sent (nil: neither was, so
+// both are kept as they are; one left out keeps its own value).
+func limitsFrom(b *api.PutAiUsageSettingsJSONRequestBody) *Limits {
+	if !b.DailyTokens.IsSpecified() && b.FeatureTokens == nil {
+		return nil
+	}
+	l := &Limits{Daily: c.ValueOrNil(b.DailyTokens), KeepDaily: !b.DailyTokens.IsSpecified(), KeepPerFeature: b.FeatureTokens == nil}
+	if b.FeatureTokens != nil {
+		l.PerFeature = *b.FeatureTokens
+	}
+	return l
 }

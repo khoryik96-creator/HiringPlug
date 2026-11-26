@@ -260,6 +260,7 @@ type SettingsInput struct {
 	PriceInputPerMillion  *string
 	PriceOutputPerMillion *string
 	WarnPercent           int
+	Limits                *Limits // nil: the daily and feature limits are kept as they are
 }
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
@@ -280,6 +281,7 @@ func CheckSettings(in SettingsInput) error {
 	if in.WarnPercent < 1 || in.WarnPercent > 99 {
 		errs.Add("warnPercent", "must be between 1 and 99")
 	}
+	checkLimits(in.Limits, &errs)
 	money := in.LimitKind == KindMoney
 	const needed = "is needed for a limit in money"
 	amount := func(field string, v *string, places, digits int, format string) (int64, bool) {
@@ -314,8 +316,12 @@ type Settings struct {
 	PriceInput  *int64 // ten-thousandths per million tokens
 	PriceOutput *int64
 	WarnPercent int
-	Version     int
-	UpdatedAt   *time.Time
+	// Daily is the most tokens a day, all features together (nil: none);
+	// PerFeature each feature's own monthly limit in tokens (limits.go).
+	Daily      *int64
+	PerFeature map[string]int64
+	Version    int
+	UpdatedAt  *time.Time
 }
 
 // DefaultSettings are a company's settings before it saves any.

@@ -26,7 +26,7 @@ import (
 // month, and the company's AI use, where each run's tokens are recorded
 // (aiusage).
 type AI interface {
-	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx, tenantID, feature string) (*api.AiAccess, bool, error)
 	RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 }
 
@@ -45,7 +45,7 @@ func (s *Service) queueIndustryAsk(ctx context.Context, tx pgx.Tx, tenantID, com
 		return nil
 	}
 	// No "the AI is picking" when no AI will: off, or none set up for the agency.
-	if _, on, err := s.ai.Allowed(ctx, tx, tenantID); err != nil || !on {
+	if _, on, err := s.ai.Allowed(ctx, tx, tenantID, "industry_pick"); err != nil || !on {
 		return err
 	}
 	now := time.Now()
@@ -90,7 +90,7 @@ func (s *Service) askIndustry(ctx context.Context, tx pgx.Tx, tenantID, companyI
 	if err != nil || len(chosen.Ids) > 0 {
 		return done(err)
 	}
-	access, on, err := s.ai.Allowed(ctx, tx, tenantID)
+	access, on, err := s.ai.Allowed(ctx, tx, tenantID, "industry_pick")
 	if err != nil || !on {
 		return done(err)
 	}

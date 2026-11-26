@@ -26,9 +26,10 @@ func (l aiLedger) RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, so
 	})
 }
 
-// Remaining is this month's allowance left, in tokens (0 or less: used up).
-func (l aiLedger) Remaining(ctx context.Context, tx pgx.Tx, tenantID string) (int64, error) {
-	return l.usage.Remaining(ctx, tx, tenantID)
+// Remaining is the allowance left for feature, in tokens (0 or less: used
+// up): this month's, today's and the feature's own (aiusage.RemainingFor).
+func (l aiLedger) Remaining(ctx context.Context, tx pgx.Tx, tenantID, feature string) (int64, error) {
+	return l.usage.RemainingFor(ctx, tx, tenantID, feature)
 }
 
 // cvReadingAI lets a module use the AI when the company has one and
@@ -38,12 +39,12 @@ type cvReadingAI struct {
 	ai *aiproviders.Module
 }
 
-func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error) {
+func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx, tenantID, feature string) (*api.AiAccess, bool, error) {
 	access, on, err := a.ai.Access(ctx, tx)
 	if err != nil || !on {
 		return nil, false, err
 	}
-	left, err := a.Remaining(ctx, tx, tenantID)
+	left, err := a.Remaining(ctx, tx, tenantID, feature)
 	return access, left > 0, err
 }
 

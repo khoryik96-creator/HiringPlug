@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import IntEnum, StrEnum
 from typing import Annotated, Any
 from pydantic import AnyUrl, AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, RootModel
+from typing_extensions import TypeAliasType
 from datetime import date
 
 
@@ -218,6 +219,7 @@ class ErrorCode(StrEnum):
 
 
 class JobKind(StrEnum):
+    ai_attempt_spent = "ai.attempt_spent"
     aiprovider_check = "aiprovider.check"
     aiprovider_checked = "aiprovider.checked"
     aiprovider_reported = "aiprovider.reported"
@@ -573,8 +575,22 @@ class AiUsageSettings(BaseModel):
     warnPercent: Annotated[
         int, Field(description="Warn when this share of the month's limit is used.", ge=1, le=99)
     ]
+    dailyTokens: Annotated[
+        int | None, Field(description="The most tokens a day, all features together (null: no daily limit).")
+    ]
+    featureTokens: Annotated[
+        dict[str, int],
+        Field(
+            description="The most tokens a month for a feature (features not listed have no limit of their own; the month's limit covers them)."
+        ),
+    ]
     version: Annotated[int, Field(description="0 until first saved.")]
     updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+FeatureTokensAdditionalProperty = TypeAliasType(
+    "FeatureTokensAdditionalProperty", Annotated[int, Field(ge=1, le=1000000000000)]
+)
 
 
 class AiUsageSettingsUpdate(BaseModel):
@@ -592,9 +608,31 @@ class AiUsageSettingsUpdate(BaseModel):
     ]
     priceOutputPerMillion: Annotated[AiPrice | None, Field(...)]
     warnPercent: Annotated[int, Field(ge=1, le=99)]
+    dailyTokens: Annotated[
+        int | None,
+        Field(description="null: no daily limit. Left out: kept as it is.", ge=1, le=1000000000000),
+    ] = None
+    featureTokens: Annotated[
+        dict[str, FeatureTokensAdditionalProperty] | None,
+        Field(
+            description="A feature's own monthly limit in tokens, by feature (AiFeature); a feature left out has none. Left out altogether: kept as they are.",
+            max_length=20,
+        ),
+    ] = None
     version: Annotated[
         int, Field(description="The version you loaded (0 before the settings were first saved).", ge=0)
     ]
+
+
+class AiAttemptSpentJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jobId: Annotated[str, Field(description="The AI job whose attempt failed.", max_length=40)]
+    jobKind: Annotated[str, Field(max_length=60)]
+    attempt: Annotated[int, Field(ge=1, le=100)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class AiUsageFeature(BaseModel):

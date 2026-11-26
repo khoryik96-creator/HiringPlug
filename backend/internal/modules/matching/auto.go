@@ -92,7 +92,7 @@ func (s *Service) autoScore(ctx context.Context, tx pgx.Tx, tenantID string, app
 			continue // scored once a CV has been read
 		}
 		if slots == 0 {
-			slots, err = s.allowanceSlots(ctx, tx, tenantID)
+			slots, err = s.allowanceSlots(ctx, tx, tenantID, "fit_score")
 			if err != nil {
 				return skipIfExpected(err)
 			}

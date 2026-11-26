@@ -12,6 +12,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const featureUseSince = `-- name: FeatureUseSince :one
+SELECT coalesce(sum(input_tokens), 0)::bigint AS input_tokens,
+       coalesce(sum(output_tokens), 0)::bigint AS output_tokens
+FROM ai_use WHERE used_at >= $1 AND feature = $2
+`
+
+type FeatureUseSinceParams struct {
+	Since   time.Time
+	Feature string
+}
+
+type FeatureUseSinceRow struct {
+	InputTokens  int64
+	OutputTokens int64
+}
+
+// What one feature used since a time (the start of the month).
+func (q *Queries) FeatureUseSince(ctx context.Context, arg FeatureUseSinceParams) (FeatureUseSinceRow, error) {
+	row := q.db.QueryRow(ctx, featureUseSince, arg.Since, arg.Feature)
+	var i FeatureUseSinceRow
+	err := row.Scan(&i.InputTokens, &i.OutputTokens)
+	return i, err
+}
+
 const forgetLevels = `-- name: ForgetLevels :exec
 DELETE FROM ai_usage_alert WHERE month = $1::date
   AND ((level = 100 AND NOT $2::boolean) OR (level < 100 AND NOT $3::boolean))
@@ -32,7 +56,7 @@ func (q *Queries) ForgetLevels(ctx context.Context, arg ForgetLevelsParams) erro
 
 const getSetting = `-- name: GetSetting :one
 SELECT limit_kind, limit_tokens, limit_money, currency, price_input_per_million, price_output_per_million,
-       warn_percent, version, updated_at
+       warn_percent, daily_tokens, feature_tokens, version, updated_at
 FROM ai_usage_setting WHERE tenant_id = app_current_tenant()
 `
 
@@ -44,6 +68,8 @@ type GetSettingRow struct {
 	PriceInputPerMillion  pgtype.Numeric
 	PriceOutputPerMillion pgtype.Numeric
 	WarnPercent           int16
+	DailyTokens           *int64
+	FeatureTokens         []byte
 	Version               int32
 	UpdatedAt             time.Time
 }
@@ -60,6 +86,8 @@ func (q *Queries) GetSetting(ctx context.Context) (GetSettingRow, error) {
 		&i.PriceInputPerMillion,
 		&i.PriceOutputPerMillion,
 		&i.WarnPercent,
+		&i.DailyTokens,
+		&i.FeatureTokens,
 		&i.Version,
 		&i.UpdatedAt,
 	)
@@ -68,10 +96,10 @@ func (q *Queries) GetSetting(ctx context.Context) (GetSettingRow, error) {
 
 const insertSetting = `-- name: InsertSetting :one
 INSERT INTO ai_usage_setting (tenant_id, limit_kind, limit_tokens, limit_money, currency,
-  price_input_per_million, price_output_per_million, warn_percent, updated_by)
+  price_input_per_million, price_output_per_million, warn_percent, daily_tokens, feature_tokens, updated_by)
 VALUES (app_current_tenant(), $1, $2, CAST($3::text AS numeric), $4,
   CAST($5::text AS numeric), CAST($6::text AS numeric),
-  $7, app_current_user())
+  $7, $8, $9, app_current_user())
 ON CONFLICT (tenant_id) DO NOTHING
 RETURNING version
 `
@@ -84,6 +112,8 @@ type InsertSettingParams struct {
 	PriceInputPerMillion  *string
 	PriceOutputPerMillion *string
 	WarnPercent           int16
+	DailyTokens           *int64
+	FeatureTokens         []byte
 }
 
 // The first save (version 0 loaded): no row when someone saved first.
@@ -96,6 +126,8 @@ func (q *Queries) InsertSetting(ctx context.Context, arg InsertSettingParams) (i
 		arg.PriceInputPerMillion,
 		arg.PriceOutputPerMillion,
 		arg.WarnPercent,
+		arg.DailyTokens,
+		arg.FeatureTokens,
 	)
 	var version int32
 	err := row.Scan(&version)
@@ -210,8 +242,9 @@ UPDATE ai_usage_setting SET limit_kind = $1, limit_tokens = $2,
   limit_money = CAST($3::text AS numeric), currency = $4,
   price_input_per_million = CAST($5::text AS numeric),
   price_output_per_million = CAST($6::text AS numeric),
-  warn_percent = $7, version = version + 1, updated_by = app_current_user(), updated_at = now()
-WHERE tenant_id = app_current_tenant() AND version = $8
+  warn_percent = $7, daily_tokens = $8, feature_tokens = $9,
+  version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE tenant_id = app_current_tenant() AND version = $10
 RETURNING version
 `
 
@@ -223,6 +256,8 @@ type UpdateSettingParams struct {
 	PriceInputPerMillion  *string
 	PriceOutputPerMillion *string
 	WarnPercent           int16
+	DailyTokens           *int64
+	FeatureTokens         []byte
 	Version               int32
 }
 
@@ -236,6 +271,8 @@ func (q *Queries) UpdateSetting(ctx context.Context, arg UpdateSettingParams) (i
 		arg.PriceInputPerMillion,
 		arg.PriceOutputPerMillion,
 		arg.WarnPercent,
+		arg.DailyTokens,
+		arg.FeatureTokens,
 		arg.Version,
 	)
 	var version int32

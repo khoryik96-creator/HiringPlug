@@ -79,6 +79,8 @@ type AiUsageSetting struct {
 	Version               int32
 	UpdatedBy             *string
 	UpdatedAt             time.Time
+	DailyTokens           *int64
+	FeatureTokens         []byte
 }
 
 type AiUse struct {

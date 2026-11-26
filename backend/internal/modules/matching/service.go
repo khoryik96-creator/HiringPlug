@@ -131,7 +131,7 @@ func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID st
 			return apperr.New(api.ErrorCodeMATCHCONSENTWITHDRAWN,
 				"This candidate withdrew consent to their data being used, so it is not sent to the AI.")
 		}
-		if err := s.withinAllowance(ctx, tx, p.TenantID); err != nil {
+		if err := s.withinAllowance(ctx, tx, p.TenantID, "fit_score"); err != nil {
 			return err
 		}
 		job, err := s.jobText(ctx, tx, p, a.JobID)
@@ -170,7 +170,7 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 		if !p.Can(api.PermissionPipelineRead) {
 			return apperr.NotFound("job")
 		}
-		slots, err := s.allowanceSlots(ctx, tx, p.TenantID)
+		slots, err := s.allowanceSlots(ctx, tx, p.TenantID, "fit_score")
 		if err != nil {
 			return err
 		}
@@ -235,21 +235,21 @@ func (s *Service) on(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
 
 // withinAllowance refuses once the company used this month's AI allowance
 // (every AI feature together).
-func (s *Service) withinAllowance(ctx context.Context, tx pgx.Tx, tenant string) error {
-	_, err := s.allowanceSlots(ctx, tx, tenant)
+func (s *Service) withinAllowance(ctx context.Context, tx pgx.Tx, tenant, feature string) error {
+	_, err := s.allowanceSlots(ctx, tx, tenant, feature)
 	return err
 }
 
 // allowanceSlots is how many more AI jobs may be queued this month (each
 // held at jobqueue.EstimatedAITokens until its result is recorded).
-func (s *Service) allowanceSlots(ctx context.Context, tx pgx.Tx, tenant string) (int64, error) {
-	remaining, err := s.deps.Usage.Remaining(ctx, tx, tenant) // work in progress held
+func (s *Service) allowanceSlots(ctx context.Context, tx pgx.Tx, tenant, feature string) (int64, error) {
+	remaining, err := s.deps.Usage.Remaining(ctx, tx, tenant, feature) // work in progress held
 	if err != nil {
 		return 0, err
 	}
 	if remaining <= 0 {
 		return 0, apperr.New(api.ErrorCodeMATCHINGLIMITREACHED,
-			"This month's AI allowance is used or reserved by work in progress. Try again after it completes or next month.")
+			"The AI allowance (this month's, today's, or this feature's own in Settings › AI usage) is used or reserved by work in progress. Try again after it completes, tomorrow, or next month.")
 	}
 	return 1 + (remaining-1)/jobqueue.EstimatedAITokens, nil
 }

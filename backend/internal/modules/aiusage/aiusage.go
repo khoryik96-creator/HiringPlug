@@ -95,7 +95,13 @@ func (m *Module) Record(ctx context.Context, tx pgx.Tx, tenantID string, u Use) 
 // limit, it is the money left in tokens at the higher price. Zero or less:
 // the limit is reached and no more AI work may start this month.
 func (m *Module) Remaining(ctx context.Context, tx pgx.Tx, tenantID string) (int64, error) {
-	return m.service.remaining(ctx, tx, tenantID)
+	return m.service.remaining(ctx, tx, tenantID, "")
+}
+
+// RemainingFor is Remaining for one feature (Features): also within the
+// company's daily limit and the feature's own monthly limit, when set.
+func (m *Module) RemainingFor(ctx context.Context, tx pgx.Tx, tenantID, feature string) (int64, error) {
+	return m.service.remaining(ctx, tx, tenantID, feature)
 }
 
 // MonthStart is when now's month began in the agency's time zone: the month

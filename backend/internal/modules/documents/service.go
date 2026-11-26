@@ -48,7 +48,7 @@ type Service struct {
 // and allowance left this month), and which (nil: the server's own); and
 // records each AI run's tokens in the company's AI use (aiusage).
 type AIAllowance interface {
-	Allowed(ctx context.Context, tx pgx.Tx, tenantID string) (*api.AiAccess, bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx, tenantID, feature string) (*api.AiAccess, bool, error)
 	RecordAI(ctx context.Context, tx pgx.Tx, tenantID, feature, sourceID, runKey string, userID *string, input, output int64) error
 }
 

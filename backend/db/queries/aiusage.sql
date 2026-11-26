@@ -16,6 +16,12 @@ SELECT count(*)::bigint AS uses,
        coalesce(sum(output_tokens), 0)::bigint AS output_tokens
 FROM ai_use WHERE used_at >= @since;
 
+-- What one feature used since a time (the start of the month).
+-- name: FeatureUseSince :one
+SELECT coalesce(sum(input_tokens), 0)::bigint AS input_tokens,
+       coalesce(sum(output_tokens), 0)::bigint AS output_tokens
+FROM ai_use WHERE used_at >= @since AND feature = @feature;
+
 -- Use per month (in the agency's time zone) and feature, since a time.
 -- name: UseByMonthAndFeature :many
 SELECT to_char(used_at AT TIME ZONE @time_zone::text, 'YYYY-MM')::text AS month, feature,
@@ -36,16 +42,16 @@ GROUP BY user_id;
 -- The company's limit and prices (no row: the defaults).
 -- name: GetSetting :one
 SELECT limit_kind, limit_tokens, limit_money, currency, price_input_per_million, price_output_per_million,
-       warn_percent, version, updated_at
+       warn_percent, daily_tokens, feature_tokens, version, updated_at
 FROM ai_usage_setting WHERE tenant_id = app_current_tenant();
 
 -- The first save (version 0 loaded): no row when someone saved first.
 -- name: InsertSetting :one
 INSERT INTO ai_usage_setting (tenant_id, limit_kind, limit_tokens, limit_money, currency,
-  price_input_per_million, price_output_per_million, warn_percent, updated_by)
+  price_input_per_million, price_output_per_million, warn_percent, daily_tokens, feature_tokens, updated_by)
 VALUES (app_current_tenant(), @limit_kind, sqlc.narg(limit_tokens), CAST(sqlc.narg(limit_money)::text AS numeric), @currency,
   CAST(sqlc.narg(price_input_per_million)::text AS numeric), CAST(sqlc.narg(price_output_per_million)::text AS numeric),
-  @warn_percent, app_current_user())
+  @warn_percent, sqlc.narg(daily_tokens), @feature_tokens, app_current_user())
 ON CONFLICT (tenant_id) DO NOTHING
 RETURNING version;
 
@@ -55,7 +61,8 @@ UPDATE ai_usage_setting SET limit_kind = @limit_kind, limit_tokens = sqlc.narg(l
   limit_money = CAST(sqlc.narg(limit_money)::text AS numeric), currency = @currency,
   price_input_per_million = CAST(sqlc.narg(price_input_per_million)::text AS numeric),
   price_output_per_million = CAST(sqlc.narg(price_output_per_million)::text AS numeric),
-  warn_percent = @warn_percent, version = version + 1, updated_by = app_current_user(), updated_at = now()
+  warn_percent = @warn_percent, daily_tokens = sqlc.narg(daily_tokens), feature_tokens = @feature_tokens,
+  version = version + 1, updated_by = app_current_user(), updated_at = now()
 WHERE tenant_id = app_current_tenant() AND version = @version
 RETURNING version;
 
