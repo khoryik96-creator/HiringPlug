@@ -13,6 +13,7 @@ import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { OpenTabs } from "./components/OpenTabs";
 import { forgetTabs, setTabsOwner } from "./components/openRecords";
+import { SessionKeeper } from "./components/SessionKeeper";
 import { SettingsLayout } from "./components/SettingsLayout";
 import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { ClientShortlistPage, shortlistRoute } from "./pages/ClientShortlistPage";
@@ -91,6 +92,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   const menuOpen = menuOpenAt === hash;
   return (
     <div className={showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
+      <SessionKeeper onSignOut={() => { forgetTabs(); void endSession().finally(onSignOut); }} />
       <header className={menuOpen ? "topbar menu-open" : "topbar"} inert={calendarModal}>
         <span className="brand">Hiring<span>Plug</span></span>
         <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>

@@ -3459,6 +3459,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep working signed in (the same session, 12 hours from now)
+         * @description The web app renews its sign-in while the person is working, so a long day never signs them out mid-task. The session stays the one signed in: signing out, a password change or a deactivation still ends it. Not for API keys.
+         */
+        post: operations["renewSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/sign-out": {
         parameters: {
             query?: never;
@@ -19944,6 +19964,28 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    renewSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Renewed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

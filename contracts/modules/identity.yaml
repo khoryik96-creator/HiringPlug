@@ -565,6 +565,26 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/auth/renew:
+    post:
+      operationId: renewSession
+      tags: [identity]
+      summary: Keep working signed in (the same session, 12 hours from now)
+      description: >
+        The web app renews its sign-in while the person is working, so a long
+        day never signs them out mid-task. The session stays the one signed
+        in: signing out, a password change or a deactivation still ends it.
+        Not for API keys.
+      x-permission: authenticated
+      responses:
+        '200':
+          description: Renewed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/auth/sign-out:
     post:
       operationId: signOut

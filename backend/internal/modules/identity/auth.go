@@ -307,7 +307,13 @@ func (m *Module) SignOut(ctx context.Context, p authz.Principal) error {
 		if err := q.PruneRevokedSessions(ctx); err != nil { // those past their expiry need no keeping
 			return err
 		}
-		if err := q.RevokeSession(ctx, store.RevokeSessionParams{ID: sess.ID, UserID: p.UserID, ExpiresAt: sess.Expires}); err != nil {
+		// Kept as long as any token of the session could still be valid: a renewal
+		// a moment ago runs SessionLength from then.
+		until := time.Now().Add(SessionLength)
+		if sess.Expires.After(until) {
+			until = sess.Expires
+		}
+		if err := q.RevokeSession(ctx, store.RevokeSessionParams{ID: sess.ID, UserID: p.UserID, ExpiresAt: until}); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.signed_out", EntityType: "user", EntityID: p.UserID})

@@ -99,10 +99,16 @@ func (v *Verifier) MintSession(tenantID, userID, method string, now time.Time, t
 	if _, err := rand.Read(id); err != nil {
 		return "", err
 	}
+	return v.RenewSession(tenantID, userID, method, base64.RawURLEncoding.EncodeToString(id), now, ttl)
+}
+
+// RenewSession issues a session's token again, with a new expiry: the same
+// session (sessionID), so signing out still ends every token of it.
+func (v *Verifier) RenewSession(tenantID, userID, method, sessionID string, now time.Time, ttl time.Duration) (string, error) {
 	c := Claims{
 		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        base64.RawURLEncoding.EncodeToString(id), // ends one session at sign-out
+			ID:        sessionID, // ends one session at sign-out
 			Subject:   userID,
 			Issuer:    v.issuer,
 			Audience:  jwt.ClaimStrings{v.audience},
