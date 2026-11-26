@@ -30,8 +30,9 @@ How to write an entry (newest at the top, one per task):
   (Cancel invitation button), dropping CVs anywhere on the candidate list, removing a candidate from a job,
   "Your sign-in is invalid or has expired" while working
 - Started: 26 Nov 2026    Last update: 26 Nov 2026
-- State: in progress
-- Next: the list above, CV reading first; each part merged on its own
+- State: in progress. Merged: CV reading (1.47.1), small fixes, booking links and sign-in renewal (1.48.0);
+  Outlook Mail (1.49.0) verifying on the branch
+- Next: the client shortlist link (notify on an answer, fields in our comment, the CV on a phone)
 
 ### Post-migration fixes and the HyPlug rename (paused)
 - Who: Claude (account A), session "Hiring Plug"
