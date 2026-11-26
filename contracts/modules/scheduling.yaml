@@ -304,9 +304,18 @@ components:
         title: { type: string, minLength: 1, maxLength: 120, description: 'e.g. Call with Aina' }
         durationMinutes: { type: integer, enum: [15, 30, 45, 60, 90] }
         location: { type: string, maxLength: 500, nullable: true, description: 'A meeting link, a phone number or an address.' }
+        askFor:
+          type: array
+          maxItems: 2
+          uniqueItems: true
+          description: What the booking page asks for before booking (their phone number to call them, their email to send the meeting).
+          items: { $ref: '#/components/schemas/BookingAsk' }
+    BookingAsk:
+      type: string
+      enum: [phone, email]
     BookingLink:
       type: object
-      required: [id, url, candidateId, candidateName, hostName, title, durationMinutes, location, status, startsAt, expiresAt, createdAt]
+      required: [id, url, candidateId, candidateName, hostName, title, durationMinutes, location, askFor, givenPhone, givenEmail, status, startsAt, expiresAt, createdAt]
       properties:
         id: { $ref: '#/components/schemas/BookingLinkId' }
         url: { type: string, nullable: true, description: The address to send (only when just created; the link is not stored). }
@@ -316,6 +325,11 @@ components:
         title: { type: string }
         durationMinutes: { type: integer }
         location: { type: string, nullable: true }
+        askFor:
+          type: array
+          items: { $ref: '#/components/schemas/BookingAsk' }
+        givenPhone: { type: string, nullable: true, description: The phone number they gave when booking. }
+        givenEmail: { type: string, nullable: true, description: The email they gave when booking. }
         status: { $ref: '#/components/schemas/BookingStatus' }
         startsAt: { type: string, format: date-time, nullable: true, description: The booked time. }
         expiresAt: { type: string, format: date-time }
@@ -326,13 +340,17 @@ components:
       enum: [open, booked, cancelled, expired]
     PublicBooking:
       type: object
-      required: [companyName, hostName, title, durationMinutes, location, timeZone, status, startsAt, canChange, slots]
+      required: [companyName, hostName, title, durationMinutes, location, askFor, timeZone, status, startsAt, canChange, slots]
       properties:
         companyName: { type: string }
         hostName: { type: string }
         title: { type: string }
         durationMinutes: { type: integer }
         location: { type: string, nullable: true, description: Shown once booked. }
+        askFor:
+          type: array
+          description: What to give before booking.
+          items: { $ref: '#/components/schemas/BookingAsk' }
         timeZone: { type: string, description: The host's time zone (the page shows times in the visitor's). }
         status: { $ref: '#/components/schemas/BookingStatus' }
         startsAt: { type: string, format: date-time, nullable: true }
@@ -347,6 +365,8 @@ components:
       required: [startsAt]
       properties:
         startsAt: { type: string, format: date-time }
+        phone: { type: string, maxLength: 40, description: Needed when the link asks for it. }
+        email: { type: string, maxLength: 254, description: Needed when the link asks for it. }
     SchedulingRefreshCalendarJob:
       type: object
       additionalProperties: false

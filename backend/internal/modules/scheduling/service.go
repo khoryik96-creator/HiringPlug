@@ -202,7 +202,7 @@ func (s *Service) CreateLink(ctx context.Context, p authz.Principal, in api.Book
 		row, err := q.InsertBookingLink(ctx, store.InsertBookingLinkParams{
 			TokenHash: hash, HostUserID: p.UserID, CandidateID: in.CandidateId, ApplicationID: in.ApplicationId,
 			Title: in.Title, DurationMinutes: int32(in.DurationMinutes), Location: emptyNil(in.Location), //nolint:gosec // an enum
-			ExpiresAt: s.now().Add(linkLife),
+			ExpiresAt: s.now().Add(linkLife), AskPhone: asks(in.AskFor, api.BookingAskPhone), AskEmail: asks(in.AskFor, api.BookingAskEmail),
 		})
 		if err != nil {
 			return err

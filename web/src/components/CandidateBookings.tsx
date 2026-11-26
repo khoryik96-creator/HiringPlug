@@ -24,9 +24,17 @@ export function BookingLinkForm({ candidateId, applicationId, onInsert, onCancel
   const queryClient = useQueryClient();
   const box = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState({ title: "Call with the recruiter", durationMinutes: 30 as Schemas["BookingLinkInput"]["durationMinutes"], location: "" });
+  const [ask, setAsk] = useState<Schemas["BookingAsk"][]>([]);
+  const toggle = (a: Schemas["BookingAsk"], on: boolean) => { setAsk((now) => (on ? [...now.filter((x) => x !== a), a] : now.filter((x) => x !== a))); };
+  /** How the meeting happens: fills Where, and asks for their phone number when we call them. */
+  const how = (kind: "teams" | "phone" | "office") => {
+    if (kind === "teams") setForm({ ...form, location: "Microsoft Teams: " });
+    if (kind === "phone") { setForm({ ...form, location: "Phone call: we will call you" }); toggle("phone", true); }
+    if (kind === "office") setForm({ ...form, location: "Our office: " });
+  };
   const create = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/booking-links", {
-      body: { candidateId, applicationId, title: form.title.trim(), durationMinutes: form.durationMinutes, location: form.location.trim() || null },
+      body: { candidateId, applicationId, title: form.title.trim(), durationMinutes: form.durationMinutes, location: form.location.trim() || null, askFor: ask },
     })),
     onSuccess: async (l) => {
       onInsert(`Please pick a time that suits you (${String(l.durationMinutes)} minutes): ${l.url ?? ""}`);
@@ -41,7 +49,20 @@ export function BookingLinkForm({ candidateId, applicationId, onInsert, onCancel
           {[15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
         </select>
       </label>
-      <label className="field">Where (link, phone or address)<input value={form.location} maxLength={500} onChange={(e) => { setForm({ ...form, location: e.target.value }); }} /></label>
+      <div className="field booking-how" role="group" aria-label="How">
+        <span>How</span>
+        <span className="row">
+          <button type="button" className="chip-button" onClick={() => { how("teams"); }}>Teams</button>
+          <button type="button" className="chip-button" onClick={() => { how("phone"); }}>Phone call</button>
+          <button type="button" className="chip-button" onClick={() => { how("office"); }}>In person</button>
+        </span>
+      </div>
+      <label className="field">Where (Teams link, phone or address)<input value={form.location} maxLength={500}
+        placeholder="Paste your Teams meeting link, or your number" onChange={(e) => { setForm({ ...form, location: e.target.value }); }} /></label>
+      <div className="field booking-ask" role="group" aria-label="Ask them for">
+        <label className="row"><input type="checkbox" checked={ask.includes("phone")} onChange={(e) => { toggle("phone", e.target.checked); }} /> Ask for their phone number</label>
+        <label className="row"><input type="checkbox" checked={ask.includes("email")} onChange={(e) => { toggle("email", e.target.checked); }} /> Ask for their email</label>
+      </div>
       <span className="row">
         <button type="button" className="primary" disabled={create.isPending} onClick={() => { if (filledIn(box.current)) create.mutate(); }}>Insert link</button>
         <button type="button" className="link" onClick={onCancel}>Cancel</button>
@@ -72,6 +93,7 @@ export function CandidateBookings({ candidateId }: { candidateId: string }) {
             <span className={`badge booking-${l.status}`}>{STATUS[l.status]}</span>
             <span>{l.title} · {l.durationMinutes} min{l.startsAt ? ` · ${slotLabel(l.startsAt)}` : ""}</span>
             <span className="muted small">{l.hostName}</span>
+            {(l.givenPhone ?? l.givenEmail) && <span className="small">They gave: {[l.givenPhone, l.givenEmail].filter(Boolean).join(" · ")}</span>}
             {(l.status === "open" || l.status === "booked") && (
               <button type="button" className="link" disabled={cancel.isPending}
                 onClick={() => { if (window.confirm(l.status === "booked" ? "Cancel this meeting? Both calendars get a cancellation." : "Cancel this booking link?")) cancel.mutate(l.id); }}>

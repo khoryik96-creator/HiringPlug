@@ -7227,17 +7227,9 @@ class DurationMinutes(IntEnum):
     integer_90 = 90
 
 
-class BookingLinkInput(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    candidateId: CandidateId
-    applicationId: ApplicationId | None = None
-    title: Annotated[str, Field(description="e.g. Call with Aina", max_length=120, min_length=1)]
-    durationMinutes: DurationMinutes
-    location: Annotated[
-        str | None, Field(description="A meeting link, a phone number or an address.", max_length=500)
-    ] = None
+class BookingAsk(StrEnum):
+    phone = "phone"
+    email = "email"
 
 
 class BookingStatus(StrEnum):
@@ -7253,6 +7245,7 @@ class PublicBooking(BaseModel):
     title: str
     durationMinutes: int
     location: Annotated[str | None, Field(description="Shown once booked.")]
+    askFor: Annotated[list[BookingAsk], Field(description="What to give before booking.")]
     timeZone: Annotated[
         str, Field(description="The host's time zone (the page shows times in the visitor's).")
     ]
@@ -7269,6 +7262,10 @@ class PublicBookingInput(BaseModel):
         extra="forbid",
     )
     startsAt: AwareDatetime
+    phone: Annotated[str | None, Field(description="Needed when the link asks for it.", max_length=40)] = None
+    email: Annotated[str | None, Field(description="Needed when the link asks for it.", max_length=254)] = (
+        None
+    )
 
 
 class SchedulingRefreshCalendarJob(BaseModel):
@@ -9768,6 +9765,26 @@ class TeamSchedule(BaseModel):
     nextAt: Annotated[AwareDatetime | None, Field(description="When the next booked meeting starts.")]
 
 
+class BookingLinkInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: CandidateId
+    applicationId: ApplicationId | None = None
+    title: Annotated[str, Field(description="e.g. Call with Aina", max_length=120, min_length=1)]
+    durationMinutes: DurationMinutes
+    location: Annotated[
+        str | None, Field(description="A meeting link, a phone number or an address.", max_length=500)
+    ] = None
+    askFor: Annotated[
+        list[BookingAsk] | None,
+        Field(
+            description="What the booking page asks for before booking (their phone number to call them, their email to send the meeting).",
+            max_length=2,
+        ),
+    ] = None
+
+
 class BookingLink(BaseModel):
     id: BookingLinkId
     url: Annotated[
@@ -9779,6 +9796,9 @@ class BookingLink(BaseModel):
     title: str
     durationMinutes: int
     location: Annotated[str | None, Field(...)]
+    askFor: list[BookingAsk]
+    givenPhone: Annotated[str | None, Field(description="The phone number they gave when booking.")]
+    givenEmail: Annotated[str | None, Field(description="The email they gave when booking.")]
     status: BookingStatus
     startsAt: Annotated[AwareDatetime | None, Field(description="The booked time.")]
     expiresAt: AwareDatetime

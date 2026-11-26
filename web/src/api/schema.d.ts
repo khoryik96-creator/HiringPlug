@@ -12447,7 +12447,11 @@ export interface components {
             durationMinutes: 15 | 30 | 45 | 60 | 90;
             /** @description A meeting link, a phone number or an address. */
             location?: string | null;
+            /** @description What the booking page asks for before booking (their phone number to call them, their email to send the meeting). */
+            askFor?: components["schemas"]["BookingAsk"][];
         };
+        /** @enum {string} */
+        BookingAsk: "phone" | "email";
         BookingLink: {
             id: components["schemas"]["BookingLinkId"];
             /** @description The address to send (only when just created; the link is not stored). */
@@ -12458,6 +12462,11 @@ export interface components {
             title: string;
             durationMinutes: number;
             location: string | null;
+            askFor: components["schemas"]["BookingAsk"][];
+            /** @description The phone number they gave when booking. */
+            givenPhone: string | null;
+            /** @description The email they gave when booking. */
+            givenEmail: string | null;
             status: components["schemas"]["BookingStatus"];
             /**
              * Format: date-time
@@ -12481,6 +12490,8 @@ export interface components {
             durationMinutes: number;
             /** @description Shown once booked. */
             location: string | null;
+            /** @description What to give before booking. */
+            askFor: components["schemas"]["BookingAsk"][];
             /** @description The host's time zone (the page shows times in the visitor's). */
             timeZone: string;
             status: components["schemas"]["BookingStatus"];
@@ -12494,6 +12505,10 @@ export interface components {
         PublicBookingInput: {
             /** Format: date-time */
             startsAt: string;
+            /** @description Needed when the link asks for it. */
+            phone?: string;
+            /** @description Needed when the link asks for it. */
+            email?: string;
         };
         SchedulingRefreshCalendarJob: {
             userId: string;

@@ -37,8 +37,8 @@ export function BookingPage({ token }: { token: string }) {
   });
   const [changing, setChanging] = useState(false);
   const book = useMutation({
-    mutationFn: async (startsAt: string) => unwrap(await api.POST("/v1/public/bookings/{bookingToken}", {
-      params: { path: { bookingToken: token } }, body: { startsAt },
+    mutationFn: async ({ startsAt, phone, email }: { startsAt: string; phone: string; email: string }) => unwrap(await api.POST("/v1/public/bookings/{bookingToken}", {
+      params: { path: { bookingToken: token } }, body: { startsAt, ...(phone.trim() && { phone: phone.trim() }), ...(email.trim() && { email: email.trim() }) },
     })),
     onSuccess: (b) => { setChanging(false); queryClient.setQueryData(key, b); },
     onError: async () => { await queryClient.invalidateQueries({ queryKey: key }); }, // a taken time leaves the list
@@ -56,7 +56,7 @@ export function BookingPage({ token }: { token: string }) {
             {b.status === "cancelled" && <p className="booking-note">This meeting was cancelled. Ask {b.hostName} for a new link if you still want to meet.</p>}
             {b.status === "expired" && <p className="booking-note">This link has expired. Ask {b.hostName} for a new one.</p>}
             {(b.status === "open" || changing) && (
-              <Picker b={b} busy={book.isPending} onPick={(s) => { book.mutate(s); }} onCancel={changing ? () => { setChanging(false); } : undefined} />
+              <Picker b={b} busy={book.isPending} onPick={(s, given) => { book.mutate({ startsAt: s, ...given }); }} onCancel={changing ? () => { setChanging(false); } : undefined} />
             )}
             <ErrorMessage error={book.error} />
           </>
@@ -78,10 +78,17 @@ function Booked({ b, onChange }: { b: Booking; onChange: () => void }) {
   );
 }
 
-function Picker({ b, busy, onPick, onCancel }: { b: Booking; busy: boolean; onPick: (s: string) => void; onCancel?: () => void }) {
+function Picker({ b, busy, onPick, onCancel }: {
+  b: Booking; busy: boolean; onPick: (s: string, given: { phone: string; email: string }) => void; onCancel?: () => void;
+}) {
   const days = byDay(b.slots);
   const [picked, setDay] = useState(days[0]?.[0] ?? "");
   const [choice, setChosen] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const askPhone = b.askFor.includes("phone");
+  const askEmail = b.askFor.includes("email");
+  const given = (!askPhone || phone.trim() !== "") && (!askEmail || email.trim() !== "");
   if (days.length === 0) return <p className="booking-note">No free times are left. Ask {b.hostName} for another link.</p>;
   // After a refresh (someone took a time), a day or time no longer offered is not kept.
   const day = days.some(([d]) => d === picked) ? picked : (days[0]?.[0] ?? "");
@@ -105,8 +112,18 @@ function Picker({ b, busy, onPick, onCancel }: { b: Booking; busy: boolean; onPi
             onClick={() => { setChosen(t); }}>{timeLabel(t)}</button>
         ))}
       </div>
+      {(askPhone || askEmail) && (
+        <div className="booking-asks">
+          {askPhone && <label className="field">Your phone number (to call you)
+            <input type="tel" required autoComplete="tel" maxLength={40} placeholder="+60 12 345 6789" value={phone} onChange={(e) => { setPhone(e.target.value); }} />
+          </label>}
+          {askEmail && <label className="field">Your email (for the meeting)
+            <input type="email" required autoComplete="email" maxLength={254} value={email} onChange={(e) => { setEmail(e.target.value); }} />
+          </label>}
+        </div>
+      )}
       <div className="row">
-        <button type="button" className="primary" disabled={!chosen || busy} onClick={() => { if (chosen) onPick(chosen); }}>
+        <button type="button" className="primary" disabled={!chosen || busy || !given} onClick={() => { if (chosen) onPick(chosen, { phone, email }); }}>
           {chosen ? `Book ${dayLabel(chosen)}, ${timeLabel(chosen)}` : "Pick a time"}
         </button>
         {onCancel && <button type="button" className="link" onClick={onCancel}>Keep the booked time</button>}

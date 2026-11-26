@@ -297,6 +297,10 @@ type BookingLink struct {
 	CreatedBy       string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	AskPhone        bool
+	AskEmail        bool
+	GivenPhone      *string
+	GivenEmail      *string
 }
 
 type CalendarBusy struct {

@@ -13,7 +13,7 @@ afterEach(() => {
 const TOKEN = "a".repeat(43);
 const open = {
   companyName: "Contoh Recruitment", hostName: "Aina", title: "Call with Aina", durationMinutes: 30, location: null,
-  timeZone: "Asia/Kuala_Lumpur", status: "open", startsAt: null, canChange: false,
+  timeZone: "Asia/Kuala_Lumpur", status: "open", startsAt: null, canChange: false, askFor: [],
   slots: ["2026-11-10T02:00:00Z", "2026-11-10T02:30:00Z", "2026-11-11T06:00:00Z"],
 } as const;
 
@@ -45,6 +45,30 @@ describe("booking page", () => {
     expect(await screen.findByText("You're booked")).toBeTruthy();
     expect(screen.getByRole("link", { name: "https://meet.google.com/abc" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Change the time" })).toBeTruthy();
+  });
+
+  it("asks for their phone and email when the link asks for them, and sends them", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ ...open, askFor: ["phone", "email"] }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ ...open, status: "booked", startsAt: open.slots[0], canChange: true, slots: [] }));
+    renderWithClient(<BookingPage token={TOKEN} />);
+    const first = (await screen.findAllByRole("radio")).filter((r) => r.closest("[aria-label='Time']"))[0] as HTMLElement;
+    fireEvent.click(first);
+    const book = screen.getByRole("button", { name: /^Book / });
+    expect(book).toHaveProperty("disabled", true); // not until both are given
+    fireEvent.change(screen.getByLabelText(/Your phone number/), { target: { value: " +60 12 345 6789 " } });
+    expect(book).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByLabelText(/Your email/), { target: { value: "aisyah@example.com" } });
+    fireEvent.click(book);
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({ startsAt: open.slots[0], phone: "+60 12 345 6789", email: "aisyah@example.com" });
+  });
+
+  it("asks nothing more when the link does not ask", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(open));
+    renderWithClient(<BookingPage token={TOKEN} />);
+    expect(await screen.findByText("Call with Aina")).toBeTruthy();
+    expect(screen.queryByLabelText(/Your phone number/)).toBeNull();
+    expect(screen.queryByLabelText(/Your email/)).toBeNull();
   });
 
   it("says when the link was cancelled", async () => {

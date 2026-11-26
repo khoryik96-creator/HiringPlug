@@ -46,8 +46,8 @@ SELECT starts_at, ends_at FROM calendar_busy WHERE user_id = @user_id AND ends_a
 SELECT count(*)::int FROM calendar_busy WHERE user_id = @user_id AND ends_at > now();
 
 -- name: InsertBookingLink :one
-INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, expires_at, created_by)
-VALUES (app_current_tenant(), @token_hash, @host_user_id, @candidate_id, sqlc.narg(application_id), @title, @duration_minutes, sqlc.narg(location), @expires_at, app_current_user())
+INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, expires_at, created_by, ask_phone, ask_email)
+VALUES (app_current_tenant(), @token_hash, @host_user_id, @candidate_id, sqlc.narg(application_id), @title, @duration_minutes, sqlc.narg(location), @expires_at, app_current_user(), @ask_phone, @ask_email)
 RETURNING *;
 
 -- name: BookingLinkByToken :one
@@ -69,7 +69,8 @@ WHERE host_user_id = @host_user_id AND status = 'booked' AND id <> @except_id
   AND starts_at < @to_time::timestamptz AND starts_at + make_interval(mins => duration_minutes) > @from_time::timestamptz;
 
 -- name: Book :one
-UPDATE booking_link SET status = 'booked', starts_at = @starts_at, sequence = sequence + 1, updated_at = now()
+UPDATE booking_link SET status = 'booked', starts_at = @starts_at, sequence = sequence + 1, updated_at = now(),
+  given_phone = coalesce(sqlc.narg(given_phone), given_phone), given_email = coalesce(sqlc.narg(given_email), given_email)
 WHERE id = @id RETURNING *;
 
 -- name: CancelBookingLink :one

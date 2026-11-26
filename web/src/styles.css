@@ -1697,3 +1697,9 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 /* A company's country after its name: [MY]. */
 .country-tag { font-size: 0.78em; font-weight: 700; color: var(--muted); letter-spacing: 0.03em; white-space: nowrap; font-family: "Inter Variable", system-ui, sans-serif; }
 .banner-name .country-tag { font-size: 0.5em; vertical-align: middle; }
+
+/* Booking links: how the meeting happens, and what to ask for. */
+.chip-button { min-height: 0; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.85rem; }
+.booking-how > span:first-child { font-size: 0.85rem; font-weight: 600; }
+.booking-ask label.row { font-weight: 500; gap: 0.4rem; }
+.booking-asks { display: grid; gap: 0.6rem; margin: 0.75rem 0; }

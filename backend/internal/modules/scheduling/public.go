@@ -29,6 +29,7 @@ type Page struct {
 	StartsAt                               *time.Time
 	CanChange                              bool
 	Slots                                  []time.Time
+	AskFor                                 []api.BookingAsk
 }
 
 func (s *Service) tenant(ctx context.Context, token string) (authz.Principal, string, string, error) {
@@ -105,6 +106,7 @@ func (s *Service) page(ctx context.Context, tx pgx.Tx, company string, row store
 	out := Page{
 		Company: company, Title: row.Title, TimeZone: loc.String(), Duration: int(row.DurationMinutes),
 		Status: Status(row.Status, row.ExpiresAt, now), StartsAt: row.StartsAt,
+		AskFor: askList(row.AskPhone && row.GivenPhone == nil, row.AskEmail && row.GivenEmail == nil), // only what is not given yet
 	}
 	out.CanChange = CanChange(out.Status, row.StartsAt, notice, now)
 	if out.Status == "booked" {
@@ -169,7 +171,7 @@ func (s *Service) PublicPage(ctx context.Context, token string) (Page, error) {
 // Book takes a time (or moves the booked one) and sends both calendars the
 // invitation. The host's schedule is locked meanwhile, so two people cannot
 // take the same time.
-func (s *Service) Book(ctx context.Context, token string, startsAt time.Time, client string) (Page, error) {
+func (s *Service) Book(ctx context.Context, token string, startsAt time.Time, given Given, client string) (Page, error) {
 	if !s.limiter.Allow(client) {
 		return Page{}, apperr.New(api.ErrorCodeBOOKINGTOOMANYTRIES, "Too many tries from your address; try again in an hour.")
 	}
@@ -198,8 +200,12 @@ func (s *Service) Book(ctx context.Context, token string, startsAt time.Time, cl
 		if !slices.ContainsFunc(before.Slots, func(t time.Time) bool { return t.Equal(startsAt) }) {
 			return apperr.New(api.ErrorCodeBOOKINGSLOTTAKEN, "That time is no longer free: pick another.")
 		}
+		given, errs := CheckGiven(given, row.AskPhone && row.GivenPhone == nil, row.AskEmail && row.GivenEmail == nil)
+		if err := errs.Err(); err != nil {
+			return err
+		}
 		moved := row.Status == "booked"
-		if row, err = q.Book(ctx, store.BookParams{ID: row.ID, StartsAt: &startsAt}); err != nil {
+		if row, err = q.Book(ctx, store.BookParams{ID: row.ID, StartsAt: &startsAt, GivenPhone: textOrNil(given.Phone), GivenEmail: textOrNil(given.Email)}); err != nil {
 			return err
 		}
 		cand, err := s.deps.Candidates.Person(ctx, tx, p, row.CandidateID)

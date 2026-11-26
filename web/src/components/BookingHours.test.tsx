@@ -67,10 +67,30 @@ describe("booking link in an email", () => {
     const insert = vi.fn();
     renderWithClient(<BookingLinkForm candidateId="cand_1" onInsert={insert} onCancel={() => undefined} />);
     fireEvent.change(screen.getByLabelText("Length"), { target: { value: "45" } });
-    fireEvent.change(screen.getByLabelText("Where (link, phone or address)"), { target: { value: " https://meet.google.com/x " } });
+    fireEvent.change(screen.getByLabelText("Where (Teams link, phone or address)"), { target: { value: " https://meet.google.com/x " } });
     fireEvent.click(screen.getByRole("button", { name: "Insert link" }));
     await waitFor(() => { expect(insert).toHaveBeenCalled(); });
-    expect(sentBody(post)).toEqual({ candidateId: "cand_1", title: "Call with the recruiter", durationMinutes: 45, location: "https://meet.google.com/x" });
+    expect(sentBody(post)).toEqual({ candidateId: "cand_1", title: "Call with the recruiter", durationMinutes: 45, location: "https://meet.google.com/x", askFor: [] });
     expect(insert).toHaveBeenCalledWith("Please pick a time that suits you (45 minutes): https://ats.example/book/abc");
+  });
+
+  it("a phone call asks for their number; their email can be asked for too", async () => {
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "bkl_1", url: "https://ats.example/book/abc", durationMinutes: 30 }));
+    const insert = vi.fn();
+    renderWithClient(<BookingLinkForm candidateId="cand_1" onInsert={insert} onCancel={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Phone call" }));
+    expect(screen.getByLabelText<HTMLInputElement>("Where (Teams link, phone or address)").value).toBe("Phone call: we will call you");
+    expect(screen.getByLabelText<HTMLInputElement>("Ask for their phone number").checked).toBe(true);
+    fireEvent.click(screen.getByLabelText("Ask for their email"));
+    fireEvent.click(screen.getByRole("button", { name: "Insert link" }));
+    await waitFor(() => { expect(insert).toHaveBeenCalled(); });
+    expect(sentBody(post)).toMatchObject({ location: "Phone call: we will call you", askFor: ["phone", "email"] });
+  });
+
+  it("Teams starts the place for the meeting link", () => {
+    renderWithClient(<BookingLinkForm candidateId="cand_1" onInsert={() => undefined} onCancel={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Teams" }));
+    expect(screen.getByLabelText<HTMLInputElement>("Where (Teams link, phone or address)").value).toBe("Microsoft Teams: ");
+    expect(screen.getByLabelText<HTMLInputElement>("Ask for their phone number").checked).toBe(false);
   });
 });

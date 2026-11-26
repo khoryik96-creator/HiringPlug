@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -27,9 +28,14 @@ type CalendarMeeting struct {
 
 func calendarMeeting(row store.BookingLink) CalendarMeeting {
 	m := CalendarMeeting{ID: row.ID, Title: row.Title, Host: row.HostUserID, Version: int(row.Sequence), Cancelled: row.Status != "booked"}
-	if row.Location != nil {
-		m.Location = *row.Location
+	// What they gave when booking goes with the place, for the call.
+	var where []string
+	for _, part := range []*string{row.Location, row.GivenPhone, row.GivenEmail} {
+		if part != nil && *part != "" {
+			where = append(where, *part)
+		}
 	}
+	m.Location = strings.Join(where, " · ")
 	if row.StartsAt != nil {
 		m.Start = *row.StartsAt
 		m.End = m.Start.Add(time.Duration(row.DurationMinutes) * time.Minute)

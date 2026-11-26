@@ -26,17 +26,25 @@ func (q *Queries) AskCalendarRead(ctx context.Context, userID string) (int64, er
 }
 
 const book = `-- name: Book :one
-UPDATE booking_link SET status = 'booked', starts_at = $1, sequence = sequence + 1, updated_at = now()
-WHERE id = $2 RETURNING id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at
+UPDATE booking_link SET status = 'booked', starts_at = $1, sequence = sequence + 1, updated_at = now(),
+  given_phone = coalesce($2, given_phone), given_email = coalesce($3, given_email)
+WHERE id = $4 RETURNING id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email
 `
 
 type BookParams struct {
-	StartsAt *time.Time
-	ID       string
+	StartsAt   *time.Time
+	GivenPhone *string
+	GivenEmail *string
+	ID         string
 }
 
 func (q *Queries) Book(ctx context.Context, arg BookParams) (BookingLink, error) {
-	row := q.db.QueryRow(ctx, book, arg.StartsAt, arg.ID)
+	row := q.db.QueryRow(ctx, book,
+		arg.StartsAt,
+		arg.GivenPhone,
+		arg.GivenEmail,
+		arg.ID,
+	)
 	var i BookingLink
 	err := row.Scan(
 		&i.ID,
@@ -55,6 +63,10 @@ func (q *Queries) Book(ctx context.Context, arg BookParams) (BookingLink, error)
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }
@@ -85,7 +97,7 @@ func (q *Queries) BookedLinkIDs(ctx context.Context, ids []string) ([]string, er
 }
 
 const bookingLinkByToken = `-- name: BookingLinkByToken :one
-SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE token_hash = $1
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email FROM booking_link WHERE token_hash = $1
 `
 
 func (q *Queries) BookingLinkByToken(ctx context.Context, tokenHash string) (BookingLink, error) {
@@ -108,6 +120,10 @@ func (q *Queries) BookingLinkByToken(ctx context.Context, tokenHash string) (Boo
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }
@@ -159,7 +175,7 @@ func (q *Queries) BusyCounts(ctx context.Context) ([]BusyCountsRow, error) {
 }
 
 const calendarBooking = `-- name: CalendarBooking :one
-SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE id= $1
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email FROM booking_link WHERE id= $1
 `
 
 // Read projections without taking the booking mutation lock.
@@ -183,12 +199,16 @@ func (q *Queries) CalendarBooking(ctx context.Context, id string) (BookingLink, 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }
 
 const calendarBookings = `-- name: CalendarBookings :many
-SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE host_user_id= $1 AND starts_at< $2::timestamptz AND starts_at+make_interval(mins=>duration_minutes)> $3::timestamptz
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email FROM booking_link WHERE host_user_id= $1 AND starts_at< $2::timestamptz AND starts_at+make_interval(mins=>duration_minutes)> $3::timestamptz
 `
 
 type CalendarBookingsParams struct {
@@ -223,6 +243,10 @@ func (q *Queries) CalendarBookings(ctx context.Context, arg CalendarBookingsPara
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AskPhone,
+			&i.AskEmail,
+			&i.GivenPhone,
+			&i.GivenEmail,
 		); err != nil {
 			return nil, err
 		}
@@ -271,7 +295,7 @@ func (q *Queries) CalendarBusy(ctx context.Context, arg CalendarBusyParams) ([]C
 
 const cancelBookingLink = `-- name: CancelBookingLink :one
 UPDATE booking_link SET status = 'cancelled', sequence = sequence + 1, updated_at = now()
-WHERE id = $1 RETURNING id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at
+WHERE id = $1 RETURNING id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email
 `
 
 func (q *Queries) CancelBookingLink(ctx context.Context, id string) (BookingLink, error) {
@@ -294,12 +318,16 @@ func (q *Queries) CancelBookingLink(ctx context.Context, id string) (BookingLink
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }
 
 const candidateBookingLinks = `-- name: CandidateBookingLinks :many
-SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE candidate_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email FROM booking_link WHERE candidate_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50
 `
 
 func (q *Queries) CandidateBookingLinks(ctx context.Context, candidateID string) ([]BookingLink, error) {
@@ -328,6 +356,10 @@ func (q *Queries) CandidateBookingLinks(ctx context.Context, candidateID string)
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AskPhone,
+			&i.AskEmail,
+			&i.GivenPhone,
+			&i.GivenEmail,
 		); err != nil {
 			return nil, err
 		}
@@ -360,7 +392,7 @@ func (q *Queries) CountBusy(ctx context.Context, userID string) (int32, error) {
 }
 
 const getBookingLink = `-- name: GetBookingLink :one
-SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE id = $1 FOR UPDATE
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email FROM booking_link WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetBookingLink(ctx context.Context, id string) (BookingLink, error) {
@@ -383,6 +415,10 @@ func (q *Queries) GetBookingLink(ctx context.Context, id string) (BookingLink, e
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }
@@ -501,9 +537,9 @@ func (q *Queries) HostLinkCounts(ctx context.Context) ([]HostLinkCountsRow, erro
 }
 
 const insertBookingLink = `-- name: InsertBookingLink :one
-INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, expires_at, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, $8, app_current_user())
-RETURNING id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at
+INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, expires_at, created_by, ask_phone, ask_email)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, $8, app_current_user(), $9, $10)
+RETURNING id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email
 `
 
 type InsertBookingLinkParams struct {
@@ -515,6 +551,8 @@ type InsertBookingLinkParams struct {
 	DurationMinutes int32
 	Location        *string
 	ExpiresAt       time.Time
+	AskPhone        bool
+	AskEmail        bool
 }
 
 func (q *Queries) InsertBookingLink(ctx context.Context, arg InsertBookingLinkParams) (BookingLink, error) {
@@ -527,6 +565,8 @@ func (q *Queries) InsertBookingLink(ctx context.Context, arg InsertBookingLinkPa
 		arg.DurationMinutes,
 		arg.Location,
 		arg.ExpiresAt,
+		arg.AskPhone,
+		arg.AskEmail,
 	)
 	var i BookingLink
 	err := row.Scan(
@@ -546,6 +586,10 @@ func (q *Queries) InsertBookingLink(ctx context.Context, arg InsertBookingLinkPa
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }
@@ -607,7 +651,7 @@ func (q *Queries) ListSchedules(ctx context.Context) ([]Schedule, error) {
 }
 
 const lockBookingLink = `-- name: LockBookingLink :one
-SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE token_hash = $1 FOR UPDATE
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at, ask_phone, ask_email, given_phone, given_email FROM booking_link WHERE token_hash = $1 FOR UPDATE
 `
 
 func (q *Queries) LockBookingLink(ctx context.Context, tokenHash string) (BookingLink, error) {
@@ -630,6 +674,10 @@ func (q *Queries) LockBookingLink(ctx context.Context, tokenHash string) (Bookin
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AskPhone,
+		&i.AskEmail,
+		&i.GivenPhone,
+		&i.GivenEmail,
 	)
 	return i, err
 }

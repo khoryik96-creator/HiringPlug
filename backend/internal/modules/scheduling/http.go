@@ -86,7 +86,7 @@ func (h *HTTP) GetPublicBooking(ctx context.Context, req api.GetPublicBookingReq
 
 // BookPublicBooking handles POST /v1/public/bookings/{bookingToken}.
 func (h *HTTP) BookPublicBooking(ctx context.Context, req api.BookPublicBookingRequestObject) (api.BookPublicBookingResponseObject, error) {
-	p, err := h.svc.Book(ctx, req.BookingToken, req.Body.StartsAt, clientip.From(ctx))
+	p, err := h.svc.Book(ctx, req.BookingToken, req.Body.StartsAt, Given{Phone: deref(req.Body.Phone), Email: deref(req.Body.Email)}, clientip.From(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +115,7 @@ func linkToAPI(l Link) api.BookingLink {
 	return api.BookingLink{
 		Id: r.ID, Url: c.OrNull(l.URL), CandidateId: r.CandidateID, CandidateName: l.CandidateName, HostName: l.HostName,
 		Title: r.Title, DurationMinutes: int(r.DurationMinutes), Location: c.OrNull(r.Location), Status: api.BookingStatus(l.Status),
+		AskFor: askList(r.AskPhone, r.AskEmail), GivenPhone: c.OrNull(r.GivenPhone), GivenEmail: c.OrNull(r.GivenEmail),
 		StartsAt: c.OrNull(r.StartsAt), ExpiresAt: r.ExpiresAt, CreatedAt: r.CreatedAt,
 	}
 }
@@ -125,7 +126,7 @@ func pageToAPI(p Page) api.PublicBooking {
 		slots = []time.Time{}
 	}
 	return api.PublicBooking{
-		CompanyName: p.Company, HostName: p.Host, Title: p.Title, DurationMinutes: p.Duration, Location: c.OrNull(p.Location),
+		CompanyName: p.Company, HostName: p.Host, Title: p.Title, DurationMinutes: p.Duration, Location: c.OrNull(p.Location), AskFor: p.AskFor,
 		TimeZone: p.TimeZone, Status: api.BookingStatus(p.Status), StartsAt: c.OrNull(p.StartsAt), CanChange: p.CanChange, Slots: slots,
 	}
 }
