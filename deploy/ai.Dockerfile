@@ -20,6 +20,8 @@ COPY ai/src ./src
 RUN uv sync --frozen --no-dev
 # CV Studio's engine (rules, prompts, renderer and template), unchanged.
 COPY ai/cvstudio ./cvstudio
+# Which version it runs, reported to Settings > System (heartbeat.py finds it above the package).
+COPY VERSION ./VERSION
 RUN npm ci --omit=dev --prefix cvstudio/engine
 # LibreOffice (old .doc files) needs a writable home.
 ENV HOME=/tmp

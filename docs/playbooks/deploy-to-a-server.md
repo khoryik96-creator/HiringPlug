@@ -239,5 +239,11 @@ starts, once a day while it lasts, and once when it is fixed:
 - background work (emails, CV reading...) failed for good in the last day, or
   waited over an hour
 - the disk has less than a tenth (or 2 GB) free
+- the AI worker (or the background worker) stopped checking in, or still runs
+  the old version after an update (1.52.0): restart it
+  (`docker compose ... up -d`)
+
+Settings › System › **Server checks** shows the same, live, with the workers'
+versions, the files folder and the free disk space.
 
 A server that is down cannot email: the uptime monitor (step 7) covers that.

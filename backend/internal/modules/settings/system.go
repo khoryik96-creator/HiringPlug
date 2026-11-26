@@ -1,7 +1,8 @@
 package settings
 
 // Settings > System: the company's background jobs (waiting, retrying,
-// failed for good, with "Try again") and the server's last backup.
+// failed for good, with "Try again"), the server's last backup, and for the
+// agency that runs the server its checks (server.go).
 
 import (
 	"context"
@@ -35,6 +36,9 @@ type SystemStatus struct {
 	HeldEveryCompany bool
 	Restore          *jobqueue.Restored
 	PaidAI           PaidAI
+	// Server is the server checks, for the agency that runs the server
+	// (HeldEveryCompany); nil for others.
+	Server *ServerChecks
 }
 
 // System returns the company's background jobs and the last backup.
@@ -70,6 +74,11 @@ func (s *Service) systemStatus(ctx context.Context, tx pgx.Tx, p authz.Principal
 	}
 	if err := s.heldStatus(ctx, tx, p, &out); err != nil {
 		return out, err
+	}
+	if out.HeldEveryCompany {
+		if out.Server, err = s.serverChecks(ctx, tx); err != nil {
+			return out, err
+		}
 	}
 	control, err := backup.ReadControl(ctx, tx)
 	out.BackupAuto = control.Auto
@@ -128,6 +137,7 @@ func systemToAPI(st SystemStatus) api.SystemStatus {
 		out.Backup.Set(backupStatusToAPI(*b))
 	}
 	heldToAPI(st, &out)
+	serverToAPI(st.Server, &out)
 	out.PaidAi = api.PaidAiSwitch{Paused: st.PaidAI.Paused || st.PaidAI.ByServer, Reason: c.OrNull(st.PaidAI.Reason),
 		ChangedAt: c.OrNull(st.PaidAI.ChangedAt), PausedByServer: st.PaidAI.ByServer, CanChange: st.PaidAI.CanChange}
 	return out

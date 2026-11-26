@@ -441,11 +441,50 @@ components:
       required: true
       schema: { type: string, pattern: '^hiringplug-[0-9]{8}-[0-9]{6}$' }
   schemas:
+    ServerChecks:
+      type: object
+      required: [version, processes, files, freeBytes, totalBytes, problems]
+      properties:
+        version: { type: string, description: "The version of HiringPlug the API runs (the VERSION file)." }
+        processes:
+          type: array
+          description: The background worker and the AI worker, as each last reported (every half minute).
+          items: { $ref: '#/components/schemas/ServerProcess' }
+        files:
+          type: string
+          nullable: true
+          description: "null: the API wrote, read back and removed a file in the files folder. Else why it could not."
+        freeBytes: { type: integer, format: int64, nullable: true, description: "Free space on the files' disk (null: unknown)." }
+        totalBytes: { type: integer, format: int64, nullable: true }
+        problems:
+          type: array
+          description: What the alert emails (HP_ALERT_EMAIL) report now; empty when all is well.
+          items: { type: string }
+    ServerProcess:
+      type: object
+      required: [name, state, version, startedAt, seenAt]
+      properties:
+        name: { type: string, enum: [worker, ai-worker] }
+        state:
+          type: string
+          enum: [running, stopped, old_version, never_seen]
+          description: >-
+            running; stopped (it reported before but not in the last 2 minutes); old_version (running another
+            version than the API: restart it after an update); never_seen (it never reported: not set up here).
+        version: { type: string, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        seenAt: { type: string, format: date-time, nullable: true }
     SystemStatus:
       type: object
-      required: [jobs, failed, backup, backupAuto, held, heldEveryCompany, restore, paidAi]
+      required: [jobs, failed, backup, backupAuto, held, heldEveryCompany, restore, paidAi, server]
       properties:
         paidAi: { $ref: '#/components/schemas/PaidAiSwitch' }
+        server:
+          description: >-
+            Checks of the server itself (its workers, files folder and disk, and what the alert emails
+            would report); only for the agency that runs the server (heldEveryCompany), null for others.
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/ServerChecks' }]
         held:
           type: array
           description: >-

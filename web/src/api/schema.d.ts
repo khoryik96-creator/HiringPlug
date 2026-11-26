@@ -12566,8 +12566,41 @@ export interface components {
         SchedulingRefreshCalendarJob: {
             userId: string;
         };
+        ServerChecks: {
+            /** @description The version of HiringPlug the API runs (the VERSION file). */
+            version: string;
+            /** @description The background worker and the AI worker, as each last reported (every half minute). */
+            processes: components["schemas"]["ServerProcess"][];
+            /** @description null: the API wrote, read back and removed a file in the files folder. Else why it could not. */
+            files: string | null;
+            /**
+             * Format: int64
+             * @description Free space on the files' disk (null: unknown).
+             */
+            freeBytes: number | null;
+            /** Format: int64 */
+            totalBytes: number | null;
+            /** @description What the alert emails (HP_ALERT_EMAIL) report now; empty when all is well. */
+            problems: string[];
+        };
+        ServerProcess: {
+            /** @enum {string} */
+            name: "worker" | "ai-worker";
+            /**
+             * @description running; stopped (it reported before but not in the last 2 minutes); old_version (running another version than the API: restart it after an update); never_seen (it never reported: not set up here).
+             * @enum {string}
+             */
+            state: "running" | "stopped" | "old_version" | "never_seen";
+            version: string | null;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            seenAt: string | null;
+        };
         SystemStatus: {
             paidAi: components["schemas"]["PaidAiSwitch"];
+            /** @description Checks of the server itself (its workers, files folder and disk, and what the alert emails would report); only for the agency that runs the server (heldEveryCompany), null for others. */
+            server: components["schemas"]["ServerChecks"] | null;
             /** @description Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany). */
             held: components["schemas"]["HeldJob"][];
             /** @description The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company. */

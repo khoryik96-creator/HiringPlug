@@ -22,8 +22,10 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/buildinfo"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/heartbeat"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/httpserver"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
@@ -201,8 +203,10 @@ func RunWorker(ctx context.Context, getenv func(string) string, out io.Writer) e
 		return err
 	}
 	go upkeep(ctx, d, m)
+	// Says every half minute that it runs, and which version (Settings › System).
+	go heartbeat.Run(ctx, d.Pool, heartbeat.Worker, buildinfo.Version(), logger)
 	// Tells HP_ALERT_EMAIL when the server needs someone (failed backups, a full disk...).
-	go (&alerts.Watcher{Checks: alerts.Checks{DB: d.Pool, FilesDir: cfg.FilesDir}, Mail: d.Mail, To: cfg.AlertEmails,
+	go (&alerts.Watcher{Checks: alerts.Checks{DB: d.Pool, FilesDir: cfg.FilesDir, Version: buildinfo.Version()}, Mail: d.Mail, To: cfg.AlertEmails,
 		Server: cfg.PublicURL, Log: logger.With("part", "alerts")}).Run(ctx)
 	return w.Run(ctx)
 }

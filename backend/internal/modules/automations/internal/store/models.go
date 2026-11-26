@@ -1831,6 +1831,13 @@ type ScreeningCallSalary struct {
 	Snapshot []byte
 }
 
+type ServerProcess struct {
+	Name      string
+	Version   string
+	StartedAt time.Time
+	SeenAt    time.Time
+}
+
 type StageTemplate struct {
 	ID        string
 	TenantID  string

@@ -1690,6 +1690,18 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
   .team-table tbody tr:hover td { background: transparent; }
 }
 .held-jobs .held-actions { white-space: nowrap; }
+.badge.check-ok { background: #dcfce7; }
+.badge.check-warn { background: #fef3c7; }
+.badge.check-bad { background: #fee2e2; }
+.server-checks h4 { margin: 0.9rem 0 0.3rem; font-size: 0.9rem; }
+.server-problems { margin: 0; padding-left: 1.2rem; }
+@media (max-width: 640px) {
+  /* Each check stacked: name and state on one line, the details under them. */
+  .server-checks thead { display: none; }
+  .server-checks tr { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.6rem; padding: 0.55rem 0; }
+  .server-checks td { padding: 0; border: 0; }
+  .server-checks td:nth-child(3) { grid-column: 1 / -1; }
+}
 .held-jobs .held-actions .link + .link { margin-left: 0.85rem; }
 
 /* Before an idle sign-in ends: the countdown, above everything, bottom right. */

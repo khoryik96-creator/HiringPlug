@@ -1,7 +1,8 @@
 // Package alerts tells the people who look after the server when something
 // needs them (HP_ALERT_EMAIL): a backup failed or is overdue, its copy off
 // the server failed, the backup service stopped, background work keeps
-// failing or waits too long, or the disk is nearly full. The worker checks
+// failing or waits too long, a worker stopped or still runs the old version
+// after an update, or the disk is nearly full. The worker checks
 // every 15 minutes and emails when a problem starts, once a day while it
 // lasts, and once when it is over. (A server that is down cannot say so: an
 // outside monitor calls /health/ready for that; see the server guide.)
@@ -35,6 +36,7 @@ type Problem struct {
 // DB is what the checks read.
 type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }
 
@@ -44,6 +46,9 @@ type Checks struct {
 	FilesDir string                                            // the uploaded files: their disk must not fill up
 	Disk     func(path string) (free, total uint64, err error) // nil: the real disk
 	Now      func() time.Time
+	// Version is the version this server runs (buildinfo.Version): a worker
+	// on another one after an update is a problem. Empty: not compared.
+	Version string
 }
 
 // Problems returns what needs someone now.
@@ -87,17 +92,33 @@ func (c Checks) Problems(ctx context.Context) ([]Problem, error) {
 	if stuck > 0 {
 		out = append(out, Problem{"jobs-stuck", fmt.Sprintf("%d background task(s) have waited over an hour: a worker may have stopped.", stuck)})
 	}
-	if c.FilesDir != "" {
-		disk := c.Disk
-		if disk == nil {
-			disk = diskSpace
-		}
-		if free, total, err := disk(c.FilesDir); err == nil && total > 0 && (free < total/10 || free < 2<<30) {
-			out = append(out, Problem{"disk-full", fmt.Sprintf("The disk is nearly full: %.1f GB free of %.1f GB.", gb(free), gb(total))})
-		}
+	procs, err := c.Processes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, processProblems(procs, c.Version)...)
+	if free, total, ok := c.Space(); ok && NearlyFull(free, total) {
+		out = append(out, Problem{"disk-full", fmt.Sprintf("The disk is nearly full: %.1f GB free of %.1f GB.", gb(free), gb(total))})
 	}
 	return out, nil
 }
+
+// Space is the free and total bytes of the uploaded files' disk (ok false:
+// no FilesDir, or the system cannot tell).
+func (c Checks) Space() (free, total uint64, ok bool) {
+	if c.FilesDir == "" {
+		return 0, 0, false
+	}
+	disk := c.Disk
+	if disk == nil {
+		disk = diskSpace
+	}
+	free, total, err := disk(c.FilesDir)
+	return free, total, err == nil && total > 0
+}
+
+// NearlyFull is under a tenth or under 2 GB free.
+func NearlyFull(free, total uint64) bool { return free < total/10 || free < 2<<30 }
 
 func gb(n uint64) float64 { return float64(n) / (1 << 30) }
 

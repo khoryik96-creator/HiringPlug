@@ -107,6 +107,7 @@ func NewModules(d Deps) *Modules {
 	m.Identity.UseTwoStepKey(d.Config.AuthJWTSecret)
 	m.Settings = settings.New(d.Pool)
 	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant})
+	m.Settings.UseServer(settings.ServerSetup{FilesDir: d.Config.FilesDir, Files: d.Files})
 	m.Settings.PaidAIOffByServer(d.Config.AI.PaidOff)
 	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret, PaidOff: d.Config.AI.PaidOff})

@@ -7322,6 +7322,31 @@ class SchedulingRefreshCalendarJob(BaseModel):
     userId: str
 
 
+class Name(StrEnum):
+    worker = "worker"
+    ai_worker = "ai-worker"
+
+
+class State2(StrEnum):
+    running = "running"
+    stopped = "stopped"
+    old_version = "old_version"
+    never_seen = "never_seen"
+
+
+class ServerProcess(BaseModel):
+    name: Name
+    state: Annotated[
+        State2,
+        Field(
+            description="running; stopped (it reported before but not in the last 2 minutes); old_version (running another version than the API: restart it after an update); never_seen (it never reported: not set up here)."
+        ),
+    ]
+    version: Annotated[str | None, Field(...)]
+    startedAt: Annotated[AwareDatetime | None, Field(...)]
+    seenAt: Annotated[AwareDatetime | None, Field(...)]
+
+
 class PaidAiSwitch(BaseModel):
     paused: Annotated[
         bool, Field(description="Paid AI is paused on the server (this switch, or HP_AI_PAID=off).")
@@ -9856,8 +9881,36 @@ class BookingLink(BaseModel):
     createdAt: AwareDatetime
 
 
+class ServerChecks(BaseModel):
+    version: Annotated[str, Field(description="The version of HiringPlug the API runs (the VERSION file).")]
+    processes: Annotated[
+        list[ServerProcess],
+        Field(
+            description="The background worker and the AI worker, as each last reported (every half minute)."
+        ),
+    ]
+    files: Annotated[
+        str | None,
+        Field(
+            description="null: the API wrote, read back and removed a file in the files folder. Else why it could not."
+        ),
+    ]
+    freeBytes: Annotated[int | None, Field(description="Free space on the files' disk (null: unknown).")]
+    totalBytes: Annotated[int | None, Field(...)]
+    problems: Annotated[
+        list[str],
+        Field(description="What the alert emails (HP_ALERT_EMAIL) report now; empty when all is well."),
+    ]
+
+
 class SystemStatus(BaseModel):
     paidAi: PaidAiSwitch
+    server: Annotated[
+        ServerChecks | None,
+        Field(
+            description="Checks of the server itself (its workers, files folder and disk, and what the alert emails would report); only for the agency that runs the server (heldEveryCompany), null for others."
+        ),
+    ]
     held: Annotated[
         list[HeldJob],
         Field(

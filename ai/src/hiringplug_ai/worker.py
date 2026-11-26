@@ -25,6 +25,8 @@ from .config import Config, ConfigError, load_config
 from .contracts import JobKind
 from .download import GiveUpError, download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
+from .heartbeat import Heartbeat
+from .heartbeat import version as heartbeat_version
 from .jobs import HANDLERS, MEANING_KINDS, Deps, ProviderLog, ReportGate
 from .meaning import model as meaning_model
 from .paid_switch import PaidSwitch
@@ -155,6 +157,9 @@ def main() -> None:
     slots.append(
         threading.Thread(target=run_slot, args=(meaning_queue, deps, config, stop, True), name="slot-meaning")
     )
+    # Says every half minute that it runs, and which version (Settings > System).
+    beat = Heartbeat(config.database_url, heartbeat_version())
+    threading.Thread(target=beat.run, args=(stop,), name="heartbeat", daemon=True).start()
     for t in slots:
         t.start()
     while any(t.is_alive() for t in slots):

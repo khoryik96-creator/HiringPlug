@@ -2108,6 +2108,14 @@ server; an owner of the agency that runs the server pauses it for every
 company at once, company keys included, or turns it back on (audited; on the
 server, `hp paid-ai on|off`): CVs are then read by the rules alone, and the AI
 notice across the app says paid AI is paused.
+**Server checks** (1.52.0; the agency that runs the server only) say whether
+the background worker and the AI worker run (each reports every half minute;
+"Stopped" after two minutes of silence) and on the same version as the rest
+of HiringPlug ("Old version": restart it after an update), whether the API
+can save and open files in the files folder (it writes, reads back and
+removes a small file each time the page loads), the disk's free space, and
+what the alert emails report now. "Not seen" is a worker that never reported:
+not running on this server, or from before 1.52.0.
 
 **Backups** (the owner of the agency that runs the server; permission
 `settings.backups:manage`) turns the nightly backup on or off, makes one now

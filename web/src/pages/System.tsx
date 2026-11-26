@@ -1,5 +1,6 @@
 // Settings > System: the company's background jobs (what is waiting, what
-// failed for good, with Try again) and the server's last backup.
+// failed for good, with Try again), the server's last backup and, for the
+// agency that runs the server, its checks.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -7,6 +8,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { HeldJobs, RestoreNotice } from "../components/HeldJobs";
 import { PaidAi } from "../components/PaidAi";
+import { ServerChecks } from "../components/ServerChecks";
 import { OffsiteCopy } from "../components/OffsiteCopy";
 import { formatWhen } from "../labels";
 
@@ -99,6 +101,7 @@ export function System() {
       <ErrorMessage error={status.error ?? retry.error} />
       {st && (
         <>
+          {st.server && <ServerChecks checks={st.server} />}
           <Backup backup={st.backup} auto={st.backupAuto} restore={st.restore} />
           <HeldJobs held={st.held} everyCompany={st.heldEveryCompany} label={label} statusKey={systemKey} />
           <PaidAi paidAi={st.paidAi} statusKey={systemKey} />

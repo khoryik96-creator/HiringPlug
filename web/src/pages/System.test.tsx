@@ -18,9 +18,53 @@ const lastBackup: NonNullable<Schemas["SystemStatus"]["backup"]> = {
 const status = (over: Partial<Schemas["SystemStatus"]> = {}): Schemas["SystemStatus"] => ({
   jobs: [{ kind: "email.send", waiting: 2, running: 1, retrying: 0, failed: 1, oldestWaitingSince: "2026-11-07T06:00:00Z" }],
   failed: [{ id: "job_1", kind: "email.send", attempts: 5, error: "smtp: 550 mailbox unavailable", failedAt: "2026-11-07T05:00:00Z" }],
-  backup: lastBackup, backupAuto: true, held: [], heldEveryCompany: false, restore: null,
+  backup: lastBackup, backupAuto: true, held: [], heldEveryCompany: false, restore: null, server: null,
   paidAi: { paused: false, reason: null, changedAt: null, pausedByServer: false, canChange: true },
   ...over,
+});
+
+const running = (name: "worker" | "ai-worker", version = "1.52.0"): Schemas["ServerProcess"] => ({
+  name, state: "running", version, startedAt: "2026-11-26T08:00:00Z", seenAt: new Date().toISOString(),
+});
+const server = (over: Partial<Schemas["ServerChecks"]> = {}): Schemas["ServerChecks"] => ({
+  version: "1.52.0", processes: [running("worker"), running("ai-worker")], files: null,
+  freeBytes: 40 * 1024 ** 3, totalBytes: 100 * 1024 ** 3, problems: [], ...over,
+});
+
+describe("System › server checks", () => {
+  it("says all is well when the workers run, files work and the disk has room", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ heldEveryCompany: true, server: server() })));
+    renderWithClient(<System />);
+    const panel = await screen.findByRole("region", { name: "Server checks" });
+    expect(panel.textContent).toContain("All is well. HiringPlug 1.52.0.");
+    expect(panel.textContent).toContain("40.0 GB free of 100.0 GB.");
+    expect(panel.textContent).toContain("Files can be saved and opened.");
+  });
+
+  it("shows a worker left on the old version, a files folder it cannot use and what the alerts say", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({
+      heldEveryCompany: true,
+      server: server({
+        processes: [running("worker"), { ...running("ai-worker", "1.51.0"), state: "old_version" }],
+        files: "cannot write: permission denied",
+        problems: ["The AI worker still runs version 1.51.0, the rest of HiringPlug 1.52.0: restart it after the update."],
+      }),
+    })));
+    renderWithClient(<System />);
+    const panel = await screen.findByRole("region", { name: "Server checks" });
+    expect(panel.textContent).toContain("Something needs looking at.");
+    expect(panel.textContent).toContain("Old version");
+    expect(panel.textContent).toContain("Runs 1.51.0, the rest of HiringPlug 1.52.0: restart it after the update.");
+    expect(panel.textContent).toContain("Files cannot be saved or opened: cannot write: permission denied");
+    expect(screen.getByText(/The AI worker still runs version 1\.51\.0/, { selector: "li" })).toBeTruthy();
+  });
+
+  it("is not shown to other companies", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status()));
+    renderWithClient(<System />);
+    await screen.findAllByText("Sending emails");
+    expect(screen.queryByRole("region", { name: "Server checks" })).toBeNull();
+  });
 });
 
 describe("System", () => {
