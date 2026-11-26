@@ -33,6 +33,14 @@ export async function fetchCv(token: string, item: Item): Promise<CvCopy> {
   return { url: URL.createObjectURL(blob), fileName, pdf };
 }
 
+/** Whether this browser shows a PDF inside the page. Phones do not (Android shows "content is blocked", an
+ * iPhone only the first page): there the CV opens in a tab of its own, in the phone's own viewer. */
+export function showsPdfInPage(): boolean {
+  const viewer = (navigator as { pdfViewerEnabled?: boolean }).pdfViewerEnabled; // not every browser says
+  if (viewer === false) return false;
+  return !(typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches);
+}
+
 function save(cv: CvCopy) {
   const a = document.createElement("a");
   a.href = cv.url;
@@ -110,13 +118,26 @@ function Candidate({ c, n, token, busy, who, onAnswer }: {
 }) {
   const [comment, setComment] = useState("");
   const [shown, setShown] = useState(false);
-  // A PDF shows on the page; a Word file downloads.
+  // A PDF shows on the page (on a phone, in a tab of its own); a Word file downloads.
   const cv = useMutation({
-    mutationFn: () => fetchCv(token, c),
-    onSuccess: (copy) => { if (copy.pdf) setShown(true); else save(copy); },
+    mutationFn: async (tab: Window | null) => ({ copy: await fetchCv(token, c), tab }),
+    onSuccess: ({ copy, tab }) => {
+      if (copy.pdf && tab) tab.location.href = copy.url;
+      else if (copy.pdf && showsPdfInPage()) setShown(true);
+      else { tab?.close(); save(copy); }
+    },
+    onError: (_e, tab) => { tab?.close(); },
   });
-  useEffect(() => () => { if (cv.data) URL.revokeObjectURL(cv.data.url); }, [cv.data]);
-  const copy = shown ? cv.data : undefined;
+  const view = () => {
+    if (showsPdfInPage()) { if (cv.data?.copy.pdf) setShown(true); else cv.mutate(null); return; }
+    // Opened now, while it is the click's: a tab opened once the CV has come would be blocked as a pop-up.
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null;
+    if (cv.data?.copy.pdf && tab) tab.location.href = cv.data.copy.url;
+    else cv.mutate(tab);
+  };
+  useEffect(() => () => { if (cv.data) URL.revokeObjectURL(cv.data.copy.url); }, [cv.data]);
+  const copy = shown ? cv.data?.copy : undefined;
   return (
     <li className={`shortlist-item${c.decision ? ` answered ${c.decision}` : ""}`} aria-label={c.label}>
       <div className="shortlist-item-head">
@@ -130,7 +151,7 @@ function Candidate({ c, n, token, busy, who, onAnswer }: {
               <button type="button" onClick={() => { setShown(false); }}>Hide CV</button>
             </>
           ) : (
-            <button type="button" disabled={cv.isPending} onClick={() => { if (cv.data?.pdf) setShown(true); else cv.mutate(); }}>
+            <button type="button" disabled={cv.isPending} onClick={view}>
               {cv.isPending ? "Opening…" : "View CV"}
             </button>
           )}
