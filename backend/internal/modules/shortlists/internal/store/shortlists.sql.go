@@ -43,6 +43,55 @@ func (q *Queries) AnswerShortlistCandidate(ctx context.Context, arg AnswerShortl
 	return i, err
 }
 
+const answersOnLinksBy = `-- name: AnswersOnLinksBy :many
+SELECT c.id, c.application_id, s.job_id, c.decision::text AS decision, coalesce(c.comment, '')::text AS comment, c.answered_at::timestamptz AS answered_at
+FROM client_shortlist_candidate c JOIN client_shortlist s ON s.id = c.shortlist_id
+WHERE s.created_by = $1 AND c.answered_at >= $2
+ORDER BY c.answered_at DESC LIMIT 100
+`
+
+type AnswersOnLinksByParams struct {
+	UserID string
+	Since  *time.Time
+}
+
+type AnswersOnLinksByRow struct {
+	ID            string
+	ApplicationID string
+	JobID         string
+	Decision      string
+	Comment       string
+	AnsweredAt    time.Time
+}
+
+// The client's answers on links a user sent, since a moment (their bell).
+func (q *Queries) AnswersOnLinksBy(ctx context.Context, arg AnswersOnLinksByParams) ([]AnswersOnLinksByRow, error) {
+	rows, err := q.db.Query(ctx, answersOnLinksBy, arg.UserID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AnswersOnLinksByRow
+	for rows.Next() {
+		var i AnswersOnLinksByRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.JobID,
+			&i.Decision,
+			&i.Comment,
+			&i.AnsweredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const applicationsOnLinks = `-- name: ApplicationsOnLinks :many
 SELECT DISTINCT application_id::text FROM client_shortlist_candidate WHERE application_id = ANY($1::text[])
 `

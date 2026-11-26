@@ -17,11 +17,12 @@ const (
 	KindOfferApproval = "offer_approval"
 	KindInterview     = "interview"
 	KindCVFormatted   = "cv_formatted"
+	KindClientAnswer  = "client_answer"
 	KindAILimit       = "ai_limit"
 )
 
 // Kinds is every kind, in the order Settings lists them.
-var Kinds = []string{KindApplicant, KindTask, KindOfferApproval, KindInterview, KindCVFormatted, KindAILimit}
+var Kinds = []string{KindApplicant, KindTask, KindOfferApproval, KindInterview, KindCVFormatted, KindClientAnswer, KindAILimit}
 
 // NormalizeMuted checks the kinds a user turned off and puts them in order,
 // once each.
@@ -51,6 +52,9 @@ const ApplicantDays = 7
 
 // FormattedDays is how far back CVs formatted show in the bell.
 const FormattedDays = 2
+
+// AnswerDays is how far back a client's answers on shortlist links show in the bell.
+const AnswerDays = 7
 
 // MorningHour is when the morning email goes, in the agency's time.
 const MorningHour = 8
@@ -91,6 +95,14 @@ type FormattedCV struct {
 	At                             time.Time // when it finished
 }
 
+// ClientAnswer is a client's answer on a shortlist link the user sent.
+type ClientAnswer struct {
+	ID, ApplicationID, JobID string
+	Approved                 bool
+	Comment                  string
+	At                       time.Time
+}
+
 // AILimitLevel is the level of the whole AI limit (an AILimit's Level
 // otherwise is the company's warning percent).
 const AILimitLevel = 100
@@ -109,6 +121,7 @@ type Inputs struct {
 	Tasks              []Task
 	Interviews         []Interview
 	FormattedCVs       []FormattedCV
+	ClientAnswers      []ClientAnswer
 	AILimits           []AILimit
 	Apps               map[string]Application
 }
@@ -128,6 +141,7 @@ type Window struct {
 	From, To        time.Time // interviews starting in [From, To)
 	ApplicantsSince time.Time
 	FormattedSince  time.Time
+	AnswersSince    time.Time
 	zone            *time.Location
 }
 
@@ -141,6 +155,7 @@ func WindowAt(now time.Time, loc *time.Location) Window {
 		To:              time.Date(y, m, d+2, 0, 0, 0, 0, loc),
 		ApplicantsSince: now.AddDate(0, 0, -ApplicantDays),
 		FormattedSince:  now.AddDate(0, 0, -FormattedDays),
+		AnswersSince:    now.AddDate(0, 0, -AnswerDays),
 		zone:            loc,
 	}
 }
@@ -208,6 +223,22 @@ func Build(in Inputs, seen *time.Time, w Window) []Item {
 			it.Title, it.Detail = what+" could not be formatted: "+f.CandidateName, "Try again from their page"
 		} else {
 			it.Title, it.Detail = what+" formatted: "+f.CandidateName, "Ready under CVs on their page"
+		}
+		out = append(out, it)
+	}
+	for _, c := range in.ClientAnswers {
+		a, ok := about(c.ApplicationID)
+		if !ok {
+			continue
+		}
+		it := Item{ID: KindClientAnswer + ":" + c.ID, Kind: KindClientAnswer, At: c.At, Detail: jobText(a), Href: "#/jobs/" + c.JobID}
+		if c.Approved {
+			it.Title = "Client approved " + a.CandidateName
+		} else {
+			it.Title = "Client rejected " + a.CandidateName
+		}
+		if comment := strings.Join(strings.Fields(c.Comment), " "); comment != "" {
+			it.Detail += ` · "` + clip(comment, 140) + `"`
 		}
 		out = append(out, it)
 	}
@@ -320,7 +351,7 @@ func DigestFor(items []Item, since time.Time) []Item {
 		if it.Kind == KindCVFormatted { // for the moment it is ready, in the bell; not the morning email
 			continue
 		}
-		if (it.Kind == KindApplicant || it.Kind == KindAILimit) && it.At.Before(since) {
+		if (it.Kind == KindApplicant || it.Kind == KindClientAnswer || it.Kind == KindAILimit) && it.At.Before(since) {
 			continue
 		}
 		out = append(out, it)
@@ -352,6 +383,7 @@ var digestSections = []struct{ kind, heading string }{
 	{KindTask, "Tasks due"},
 	{KindOfferApproval, "Offers waiting for your approval"},
 	{KindApplicant, "New applicants on your jobs"},
+	{KindClientAnswer, "Clients' answers on your shortlist links"},
 	{KindAILimit, "The company's AI use this month"},
 }
 
@@ -390,10 +422,20 @@ func countText(kind string, n int) string {
 		KindTask:          {"task due", "tasks due"},
 		KindOfferApproval: {"offer to approve", "offers to approve"},
 		KindApplicant:     {"new applicant", "new applicants"},
+		KindClientAnswer:  {"client answer", "client answers"},
 		KindAILimit:       {"AI limit notice", "AI limit notices"},
 	}[kind]
 	if n == 1 {
 		return "1 " + unit[0]
 	}
 	return fmt.Sprintf("%d %s", n, unit[1])
+}
+
+// clip shortens text to at most n characters, ending in "…" when cut.
+func clip(text string, n int) string {
+	r := []rune(text)
+	if len(r) <= n {
+		return text
+	}
+	return strings.TrimSpace(string(r[:n-1])) + "…"
 }

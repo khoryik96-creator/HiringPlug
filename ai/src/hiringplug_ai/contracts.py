@@ -6151,6 +6151,7 @@ class NotificationKind(StrEnum):
     offer_approval = "offer_approval"
     interview = "interview"
     cv_formatted = "cv_formatted"
+    client_answer = "client_answer"
     ai_limit = "ai_limit"
 
 

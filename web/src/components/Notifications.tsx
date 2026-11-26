@@ -26,6 +26,7 @@ export const KINDS: { kind: Kind; label: string; short: string; permission: Perm
   { kind: "offer_approval", label: "Offers waiting for your approval", short: "Offer", permission: "offers:approve" },
   { kind: "interview", label: "Your interviews today and tomorrow", short: "Interview", permission: "interviews:read" },
   { kind: "cv_formatted", label: "CVs you had formatted, ready or failed", short: "CV ready", permission: "cvformats:create" },
+  { kind: "client_answer", label: "Clients' answers on shortlist links you sent", short: "Client", permission: "shortlists:share" },
   { kind: "ai_limit", label: "The company's AI use near or at this month's limit", short: "AI limit", permission: "aiusage:read" },
 ];
 const SHORT = Object.fromEntries(KINDS.map((k) => [k.kind, k.short])) as Record<Kind, string>;

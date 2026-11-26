@@ -58,3 +58,10 @@ SELECT DISTINCT application_id::text FROM client_shortlist_candidate WHERE appli
 -- Merging candidates: the duplicate's places on links follow it.
 -- name: MoveShortlistCandidates :exec
 UPDATE client_shortlist_candidate SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- The client's answers on links a user sent, since a moment (their bell).
+-- name: AnswersOnLinksBy :many
+SELECT c.id, c.application_id, s.job_id, c.decision::text AS decision, coalesce(c.comment, '')::text AS comment, c.answered_at::timestamptz AS answered_at
+FROM client_shortlist_candidate c JOIN client_shortlist s ON s.id = c.shortlist_id
+WHERE s.created_by = @user_id AND c.answered_at >= @since
+ORDER BY c.answered_at DESC LIMIT 100;

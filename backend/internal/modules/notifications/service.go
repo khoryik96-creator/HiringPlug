@@ -165,6 +165,11 @@ func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state
 			return nil, err
 		}
 	}
+	if p.Can(api.PermissionShortlistsShare) && wants(KindClientAnswer) {
+		if in.ClientAnswers, err = s.src.ClientAnswers(ctx, tx, p.UserID, w.AnswersSince); err != nil {
+			return nil, err
+		}
+	}
 	if p.Can(api.PermissionAiusageRead) && wants(KindAILimit) {
 		if in.AILimits, err = s.src.AILimits(ctx, tx, now); err != nil {
 			return nil, err
@@ -178,6 +183,9 @@ func (s *Service) items(ctx context.Context, tx pgx.Tx, p authz.Principal, state
 		ids = append(ids, r.ApplicationID)
 	}
 	for _, r := range in.Interviews {
+		ids = append(ids, r.ApplicationID)
+	}
+	for _, r := range in.ClientAnswers {
 		ids = append(ids, r.ApplicationID)
 	}
 	for _, t := range in.Tasks {

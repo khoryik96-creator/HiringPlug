@@ -46,6 +46,9 @@ type Sources interface {
 	// FormattedCVs is the CVs the user had formatted CV Studio's way that
 	// finished since then, with the candidate's name.
 	FormattedCVs(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]FormattedCV, error)
+	// ClientAnswers is the client's answers since then on the shortlist links
+	// the user sent.
+	ClientAnswers(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]ClientAnswer, error)
 	// AILimits is the levels the company's AI use reached in now's month
 	// (its warning percent, AILimitLevel).
 	AILimits(ctx context.Context, tx pgx.Tx, now time.Time) ([]AILimit, error)

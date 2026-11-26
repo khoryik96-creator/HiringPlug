@@ -136,3 +136,22 @@ func (m *Module) OnApplications(ctx context.Context, tx pgx.Tx, applicationIDs [
 func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
 	return store.New(tx).MoveShortlistCandidates(ctx, store.MoveShortlistCandidatesParams{FromID: fromID, ToID: toID})
 }
+
+// Answer is a client's answer on a link: the candidate approved or rejected.
+type Answer struct {
+	ID, ApplicationID, JobID string
+	Approved                 bool
+	Comment                  string // the client's, "" when none
+	At                       time.Time
+}
+
+// AnswersBy is the client's answers since then on the links a user sent,
+// newest first, in the caller's transaction (their bell).
+func (m *Module) AnswersBy(ctx context.Context, tx pgx.Tx, userID string, since time.Time) ([]Answer, error) {
+	rows, err := store.New(tx).AnswersOnLinksBy(ctx, store.AnswersOnLinksByParams{UserID: userID, Since: &since})
+	out := make([]Answer, len(rows))
+	for i, r := range rows {
+		out[i] = Answer{ID: r.ID, ApplicationID: r.ApplicationID, JobID: r.JobID, Approved: r.Decision == "approved", Comment: r.Comment, At: r.AnsweredAt}
+	}
+	return out, err
+}

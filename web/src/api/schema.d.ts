@@ -11393,10 +11393,10 @@ export interface components {
             items: components["schemas"]["ActivityEntry"][];
         };
         /**
-         * @description applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow; cv_formatted: a CV you had formatted CV Studio's way is ready, or could not be made (last 2 days); ai_limit: this month's AI use reached the company's warning level or its whole limit (with aiusage:read).
+         * @description applicant: someone applied to a job you own (last 7 days); task: a task of yours due today or overdue; offer_approval: an offer waiting for your approval; interview: an interview of yours today or tomorrow; cv_formatted: a CV you had formatted CV Studio's way is ready, or could not be made (last 2 days); client_answer: a client approved or rejected a candidate on a shortlist link you sent (last 7 days); ai_limit: this month's AI use reached the company's warning level or its whole limit (with aiusage:read).
          * @enum {string}
          */
-        NotificationKind: "applicant" | "task" | "offer_approval" | "interview" | "cv_formatted" | "ai_limit";
+        NotificationKind: "applicant" | "task" | "offer_approval" | "interview" | "cv_formatted" | "client_answer" | "ai_limit";
         Notification: {
             /** @description The kind and record it is about, e.g. task:tsk_..., stable while it shows. */
             id: string;
