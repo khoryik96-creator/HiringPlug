@@ -25,6 +25,7 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "aiprovider.check": "Checking an AI key",
   "aiprovider.checked": "Saving an AI key check",
   "aiprovider.reported": "Noting whether the AI answered",
+  "ai.attempt_spent": "Counting a failed AI attempt",
   "assistant.ask": "AI assistant questions",
   "bin.remove_files": "Remove purged files",
   "bin.purge": "Deleting from the Bin after 30 days",

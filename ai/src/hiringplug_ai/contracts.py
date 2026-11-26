@@ -615,7 +615,7 @@ class AiUsageSettingsUpdate(BaseModel):
     featureTokens: Annotated[
         dict[str, FeatureTokensAdditionalProperty] | None,
         Field(
-            description="A feature's own monthly limit in tokens, by feature (AiFeature); a feature left out has none. Left out altogether: kept as they are.",
+            description="A feature's own monthly limit in tokens, by feature (AiFeature); a feature left out has none; provider_check takes none (checking a key is never held back). Left out altogether: kept as they are.",
             max_length=20,
         ),
     ] = None

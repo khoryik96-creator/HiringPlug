@@ -66,3 +66,11 @@
   .ai-usage-table :is(td, th) { padding: 0.55rem 0.6rem; }
   .ai-usage-values { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Daily and per-feature limits */
+.ai-daily { max-width: 22rem; margin-bottom: .75rem; }
+.ai-feature-limits { width: 100%; max-width: 34rem; border-collapse: collapse; margin-bottom: .75rem; }
+.ai-feature-limits th { text-align: left; font-size: .85rem; font-weight: 600; padding: .3rem .4rem; }
+.ai-feature-limits td { padding: .3rem .4rem; border-top: 1px solid var(--line); vertical-align: middle; }
+.ai-feature-limits input { width: 100%; box-sizing: border-box; }
+.ai-usage-values .contents { display: contents; }

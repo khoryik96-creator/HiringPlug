@@ -10269,7 +10269,7 @@ components:
         dailyTokens: {type: integer, format: int64, nullable: true, minimum: 1, maximum: 1000000000000, description: "null: no daily limit. Left out: kept as it is."}
         featureTokens:
           type: object
-          description: "A feature's own monthly limit in tokens, by feature (AiFeature); a feature left out has none. Left out altogether: kept as they are."
+          description: "A feature's own monthly limit in tokens, by feature (AiFeature); a feature left out has none; provider_check takes none (checking a key is never held back). Left out altogether: kept as they are."
           maxProperties: 20
           additionalProperties: {type: integer, format: int64, minimum: 1, maximum: 1000000000000}
         version: {type: integer, minimum: 0, description: The version you loaded (0 before the settings were first saved).}

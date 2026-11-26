@@ -533,6 +533,17 @@ Built in 1.44.0.
   Once it is reached, AI work is refused until the 1st (the assistant and fit
   scores answer `*_LIMIT_REACHED`, CVs are read by the rules alone); AI work
   already on its way finishes.
+- **Daily and per-feature limits** (1.51.0). Besides the month's limit, a
+  company can set a daily limit for all features together (a day is midnight
+  to midnight in agency time) and a monthly limit of a feature's own (say, CV
+  reading). New AI work starts only while all three have room; whichever is
+  used first stops it, with the same messages as the month's limit. They are
+  saved with `PUT /v1/ai-usage/settings` (`dailyTokens`, `featureTokens`; left
+  out, they are kept). Checking a provider's key takes no limit of its own.
+- **Failed attempts count.** An AI job that the provider answered but that
+  then failed (and was tried again, or gave up) still cost tokens: the worker
+  reports them (`ai.attempt_spent`) and they are recorded once per attempt
+  under the job's feature, so retries show in the ledger and the limits.
 - **Warnings.** When the month's use reaches the company's warning percent
   (80% by default) and again at 100%, those who may see the company's AI use
   (`aiusage:read`) get a bell item (`ai_limit`, can be turned off) and a line in
@@ -551,7 +562,8 @@ Built in 1.44.0.
   and when the limit starts again. Beside it the limit and prices: a form for
   `aiusage:manage` (tokens or money, warning percent, currency, price per
   million tokens in and out, "Use the server default"), the values for those
-  who only read them. Then this month by feature and by person (what the
+  who only read them. Below them the daily and per-feature limits: a daily
+  box and one box per feature (empty: none of its own). Then this month by feature and by person (what the
   system did on its own is "Automatic"), and the last 12 months as bars with
   the limit as a line: clicking a month lists its features. Money is shown
   exactly as the API sends it (decimal strings, never rounded in the browser).

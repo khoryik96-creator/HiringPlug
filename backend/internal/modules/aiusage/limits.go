@@ -32,10 +32,19 @@ func checkLimits(l *Limits, errs *apperr.FieldErrors) {
 		switch {
 		case !IsFeature(f):
 			errs.Add("featureTokens", fmt.Sprintf("%q is not a feature", f))
+		case !Limitable(f):
+			errs.Add("featureTokens."+f, "is never held back, so it takes no limit of its own")
 		case n < 1 || n > MaxLimitTokens:
 			errs.Add("featureTokens."+f, "must be between 1 and 1,000,000,000,000")
 		}
 	}
+}
+
+// Limitable is whether a feature asks for the allowance before it runs, so
+// a limit of its own would hold it back. Checking an AI provider's key in
+// Settings never does: an admin can always test the key.
+func Limitable(feature string) bool {
+	return IsFeature(feature) && feature != FeatureProviderCheck
 }
 
 // DayStart is when now's day began in the agency's time zone: the day the

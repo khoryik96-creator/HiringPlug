@@ -26,7 +26,8 @@ func TestTheDayStartsAtMidnightInTheAgencysTime(t *testing.T) {
 
 func TestLimitsAreChecked(t *testing.T) {
 	zero, big := int64(0), int64(MaxLimitTokens+1)
-	for _, l := range []*Limits{{Daily: &zero}, {Daily: &big}, {PerFeature: map[string]int64{"coffee": 10}}, {PerFeature: map[string]int64{"cv_reading": 0}}} {
+	for _, l := range []*Limits{{Daily: &zero}, {Daily: &big}, {PerFeature: map[string]int64{"coffee": 10}}, {PerFeature: map[string]int64{"cv_reading": 0}},
+		{PerFeature: map[string]int64{FeatureProviderCheck: 1000}}} {
 		in := SettingsInput{LimitKind: KindTokens, Currency: "USD", WarnPercent: 80, Limits: l}
 		assert.Error(t, CheckSettings(in))
 	}

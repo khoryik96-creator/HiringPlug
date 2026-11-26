@@ -47,7 +47,7 @@ const tokenUsage: Schemas["AiUsage"] = {
 
 const defaults: Schemas["AiUsageSettings"] = {
   limitKind: "tokens", limitTokens: null, serverDefaultTokens: 2_000_000, limitMoney: null, currency: "USD",
-  priceInputPerMillion: null, priceOutputPerMillion: null, warnPercent: 80, version: 0, updatedAt: null,
+  priceInputPerMillion: null, priceOutputPerMillion: null, warnPercent: 80, dailyTokens: null, featureTokens: {}, version: 0, updatedAt: null,
 };
 const moneySettings: Schemas["AiUsageSettings"] = {
   ...defaults, limitKind: "money", limitMoney: "10.00", priceInputPerMillion: "0.2800", priceOutputPerMillion: "0.4200", version: 3, updatedAt: "2026-11-20T00:00:00Z",
@@ -232,5 +232,43 @@ describe("Settings › AI usage", () => {
     expect(october.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(october);
     expect(screen.queryByRole("table", { name: "October 2026 by feature" })).toBeNull();
+  });
+
+  it("sets a daily limit and a feature's own, keeping the month's settings as they are", async () => {
+    const saved = { ...moneySettings, dailyTokens: 200000, featureTokens: { cv_reading: 50000 }, version: 4 };
+    reads(moneyUsage, () => (put.mock.calls.length > 0 ? saved : moneySettings));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(saved));
+    renderWithClient(<AiUsage canManage />);
+    const daily = await screen.findByLabelText("Daily limit, all features (tokens)");
+    fireEvent.change(daily, { target: { value: "200,000" } });
+    fireEvent.change(screen.getByLabelText("CV reading: monthly limit in tokens"), { target: { value: "50000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save limits" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({
+      limitKind: "money", limitTokens: null, limitMoney: "10.00", currency: "USD",
+      priceInputPerMillion: "0.2800", priceOutputPerMillion: "0.4200", warnPercent: 80, version: 3,
+      dailyTokens: 200000, featureTokens: { cv_reading: 50000 },
+    });
+    expect(await screen.findByText("Saved.")).toBeTruthy();
+    expect(screen.queryByLabelText("AI provider checks: monthly limit in tokens")).toBeNull();
+    expect(screen.getByLabelText<HTMLInputElement>("Daily limit, all features (tokens)").value).toBe("200,000");
+    expect(screen.getByLabelText<HTMLInputElement>("CV reading: monthly limit in tokens").value).toBe("50,000");
+  });
+
+  it("asks for whole numbers of tokens", async () => {
+    reads(moneyUsage, moneySettings);
+    const put = vi.spyOn(api, "PUT");
+    renderWithClient(<AiUsage canManage />);
+    fireEvent.change(await screen.findByLabelText("Daily limit, all features (tokens)"), { target: { value: "lots" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save limits" }));
+    expect(await screen.findByText(/Enter a whole number of tokens above 0/)).toBeTruthy();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("shows the limits to those who only read them", async () => {
+    reads(moneyUsage, { ...moneySettings, dailyTokens: 200000, featureTokens: { cv_reading: 50000 } });
+    renderWithClient(<AiUsage canManage={false} />);
+    expect(await screen.findByText("200,000 tokens a day")).toBeTruthy();
+    expect(screen.getByText("50,000 tokens a month")).toBeTruthy();
   });
 });

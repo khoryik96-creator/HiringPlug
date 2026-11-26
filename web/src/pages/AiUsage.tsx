@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { ExtraLimits } from "./aiUsage/ExtraLimits";
 import { LimitForm } from "./aiUsage/LimitForm";
 import { MonthsChart } from "./aiUsage/MonthsChart";
 import { ThisMonth } from "./aiUsage/ThisMonth";
@@ -33,6 +34,7 @@ export function AiUsage({ canManage }: { canManage: boolean }) {
       <div className="ai-usage-top">
         {u && <ThisMonth usage={u} />}
         <LimitForm canManage={canManage} />
+        <ExtraLimits canManage={canManage} />
       </div>
       {u && (
         <>
