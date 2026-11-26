@@ -271,3 +271,19 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
 .outlook-candidate-details { border: 1px solid var(--line, #ded8eb); border-radius: 10px; padding: .45rem .65rem; background: var(--soft, #f7f5fc); min-width: 0; }
 .outlook-candidate-details > summary { cursor: pointer; font-size: .9rem; font-weight: 600; color: var(--accent-dark, #5d3dc2); }
 .outlook-candidate-details .shortlist { margin: .5rem 0 0; border: 0; padding: 0; min-width: 0; }
+
+/* Save and Send stay in view at the bottom of the editor, however long the reply. */
+.outlook-draft-dialog .outlook-send-bar {
+  position: sticky; bottom: -1.25rem; z-index: 30;
+  margin: 0 -1.5rem -1.25rem; padding: .75rem 1.5rem 1.25rem;
+  background: var(--surface, #fff); border-top: 1px solid var(--line, #ded8eb);
+}
+/* Docked on the right, below the top bar: the mail beside it stays usable. */
+.outlook-dialog.docked {
+  position: fixed; inset: auto 0 auto auto; margin: 0; max-width: 100vw; max-height: none;
+  border-radius: 12px 0 0 0; box-shadow: -10px 0 28px #20172b2e; z-index: 40;
+}
+.outlook-dialog.docked .outlook-dialog-body { height: 100%; max-height: none; }
+.outlook-dialog.docked .outlook-dialog-edge.start { left: -5px; top: 0; bottom: 0; }
+/* The page leaves room for the docked editor. */
+main.outlook-page { padding-right: calc(1.25rem + var(--outlook-docked, 0px)); }

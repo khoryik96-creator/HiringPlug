@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../../api/client";
 import { uploadOutlookDraftFile } from "../../api/files";
 import { formatWhen } from "../../labels";
-import { CloseIcon, IconButton, RefreshIcon, TrashIcon } from "../ActionIcons";
+import { CloseIcon, DockRightIcon, IconButton, RefreshIcon, TrashIcon } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 import { Field } from "../Field";
 import { fieldErrors, FormInvalid } from "../forms";
@@ -15,7 +15,7 @@ import { mentionsField } from "../clientEmail/useFieldValues";
 import { useCandidatePackages } from "../clientEmail/useCandidatePackages";
 import { OutlookCandidateDetails } from "./OutlookCandidateDetails";
 import { type ComposeContext, OutlookComposeTools, useComposeData } from "./OutlookComposeTools";
-import { OutlookDialog } from "./OutlookDialog";
+import { OutlookDialog, useOutlookDock } from "./OutlookDialog";
 import { maxDraftFileSize, OutlookDraftFiles } from "./OutlookDraftFiles";
 import { hasSignature, withSignature } from "./outlookSignature";
 import { outlookAddresses } from "./outlookAddresses";
@@ -44,17 +44,20 @@ export function OutlookDraftEditor({ id, onClose, focusMessage = false, fresh = 
     refetchOnReconnect: false,
     gcTime: 0,
   });
-  return <OutlookDialog className="outlook-draft-dialog" dialogRef={dialog} labelledBy="outlook-draft-heading"
+  const [docked, setDocked] = useOutlookDock();
+  const dock = <IconButton label="Dock right" tip={docked ? "Back to the middle" : "Dock on the right, to read mail beside it"}
+    icon={<DockRightIcon />} pressed={docked} onClick={() => { setDocked(!docked); }} />;
+  return <OutlookDialog className="outlook-draft-dialog" dialogRef={dialog} labelledBy="outlook-draft-heading" docked={docked}
     onCancel={() => { if (!busy.current) onClose(); }}>
     {id && !query.data ? <>
       <div className="row spread">
         <h3 id="outlook-draft-heading">Outlook draft</h3>
-        <IconButton label="Close" icon={<CloseIcon />} onClick={() => { onClose(); }} />
+        <span className="row">{dock}<IconButton label="Close" icon={<CloseIcon />} onClick={() => { onClose(); }} /></span>
       </div>
       <ErrorMessage error={query.error}/>
       {query.isPending && <p className="muted">Opening draft…</p>}
     </> : <DraftFields key={query.dataUpdatedAt} opened={query.data} focusMessage={focusMessage} setBusy={(pending) => { busy.current = pending; }}
-      onClose={onClose} fresh={fresh} permissions={permissions} about={about}/>}
+      onClose={onClose} fresh={fresh} permissions={permissions} about={about} dock={dock}/>}
   </OutlookDialog>;
 }
 
@@ -78,7 +81,9 @@ const formOf = (draft?: Draft) => draft ? {
 type Operation = "save" | "send" | "schedule" | "discard";
 type DraftAction = Operation | "reload" | { file: File | (() => Promise<File>) } | { remove: string };
 
-function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permissions, about }: {
+function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permissions, about, dock }: {
+  /** The button that docks the window on the right. */
+  dock?: ReactNode;
   opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; setBusy: (pending: boolean) => void;
   focusMessage: boolean; fresh: boolean; permissions: Permission[]; about: ComposeContext;
 }) {
@@ -219,7 +224,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   return <>
     <div className="row spread outlook-draft-head">
       <h3 id="outlook-draft-heading">{draft ? "Outlook draft" : "New Outlook message"}</h3>
-      <IconButton label="Close" icon={<CloseIcon />} disabled={action.isPending} onClick={() => { onClose(); }} />
+      <span className="row">{dock}<IconButton label="Close" icon={<CloseIcon />} disabled={action.isPending} onClick={() => { onClose(); }} /></span>
     </div>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); run("save"); }}>
       <fieldset disabled={locked || action.isPending} className="full outlook-draft-fields">
@@ -271,7 +276,8 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       </p>}
       <div className="full"><ErrorMessage error={action.error}/></div>
       {notice && <p className="full" role="status">{notice}</p>}
-      <div className="row full outlook-actions">
+      {/* Kept in view at the bottom: a long reply is sent without scrolling down to it. */}
+      <div className="row full outlook-actions outlook-send-bar">
         <button type="submit" className="primary" disabled={locked || action.isPending}>Save draft</button>
         {(!plan || plan.status === "needs_review") && <button type="button" disabled={!readyToSend || action.isPending} onClick={() => { run("send"); }}>Send now</button>}
         <button type="button" disabled={locked || action.isPending} aria-expanded={later} onClick={() => { setLater(!later); }}>

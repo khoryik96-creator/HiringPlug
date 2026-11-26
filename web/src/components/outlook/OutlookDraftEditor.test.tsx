@@ -4,14 +4,11 @@ import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { api, type Schemas } from "../../api/client";
 import { ok, renderWithClient, sentBody } from "../../test-utils";
 import { zonedInput } from "../calendar/dates";
+import { allowDialogs } from "../whatsAppTestApi";
 import { OutlookDraftEditor } from "./OutlookDraftEditor";
 import { OutlookScheduledList } from "./OutlookScheduledList";
 
-beforeAll(() => {
-  if (typeof HTMLDialogElement.prototype.showModal !== "function") {
-    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
-  }
-});
+beforeAll(() => { allowDialogs(); });
 
 afterEach(() => {
   cleanup();
@@ -169,4 +166,30 @@ it("lists a forward's files even while Outlook says it has none", async () => {
   renderWithClient(<OutlookDraftEditor id="omg_fw" onClose={vi.fn()} />);
   expect(await screen.findByText("Aina-Resume.pdf")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Remove Aina-Resume.pdf" })).toBeTruthy();
+});
+
+it("docks on the right, beside the mail, and opens docked the next time", async () => {
+  try { localStorage.removeItem("hiringplug.outlook.docked"); } catch { /* none */ }
+  const draft: Schemas["OutlookDraft"] = {
+    messageId: "omg_dock", version: "opened", subject: "Interview", body: "Tuesday?", to: ["nadia@example.test"], cc: [], bcc: [],
+    hasAttachments: false, bodyTruncated: false, schedule: null, scheduleNeedsReview: false, webUrl: null,
+  };
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/outlook/messages/{messageId}/attachments"
+    ? ok({ items: [], more: false }) : path === "/v1/outlook/drafts/{messageId}" ? ok(draft) : ok({ items: [], fields: [] }))) as never);
+  renderWithClient(<OutlookDraftEditor id="omg_dock" onClose={vi.fn()} />);
+  const dock = await screen.findByRole("button", { name: "Dock right" });
+  expect(dock.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(dock);
+  const dialog = screen.getByRole("dialog");
+  expect(dialog.className).toContain("docked");
+  expect(dialog.hasAttribute("open")).toBe(true);
+  expect(document.documentElement.style.getPropertyValue("--outlook-docked")).toMatch(/px$/); // the page leaves room
+  // Send stays in a bar kept at the bottom of the window.
+  expect(screen.getByRole("button", { name: "Send now" }).closest(".outlook-send-bar")).toBeTruthy();
+  cleanup(); // closed
+  expect(document.documentElement.style.getPropertyValue("--outlook-docked")).toBe("");
+  renderWithClient(<OutlookDraftEditor id="omg_dock" onClose={vi.fn()} />);
+  expect((await screen.findByRole("button", { name: "Dock right" })).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByRole("dialog").className).toContain("docked");
+  try { localStorage.removeItem("hiringplug.outlook.docked"); } catch { /* none */ }
 });

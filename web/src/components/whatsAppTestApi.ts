@@ -70,6 +70,9 @@ export function allowDialogs() {
   if (typeof HTMLDialogElement.prototype.showModal !== "function") {
     Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
   }
+  if (typeof HTMLDialogElement.prototype.show !== "function") {
+    Object.defineProperty(HTMLDialogElement.prototype, "show", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
+  }
   if (typeof HTMLDialogElement.prototype.close !== "function") {
     Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value(this: HTMLDialogElement) { this.open = false; } });
   }
