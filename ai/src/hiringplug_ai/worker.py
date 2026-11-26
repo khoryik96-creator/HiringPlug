@@ -76,11 +76,16 @@ def process(
             # The provider is why: say so now, not after the retries.
             failed = calls.ok is False and gate.should(job.tenant_id, calls.provider, False)
             report = calls.report() if failed else None
-            if report is not None:
+            # What the attempt's answered calls spent still counts (the provider charged it).
+            spent = calls.spent_report(job.id, job.kind, job.attempts)
+            tell = ((report, "the AI provider's failure"), (spent, "the failed attempt's AI use"))
+            for follow_up, what in tell:
+                if follow_up is None:
+                    continue
                 try:
-                    queue.enqueue(job, report)
+                    queue.enqueue(job, follow_up)
                 except psycopg.Error:  # telling is best effort; the failure itself is recorded
-                    log.warning("could not report the AI provider's failure")
+                    log.warning("could not report %s", what)
 
 
 def main() -> None:

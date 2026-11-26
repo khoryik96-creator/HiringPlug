@@ -451,6 +451,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Bin.JobHandlers(),
 		m.Claims.JobHandlers(),
 		m.InterviewPrep.JobHandlers(),
+		m.AIUsage.JobHandlers(),
 		m.Notifications.JobHandlers(),
 		// scaffold:job-handlers
 	} {

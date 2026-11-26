@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from ..contracts import (
     AiAccess,
+    AiAttemptSpentJob,
     AiProviderCheckJob,
     AiProviderReportedJob,
     AssistantAskJob,
@@ -76,9 +77,33 @@ class ProviderLog:
     provider: str = ""
     ok: bool | None = None  # None: the job did not call the provider
     error: str | None = None  # safe to show (a ProviderError's text)
+    # What this attempt's answered calls spent: told to the app when the
+    # attempt fails, since the provider charged them (ai.attempt_spent).
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     def note(self, provider: str, error: str | None) -> None:
         self.provider, self.ok, self.error = provider, error is None, error
+
+    def spent(self, done: Completion) -> None:
+        self.input_tokens += max(done.input_tokens, 0)
+        self.output_tokens += max(done.output_tokens, 0)
+
+    def spent_report(self, job_id: str, job_kind: str, attempt: int) -> FollowUp | None:
+        """A failed attempt's spend for the app to record, or None when it spent nothing."""
+        if self.input_tokens + self.output_tokens == 0:
+            return None
+        return FollowUp(
+            queue="core",  # checked against the contract by tests/test_contract_wiring.py
+            kind=JobKind.ai_attempt_spent,
+            payload=AiAttemptSpentJob(
+                jobId=job_id,
+                jobKind=job_kind,
+                attempt=max(attempt, 1),
+                inputTokens=self.input_tokens,
+                outputTokens=self.output_tokens,
+            ),
+        )
 
     def report(self) -> FollowUp | None:
         """The job telling the app, or None when the provider was not called."""
@@ -138,6 +163,7 @@ class _Watched:
             self.log.note(self.name, str(exc))
             raise
         self.log.note(self.name, None)
+        self.log.spent(done)
         return done
 
 
