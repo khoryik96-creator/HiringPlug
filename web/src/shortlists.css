@@ -37,7 +37,10 @@
 .client-link-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 0.75rem; }
 .client-link-table th { text-align: left; font-weight: 600; font-size: 0.85rem; padding: 0.3rem 0.4rem; }
 .client-link-table td { padding: 0.35rem 0.4rem; vertical-align: middle; border-top: 1px solid var(--line); }
-.client-link-table select, .client-link-table input { width: 100%; box-sizing: border-box; }
+.client-link-table select, .client-link-table input, .client-link-table textarea { width: 100%; box-sizing: border-box; }
+.client-link-note textarea { resize: vertical; min-height: 2.6rem; }
+.note-fields { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .3rem; }
+.note-fields select { width: auto; min-width: 11rem; font-size: .85rem; padding-block: .25rem; }
 .client-link-options { gap: 1.25rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .client-link-options label.check { gap: 0.4rem; }
 .client-link-url { display: flex; gap: 0.4rem; align-items: center; margin: 0.4rem 0; }

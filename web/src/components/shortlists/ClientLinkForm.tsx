@@ -9,6 +9,7 @@ import { STAGE } from "../../labels";
 import { copyText } from "../CopyButton";
 import { ErrorMessage } from "../ErrorMessage";
 import { clientShortlistsKey } from "../../api/keys";
+import { NoteFields } from "./NoteFields";
 
 /** A candidate on the job, to put on a link. */
 export type LinkCandidate = { applicationId: string; candidateId: string; name: string; stage: Schemas["Stage"] };
@@ -78,8 +79,8 @@ export function ClientLinkForm({ jobId, people: chosen, contactName, canEmail, o
         <button type="button" onClick={onClose}>Cancel</button>
       </div>
       <p className="muted small">
-        The client sees only these candidates, each with the CV you choose (a blind CV shows a reference instead of the name), never their salary,
-        email or phone. They approve or reject each one; approved candidates move to Interview, rejected ones to Rejected (client said no).
+        The client sees only these candidates, each with the CV you choose (a blind CV shows a reference instead of the name), never their email
+        or phone, nor their salary unless you add it to your note. They approve or reject each one; approved candidates move to Interview, rejected ones to Rejected (client said no).
       </p>
       {people.length === 0 && <p className="warning">Choose candidates on the pipeline first.</p>}
       <table className="client-link-table">
@@ -99,8 +100,12 @@ export function ClientLinkForm({ jobId, people: chosen, contactName, canEmail, o
                     </select>
                   )}
                 </td>
-                <td><input aria-label={`Note for ${p.name}`} maxLength={1000} value={notes[p.applicationId] ?? ""}
-                  onChange={(e) => { setNotes({ ...notes, [p.applicationId]: e.target.value }); }} /></td>
+                <td className="client-link-note">
+                  <textarea aria-label={`Note for ${p.name}`} rows={2} maxLength={1000} value={notes[p.applicationId] ?? ""}
+                    onChange={(e) => { setNotes({ ...notes, [p.applicationId]: e.target.value }); }} />
+                  <NoteFields candidateId={p.candidateId} applicationId={p.applicationId} name={p.name} note={notes[p.applicationId] ?? ""}
+                    onChange={(note) => { setNotes((now) => ({ ...now, [p.applicationId]: note.slice(0, 1000) })); }} />
+                </td>
                 <td>{people.length > 1 && <button type="button" className="link" aria-label={`Leave out ${p.name}`}
                   onClick={() => { setPeople(people.filter((x) => x !== p)); }}>×</button>}</td>
               </tr>
