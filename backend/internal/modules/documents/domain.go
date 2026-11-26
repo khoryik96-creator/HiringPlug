@@ -30,7 +30,7 @@ const (
 // ai/src/hiringplug_ai/parsing/__init__.py, checked by a test): a CV read by
 // another was read by older rules (or its text taken out by an older reader),
 // and reviewing it reads it again first.
-const CVReader = "rules@2"
+const CVReader = "rules@3"
 
 type Document struct {
 	ID            string

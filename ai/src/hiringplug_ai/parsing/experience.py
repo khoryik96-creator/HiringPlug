@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass
 
 from .dates import DateRange, find_range
+from .job_groups import with_employers
 from .layout import BULLET, Line, is_bullet
 from .table_rows import by_columns, header_above
 from .vocab import (
@@ -339,7 +340,7 @@ def experience(lines: list[Line]) -> list[Job]:
         job = _job(section, i, start, end, dates_first=dates_first)
         if job:
             jobs.append(job)
-    return jobs[:30]
+    return with_employers(jobs)[:30]
 
 
 def _headlines(section: list[str], indexes: range) -> list[str]:

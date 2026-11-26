@@ -212,7 +212,21 @@ def section_of(text: str) -> str | None:
     found = _LOOKUP.get(key) or _LOOKUP.get(singular) or _LOOKUP_JOINED.get(key.replace(" ", ""))
     if found is None and _field_experience(key.split()):
         return "experience"  # "IT Experience", "Relevant Work Experience", "Oil & Gas Experience"
+    if found is None and _project_heading(text, key.split()):
+        return "other"  # "SELECTED ARCHITECTURE & DELIVERY ENGAGEMENTS", "Key Client Projects:"
     return found
+
+
+# What a heading over projects (not jobs) is about.
+_PROJECT_WORDS = frozenset(["project", "projects", "engagement", "engagements", "portfolio", "assignments delivered"])
+
+
+def _project_heading(text: str, words: list[str]) -> bool:
+    """A short heading, in capitals or ending in a colon, over a list of
+    projects or client engagements: their dated lines are not jobs."""
+    if not (2 <= len(words) <= 6) or not (text.isupper() or text.rstrip().endswith((":", "："))):
+        return False
+    return words[-1] in _PROJECT_WORDS or (words[-1] in ("studies", "highlights") and "case" in words)
 
 
 def _field_experience(words: list[str]) -> bool:

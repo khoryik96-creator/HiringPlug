@@ -179,7 +179,7 @@ def test_nothing_to_read_gives_an_empty_profile() -> None:
     p = parse_cv("")
     assert p.fullName is None
     assert p.experience == []
-    assert p.parser == "rules@2"  # raised with the rules: the app reads older CVs again
+    assert p.parser == "rules@3"  # raised with the rules: the app reads older CVs again
 
 
 def test_a_referees_labelled_phone_does_not_beat_the_candidates_own() -> None:

@@ -75,10 +75,33 @@ def _ocr_fixed(text: str) -> str:
     return _OCR_I.sub(lambda m: "I" if m.string[: m.start()].split()[-1].isupper() else "i", text)
 
 
+# "Koh, Siew Yee" / "TAN, PEI YIN": the surname, a comma, then the given names
+# (not letters after a name: ", CPA" or ", PhD").
+_SURNAME_FIRST = re.compile(
+    r"^([^\W\d_][^\W\d_'’\-]*(?:\s+[^\W\d_][^\W\d_'’\-]*)?),\s*"
+    r"([^\W\d_][^\W\d_'’\-]*(?:\s+[^\W\d_][^\W\d_'’\-]*){0,3})$"
+)
+
+
+def _surname_first(text: str) -> str | None:
+    """"Koh, Siew Yee" -> "Siew Yee Koh"; None when text is not written that way."""
+    m = _SURNAME_FIRST.match(text.strip())
+    if not m:
+        return None
+    given = m.group(2).split()
+    if any(re.fullmatch(_LETTERS_AFTER, w.strip("."), re.I) for w in given) or (
+        len(given) == 1 and given[0].isupper() and len(given[0]) <= 4
+    ):
+        return None
+    return f"{m.group(2)} {m.group(1)}"
+
+
 def _value(text: str) -> str:
     """The name as the profile should show it: no honorifics, letters after
-    the name or nickname, ALL CAPS in Title Case."""
-    text = _NICKNAME.sub("", _POST_NOMINALS.sub("", _HONORIFIC.sub("", _ocr_fixed(text.strip()))))
+    the name or nickname, ALL CAPS in Title Case; "Surname, Given" as "Given Surname"."""
+    text = _HONORIFIC.sub("", _ocr_fixed(text.strip()))
+    text = _surname_first(text) or text
+    text = _NICKNAME.sub("", _POST_NOMINALS.sub("", text))
     text = re.sub(r"\s+", " ", text).strip(" ,.")
     text = _TRAILING_LETTERS.sub("", text).strip(" ,.") or text
     if text.isupper():

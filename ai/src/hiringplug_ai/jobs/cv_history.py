@@ -51,6 +51,8 @@ Rules:
 - The employer is the company that paid them. For "IBM (client: Westpac)" or a consultant placed at a
   client, the employer is IBM, not the client.
 - A department, business unit, team, team size, project, "Sabbatical" or a career break is not an employer.
+- Projects and client engagements listed under their own heading ("Selected Projects", "Key Engagements")
+  are work done in a job, not jobs: leave them out.
 - Several titles at one company (promotions): one job per title, each with its own dates.
 - Leave out education, certifications and referees.
 - Use null for anything the CV does not say."""
