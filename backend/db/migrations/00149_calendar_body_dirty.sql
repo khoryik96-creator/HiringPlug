@@ -1,4 +1,4 @@
--- calendars: body_dirty marks an event whose notes HyPlug changed and has
+-- calendars: body_dirty marks an event whose notes HiringPlug changed and has
 -- not sent to Outlook yet, so a change of time alone never replaces the
 -- event's body in Outlook (Outlook rewrites formatted bodies, so they cannot
 -- be compared with what it holds).

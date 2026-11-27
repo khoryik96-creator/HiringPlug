@@ -1,14 +1,14 @@
 -- calendars and interviews: changes the organizer makes in Outlook to an
--- interview invitation HyPlug sent (people, title, place, notes, time)
--- are taken into HyPlug.
+-- interview invitation HiringPlug sent (people, title, place, notes, time)
+-- are taken into HiringPlug.
 -- candidate_email pins the invitation's candidate, so people added in Outlook
 -- (even as required attendees) are never taken for the candidate. It is
 -- deleted with the invitation row, which is deleted with the candidate. An
 -- invitation with a pinned candidate may have other required attendees (and
 -- up to Outlook's 100 a sync reads); one without keeps the old rule.
 -- outlook_body marks an event whose message was rewritten in Outlook: a later
--- HyPlug change does not send HyPlug's copy of the message over it.
--- outlook_changed_at is when HyPlug last took such a change.
+-- HiringPlug change does not send HiringPlug's copy of the message over it.
+-- outlook_changed_at is when HiringPlug last took such a change.
 -- Committed migrations are never edited (CI enforces this): add a new file.
 
 -- +goose Up

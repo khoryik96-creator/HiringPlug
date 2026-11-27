@@ -1,6 +1,6 @@
 -- documents: find a CV by its content (sha256) or its file name quickly, so
 --   the same CV is never uploaded twice.
--- intake: an imported file that is exactly a CV already in HyPlug is
+-- intake: an imported file that is exactly a CV already in HiringPlug is
 --   skipped (status duplicate), its candidate_id the one who has it.
 -- Committed migrations are never edited (CI enforces this): add a new file.
 

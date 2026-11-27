@@ -1,6 +1,6 @@
 -- Server checks (1.52.0): each background process (the Go worker, the AI
 -- worker) says every half minute that it is running and which version of
--- HyPlug it runs, so Settings > System can show a worker that stopped,
+-- HiringPlug it runs, so Settings > System can show a worker that stopped,
 -- or one still on the old version after an update. One row per kind of
 -- process (replicas share it). Not company data. The processes write it only
 -- through server_process_seen(), as the AI worker reads nothing else; the API

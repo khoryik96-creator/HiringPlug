@@ -15,8 +15,8 @@ FROM ranked r WHERE s.id=r.id AND r.position>1;
 UPDATE email_outlook_send s
 SET status=CASE WHEN s.status='confirming' THEN 'uncertain' ELSE 'needs_review' END,
     updated_at=now(),
-    error=CASE WHEN s.status='confirming' THEN 'HyPlug could not confirm the send. Check Outlook Drafts and Sent Items.'
-               ELSE 'HyPlug could not process the scheduled send. Review it before scheduling again.' END
+    error=CASE WHEN s.status='confirming' THEN 'HiringPlug could not confirm the send. Check Outlook Drafts and Sent Items.'
+               ELSE 'HiringPlug could not process the scheduled send. Review it before scheduling again.' END
 WHERE s.status IN ('scheduled','confirming')
   AND EXISTS (SELECT 1 FROM job j WHERE j.tenant_id=s.tenant_id
     AND j.kind='email.outlook_scheduled' AND j.status='dead'

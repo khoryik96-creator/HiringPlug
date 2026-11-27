@@ -1,4 +1,4 @@
--- identity module: tenants (companies using HyPlug) and their users.
+-- identity module: tenants (companies using HiringPlug) and their users.
 
 -- +goose Up
 CREATE TABLE tenant (
