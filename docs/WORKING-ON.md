@@ -23,13 +23,13 @@ How to write an entry (newest at the top, one per task):
 ### Post-migration fixes and the HyPlug rename (taken over)
 - Who: Claude (account B), taken over from Claude (account A) on 26 Nov at the owner's request
 - Branch: claude/brave-thompson-k08hlg
-- Touches: contacts and companies (the stale-record flag and list); later every user-visible "HiringPlug" string
+- Touches: nothing now; later every user-visible "HiringPlug" string (the rename)
 - Started: 25 Nov 2026    Last update: 27 Nov 2026
-- State: merged so far: 1.50.1 (held recurring jobs carry on), 1.51.0 (P1: links re-signed on retry, backups verified,
-  daily and per-feature AI limits, failed AI attempts counted), 1.52.0 (P2: Settings › System server checks; the
-  Codespaces part skipped at the owner's word). Now: the stale-record sweep, as the owner chose "flag and list".
+- State: merged: 1.50.1 (held repeating jobs), 1.51.0 (P1), 1.52.0 (server checks), 1.53.0 (mail dock, header wrap),
+  1.54.0 (Download all, view attachments, stay after Send), 1.55.0 (stale records: tag, filter, monthly email line).
+  Waiting on the owner: the rename's go-ahead; the CV whose PDF reads without spaces ("DatabaseAdministrator").
 - Next:
-  1. Stale-record sweep: contacts and companies untouched for a year get a "Not touched in a year" filter and tag on
-     their lists, and a monthly line in the morning email. Nothing is changed or hidden.
-  2. Rename the product to HyPlug in everything people see (not formatted CVs or the agency's own branding; keep hidden
+  1. Rename the product to HyPlug in everything people see (not formatted CVs or the agency's own branding; keep hidden
      technical names: Go module, database, HP_* settings, Python package, storage keys). Waits for the owner's go-ahead.
+  2. With the owner's CV: PDF text read without word gaps (pdfplumber x_tolerance in ai/.../extraction/columns.py),
+     re-checked against the 31 sample CVs.
