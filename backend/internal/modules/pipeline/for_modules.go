@@ -270,15 +270,63 @@ func (m *Module) FirstSubmitted(ctx context.Context, tx pgx.Tx, from, to time.Ti
 	return out, err
 }
 
-// CategoriesReached returns every category each of some applications has
-// been in, in the caller's transaction.
-func (m *Module) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]string, error) {
+// Reached is an application getting to a category at a time.
+type Reached struct {
+	Category string
+	At       time.Time
+}
+
+// CategoriesReached returns, for each of some applications, every category it
+// got to and when, oldest first, in the caller's transaction. A move recorded
+// without a category (before categories) is in its stage's first.
+func (m *Module) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]Reached, error) {
 	rows, err := store.New(tx).CategoriesReached(ctx, ids)
-	out := map[string][]string{}
+	if err != nil {
+		return nil, err
+	}
+	cats, _, err := categories(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	first := firstOfKind(cats)
+	out := map[string][]Reached{}
 	for _, r := range rows {
-		out[r.ApplicationID] = append(out[r.ApplicationID], r.Category)
+		if c := categoryOf(r.ToStage, r.ToCategory, first); c != "" {
+			out[r.ApplicationID] = append(out[r.ApplicationID], Reached{Category: c, At: r.ChangedAt})
+		}
+	}
+	return out, nil
+}
+
+// FirstPlacedJobs returns the jobs whose first placement was between two
+// instants, in the caller's transaction.
+func (m *Module) FirstPlacedJobs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]JobFirst, error) {
+	rows, err := store.New(tx).FirstPlacedJobsBetween(ctx, store.FirstPlacedJobsBetweenParams{FromTime: from, ToTime: to})
+	out := make([]JobFirst, len(rows))
+	for i, r := range rows {
+		out[i] = JobFirst{JobID: r.JobOrderID, At: r.FirstAt}
 	}
 	return out, err
+}
+
+// firstOfKind is each stage kind's first category (by position).
+func firstOfKind(cats []Category) map[string]string {
+	out := map[string]string{}
+	for _, c := range cats {
+		if _, ok := out[c.Kind]; !ok {
+			out[c.Kind] = c.Key
+		}
+	}
+	return out
+}
+
+// categoryOf is the category a stage move is in: the one recorded, else (a
+// move from before categories) its stage's first; "" for a closed stage.
+func categoryOf(stage string, category *string, first map[string]string) string {
+	if category != nil && *category != "" {
+		return *category
+	}
+	return first[stage]
 }
 
 // moveTo moves an application to stage (its kind's first step), with the

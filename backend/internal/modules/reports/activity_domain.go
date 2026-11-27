@@ -6,7 +6,6 @@ package reports
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
@@ -58,10 +57,11 @@ type Facts struct {
 	CategoryMoves  []CategoryMove
 }
 
-// CategoryMove is a user moving an application into a stage of a category.
+// CategoryMove is a user moving an application (a candidate on a job) into a
+// stage of a category.
 type CategoryMove struct {
-	By, ApplicationID, Category string
-	At                          time.Time
+	By, ApplicationID, CandidateID, Category string
+	At                                       time.Time
 }
 
 // CountActivity adds up each user's activity. A screening call counts once
@@ -101,10 +101,10 @@ func CountActivity(f Facts, day func(time.Time) time.Time) map[string]*Counts {
 		of(d.By).Placements++
 	}
 	// A candidate counts once per category however often they are moved back
-	// into it.
+	// into it, and on however many jobs.
 	moved := map[string]bool{}
 	for _, m := range f.CategoryMoves {
-		key := m.By + "|" + m.ApplicationID + "|" + m.Category
+		key := m.By + "|" + m.CandidateID + "|" + m.Category
 		if moved[key] {
 			continue
 		}
@@ -117,7 +117,7 @@ func CountActivity(f Facts, day func(time.Time) time.Time) map[string]*Counts {
 	}
 	// The app's own work (a worker, an accepted offer) is no one's activity.
 	for user := range out {
-		if !strings.HasPrefix(user, "usr_") {
+		if !isPerson(user) {
 			delete(out, user)
 		}
 	}

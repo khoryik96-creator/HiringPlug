@@ -96,7 +96,8 @@ export function ActivityProgress({ onlyUser, people, title = "Activity against t
   const all = a?.rows ?? [];
   const rows = chosen === undefined || chosen === "team" ? all : all.filter((r) => chosen.includes(r.userId));
   const single = rows.length === 1 && (chosen !== undefined || !a?.team);
-  const me = chosen === "team" ? sumRows(all, "Whole team") : single ? rows[0] : undefined;
+  // The team's total once there is something to add up (not zeros while loading or on an error).
+  const me = chosen === "team" ? (a ? sumRows(all, "Whole team") : undefined) : single ? rows[0] : undefined;
   const total = Array.isArray(chosen) && rows.length > 1 ? sumRows(rows, "Together") : undefined;
   const measures = measuresOf(rows, useStageCategories().data?.items ?? []);
   return (

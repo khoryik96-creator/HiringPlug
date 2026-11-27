@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
@@ -20,6 +21,9 @@ const (
 	Quarter = "quarter"
 	Year    = "year"
 )
+
+// isPerson is whether an actor is a person (a user), not the app's own work.
+func isPerson(id string) bool { return strings.HasPrefix(id, "usr_") }
 
 // MaxBuckets is the most periods one performance report has.
 const MaxBuckets = 160
@@ -105,8 +109,11 @@ type PerfRow struct {
 // Performance counts each period's figures and the whole range's, for the
 // people who counts (by user id; "" is no one credited). A CV counts once per
 // person, candidate and day; a candidate once per person and category in a
-// period (and in the range). Placements that stand count, with their fees.
-func Performance(f PerfFacts, buckets []Bucket, day func(time.Time) time.Time, counts func(string) bool) ([]PerfRow, PerfRow) {
+// period (and in the range), on however many jobs. Placements that stand
+// count, with their fees. The app's own work (a worker, an automation) is no
+// one's: its CVs and moves are left out, as in the activity.
+func Performance(f PerfFacts, buckets []Bucket, day func(time.Time) time.Time, chosen func(string) bool) ([]PerfRow, PerfRow) {
+	counts := func(id string) bool { return isPerson(id) && chosen(id) }
 	rows := make([]PerfRow, len(buckets))
 	for i, b := range buckets {
 		rows[i] = PerfRow{From: b.From, To: b.To, Categories: map[string]int{}}
@@ -137,7 +144,7 @@ func Performance(f PerfFacts, buckets []Bucket, day func(time.Time) time.Time, c
 		if i < 0 || !counts(m.By) {
 			continue
 		}
-		key := m.By + "|" + m.ApplicationID + "|" + m.Category
+		key := m.By + "|" + m.CandidateID + "|" + m.Category
 		if bucketKey := key + "|" + rows[i].From.Format(time.DateOnly); !seen[bucketKey] {
 			seen[bucketKey] = true
 			rows[i].Categories[m.Category]++
@@ -151,7 +158,7 @@ func Performance(f PerfFacts, buckets []Bucket, day func(time.Time) time.Time, c
 	all := map[string]*big.Rat{}
 	for _, p := range f.Placements {
 		i := in(p.StartDate)
-		if i < 0 || p.Status != "active" || !counts(idOf(p.RecruiterID)) {
+		if i < 0 || p.Status != "active" || !chosen(idOf(p.RecruiterID)) {
 			continue
 		}
 		rows[i].Placements++
@@ -196,38 +203,41 @@ type Conversion struct {
 	Entered, Reached int
 }
 
+// Reach is an application getting to a category at a time.
+type Reach struct {
+	Category string
+	At       time.Time
+}
+
 // Conversions works out, for each category after the first (in the company's
 // order), how many candidates moved into the one before it in the range went
-// on to reach it or further. reached gives every category each application
-// has been in, ever.
-func Conversions(cohort []CategoryMove, reached map[string][]string, order []string) []Conversion {
+// on to reach it or further afterwards: what they had reached before (a
+// candidate moved back for another round) does not count. reached gives
+// every category each application got to, and when.
+func Conversions(cohort []CategoryMove, reached map[string][]Reach, order []string) []Conversion {
 	pos := map[string]int{}
 	for i, key := range order {
 		pos[key] = i
 	}
-	furthest := map[string]int{}
-	for app, cats := range reached {
-		furthest[app] = -1
-		for _, c := range cats {
-			if p, ok := pos[c]; ok && p > furthest[app] {
-				furthest[app] = p
-			}
-		}
-	}
-	entered := map[string]map[string]bool{} // category -> applications
+	entered := map[string]map[string]time.Time{} // category -> application -> first entered in the range
 	for _, m := range cohort {
 		if entered[m.Category] == nil {
-			entered[m.Category] = map[string]bool{}
+			entered[m.Category] = map[string]time.Time{}
 		}
-		entered[m.Category][m.ApplicationID] = true
+		if at, ok := entered[m.Category][m.ApplicationID]; !ok || m.At.Before(at) {
+			entered[m.Category][m.ApplicationID] = m.At
+		}
 	}
 	var out []Conversion
 	for i := 1; i < len(order); i++ {
 		c := Conversion{From: order[i-1], To: order[i]}
-		for app := range entered[order[i-1]] {
+		for app, at := range entered[order[i-1]] {
 			c.Entered++
-			if f, ok := furthest[app]; ok && f >= i {
-				c.Reached++
+			for _, r := range reached[app] {
+				if p, ok := pos[r.Category]; ok && p >= i && !r.At.Before(at) {
+					c.Reached++
+					break
+				}
 			}
 		}
 		out = append(out, c)

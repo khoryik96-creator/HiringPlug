@@ -53,10 +53,11 @@ func TestPerformanceReport(t *testing.T) {
 	moveTo(admin.Token, aina, map[string]any{"stage": "submitted"})
 
 	team := a.performance(owner, "")
+	today := time.Now().In(a.deps.Config.TimeZone) // the company's today, whatever the machine's zone
 	assert.Equal(t, api.PerformanceGrainMonth, team.Grain)
-	assert.Equal(t, time.Now().Year(), team.From.Year())
+	assert.Equal(t, today.Year(), team.From.Year())
 	assert.Equal(t, time.January, team.From.Month(), "this year so far")
-	require.Len(t, team.Rows, int(time.Now().Month()), "a row a month")
+	require.Len(t, team.Rows, int(today.Month()), "a row a month")
 	assert.Equal(t, 3, team.Total.CvsSent)
 	assert.Equal(t, 3, team.Rows[len(team.Rows)-1].CvsSent, "all this month")
 	assert.Equal(t, 1, team.Total.Categories["interview"])
@@ -84,7 +85,7 @@ func TestPerformanceReport(t *testing.T) {
 	assert.Equal(t, []string{recruiter.ID}, mine.Users)
 	assert.Equal(t, 2, mine.Total.CvsSent)
 	assert.Equal(t, 1, mine.DaysToFirstCv.Jobs, "only their jobs")
-	assert.Len(t, mine.Rows, (int(time.Now().Month())+2)/3)
+	assert.Len(t, mine.Rows, (int(today.Month())+2)/3)
 	theirs := a.performance(owner, "?user="+admin.ID)
 	assert.Equal(t, 1, theirs.Total.CvsSent)
 	assert.Zero(t, theirs.Total.Placements)
@@ -100,4 +101,63 @@ func TestPerformanceReport(t *testing.T) {
 	res = a.request(http.MethodGet, "/v1/reports/performance?grain=week&from=2019-01-01", owner, nil)
 	assert.Equal(t, http.StatusBadRequest, res.Status, "too many weeks")
 	assert.Zero(t, a.performance(testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token, "").Total.CvsSent, "another company sees nothing")
+}
+
+// Moves recorded before stage categories (no category stored) count in their
+// stage's first category, for counts and conversions alike.
+func TestPerformanceCountsMovesFromBeforeCategories(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	company := a.createCompany(owner, map[string]any{"name": "Contoh Berhad"})
+	job := a.createJob(owner, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	for _, name := range []string{"Siti", "Wei"} {
+		app := a.addToJob(owner, job.Id, a.createCandidate(owner, map[string]any{"firstName": name}).Id)
+		for _, stage := range []string{"submitted", "interview"} {
+			res := a.move(owner, app, map[string]any{"stage": stage})
+			require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+			res.JSON(&app)
+		}
+	}
+	_, err := testutil.Current.Admin.Exec(t.Context(),
+		"UPDATE application_stage_change SET from_category = NULL, to_category = NULL WHERE tenant_id = $1", tenant.ID)
+	require.NoError(t, err, "as recorded before 1.57.0")
+
+	p := a.performance(owner, "")
+	assert.Equal(t, 2, p.Total.Categories["submitted"])
+	assert.Equal(t, 2, p.Total.Categories["interview"], "1st Interview: the interview stage's first category")
+	for _, c := range p.Conversions {
+		if c.From == "submitted" {
+			assert.Equal(t, 2, c.Entered)
+			assert.Equal(t, 2, c.Reached)
+		}
+	}
+	row := rowOf(t, a.activity(owner, "?period=week"), tenant.Users[api.RoleOwner].ID)
+	assert.Equal(t, 2, row.Done.Categories["interview"], "the activity counts them too")
+}
+
+// Days to fill counts a job first placed in the range; one filled before it
+// and placed again in it is not.
+func TestDaysToFillCountsJobsFirstPlacedInTheRange(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	company := a.createCompany(owner, map[string]any{"name": "Contoh Berhad"})
+	job := a.createJob(owner, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	var first api.Application
+	for i, name := range []string{"Siti", "Wei"} {
+		app := a.addToJob(owner, job.Id, a.createCandidate(owner, map[string]any{"firstName": name}).Id)
+		a.placement(http.MethodPost, "/v1/applications/"+app.Id+"/placement", owner, map[string]any{
+			"startDate": time.Now().UTC().Format(time.DateOnly)}, http.StatusCreated)
+		if i == 0 {
+			first = app
+		}
+	}
+	assert.Equal(t, 1, a.performance(owner, "").DaysToFill.Jobs, "first placed this year")
+	_, err := testutil.Current.Admin.Exec(t.Context(), `UPDATE application_stage_change SET changed_at = now() - interval '400 days'
+		WHERE tenant_id = $1 AND application_id = $2 AND to_stage = 'placed'`, tenant.ID, first.Id)
+	require.NoError(t, err)
+	assert.Zero(t, a.performance(owner, "").DaysToFill.Jobs, "first filled last year: placed again this year is not a first placement")
 }

@@ -36,17 +36,23 @@ export function draftsOf(targets: Schemas["ActivityTarget"][]): Record<string, D
   return out;
 }
 
-/** The targets to save: every person and period with at least one number. */
-export function targetsOf(drafts: Record<string, Draft>): Schemas["ActivityTarget"][] {
+/**
+ * The targets to save: every person and period with at least one number.
+ * With categories, only those still among them (one removed since has no box).
+ */
+export function targetsOf(drafts: Record<string, Draft>, categories?: string[]): Schemas["ActivityTarget"][] {
   const out: Schemas["ActivityTarget"][] = [];
   for (const [key, d] of Object.entries(drafts)) {
     if (Object.values(d).every((v) => v.trim() === "")) continue;
     const [user = "", period = "week"] = key.split("|");
     const goal = { calls: null, cvsSent: null, interviews: null, placements: null } as Goal;
     for (const [k] of ACTIVITIES) goal[k] = (d[k] ?? "").trim() === "" ? null : Number(d[k]);
-    const categories: Record<string, number> = {};
-    for (const [k, v] of Object.entries(d)) if (k.startsWith(CAT) && v.trim() !== "") categories[k.slice(CAT.length)] = Number(v);
-    if (Object.keys(categories).length > 0) goal.categories = categories;
+    const byCategory: Record<string, number> = {};
+    for (const [k, v] of Object.entries(d)) {
+      const cat = k.slice(CAT.length);
+      if (k.startsWith(CAT) && v.trim() !== "" && (!categories || categories.includes(cat))) byCategory[cat] = Number(v);
+    }
+    if (Object.keys(byCategory).length > 0) goal.categories = byCategory;
     out.push({ userId: user === EVERYONE ? null : user, period: period as Period, goal });
   }
   return out;
@@ -61,7 +67,9 @@ export function TargetSettings() {
     queryFn: async () => unwrap(await api.GET("/v1/reports/activity", { params: { query: { period: "week" } } })),
   });
   const [period, setPeriod] = useState<Period>("week");
-  const categories = targetCategories(useStageCategories().data?.items ?? []);
+  const stageCats = useStageCategories().data?.items;
+  const categories = targetCategories(stageCats ?? []);
+  const allKeys = stageCats?.map((c) => c.key);
   const columns: [string, string][] = [...ACTIVITIES, ...categories.map((c): [string, string] => [CAT + c.key, c.label])];
   const [drafts, setDrafts] = useState<Record<string, Draft> | null>(null);
   const [weights, setWeights] = useState<Weight[] | null>(null);
@@ -71,7 +79,7 @@ export function TargetSettings() {
   const save = useMutation({
     // Targets of people no longer in the company are dropped.
     mutationFn: async () => unwrap(await api.PUT("/v1/reports/settings", {
-      body: { targets: targetsOf(current).filter((t) => t.userId === null || people.some(([id]) => id === t.userId)), stageWeights: currentWeights },
+      body: { targets: targetsOf(current, allKeys).filter((t) => t.userId === null || people.some(([id]) => id === t.userId)), stageWeights: currentWeights },
     })),
     onSuccess: async (saved) => {
       queryClient.setQueryData(reportSettingsKey, saved);
@@ -87,7 +95,7 @@ export function TargetSettings() {
   };
   const setWeight = (i: number, change: Partial<Weight>) => { setWeights(currentWeights.map((w, j) => (j === i ? { ...w, ...change } : w))); };
   // Each problem names whose target (or which stage) it is about.
-  const sent = targetsOf(current).filter((t) => t.userId === null || people.some(([id]) => id === t.userId));
+  const sent = targetsOf(current, allKeys).filter((t) => t.userId === null || people.some(([id]) => id === t.userId));
   const where = (field: string) => {
     const t = /^targets\.(\d+)\./.exec(field);
     const target = t ? sent[Number(t[1])] : undefined;

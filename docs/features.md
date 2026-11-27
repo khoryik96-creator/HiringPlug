@@ -1052,9 +1052,9 @@ running.
   Interview**, **Final Interview**, Offer and Placed; a job with no template
   has one stage per category, so its board shows each interview round.
   Settings › Pipeline stages › **Categories** lists them by the kind each
-  counts as; owners (and roles given "Change the stage categories",
-  `pipeline.categories:manage`, in Roles and access) rename, add, order and
-  remove them. A category keeps its kind, each kind keeps one, and one still
+  counts as; owners and admins (`pipeline.categories:manage`, from 1.59.1;
+  an owner can take it from admins in Roles and access) rename, add, order
+  and remove them. A category keeps its kind, each kind keeps one, and one still
   used by a stage or an open candidate cannot be removed. In a template or a
   job's own stages, each stage picks its category ("falls under"). A move
   between rounds (1st to 2nd Interview) is in the stage history, named by

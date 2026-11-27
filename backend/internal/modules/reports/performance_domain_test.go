@@ -35,13 +35,16 @@ func TestPerformance(t *testing.T) {
 	a, b := "usr_a", "usr_b"
 	f := PerfFacts{
 		CVs: []CVSent{
+			{By: "system", CandidateID: "c9", At: at("2026-01-06")},                                            // the app's own work: no one's
 			{By: a, CandidateID: "c1", At: at("2026-01-05")}, {By: a, CandidateID: "c1", At: at("2026-01-05")}, // the same day: once
 			{By: a, CandidateID: "c2", At: at("2026-02-02")}, {By: b, CandidateID: "c3", At: at("2026-02-02")},
 		},
 		Moves: []CategoryMove{
-			{By: a, ApplicationID: "app1", Category: "interview", At: at("2026-01-10")},
-			{By: a, ApplicationID: "app1", Category: "interview", At: at("2026-02-10")}, // again, in another month
-			{By: b, ApplicationID: "app2", Category: "interview", At: at("2026-02-11")},
+			{By: a, ApplicationID: "app1", CandidateID: "c1", Category: "interview", At: at("2026-01-10")},
+			{By: a, ApplicationID: "app1", CandidateID: "c1", Category: "interview", At: at("2026-02-10")}, // again, in another month
+			{By: b, ApplicationID: "app2", CandidateID: "c2", Category: "interview", At: at("2026-02-11")},
+			{By: b, ApplicationID: "app3", CandidateID: "c2", Category: "interview", At: at("2026-02-12")}, // the same candidate on another job: once
+			{By: "automation", ApplicationID: "app4", CandidateID: "c4", Category: "interview", At: at("2026-02-12")},
 		},
 	}
 	f1a, f1c := fee("6000.50", "MYR")
@@ -75,20 +78,23 @@ func TestPerformance(t *testing.T) {
 
 func TestConversions(t *testing.T) {
 	order := []string{"submitted", "interview", "interview_final", "offer", "placed"}
+	day := func(d int) time.Time { return date("2026-03-01").AddDate(0, 0, d) }
 	cohort := []CategoryMove{
-		{ApplicationID: "app1", Category: "submitted"}, {ApplicationID: "app2", Category: "submitted"},
-		{ApplicationID: "app3", Category: "submitted"}, {ApplicationID: "app4", Category: "offer"},
+		{ApplicationID: "app1", Category: "submitted", At: day(1)}, {ApplicationID: "app2", Category: "submitted", At: day(1)},
+		{ApplicationID: "app3", Category: "submitted", At: day(1)}, {ApplicationID: "app4", Category: "offer", At: day(1)},
+		{ApplicationID: "app5", Category: "interview", At: day(9)}, // moved back from Offer for another round
 	}
-	reached := map[string][]string{
-		"app1": {"submitted", "interview"},
-		"app2": {"submitted", "interview", "interview_final", "offer"}, // went further: counts for every step
-		"app3": {"submitted"},
-		"app4": {"offer", "placed"},
+	reached := map[string][]Reach{
+		"app1": {{"submitted", day(1)}, {"interview", day(2)}},
+		"app2": {{"submitted", day(1)}, {"interview", day(2)}, {"interview_final", day(3)}, {"offer", day(4)}}, // went further: every step
+		"app3": {{"submitted", day(1)}},
+		"app4": {{"offer", day(1)}, {"placed", day(5)}},
+		"app5": {{"interview", day(1)}, {"interview_final", day(3)}, {"offer", day(5)}, {"interview", day(9)}},
 	}
 	got := Conversions(cohort, reached, order)
 	assert.Equal(t, []Conversion{
 		{From: "submitted", To: "interview", Entered: 3, Reached: 2},
-		{From: "interview", To: "interview_final", Entered: 0, Reached: 0},
+		{From: "interview", To: "interview_final", Entered: 1, Reached: 0}, // what it reached before going back does not count
 		{From: "interview_final", To: "offer", Entered: 0, Reached: 0},
 		{From: "offer", To: "placed", Entered: 1, Reached: 1},
 	}, got)

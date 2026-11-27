@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
@@ -8,6 +8,7 @@ import { Dashboard } from "./Dashboard";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  localStorage.clear(); // a choice of whose numbers stays with its test
 });
 
 const summary = { openJobs: 0, stageCounts: { applied: 0, screening: 0, submitted: 0, interview: 0, offer: 0, placed: 0 }, placedLast30Days: 0, movedLast7Days: 0, jobs: [], stuck: [] };
@@ -47,7 +48,6 @@ describe("dashboard", () => {
   });
 
   it("lets owners and admins choose whose numbers: someone, several people, or the whole team", async () => {
-    localStorage.removeItem("hyplug.dashboard.people");
     const done = { calls: 1, cvsSent: 2, interviews: 0, placements: 0, categories: {} };
     const activity = { period: "week", from: "2026-11-23", to: "2026-11-29", team: true, rows: [
       { userId: "usr_me", userName: "Demo owner", done, target: null },
@@ -76,6 +76,21 @@ describe("dashboard", () => {
     const all = await screen.findByRole("region", { name: "Activity: Whole team" });
     expect(within(all).getByText("9"), "everyone's calls together").toBeTruthy();
     expect(get).toHaveBeenLastCalledWith("/v1/pipeline/summary", { params: { query: {} } });
-    expect(JSON.parse(localStorage.getItem("hyplug.dashboard.people") ?? "null"), "remembered").toBe("team");
+    expect(JSON.parse(localStorage.getItem("hyplug.dashboard.people.usr_me") ?? "null"), "remembered, for this person").toBe("team");
+  });
+
+  it("keeps each person's choice to them, and drops people no longer in the team", async () => {
+    localStorage.setItem("hyplug.dashboard.people.usr_other", JSON.stringify("team")); // someone else on this computer
+    const team = { period: "week", from: "2026-11-23", to: "2026-11-29", team: true, rows: [
+      { userId: "usr_me", userName: "Demo owner", done: { calls: 0, cvsSent: 0, interviews: 0, placements: 0, categories: {} }, target: null }] };
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/summary" ? summary
+      : path === "/v1/reports/activity" ? team : path === "/v1/settings/fields" ? testFieldSettings() : { items: [] }))) as never);
+    renderWithClient(<Dashboard permissions={["pipeline:read", "reports:read", "reports.team:read"]} meId="usr_me" />);
+    expect(await screen.findByRole("button", { name: /Showing Me/ }), "another person's choice is theirs").toBeTruthy();
+    cleanup();
+    localStorage.setItem("hyplug.dashboard.people.usr_me", JSON.stringify(["usr_gone"]));
+    renderWithClient(<Dashboard permissions={["pipeline:read", "reports:read", "reports.team:read"]} meId="usr_me" />);
+    await waitFor(() => { expect(screen.getByRole("button", { name: /Showing Me/ })).toBeTruthy(); });
+    await waitFor(() => { expect(get).toHaveBeenLastCalledWith("/v1/pipeline/summary", { params: { query: { owner: ["usr_me"] } } }); });
   });
 });

@@ -26,14 +26,14 @@ const active = (c: Counts) => c.applied + c.screening + c.submitted + c.intervie
 export function Dashboard({ permissions, meId }: { permissions: Permission[]; meId?: string }) {
   // Owners and admins choose whose numbers: theirs, some people's, or the team's.
   const canChoose = permissions.includes("reports.team:read") && permissions.includes("reports:read");
-  const [chosen, choose] = useRememberedPeople(meId);
-  const people = canChoose ? chosen : undefined;
   const team = useQuery({
     queryKey: ["reports", "activity", "week"],
     queryFn: async () => unwrap(await api.GET("/v1/reports/activity", { params: { query: { period: "week" } } })),
     enabled: canChoose,
   });
   const everyone = (team.data?.rows ?? []).map((r) => ({ id: r.userId, name: r.userName }));
+  const [chosen, choose] = useRememberedPeople(meId, team.data ? everyone.map((p) => p.id) : undefined);
+  const people = canChoose ? chosen : undefined;
   // The team: every open job, as before; people: the jobs they own.
   const owners = people === undefined || people === "team" ? [] : people;
   const summary = useQuery({

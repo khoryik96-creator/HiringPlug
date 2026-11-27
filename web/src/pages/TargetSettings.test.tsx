@@ -33,6 +33,12 @@ const reads = () => vi.spyOn(api, "GET").mockImplementation(((path: string) => P
   path === "/v1/reports/settings" ? saved : path === "/v1/stage-categories" ? categories : team))) as never);
 
 describe("targets and forecast settings", () => {
+  it("leaves out a category removed since (no box could clear it)", () => {
+    const drafts = { "|week": { calls: "", cvsSent: "", interviews: "", placements: "", "category:interview": "3", "category:technical_test": "2" } };
+    expect(targetsOf(drafts, ["interview", "offer"])).toEqual([
+      { userId: null, period: "week", goal: { calls: null, cvsSent: null, interviews: null, placements: null, categories: { interview: 3 } } }]);
+  });
+
   it("keeps only the targets with a number", () => {
     const drafts = draftsOf(saved.targets);
     expect(drafts["|week"]).toEqual({ calls: "20", cvsSent: "5", interviews: "", placements: "" });

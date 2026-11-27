@@ -53,8 +53,9 @@ type Job struct {
 	OwnerID *string
 }
 
-// FirstCV is when a job's first CV was sent (its first move to submitted).
-type FirstCV struct {
+// JobFirst is when something first happened on a job: its first CV sent (its
+// first move to submitted), or its first placement.
+type JobFirst struct {
 	JobID string
 	At    time.Time
 }
@@ -65,9 +66,11 @@ type Deps struct {
 		Facts(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Application, error)
 		FirstPlaced(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Placed, error)
 		// FirstCVs are the jobs whose first CV was sent from one instant to another.
-		FirstCVs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]FirstCV, error)
-		// CategoriesReached gives every category each application has been in.
-		CategoriesReached(ctx context.Context, tx pgx.Tx, applicationIDs []string) (map[string][]string, error)
+		FirstCVs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]JobFirst, error)
+		// FirstPlacements are the jobs first placed from one instant to another.
+		FirstPlacements(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]JobFirst, error)
+		// CategoriesReached gives every category each application got to, and when.
+		CategoriesReached(ctx context.Context, tx pgx.Tx, applicationIDs []string) (map[string][]Reach, error)
 		// Categories are the company's stage categories, in order.
 		Categories(ctx context.Context, tx pgx.Tx) ([]Category, error)
 	}

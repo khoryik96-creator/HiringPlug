@@ -104,8 +104,8 @@ DELETE FROM placement_money WHERE placement_id = @placement_id;
 SELECT p.id, p.recruiter_id, p.status, p.start_date, m.fee_amount, m.fee_currency
 FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
 WHERE p.start_date >= @from_day AND p.start_date <= @to_day
-ORDER BY p.start_date
-LIMIT 20000;
+ORDER BY p.start_date, p.id
+LIMIT 200000;
 
 -- Invoicing: who receives the invoice, the terms and due date, and the
 -- emailing on the start date.

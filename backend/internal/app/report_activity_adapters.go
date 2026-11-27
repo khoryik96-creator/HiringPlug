@@ -96,7 +96,7 @@ func (a reportActivity) CategoryMoves(ctx context.Context, tx pgx.Tx, from, to t
 	moves, err := a.pipeline.MovesToCategory(ctx, tx, from, to)
 	out := make([]reports.CategoryMove, len(moves))
 	for i, m := range moves {
-		out[i] = reports.CategoryMove{By: m.By, ApplicationID: m.ApplicationID, Category: m.Category, At: m.At}
+		out[i] = reports.CategoryMove{By: m.By, ApplicationID: m.ApplicationID, CandidateID: m.CandidateID, Category: m.Category, At: m.At}
 	}
 	return out, err
 }

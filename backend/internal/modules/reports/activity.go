@@ -57,7 +57,7 @@ func (s *Service) Activity(ctx context.Context, p authz.Principal, period string
 			return err
 		}
 		out.Period = period
-		targets, err := listTargets(ctx, tx)
+		targets, err := s.currentTargets(ctx, tx)
 		for i, r := range out.Rows {
 			if g, ok := TargetFor(targets, r.UserID, period); ok {
 				out.Rows[i].Target = &g
@@ -174,6 +174,35 @@ func to32(v *int) *int32 {
 	return &n
 }
 
+// currentTargets are the saved targets without those for categories the
+// company has since removed (no one can be held to them, and the settings
+// could not be saved with them).
+func (s *Service) currentTargets(ctx context.Context, tx pgx.Tx) ([]Target, error) {
+	targets, err := listTargets(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := s.deps.Activity.Categories(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	known := map[string]bool{}
+	for _, k := range keys {
+		known[k] = true
+	}
+	for i := range targets {
+		for key := range targets[i].Goal.Categories {
+			if !known[key] {
+				delete(targets[i].Goal.Categories, key)
+			}
+		}
+		if len(targets[i].Goal.Categories) == 0 {
+			targets[i].Goal.Categories = nil
+		}
+	}
+	return targets, nil
+}
+
 func listTargets(ctx context.Context, tx pgx.Tx) ([]Target, error) {
 	rows, err := store.New(tx).ListTargets(ctx)
 	if err != nil {
@@ -212,7 +241,7 @@ func (s *Service) Settings(ctx context.Context, p authz.Principal) (Settings, er
 	var out Settings
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		if out.Targets, err = listTargets(ctx, tx); err != nil {
+		if out.Targets, err = s.currentTargets(ctx, tx); err != nil {
 			return err
 		}
 		out.Weights, err = listWeights(ctx, tx)

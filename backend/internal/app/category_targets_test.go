@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,4 +56,35 @@ func TestTargetsForStageCategories(t *testing.T) {
 	require.NotNil(t, target.Categories)
 	assert.Equal(t, 3, (*target.Categories)["interview"])
 	assert.Equal(t, 1, rowOf(t, a.activity(owner, "?period=week"), recruiter.ID).Done.Categories["interview_final"], "the team sees it too")
+}
+
+// A category removed after a target was set for it no longer blocks saving the
+// targets: it is left out of them (no box on the page could clear it).
+func TestARemovedCategoryDoesNotBlockTheTargets(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	owner := testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token
+	cats := a.categories(owner)
+	items := append(categoryItems(cats.Items), map[string]any{"label": "Technical Test", "kind": "interview"})
+	res := a.request(http.MethodPut, "/v1/stage-categories", owner, map[string]any{"version": cats.Version, "items": items})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res.JSON(&cats)
+	g := goal(10, nil, nil, nil)
+	g["categories"] = map[string]any{"technical_test": 2, "interview": 3}
+	res = a.request(http.MethodPut, "/v1/reports/settings", owner, map[string]any{
+		"targets": []any{map[string]any{"userId": nil, "period": "week", "goal": g}}, "stageWeights": []any{}})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	without := slices.DeleteFunc(categoryItems(cats.Items), func(m map[string]any) bool { return m["key"] == "technical_test" })
+	res = a.request(http.MethodPut, "/v1/stage-categories", owner, map[string]any{"version": cats.Version, "items": without})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	res = a.request(http.MethodGet, "/v1/reports/settings", owner, nil)
+	require.Equal(t, http.StatusOK, res.Status)
+	var saved api.ReportSettings
+	res.JSON(&saved)
+	require.Len(t, saved.Targets, 1)
+	assert.Equal(t, map[string]int{"interview": 3}, *saved.Targets[0].Goal.Categories, "the removed one is left out")
+	res = a.request(http.MethodPut, "/v1/reports/settings", owner, saved)
+	assert.Equal(t, http.StatusOK, res.Status, "saving what the page shows works: %s", res.Body)
 }

@@ -58,7 +58,8 @@ func (q *Queries) BindEmailDelivery(ctx context.Context, arg BindEmailDeliveryPa
 const cVsEmailedBetween = `-- name: CVsEmailedBetween :many
 SELECT sent_by, created_at, cv_candidate_ids FROM email
 WHERE cardinality(cv_candidate_ids) > 0 AND status <> 'failed' AND created_at >= $1 AND created_at < $2
-LIMIT 20000
+ORDER BY created_at, id
+LIMIT 500000
 `
 
 type CVsEmailedBetweenParams struct {

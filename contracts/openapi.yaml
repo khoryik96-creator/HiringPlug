@@ -20112,9 +20112,9 @@ x-permissions:
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
   pipeline.categories:manage:
     module: pipeline
-    description: Change the stage categories (1st, 2nd, Final Interview...) that reports count by.
+    description: Add, rename, reorder and delete the stage categories (1st, 2nd, Final Interview...) that reports and targets count by.
     sensitive: false
-    roles: [owner]
+    roles: [owner, admin]
   pipeline.templates:manage:
     module: pipeline
     description: Create, change and delete the company's stage templates, and choose the default.

@@ -19,7 +19,7 @@ const rowsOf = (cats: Category[]): Row[] => cats.map((c) => ({ id: c.key, key: c
 /**
  * Settings › Pipeline stages › Categories: what stages fall under (1st, 2nd
  * and Final Interview...), grouped by the kind each counts as. Everyone sees
- * them; owners, and those given pipeline.categories:manage, change them.
+ * them; owners and admins (pipeline.categories:manage) change them.
  */
 export function StageCategories() {
   const cats = useStageCategories();

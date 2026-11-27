@@ -6,10 +6,16 @@ import { useEffect, useRef, useState } from "react";
 /** Everyone together, or some people by id. */
 export type People = "team" | string[];
 
-const STORE = "hyplug.dashboard.people";
+/** Each person's choice is their own, on a computer people share. */
+export const peopleStore = (meId: string | undefined) => `hyplug.dashboard.people.${meId ?? "anyone"}`;
 
-/** The remembered choice (yourself when none, or when it can't be read). */
-export function useRememberedPeople(meId: string | undefined): [People, (p: People) => void] {
+/**
+ * The remembered choice (yourself when none, or when it can't be read).
+ * known are the people there are to choose from: anyone no longer among them
+ * is dropped from the choice (once they are known).
+ */
+export function useRememberedPeople(meId: string | undefined, known?: string[]): [People, (p: People) => void] {
+  const STORE = peopleStore(meId);
   const [people, setPeople] = useState<People | null>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORE) ?? "null") as unknown;
@@ -21,7 +27,13 @@ export function useRememberedPeople(meId: string | undefined): [People, (p: Peop
     setPeople(p);
     try { localStorage.setItem(STORE, JSON.stringify(p)); } catch { /* not remembered */ }
   };
-  return [people ?? (meId ? [meId] : "team"), choose];
+  const fallback: People = meId ? [meId] : "team";
+  let current = people ?? fallback;
+  if (current !== "team" && known && known.length > 0) {
+    const still = current.filter((id) => known.includes(id));
+    current = still.length > 0 ? still : fallback;
+  }
+  return [current, choose];
 }
 
 /** What the button says: "Me", "Aina", "Aina, Wei", "3 people" or "Whole team". */

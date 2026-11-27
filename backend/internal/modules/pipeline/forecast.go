@@ -31,19 +31,37 @@ func (m *Module) MovesTo(ctx context.Context, tx pgx.Tx, stage string, from, to 
 
 // CategoryMove is a user moving an application into a stage of a category.
 type CategoryMove struct {
-	By, ApplicationID, Category string
-	At                          time.Time
+	By, ApplicationID, CandidateID, Category string
+	At                                       time.Time
 }
 
 // MovesToCategory returns the moves into a stage category (from another
-// category or none) from one instant to another, in the caller's transaction.
+// category or none) from one instant to another, in the caller's
+// transaction. A move recorded without a category (before categories) is in
+// its stage's first.
 func (m *Module) MovesToCategory(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CategoryMove, error) {
 	rows, err := store.New(tx).MovesToCategoryBetween(ctx, store.MovesToCategoryBetweenParams{FromTime: from, ToTime: to})
-	out := make([]CategoryMove, len(rows))
-	for i, r := range rows {
-		out[i] = CategoryMove{By: r.ChangedBy, ApplicationID: r.ApplicationID, Category: r.Category, At: r.ChangedAt}
+	if err != nil {
+		return nil, err
 	}
-	return out, err
+	cats, _, err := categories(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	first := firstOfKind(cats)
+	var out []CategoryMove
+	for _, r := range rows {
+		into := categoryOf(r.ToStage, r.ToCategory, first)
+		was := ""
+		if r.FromStage != nil {
+			was = categoryOf(*r.FromStage, r.FromCategory, first)
+		}
+		if into == "" || into == was {
+			continue
+		}
+		out = append(out, CategoryMove{By: r.ChangedBy, ApplicationID: r.ApplicationID, CandidateID: r.CandidateID, Category: into, At: r.ChangedAt})
+	}
+	return out, nil
 }
 
 // AtStages returns the applications now at any of stages (at most 5,000),

@@ -14,8 +14,8 @@ x-module:
       description: Create, change and delete the company's stage templates, and choose the default.
       roles: [owner, admin]
     pipeline.categories:manage:
-      description: Change the stage categories (1st, 2nd, Final Interview...) that reports count by.
-      roles: [owner]
+      description: Add, rename, reorder and delete the stage categories (1st, 2nd, Final Interview...) that reports and targets count by.
+      roles: [owner, admin]
   errorCodes:
     CATEGORY_IN_USE:
       status: 409

@@ -107,12 +107,25 @@ SELECT a.job_order_id, min(c.changed_at)::timestamptz AS first_at
 FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'submitted'
 GROUP BY a.job_order_id
 HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
-LIMIT 20000;
+ORDER BY a.job_order_id
+LIMIT 200000;
 
--- Every category some applications have been in (reports: conversions).
+-- Jobs whose first placement (first move to placed on any of their
+-- applications) was between two instants.
+-- name: FirstPlacedJobsBetween :many
+SELECT a.job_order_id, min(c.changed_at)::timestamptz AS first_at
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'
+GROUP BY a.job_order_id
+HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
+ORDER BY a.job_order_id
+LIMIT 200000;
+
+-- Every stage move of some applications, oldest first (reports: conversions).
+-- A move without a category (before categories) is in its stage's first.
 -- name: CategoriesReached :many
-SELECT DISTINCT application_id, to_category::text AS category FROM application_stage_change
-WHERE application_id = ANY(@ids::text[]) AND to_category IS NOT NULL;
+SELECT application_id, to_stage, to_category, changed_at FROM application_stage_change
+WHERE application_id = ANY(@ids::text[])
+ORDER BY changed_at, id;
 
 -- Stage moves, newest first (the dashboard's timeline, or one candidate's).
 -- name: StageMoves :many
@@ -142,15 +155,18 @@ GROUP BY job_order_id, stage;
 
 -- The dashboard's week: applications that changed stage this week and the
 -- week before, and applications added this week.
--- scoped: only the applications on job_ids (some people's jobs).
+-- scoped: only the applications on job_ids (some people's jobs). Unscoped
+-- reads only the last two weeks, as before people could be chosen.
 -- name: WeekTrends :one
-WITH apps AS (SELECT id, created_at FROM application WHERE NOT @scoped::boolean OR job_order_id = ANY(@job_ids::text[]))
 SELECT
-  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c JOIN apps ON apps.id = c.application_id
-    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '7 days')::integer AS moved_this_week,
-  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c JOIN apps ON apps.id = c.application_id
-    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '14 days' AND c.changed_at <= now() - interval '7 days')::integer AS moved_last_week,
-  (SELECT count(*) FROM apps WHERE created_at > now() - interval '7 days')::integer AS added_this_week;
+  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c
+    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '7 days'
+      AND (NOT @scoped::boolean OR c.application_id IN (SELECT id FROM application WHERE job_order_id = ANY(@job_ids::text[]))))::integer AS moved_this_week,
+  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c
+    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '14 days' AND c.changed_at <= now() - interval '7 days'
+      AND (NOT @scoped::boolean OR c.application_id IN (SELECT id FROM application WHERE job_order_id = ANY(@job_ids::text[]))))::integer AS moved_last_week,
+  (SELECT count(*) FROM application WHERE created_at > now() - interval '7 days'
+      AND (NOT @scoped::boolean OR job_order_id = ANY(@job_ids::text[])))::integer AS added_this_week;
 
 -- The Bin: applications of binned candidates or jobs are hidden with them.
 -- name: ApplicationsOf :many
@@ -230,16 +246,19 @@ LIMIT 50;
 SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
 WHERE c.to_stage = @stage AND c.from_stage IS DISTINCT FROM c.to_stage AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
-LIMIT 50000;
+ORDER BY c.changed_at, c.id
+LIMIT 1000000;
 
--- Moves into a stage category (reports: targets per category): from another
--- category, or from none.
+-- Stage moves by people in a period, with the candidate (reports: targets per
+-- category). The caller works out each side's category: a move recorded
+-- without one (before categories) is in its stage's first.
 -- name: MovesToCategoryBetween :many
-SELECT c.changed_by::text AS changed_by, c.changed_at, c.application_id, c.to_category::text AS category
-FROM application_stage_change c
-WHERE c.to_category IS NOT NULL AND c.from_category IS DISTINCT FROM c.to_category
-  AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
-LIMIT 50000;
+SELECT c.changed_by::text AS changed_by, c.changed_at, c.application_id, a.candidate_id,
+  c.from_stage, c.from_category, c.to_stage, c.to_category
+FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
+WHERE c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
+ORDER BY c.changed_at, c.id
+LIMIT 1000000;
 
 -- Applications now at some stages (reports: the revenue forecast).
 -- name: ApplicationsAtStages :many

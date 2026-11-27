@@ -42,6 +42,16 @@ describe("activity against targets", () => {
     await waitFor(() => { expect(get).toHaveBeenLastCalledWith("/v1/reports/activity", { params: { query: { period: "month" } } }); });
   });
 
+  it("shows no made-up zeros for the whole team while loading", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => (path === "/v1/reports/activity"
+      ? new Promise(() => { /* still loading */ }) : Promise.resolve(ok({ version: "0", items: [] })))) as never);
+    renderWithClient(<ActivityProgress people="team" title="Activity: Whole team" />);
+    const panel = await screen.findByRole("region", { name: "Activity: Whole team" });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(within(panel).queryByText("No target set")).toBeNull();
+    expect(within(panel).queryByText("Nobody to show.")).toBeNull();
+  });
+
   it("shows a stage category someone has a target for", async () => {
     const withRounds = activity({ rows: [
       { userId: "usr_a", userName: "Aina", done: { calls: 0, cvsSent: 0, interviews: 0, placements: 0, categories: { interview: 3, applied: 9 } },

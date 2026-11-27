@@ -34,7 +34,7 @@ func categoryItems(cats []api.StageCategory) []map[string]any {
 
 // Stage categories: what each stage falls under (1st, 2nd and Final
 // Interview), which the board, a candidate's tag and the report's funnel
-// show. Owners change them, and admins once the owner gives them the right.
+// show. Owners and admins change them (an owner can take that from admins).
 func TestStageCategories(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
@@ -59,7 +59,6 @@ func TestStageCategories(t *testing.T) {
 		return a.request(http.MethodPut, "/v1/stage-categories", token, body)
 	}
 	assert.Equal(t, http.StatusForbidden, put(recruiter, map[string]any{"version": cats.Version, "items": items}).Status)
-	assert.Equal(t, http.StatusForbidden, put(admin, map[string]any{"version": cats.Version, "items": items}).Status, "owners only, until given to admins")
 
 	res := put(owner, map[string]any{"version": cats.Version, "items": items})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
@@ -135,10 +134,22 @@ func TestStageCategories(t *testing.T) {
 		assert.Equal(t, []string{"applied", "interview_final", "offer"}, []string{tpl.Steps[0].Category, tpl.Steps[1].Category, tpl.Steps[2].Category})
 	})
 
-	t.Run("the owner can give admins the right to change them", func(t *testing.T) {
-		perms := append(authz.PermissionsForRole(api.RoleAdmin), api.PermissionPipelineCategoriesManage)
-		a.setRole(owner, "admin", map[string]any{"version": 0, "permissions": perms, "candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+	t.Run("admins add, rename and remove them too, unless the owner takes that away", func(t *testing.T) {
 		now := a.categories(admin)
-		assert.Equal(t, http.StatusOK, put(admin, map[string]any{"version": now.Version, "items": categoryItems(now.Items)}).Status)
+		items := categoryItems(now.Items)
+		items[3]["label"] = "First Interview"
+		items = append(items, map[string]any{"label": "Client Presentation", "kind": "offer"})
+		res := put(admin, map[string]any{"version": now.Version, "items": items})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&now)
+		assert.Equal(t, "First Interview", now.Items[3].Label)
+		res = put(admin, map[string]any{"version": now.Version, "items": slices.DeleteFunc(categoryItems(now.Items),
+			func(m map[string]any) bool { return m["label"] == "Client Presentation" })})
+		require.Equal(t, http.StatusOK, res.Status, "removed again: %s", res.Body)
+		res.JSON(&now)
+
+		perms := slices.DeleteFunc(authz.PermissionsForRole(api.RoleAdmin), func(p api.Permission) bool { return p == api.PermissionPipelineCategoriesManage })
+		a.setRole(owner, "admin", map[string]any{"version": 0, "permissions": perms, "candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+		assert.Equal(t, http.StatusForbidden, put(admin, map[string]any{"version": now.Version, "items": categoryItems(now.Items)}).Status)
 	})
 }

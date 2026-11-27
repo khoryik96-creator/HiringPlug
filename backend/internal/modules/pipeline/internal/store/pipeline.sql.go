@@ -184,16 +184,20 @@ func (q *Queries) ApplicationsOf(ctx context.Context, arg ApplicationsOfParams) 
 }
 
 const categoriesReached = `-- name: CategoriesReached :many
-SELECT DISTINCT application_id, to_category::text AS category FROM application_stage_change
-WHERE application_id = ANY($1::text[]) AND to_category IS NOT NULL
+SELECT application_id, to_stage, to_category, changed_at FROM application_stage_change
+WHERE application_id = ANY($1::text[])
+ORDER BY changed_at, id
 `
 
 type CategoriesReachedRow struct {
 	ApplicationID string
-	Category      string
+	ToStage       string
+	ToCategory    *string
+	ChangedAt     time.Time
 }
 
-// Every category some applications have been in (reports: conversions).
+// Every stage move of some applications, oldest first (reports: conversions).
+// A move without a category (before categories) is in its stage's first.
 func (q *Queries) CategoriesReached(ctx context.Context, ids []string) ([]CategoriesReachedRow, error) {
 	rows, err := q.db.Query(ctx, categoriesReached, ids)
 	if err != nil {
@@ -203,7 +207,12 @@ func (q *Queries) CategoriesReached(ctx context.Context, ids []string) ([]Catego
 	var items []CategoriesReachedRow
 	for rows.Next() {
 		var i CategoriesReachedRow
-		if err := rows.Scan(&i.ApplicationID, &i.Category); err != nil {
+		if err := rows.Scan(
+			&i.ApplicationID,
+			&i.ToStage,
+			&i.ToCategory,
+			&i.ChangedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -358,12 +367,54 @@ func (q *Queries) FirstPlacedBetween(ctx context.Context, arg FirstPlacedBetween
 	return items, nil
 }
 
+const firstPlacedJobsBetween = `-- name: FirstPlacedJobsBetween :many
+SELECT a.job_order_id, min(c.changed_at)::timestamptz AS first_at
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'
+GROUP BY a.job_order_id
+HAVING min(c.changed_at) >= $1 AND min(c.changed_at) < $2
+ORDER BY a.job_order_id
+LIMIT 200000
+`
+
+type FirstPlacedJobsBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type FirstPlacedJobsBetweenRow struct {
+	JobOrderID string
+	FirstAt    time.Time
+}
+
+// Jobs whose first placement (first move to placed on any of their
+// applications) was between two instants.
+func (q *Queries) FirstPlacedJobsBetween(ctx context.Context, arg FirstPlacedJobsBetweenParams) ([]FirstPlacedJobsBetweenRow, error) {
+	rows, err := q.db.Query(ctx, firstPlacedJobsBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FirstPlacedJobsBetweenRow
+	for rows.Next() {
+		var i FirstPlacedJobsBetweenRow
+		if err := rows.Scan(&i.JobOrderID, &i.FirstAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const firstSubmittedBetween = `-- name: FirstSubmittedBetween :many
 SELECT a.job_order_id, min(c.changed_at)::timestamptz AS first_at
 FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'submitted'
 GROUP BY a.job_order_id
 HAVING min(c.changed_at) >= $1 AND min(c.changed_at) < $2
-LIMIT 20000
+ORDER BY a.job_order_id
+LIMIT 200000
 `
 
 type FirstSubmittedBetweenParams struct {
@@ -868,11 +919,12 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 }
 
 const movesToCategoryBetween = `-- name: MovesToCategoryBetween :many
-SELECT c.changed_by::text AS changed_by, c.changed_at, c.application_id, c.to_category::text AS category
-FROM application_stage_change c
-WHERE c.to_category IS NOT NULL AND c.from_category IS DISTINCT FROM c.to_category
-  AND c.changed_at >= $1 AND c.changed_at < $2 AND c.changed_by IS NOT NULL
-LIMIT 50000
+SELECT c.changed_by::text AS changed_by, c.changed_at, c.application_id, a.candidate_id,
+  c.from_stage, c.from_category, c.to_stage, c.to_category
+FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
+WHERE c.changed_at >= $1 AND c.changed_at < $2 AND c.changed_by IS NOT NULL
+ORDER BY c.changed_at, c.id
+LIMIT 1000000
 `
 
 type MovesToCategoryBetweenParams struct {
@@ -884,11 +936,16 @@ type MovesToCategoryBetweenRow struct {
 	ChangedBy     string
 	ChangedAt     time.Time
 	ApplicationID string
-	Category      string
+	CandidateID   string
+	FromStage     *string
+	FromCategory  *string
+	ToStage       string
+	ToCategory    *string
 }
 
-// Moves into a stage category (reports: targets per category): from another
-// category, or from none.
+// Stage moves by people in a period, with the candidate (reports: targets per
+// category). The caller works out each side's category: a move recorded
+// without one (before categories) is in its stage's first.
 func (q *Queries) MovesToCategoryBetween(ctx context.Context, arg MovesToCategoryBetweenParams) ([]MovesToCategoryBetweenRow, error) {
 	rows, err := q.db.Query(ctx, movesToCategoryBetween, arg.FromTime, arg.ToTime)
 	if err != nil {
@@ -902,7 +959,11 @@ func (q *Queries) MovesToCategoryBetween(ctx context.Context, arg MovesToCategor
 			&i.ChangedBy,
 			&i.ChangedAt,
 			&i.ApplicationID,
-			&i.Category,
+			&i.CandidateID,
+			&i.FromStage,
+			&i.FromCategory,
+			&i.ToStage,
+			&i.ToCategory,
 		); err != nil {
 			return nil, err
 		}
@@ -918,7 +979,8 @@ const movesToStageBetween = `-- name: MovesToStageBetween :many
 SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
 WHERE c.to_stage = $1 AND c.from_stage IS DISTINCT FROM c.to_stage AND c.changed_at >= $2 AND c.changed_at < $3 AND c.changed_by IS NOT NULL
-LIMIT 50000
+ORDER BY c.changed_at, c.id
+LIMIT 1000000
 `
 
 type MovesToStageBetweenParams struct {
@@ -1459,13 +1521,15 @@ func (q *Queries) UpsertJobStagePlan(ctx context.Context, arg UpsertJobStagePlan
 }
 
 const weekTrends = `-- name: WeekTrends :one
-WITH apps AS (SELECT id, created_at FROM application WHERE NOT $1::boolean OR job_order_id = ANY($2::text[]))
 SELECT
-  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c JOIN apps ON apps.id = c.application_id
-    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '7 days')::integer AS moved_this_week,
-  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c JOIN apps ON apps.id = c.application_id
-    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '14 days' AND c.changed_at <= now() - interval '7 days')::integer AS moved_last_week,
-  (SELECT count(*) FROM apps WHERE created_at > now() - interval '7 days')::integer AS added_this_week
+  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c
+    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '7 days'
+      AND (NOT $1::boolean OR c.application_id IN (SELECT id FROM application WHERE job_order_id = ANY($2::text[]))))::integer AS moved_this_week,
+  (SELECT count(DISTINCT c.application_id) FROM application_stage_change c
+    WHERE c.from_stage IS NOT NULL AND c.changed_at > now() - interval '14 days' AND c.changed_at <= now() - interval '7 days'
+      AND (NOT $1::boolean OR c.application_id IN (SELECT id FROM application WHERE job_order_id = ANY($2::text[]))))::integer AS moved_last_week,
+  (SELECT count(*) FROM application WHERE created_at > now() - interval '7 days'
+      AND (NOT $1::boolean OR job_order_id = ANY($2::text[])))::integer AS added_this_week
 `
 
 type WeekTrendsParams struct {
@@ -1481,7 +1545,8 @@ type WeekTrendsRow struct {
 
 // The dashboard's week: applications that changed stage this week and the
 // week before, and applications added this week.
-// scoped: only the applications on job_ids (some people's jobs).
+// scoped: only the applications on job_ids (some people's jobs). Unscoped
+// reads only the last two weeks, as before people could be chosen.
 func (q *Queries) WeekTrends(ctx context.Context, arg WeekTrendsParams) (WeekTrendsRow, error) {
 	row := q.db.QueryRow(ctx, weekTrends, arg.Scoped, arg.JobIds)
 	var i WeekTrendsRow

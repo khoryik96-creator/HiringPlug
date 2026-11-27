@@ -118,7 +118,7 @@ func (s *Service) conversions(ctx context.Context, tx pgx.Tx, moves []CategoryMo
 	var cohort []CategoryMove
 	ids := map[string]bool{}
 	for _, m := range moves {
-		if counts(m.By) {
+		if isPerson(m.By) && counts(m.By) {
 			cohort = append(cohort, m)
 			ids[m.ApplicationID] = true
 		}
@@ -152,15 +152,15 @@ func (s *Service) jobTimes(ctx context.Context, tx pgx.Tx, out *PerformanceRepor
 	if err != nil {
 		return err
 	}
-	placed, err := s.deps.Applications.FirstPlaced(ctx, tx, start, end)
+	// Jobs first placed in the range: a job filled before it and placed again
+	// in it is not one.
+	placed, err := s.deps.Applications.FirstPlacements(ctx, tx, start, end)
 	if err != nil {
 		return err
 	}
 	firstPlaced := map[string]time.Time{}
 	for _, p := range placed {
-		if at, ok := firstPlaced[p.JobID]; !ok || p.PlacedAt.Before(at) {
-			firstPlaced[p.JobID] = p.PlacedAt
-		}
+		firstPlaced[p.JobID] = p.At
 	}
 	var ids []string
 	for _, c := range cvs {

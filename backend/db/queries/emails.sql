@@ -231,7 +231,8 @@ UPDATE email SET cv_candidate_ids = @candidate_ids::text[] WHERE id = @id;
 -- name: CVsEmailedBetween :many
 SELECT sent_by, created_at, cv_candidate_ids FROM email
 WHERE cardinality(cv_candidate_ids) > 0 AND status <> 'failed' AND created_at >= @from_time AND created_at < @to_time
-LIMIT 20000;
+ORDER BY created_at, id
+LIMIT 500000;
 
 -- An email whose sending job ended without trying (cancelled after a
 -- restore, or stopped): not sent, saying why. One whose delivery was

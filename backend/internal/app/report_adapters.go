@@ -44,17 +44,31 @@ func (a reportApplications) FirstPlaced(ctx context.Context, tx pgx.Tx, from, to
 	return out, err
 }
 
-func (a reportApplications) FirstCVs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.FirstCV, error) {
-	firsts, err := a.pipeline.FirstSubmitted(ctx, tx, from, to)
-	out := make([]reports.FirstCV, len(firsts))
+func jobFirsts(firsts []pipeline.JobFirst, err error) ([]reports.JobFirst, error) {
+	out := make([]reports.JobFirst, len(firsts))
 	for i, f := range firsts {
-		out[i] = reports.FirstCV{JobID: f.JobID, At: f.At}
+		out[i] = reports.JobFirst{JobID: f.JobID, At: f.At}
 	}
 	return out, err
 }
 
-func (a reportApplications) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]string, error) {
-	return a.pipeline.CategoriesReached(ctx, tx, ids)
+func (a reportApplications) FirstCVs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.JobFirst, error) {
+	return jobFirsts(a.pipeline.FirstSubmitted(ctx, tx, from, to))
+}
+
+func (a reportApplications) FirstPlacements(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.JobFirst, error) {
+	return jobFirsts(a.pipeline.FirstPlacedJobs(ctx, tx, from, to))
+}
+
+func (a reportApplications) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]reports.Reach, error) {
+	reached, err := a.pipeline.CategoriesReached(ctx, tx, ids)
+	out := make(map[string][]reports.Reach, len(reached))
+	for app, rs := range reached {
+		for _, r := range rs {
+			out[app] = append(out[app], reports.Reach{Category: r.Category, At: r.At})
+		}
+	}
+	return out, err
 }
 
 type reportSources struct{ candidates *candidates.Module }

@@ -48,11 +48,12 @@ func TestCountActivity(t *testing.T) {
 		Interviews: []Done{{By: "usr_b", At: at}, {By: "system", At: at}},
 		Placements: []Done{{By: "usr_a", At: at}},
 		CategoryMoves: []CategoryMove{
-			{By: "usr_a", ApplicationID: "appl_1", Category: "interview1"},
-			{By: "usr_a", ApplicationID: "appl_1", Category: "interview1"}, // moved back and in again: once
-			{By: "usr_a", ApplicationID: "appl_2", Category: "interview1"},
-			{By: "usr_a", ApplicationID: "appl_1", Category: "final"},
-			{By: "usr_b", ApplicationID: "appl_1", Category: "interview1"}, // another user
+			{By: "usr_a", ApplicationID: "appl_1", CandidateID: "cand_1", Category: "interview1"},
+			{By: "usr_a", ApplicationID: "appl_1", CandidateID: "cand_1", Category: "interview1"}, // moved back and in again: once
+			{By: "usr_a", ApplicationID: "appl_2", CandidateID: "cand_2", Category: "interview1"},
+			{By: "usr_a", ApplicationID: "appl_3", CandidateID: "cand_2", Category: "interview1"}, // the same candidate on another job: once
+			{By: "usr_a", ApplicationID: "appl_1", CandidateID: "cand_1", Category: "final"},
+			{By: "usr_b", ApplicationID: "appl_1", CandidateID: "cand_1", Category: "interview1"}, // another user
 		},
 	}
 	day := func(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC) }
