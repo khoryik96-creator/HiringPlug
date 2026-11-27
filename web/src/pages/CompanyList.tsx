@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { StaleFilter, StaleTag } from "../components/StaleTag";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
@@ -47,6 +48,7 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [type, setType] = useState<TypeFilter>("");
   const [category, setCategory] = useState("");
+  const [stale, setStale] = useState(() => hashParam("stale") === "1"); // from the morning email's link
   const fs = useFieldSettings();
   const [adding, setAdding] = useState(false);
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set()); // to put in a folder
@@ -61,16 +63,17 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
   };
   const typed = useDebounced(q, 350); // one search once typing pauses
   const list = useInfiniteQuery({
-    queryKey: [...companiesKey, typed, type, category, folder],
+    queryKey: [...companiesKey, typed, type, category, stale, folder],
     enabled: folders.ready,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
-      const query: { q?: string; boolean?: string; type?: Schemas["CompanyType"]; category?: string; folder?: string; limit: number; cursor?: string } = { limit: 100 };
+      const query: { q?: string; boolean?: string; type?: Schemas["CompanyType"]; category?: string; stale?: boolean; folder?: string; limit: number; cursor?: string } = { limit: 100 };
       if (pageParam) query.cursor = pageParam;
       if (folder) query.folder = folder;
       if (typed.trim()) query[looksBoolean(typed) ? "boolean" : "q"] = typed.trim(); // AND, OR, NOT…: a boolean search
       if (type) query.type = type;
       if (category) query.category = category;
+      if (stale) query.stale = true;
       return unwrap(await api.GET("/v1/companies", { params: { query } }));
     },
     getNextPageParam: (last) => last.nextCursor,
@@ -98,6 +101,7 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
             <option value="">All categories</option>
             {fs.options("company_category").filter((o) => o.key !== UNKNOWN_CATEGORY).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
+          <StaleFilter on={stale} onChange={setStale} />
         </BooleanSearchBox>
         <a className="dupes-link" href="#/companies/duplicates">Possible duplicates</a>
         {canExport && <ExportButton what="companies" run={(format) => {
@@ -106,6 +110,7 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
           if (typed.trim()) query.set(looksBoolean(typed) ? "boolean" : "q", typed.trim());
           if (type) query.set("type", type);
           if (category) query.set("category", category);
+          if (stale) query.set("stale", "true");
           return downloadExport(`/v1/companies/export?${query.toString()}`);
         }} />}
         {canCreate && !adding && <IconButton label="Add company" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
@@ -150,7 +155,7 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
           {items?.map((c) => (
             <tr key={c.id} {...picking.rowProps(c.id)}>
               <td {...folders.drag(c.id, chosen)}>
-                <a href={`#/companies/${c.id}`}>{c.name}</a> <CountryTag country={c.country} />
+                <a href={`#/companies/${c.id}`}>{c.name}</a> <CountryTag country={c.country} /> <StaleTag touchedAt={c.touchedAt} />
                 {chosen.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
               </td>
               {columns.order.map((k) => <td key={k}>{CELLS[k].cell(c, fs)}</td>)}
@@ -159,7 +164,7 @@ export function CompanyList({ canCreate, canExport = false, canFolders = false, 
           ))}
           {items?.length === 0 && (
             <tr><td colSpan={columns.order.length + (folders.hasFolders ? 2 : 1)} className="muted">
-              {q || type || category ? "No companies match." : folder ? "Nothing in this folder yet: choose companies under All companies, then Add to folder (or drag them onto it)." : "No companies yet."}
+              {q || type || category || stale ? "No companies match." : folder ? "Nothing in this folder yet: choose companies under All companies, then Add to folder (or drag them onto it)." : "No companies yet."}
             </td></tr>
           )}
         </tbody>

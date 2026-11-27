@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 const company = (id: string, name: string, country: string | null = null): CompanySummary => ({
-  id, name, type: "client", category: null, industry: null, city: null, country, website: null, linkedinUrl: null, updatedAt: "2026-11-01T00:00:00Z",
+  id, name, type: "client", category: null, industry: null, city: null, country, website: null, linkedinUrl: null, updatedAt: "2026-11-01T00:00:00Z", touchedAt: "2026-11-01T00:00:00Z",
 });
 
 it("pages through every company, 100 at a time", async () => {

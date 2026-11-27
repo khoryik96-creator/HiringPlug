@@ -920,6 +920,14 @@ for each of their jobs, with **Score fit** / **Score again**.
   company's LinkedIn check only checks contacts due (never checked, or 90 days
   since), with "Check them again too". Contact lists show how long ago each
   address was checked.
+- **Stale records** ✅ (1.55.0): a contact or company nobody touched for a
+  year (not edited, no note written on it, no email sent to the contact, no
+  job opened or changed for it; a contact touched touches their company;
+  automatic work such as the monthly email check does not count) shows "Not
+  touched in a year" beside its name. The Contacts and Companies lists filter
+  to them (the "Not touched in a year" pill; `?stale=true`, exports too), and
+  the first morning email of each month says how many there are, with links.
+  Nothing is changed or hidden: what to do with them is the recruiter's call.
 - **Emails that would not arrive** ✅: the composer warns about recipients who
   left or whose mailbox is gone (`POST /v1/contacts/address-check`).
   Automations do not send to them (`EMAIL_UNDELIVERABLE`): the run is skipped

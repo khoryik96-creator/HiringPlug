@@ -28,7 +28,7 @@ const folder = (over: Partial<Folder>): Folder => ({
 });
 const contact = (id: string, fullName: string): ContactSummary => ({
   id, fullName, title: "HR Manager", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maju", email: null, emailCheckStatus: null,
-  mailboxStatus: null, mailboxCheckedAt: null, linkedinEmployment: null, phone: null, mobile: null, status: "active", role: "hr", updatedAt: "2026-11-01T00:00:00Z",
+  mailboxStatus: null, mailboxCheckedAt: null, linkedinEmployment: null, phone: null, mobile: null, status: "active", role: "hr", updatedAt: "2026-11-01T00:00:00Z", touchedAt: "2026-11-01T00:00:00Z",
 });
 const MEI = contact("cont_01jbz6w0m0k8q9x2r3s4t5v6c1", "Mei Tan");
 const ALI = contact("cont_01jbz6w0m0k8q9x2r3s4t5v6c2", "Ali Hassan");

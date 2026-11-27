@@ -1728,3 +1728,7 @@ button.whatsapp-send:hover:not(:disabled) { background: #0e7a40; }
 .booking-asks { display: grid; gap: 0.6rem; margin: 0.75rem 0; }
 /* The mail dock is wider than the calendar's: a message needs room to be read. */
 .mail-docked .shell-content { grid-template-columns: minmax(0,1fr) clamp(380px,36vw,620px); }
+
+/* A contact or company nobody touched for a year: quiet, beside the name. */
+.stale-tag { display: inline-block; margin-left: 0.35rem; padding: 0.05rem 0.45rem; border-radius: 999px; font-size: 0.72rem;
+  font-weight: 600; color: #8a5a00; background: #fff4db; border: 1px solid #f1d9a6; white-space: nowrap; vertical-align: 1px; }

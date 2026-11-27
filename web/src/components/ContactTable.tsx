@@ -1,5 +1,6 @@
 import type React from "react";
 import { useRef } from "react";
+import { StaleTag } from "./StaleTag";
 
 import type { ContactSummary } from "../api/client";
 import { formatWhen, linkedinDates, timeAgo } from "../labels";
@@ -101,7 +102,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
           return (
           <tr key={c.id} {...pickProps} className={[pickProps?.className, bounces ? "bounces" : ""].filter(Boolean).join(" ") || undefined}>
             <td {...dragName?.(c.id)}>
-              <a href={`#/contacts/${c.id}`}>{c.fullName}</a>
+              <a href={`#/contacts/${c.id}`}>{c.fullName}</a> <StaleTag touchedAt={c.touchedAt} />
               {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
             </td>
             {columns.order.map((k) => <td key={k}>{CELLS[k].cell(c, fs)}</td>)}

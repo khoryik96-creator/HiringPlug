@@ -13,7 +13,7 @@ afterEach(() => {
 const contact = (over: Partial<ContactSummary>): ContactSummary => ({
   id: "cont_01jbz6w0m0k8q9x2r3s4t5v6w7", fullName: "Mei Tan", title: "HR Manager", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7",
   companyName: "Maju", email: null, emailCheckStatus: null, mailboxStatus: null, mailboxCheckedAt: null, linkedinEmployment: null, phone: null, mobile: null, status: "active", role: "hr",
-  updatedAt: "2026-11-01T00:00:00Z", ...over,
+  updatedAt: "2026-11-01T00:00:00Z", touchedAt: "2026-11-01T00:00:00Z", ...over,
 });
 
 it("shows each contact's role and whether they still work there, and filters by both", async () => {
@@ -63,4 +63,29 @@ it("pages through more than one page of contacts and says when there are more", 
   expect(screen.getByRole("link", { name: "Mei Tan" }), "the first page stays").toBeTruthy();
   expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
   expect(screen.getByText("2 contacts")).toBeTruthy();
+});
+
+it("tags contacts nobody touched for a year and lists only them on asking (or from the morning email's link)", async () => {
+  window.location.hash = "#/contacts?stale=1";
+  const asked: Record<string, unknown>[] = [];
+  vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: Record<string, unknown> } }) => {
+    if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+    asked.push(init?.params?.query ?? {});
+    return Promise.resolve(ok({ nextCursor: null, items: [
+      contact({ touchedAt: "2025-03-01T00:00:00Z" }),
+      contact({ id: "cont_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Ali Hassan" }),
+    ] }));
+  }) as never);
+  renderWithClient(<ContactList canCreate={false} />);
+  const mei = (await screen.findByRole("link", { name: "Mei Tan" })).closest("tr");
+  const ali = screen.getByRole("link", { name: "Ali Hassan" }).closest("tr");
+  if (!mei || !ali) throw new Error("rows");
+  expect(within(mei).getByText("Not touched in a year")).toBeTruthy();
+  expect(within(ali).queryByText("Not touched in a year")).toBeNull();
+  const pill = screen.getByRole("button", { name: "Not touched in a year" });
+  expect(pill.getAttribute("aria-pressed")).toBe("true");
+  expect(asked[0]).toEqual({ limit: 100, stale: true });
+  fireEvent.click(pill);
+  await waitFor(() => { expect(asked.at(-1)).toEqual({ limit: 100 }); });
+  window.location.hash = "";
 });

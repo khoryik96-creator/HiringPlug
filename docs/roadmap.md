@@ -73,10 +73,10 @@ five are being built now; the rest are queued in this order.
 | ✅ 1.52.0 | **After a migration, P2: server checks** in Settings › System for the agency that runs the server: the background and AI workers report every half minute with their version, so one that stopped or still runs the old version after an update shows (and is emailed to `HP_ALERT_EMAIL`); the API checks it can save and open files; free disk space; what the alert emails report now | A stopped AI worker or a half-done update showed only as CVs never read; problems reached the alert email but were nowhere in the app |
 | ✅ 1.53.0 | **Mail dock**: the Outlook mailbox (inbox, folders, reading, replying) docked on the right beside any page, one dock at a time with the calendar's. Fix: a job title or employer with no spaces wraps inside the candidate header's tile | The mail could only be read on its own page; such a title ran over the next tile |
 | ✅ 1.54.0 | **Outlook attachments as in Outlook**: Download all (one .zip), a PDF or picture opens to view on a click; after Send the mail stays where you were | Each file downloaded one by one, a PDF only by downloading it; Send jumped to the Scheduled list |
+| ✅ 1.55.0 | **Stale records**: contacts and companies nobody touched for a year (no edit, note, email or job; a contact touched touches its company; automatic checks do not count) get a "Not touched in a year" tag and filter on their lists (and in exports), and the first morning email of each month counts them with links | Data went out of date quietly |
 | ⬜ | Single sign-on (Microsoft, Google) | After two-step sign-in |
 | ⬜ | Cloud readiness: files in object storage, sign-in limits in PostgreSQL, key rotation, metrics and alerts (Phase 7) | Needed to host many agencies |
 | ⬜ | Accessibility and visual checks in the browser tests | Screens are checked by hand |
-| ⬜ | Stale-record sweep (contacts and companies untouched for a year) | Data goes out of date quietly |
 
 ## The plan
 

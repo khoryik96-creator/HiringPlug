@@ -15,6 +15,7 @@ import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { contactPerson, usePicked } from "../components/usePicked";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { hashParam } from "../hashQuery";
+import { StaleFilter } from "../components/StaleTag";
 
 /** "" any role; NOT_SET those without one; otherwise a role's key. */
 const NOT_SET = "-";
@@ -25,6 +26,7 @@ export function ContactList({ canCreate, canExport = false, canEmail = false, ca
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [role, setRole] = useState("");
   const [status, setStatus] = useState<Schemas["ContactStatus"] | "">("");
+  const [stale, setStale] = useState(() => hashParam("stale") === "1"); // from the morning email's link
   const [adding, setAdding] = useState(false);
   const pick = usePicked();
   const folders = useFolderView("contact", canFolders, meId, pick.clear);
@@ -33,13 +35,14 @@ export function ContactList({ canCreate, canExport = false, canEmail = false, ca
   const [emailing, setEmailing] = useState(false);
   const typed = useDebounced(q, 350); // one search once typing pauses
   const list = useInfiniteQuery({
-    queryKey: [...contactsKey, typed, role, status, folder],
+    queryKey: [...contactsKey, typed, role, status, stale, folder],
     enabled: folders.ready,
     queryFn: async ({ pageParam }) => unwrap(await api.GET("/v1/contacts", { params: { query: {
       limit: 100,
       ...(typed.trim() ? { [looksBoolean(typed) ? "boolean" : "q"]: typed.trim() } : {}), // AND, OR, NOT…: a boolean search
       ...(role === NOT_SET ? { roleNotSet: true } : role ? { role } : {}),
       ...(status ? { status } : {}),
+      ...(stale ? { stale } : {}),
       ...(folder ? { folder } : {}),
       ...(pageParam ? { cursor: pageParam } : {}),
     } } })),
@@ -47,7 +50,7 @@ export function ContactList({ canCreate, canExport = false, canEmail = false, ca
     getNextPageParam: (last) => last.nextCursor,
   });
   const contacts = list.data?.pages.flatMap((page) => page.items);
-  const filtered = !!(q || role || status);
+  const filtered = !!(q || role || status || stale);
   const inFolders = useInFolders(folders, contacts?.map((c) => c.id) ?? []);
 
   return (
@@ -65,6 +68,7 @@ export function ContactList({ canCreate, canExport = false, canEmail = false, ca
             <option value="active">Still there</option>
             <option value="left">Has left</option>
           </select>
+          <StaleFilter on={stale} onChange={setStale} />
         </BooleanSearchBox>
         <a className="dupes-link" href="#/contacts/duplicates">Possible duplicates</a>
         {canExport && <ExportButton what="contacts" run={(format) => {
@@ -73,6 +77,7 @@ export function ContactList({ canCreate, canExport = false, canEmail = false, ca
           if (role === NOT_SET) query.set("roleNotSet", "true");
           else if (role) query.set("role", role);
           if (status) query.set("status", status);
+          if (stale) query.set("stale", "true");
           if (folder) query.set("folder", folder);
           return downloadExport(`/v1/contacts/export?${query.toString()}`);
         }} />}
