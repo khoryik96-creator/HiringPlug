@@ -55,7 +55,8 @@ export function JobForm({ job, company = null, jdFile = null, onDone, onSaved }:
     enabled: companyId !== undefined,
   });
   const save = useMutation({
-    mutationFn: async () => {
+    // What is saved is passed in at the click: the form as shown then, never an earlier render's.
+    mutationFn: async ({ form, jdFileId }: { form: JobFormState; jdFileId: string | null }) => {
       const problems = jobProblems(form);
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
       const fields = jobFields(form);
@@ -93,7 +94,7 @@ export function JobForm({ job, company = null, jdFile = null, onDone, onSaved }:
       aria-label={opened.id ? "Edit job" : "Add job"}
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate();
+        save.mutate({ form, jdFileId });
       }}
     >
       {!opened.id && (
