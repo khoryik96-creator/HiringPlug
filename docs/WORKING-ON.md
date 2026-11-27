@@ -20,20 +20,13 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
-### Stage categories (1st, 2nd, Final Interview)
-- Who: Claude (account B)
-- Branch: claude/brave-thompson-k08hlg (worked locally, merged when verified)
-- Touches: pipeline module (stage_category table, migration 00207, stages, moves), reports funnel, web Settings › Pipeline stages, StepsEditor, PipelineBoard, CandidateApplications, Reports
-- Started: 27 Nov 2026    Last update: 27 Nov 2026
-- State: verifying 1.57.0
-- Next: merge when `task verify` passes; then remove this entry.
-
 ### Post-migration fixes and the HyPlug rename (taken over)
 - Who: Claude (account B), taken over from Claude (account A) on 26 Nov at the owner's request
 - Branch: claude/brave-thompson-k08hlg
 - Touches: the product's name everywhere people see it (1.56.0, the rename), then the PDF text reader
 - Started: 25 Nov 2026    Last update: 27 Nov 2026
 - State: merged: 1.50.1 to 1.55.0, the rename 1.56.0, 1.56.1 (the committed migrations 1.56.0 changed put back),
-  1.56.2 (PDFs saved without spaces between words read right; the owner's CV).
+  1.56.2 (PDFs saved without spaces between words read right; the owner's CV), 1.57.0 (stage categories:
+  1st, 2nd and Final Interview on the board, tags and report; owners edit them in Settings › Pipeline stages).
 - Next: the LinkedIn companion's listed name (manifest "name") becomes "HyPlug LinkedIn Companion" once companions
   run 1.7.0 (its updater takes either name from then on).
