@@ -109,6 +109,13 @@ func (s *Service) apolloUserAllowed(ctx context.Context, tx pgx.Tx, user string)
 	return ok && slices.Contains(perms, api.PermissionContactsApolloUse), nil
 }
 
+// The reasons a broker gives with a limited lookup: Apollo's refusal.
+var apolloRefusals = map[api.ApolloLookupReason]bool{
+	api.ApolloLookupReasonNoCredits:      true,
+	api.ApolloLookupReasonPlanNotAllowed: true,
+	api.ApolloLookupReasonRateLimited:    true,
+}
+
 func normalizeApolloReply(reply apolloReply, status int) api.ApolloLookup {
 	out := api.ApolloLookup{State: api.ApolloLookupStateUnconfirmed}
 	if reply.NotDispatched {
@@ -146,8 +153,7 @@ func normalizeApolloReply(reply apolloReply, status int) api.ApolloLookup {
 	case api.ApolloLookupStateLimited:
 		out.State = api.ApolloLookupStateLimited
 		// Which refusal Apollo gave (no credits, plan, too many requests).
-		switch reason := api.ApolloLookupReason(reply.Reason); reason {
-		case api.ApolloLookupReasonNoCredits, api.ApolloLookupReasonPlanNotAllowed, api.ApolloLookupReasonRateLimited:
+		if reason := api.ApolloLookupReason(reply.Reason); apolloRefusals[reason] {
 			out.Reason = &reason
 		}
 	case api.ApolloLookupStateMismatch, api.ApolloLookupStatePending, api.ApolloLookupStateAuthRequired:
