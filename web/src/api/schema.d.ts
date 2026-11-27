@@ -8193,7 +8193,7 @@ export interface components {
             /** @enum {string} */
             emailStatus?: "verified" | "unverified" | "catch_all" | "unavailable" | "user_managed" | "unknown";
             /** @enum {string} */
-            reason?: "profile_not_found" | "email_not_returned" | "personal_email_only" | "email_redacted" | "email_unusable" | "contact_unconfirmed" | "queue_expired" | "retryable_limit" | "reconnect_required";
+            reason?: "profile_not_found" | "email_not_returned" | "personal_email_only" | "email_redacted" | "email_unusable" | "contact_unconfirmed" | "queue_expired" | "retryable_limit" | "reconnect_required" | "no_credits" | "plan_not_allowed" | "rate_limited";
         };
         ContactApolloLookupJob: {
             lookupId: string;

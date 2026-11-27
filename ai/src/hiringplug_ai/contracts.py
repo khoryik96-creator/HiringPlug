@@ -2392,6 +2392,9 @@ class Reason1(StrEnum):
     queue_expired = "queue_expired"
     retryable_limit = "retryable_limit"
     reconnect_required = "reconnect_required"
+    no_credits = "no_credits"
+    plan_not_allowed = "plan_not_allowed"
+    rate_limited = "rate_limited"
 
 
 class ApolloLookup(BaseModel):

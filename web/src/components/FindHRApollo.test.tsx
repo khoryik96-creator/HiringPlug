@@ -43,6 +43,17 @@ describe("Apollo work email", () => {
     expect(await screen.findByRole("button", { name: "Confirm credit use" })).toBeTruthy();
   });
 
+  it("says which refusal Apollo gave when it limits a lookup", async () => {
+    serve(() => ({ state: "limited", reason: "plan_not_allowed" }));
+    open();
+    expect(await screen.findByText(/its plan may not allow email lookups through other apps/)).toBeTruthy();
+    expect(screen.queryByText(/Check your plan, credits, and account activity/)).toBeNull();
+    cleanup();
+    serve(() => ({ state: "limited" })); // an older broker gives no reason
+    open();
+    expect(await screen.findByText(/Check your plan, credits, and account activity/)).toBeTruthy();
+  });
+
   it("keeps checking a lookup confirmed after the dialog has been open a while", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let state: Lookup["state"] = "ready";

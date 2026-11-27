@@ -160,15 +160,21 @@ test("the versioned broker distinguishes a preflight limit from an attempted mat
   f.sql.prepare("UPDATE connections SET busy=0").run();
   f.setMatchStatus(429);
   const attempted = await (await f.post("/reveal-v2", f.op("b"))).json();
-  assert.deepEqual(attempted, { state: "limited" });
+  assert.deepEqual(attempted, { state: "limited", reason: "rate_limited" });
   assert.equal(f.paid(), 1);
+  // Which refusal it was, so the person knows what to check in Apollo.
+  for (const [status, reason, digit] of [[402, "no_credits", "d"], [403, "plan_not_allowed", "e"]]) {
+    f.setMatchStatus(status);
+    assert.deepEqual(await (await f.post("/reveal-v2", f.op(digit))).json(), { state: "limited", reason });
+  }
+  assert.equal(f.paid(), 3);
 
   f.setMatchStatus(200);
   const found = await (await f.post("/reveal-v2", f.op("c"))).json();
   assert.equal(found.identity_checked, true);
   assert.equal(found.email, contact.email);
   assert.equal((await (await f.post("/lookup-status-v2", f.op("c"))).json()).email, contact.email);
-  assert.equal(f.paid(), 2);
+  assert.equal(f.paid(), 4);
 });
 
 test("revocation uses the proof even when an OAuth flow has expired", async (t) => {

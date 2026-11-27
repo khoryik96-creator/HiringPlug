@@ -219,6 +219,9 @@ async function callback(request, env, now, fetcher) {
     return page(error instanceof SignInFailure ? error : null);
   }
 }
+// Apollo's refusals of a match, by status: out of credits, not allowed for
+// this account or plan, or too many requests for now.
+const LIMITS = { 402: "no_credits", 403: "plan_not_allowed", 429: "rate_limited" };
 const BUSY_LEASE = 120; // seconds: more than a token refresh plus People Match
 const finishOperation = async (env, connection, id, result) =>
   statement(env, "UPDATE operations SET state='done',cipher=? WHERE connection_id=? AND id=?",
@@ -310,14 +313,9 @@ async function reveal(env, data, connection, now, fetcher) {
       result =
         reply.status === 200
           ? emailResult(reply.data, p)
-          : {
-              state:
-                reply.status === 401
-                  ? "auth_required"
-                  : [402, 403, 429].includes(reply.status)
-                    ? "limited"
-                    : "unconfirmed",
-            };
+          : LIMITS[reply.status]
+            ? { state: "limited", reason: LIMITS[reply.status] }
+            : { state: reply.status === 401 ? "auth_required" : "unconfirmed" };
       if (result.state === "found") result.identity_checked = true;
       if (reply.status === 401)
         await statement(env, "UPDATE connections SET reauth=1 WHERE id=?", connection.id).run();

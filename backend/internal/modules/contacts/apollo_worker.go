@@ -143,7 +143,14 @@ func normalizeApolloReply(reply apolloReply, status int) api.ApolloLookup {
 		if reason := api.ApolloLookupReason(reply.Reason); reason.Valid() {
 			out.Reason = &reason
 		}
-	case api.ApolloLookupStateMismatch, api.ApolloLookupStatePending, api.ApolloLookupStateAuthRequired, api.ApolloLookupStateLimited:
+	case api.ApolloLookupStateLimited:
+		out.State = api.ApolloLookupStateLimited
+		// Which refusal Apollo gave (no credits, plan, too many requests).
+		switch reason := api.ApolloLookupReason(reply.Reason); reason {
+		case api.ApolloLookupReasonNoCredits, api.ApolloLookupReasonPlanNotAllowed, api.ApolloLookupReasonRateLimited:
+			out.Reason = &reason
+		}
+	case api.ApolloLookupStateMismatch, api.ApolloLookupStatePending, api.ApolloLookupStateAuthRequired:
 		out.State = api.ApolloLookupState(reply.State)
 	default:
 		// All other states are local or indicate an unexpected broker response.

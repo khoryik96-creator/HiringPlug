@@ -101,6 +101,9 @@ const absent: Record<NonNullable<Lookup["reason"]>, string> = {
   queue_expired: "The lookup expired in the queue.",
   retryable_limit: "The broker was busy before it could start this lookup.",
   reconnect_required: "Disconnect and reconnect Apollo to try again.",
+  no_credits: "Apollo says your account has no credits left for lookups through apps. Check your credits in Apollo.",
+  plan_not_allowed: "Apollo refused this lookup for your account: its plan may not allow email lookups through other apps, even when the Apollo LinkedIn extension works. Check your plan in Apollo.",
+  rate_limited: "Apollo says too many lookups were made in a short time. Try again in a few minutes.",
 };
 
 const statusLabel: Record<NonNullable<Lookup["emailStatus"]>, string> = {
@@ -150,7 +153,7 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
     {result && <div aria-live="polite">
       {result.email && <p className="hr-apollo-address"><strong>{result.email}</strong><br />
         <span className="muted">{result.state === "existing" ? "Already in HyPlug. No Apollo credit used." : statusLabel[result.emailStatus ?? "unknown"]}</span></p>}
-      {issues[result.state] && <p>{result.state === "cancelled" && result.reason ? absent[result.reason] : issues[result.state]}</p>}
+      {issues[result.state] && <p>{(result.state === "cancelled" || result.state === "limited") && result.reason ? absent[result.reason] : issues[result.state]}</p>}
       {result.state === "not_found" && <p>{absent[result.reason ?? "email_not_returned"]} Check Apollo for any credit use.</p>}
       {(result.state === "ready" || result.state === "cancelled") && result.confirmation && <>
         <p>This lookup may use a credit from your Apollo account, even if no email is returned.</p>

@@ -60,6 +60,11 @@ search so HyPlug can bind the company page used in that scan.
   grant), the answer was incomplete, or the profile could not be read.
   Fix that setting, then connect again. Redeploy the Worker after updating
   HyPlug to get these messages.
+- **Apollo limited the lookup.** HyPlug says which refusal Apollo gave: no
+  credits left (402), not allowed for the account's plan (403), or too many
+  lookups in a short time (429). Lookups through other apps can be refused
+  even while Apollo's own LinkedIn extension still finds emails for the
+  same account. Redeploy the Worker after updating HyPlug to get the reason.
 - **Apollo says sign-in succeeded, but HyPlug is still waiting.** Click
   **Check connection** in the browser where you started. If the ten-minute
   window elapsed, sign in again. Verify the Worker origin and deployed callback
