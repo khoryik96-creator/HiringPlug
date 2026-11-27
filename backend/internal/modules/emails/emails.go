@@ -203,7 +203,7 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 }
 
 // Notice is an email the app sends by itself (an interview reminder): from
-// HiringPlug, with no one in particular to reply to.
+// HyPlug, with no one in particular to reply to.
 type Notice struct {
 	To            []string
 	Subject, Body string
@@ -224,7 +224,7 @@ type Notice struct {
 	// caused it (a copy in their Sent Items would hand them the link), and in
 	// no one's sent mail here either.
 	AccountNotice bool
-	// SenderName is who it is from ("HiringPlug" when empty).
+	// SenderName is who it is from ("HyPlug" when empty).
 	SenderName string
 	// SentBy, when given, is the user it is sent for: from their connected
 	// mailbox if they have one (else the server's), replies going to them.

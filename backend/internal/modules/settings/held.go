@@ -1,7 +1,7 @@
 package settings
 
 // Settings > System after a restore: the jobs it held because they act
-// outside HiringPlug (emails, calendar updates, webhooks, automations) or
+// outside HyPlug (emails, calendar updates, webhooks, automations) or
 // ask a paid AI, each released or cancelled, or all at once. Audited like a
 // retried job. A company's owners and admins see and settle their own; the
 // agency that runs the server (runsServer) every company's, so one restore

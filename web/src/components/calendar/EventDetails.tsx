@@ -13,7 +13,7 @@ export function EventDetails({ event, onClose, onEdit, onChanged }: { event: Sch
   }, onSuccess: onChanged });
   return <section className="panel calendar-detail" role="dialog" aria-modal="true" aria-label="Appointment details">
     <div className="calendar-heading"><span className="badge">{event.source === "local" ? "Appointment" : event.source === "interview_invitation" ? "Interview invitation" : event.source}</span><button autoFocus onClick={onClose}>Close</button></div>
-    <h3>{event.title}</h3>{event.status === "cancelled" && <p className="warning">Cancelled in HiringPlug; Outlook cancellation is awaiting confirmation.</p>}<p>{dateLabel(new Date(event.startsAt))} · {event.allDay ? "All day" : `${timeLabel(event.startsAt)} – ${timeLabel(event.endsAt)}`}</p>
+    <h3>{event.title}</h3>{event.status === "cancelled" && <p className="warning">Cancelled in HyPlug; Outlook cancellation is awaiting confirmation.</p>}<p>{dateLabel(new Date(event.startsAt))} · {event.allDay ? "All day" : `${timeLabel(event.startsAt)} – ${timeLabel(event.endsAt)}`}</p>
     {event.location && <p>{event.location}</p>}
     {!event.joinUrl && join && <p><a className="button primary join-link" href={join.url} target="_blank" rel="noreferrer"><ServiceMark service={join.service} /> Join {SHORT_LABEL[join.service]}</a></p>}
     {event.notes && <p className="calendar-notes">{event.notes}</p>}
@@ -26,10 +26,10 @@ export function EventDetails({ event, onClose, onEdit, onChanged }: { event: Sch
       {event.editable && <button onClick={onEdit}>Edit</button>}
       {event.joinUrl && <a className="button primary" href={event.joinUrl} target="_blank" rel="noreferrer">Join meeting</a>}
       {event.webUrl && <a className="button" href={event.webUrl} target="_blank" rel="noreferrer">Open in Outlook</a>}
-      {(event.syncStatus === "failed" || event.syncStatus === "conflict") && event.source !== "outlook" && event.source !== "interview_invitation" && <button disabled={action.isPending} onClick={() => { if (window.confirm("Keep the HiringPlug details and sync them to Outlook? Any attendees will receive an update.")) action.mutate("retry"); }}>Keep HiringPlug details & sync</button>}
+      {(event.syncStatus === "failed" || event.syncStatus === "conflict") && event.source !== "outlook" && event.source !== "interview_invitation" && <button disabled={action.isPending} onClick={() => { if (window.confirm("Keep the HyPlug details and sync them to Outlook? Any attendees will receive an update.")) action.mutate("retry"); }}>Keep HyPlug details & sync</button>}
       {event.editable && <button disabled={action.isPending} onClick={() => { if (window.confirm(event.attendees.length ? "Cancel this appointment and send cancellations to its attendees?" : "Cancel this appointment?")) action.mutate("cancel"); }}>Cancel appointment</button>}
     </div>
-    {event.source === "interview_invitation" && <p className="small muted">Changes made in Outlook are taken into the interview on the next refresh. Cancel it in HiringPlug.</p>}
-    {(event.source === "interview" || event.source === "booking") && <p className="small muted">Change this meeting in its HiringPlug interview or booking link.</p>}
+    {event.source === "interview_invitation" && <p className="small muted">Changes made in Outlook are taken into the interview on the next refresh. Cancel it in HyPlug.</p>}
+    {(event.source === "interview" || event.source === "booking") && <p className="small muted">Change this meeting in its HyPlug interview or booking link.</p>}
   </section>;
 }

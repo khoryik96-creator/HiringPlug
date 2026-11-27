@@ -1,6 +1,6 @@
 # 0006 Local first, cloud ready
 
-**Decision.** HiringPlug runs on one machine with Docker Compose (PostgreSQL,
+**Decision.** HyPlug runs on one machine with Docker Compose (PostgreSQL,
 API, both workers, web) and uses only portable building blocks, so the same
 containers move to the cloud later.
 

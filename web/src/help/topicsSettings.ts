@@ -83,7 +83,7 @@ export const SETTINGS_TOPICS: HelpTopic[] = [
         needs: ["privacy:manage"],
         points: [
           "Each candidate's page has Data protection: consent given or withdrawn, and requests about their data. Withdrawn consent means do not contact.",
-          "Settings › Data protection shows what needs deciding. HiringPlug never deletes anything by itself.",
+          "Settings › Data protection shows what needs deciding. HyPlug never deletes anything by itself.",
         ],
       },
       {

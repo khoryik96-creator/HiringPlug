@@ -64,7 +64,7 @@ export const TOOL_TOPICS: HelpTopic[] = [
         heading: "Templates",
         points: [
           "Settings › Email templates: the agency's templates, with fields, ready in every email window.",
-          "Outlook Mail (the envelope icon) shows your mailbox inside HiringPlug.",
+          "Outlook Mail (the envelope icon) shows your mailbox inside HyPlug.",
         ],
       },
     ],
@@ -82,7 +82,7 @@ export const TOOL_TOPICS: HelpTopic[] = [
         points: [
           "The green chat button beside a candidate's phone or a contact's mobile opens a message: blank or from a template, filled in with their name and the job.",
           "\"Open in WhatsApp\" opens your own WhatsApp with the message typed in, and keeps it on their timeline as a WhatsApp note.",
-          "HiringPlug sends nothing itself, so no WhatsApp Business account is needed. Salary is never filled in.",
+          "HyPlug sends nothing itself, so no WhatsApp Business account is needed. Salary is never filled in.",
           "Settings › WhatsApp templates holds the templates (three to start with).",
         ],
       },

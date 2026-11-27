@@ -1,5 +1,5 @@
 // On a new contact's form: their LinkedIn profile fills in their name and job
-// title, and offers the companies in HiringPlug that may be where they work.
+// title, and offers the companies in HyPlug that may be where they work.
 import { useState } from "react";
 
 import { api, unwrap } from "../api/client";
@@ -67,7 +67,7 @@ export function ContactFromLinkedin({ url, company, onRead, onCompany }: {
                 {m.name}{m.samePage ? " (same LinkedIn page)" : ""}
               </button>
             ))}</span>
-            : <span className="muted small">No company in HiringPlug matches {role?.company_name}: add it under Companies first.</span>)}
+            : <span className="muted small">No company in HyPlug matches {role?.company_name}: add it under Companies first.</span>)}
         </div>
       )}
     </div>

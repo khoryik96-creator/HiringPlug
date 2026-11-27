@@ -41,7 +41,7 @@ describe("the getting-started checklist", () => {
   it("ticks the steps the records show are done, each linking to its screen", async () => {
     company({ team: 3, candidates: 1 });
     renderWithClient(<FirstRunGuide permissions={OWNER} />);
-    await screen.findByRole("region", { name: "Get HiringPlug ready" });
+    await screen.findByRole("region", { name: "Get HyPlug ready" });
     expect(steps()).toEqual(["Add your company's details", "Invite your team ✓", "Connect your email", "Add your first job",
       "Import candidates ✓", "Set up the AI provider ✓"]);
     expect(screen.getByText("3 of 6 done")).toBeTruthy();
@@ -53,7 +53,7 @@ describe("the getting-started checklist", () => {
   it("counts the AI as not set up when it is off, or the server has none", async () => {
     company({ ai: "off" });
     renderWithClient(<FirstRunGuide permissions={["aiproviders:manage", "emails:send"]} />);
-    await screen.findByRole("region", { name: "Get HiringPlug ready" });
+    await screen.findByRole("region", { name: "Get HyPlug ready" });
     expect(steps()).toEqual(["Connect your email", "Set up the AI provider"]);
   });
 
@@ -62,7 +62,7 @@ describe("the getting-started checklist", () => {
     renderWithClient(<FirstRunGuide permissions={OWNER} />);
     await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/ai-providers"); });
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByRole("region", { name: "Get HiringPlug ready" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Get HyPlug ready" })).toBeNull();
   });
 
   it("is hidden for good with Hide checklist, remembered for this person", async () => {
@@ -74,7 +74,7 @@ describe("the getting-started checklist", () => {
     }) as never);
     renderWithClient(<FirstRunGuide permissions={SOURCER} />);
     fireEvent.click(await screen.findByRole("button", { name: "Hide checklist" }));
-    await waitFor(() => { expect(screen.queryByRole("region", { name: "Get HiringPlug ready" })).toBeNull(); });
+    await waitFor(() => { expect(screen.queryByRole("region", { name: "Get HyPlug ready" })).toBeNull(); });
     expect(sentBody(put)).toEqual({ guideDismissed: true });
   });
 
@@ -83,7 +83,7 @@ describe("the getting-started checklist", () => {
     renderWithClient(<FirstRunGuide permissions={OWNER} />);
     await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/me/preferences"); });
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByRole("region", { name: "Get HiringPlug ready" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Get HyPlug ready" })).toBeNull();
     expect(get).not.toHaveBeenCalledWith("/v1/team");
   });
 });

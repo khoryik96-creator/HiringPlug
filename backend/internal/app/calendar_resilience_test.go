@@ -91,7 +91,7 @@ func TestCalendarADeletedInterviewLeavesOutlookAndFreesTheTime(t *testing.T) {
 	assert.Zero(t, busy, "and the time is free again")
 }
 
-// Disconnecting takes HiringPlug's interviews out of Outlook (nothing would
+// Disconnecting takes HyPlug's interviews out of Outlook (nothing would
 // update them) and leaves the person's own appointments where they are.
 func TestCalendarDisconnectingTakesInterviewsOutOfOutlook(t *testing.T) {
 	t.Parallel()

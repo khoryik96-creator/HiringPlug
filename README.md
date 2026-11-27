@@ -1,4 +1,4 @@
-# HiringPlug
+# HyPlug
 
 An applicant tracking system (ATS) for recruitment agencies and in-house
 hiring teams. It works for one company or many: it can run for your own team
@@ -37,7 +37,7 @@ machine first and is built to move to the cloud later.
 
 Your full feature list and how each item is designed: [docs/features.md](docs/features.md).
 
-## Selling HiringPlug as a SaaS
+## Selling HyPlug as a SaaS
 
 - **[Profit Planner](https://claude.ai/artifact/SXZUgNHU16BkqiUHX6uU2G)**: an
   interactive calculator for pricing, users, costs, SST and income tax, with

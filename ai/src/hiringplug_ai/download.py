@@ -29,7 +29,7 @@ class DownloadGoneError(GiveUpError):
 
 
 class FileMissingError(DownloadGoneError):
-    """HiringPlug's file server says the file is not there (its own 404,
+    """HyPlug's file server says the file is not there (its own 404,
     marked by MISSING_HEADER): deleted, or never copied to this server.
     Uploading it again is the way back."""
 
@@ -40,7 +40,7 @@ class LinkExpiredError(DownloadGoneError):
     again; reading the file again signs a new one."""
 
 
-# The header HiringPlug's file server sets on its own "not found"
+# The header HyPlug's file server sets on its own "not found"
 # (platform/blob: blob.MissingHeader). A 404 without it is not about the
 # file: something else answered (a wrong HP_INTERNAL_BASE_URL, a proxy),
 # a setting to fix, so it is tried again.
@@ -61,7 +61,7 @@ def download(url: str, max_bytes: int, timeout_seconds: float = 30.0) -> bytes:
                 )
             if status in (httpx.codes.NOT_FOUND, httpx.codes.GONE):
                 raise DownloadError(
-                    f"download failed: answer {status} from something other than HiringPlug's file server"
+                    f"download failed: answer {status} from something other than HyPlug's file server"
                     " (check HP_INTERNAL_BASE_URL)"
                 )
             if status != httpx.codes.OK:

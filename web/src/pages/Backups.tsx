@@ -59,9 +59,9 @@ export function BackupsPage() {
           <section className="panel" aria-label="Nightly backup">
             <h3>Nightly backup</h3>
             <p className="muted">
-              A backup is a copy of everything in HiringPlug: candidates, notes and screening calls, salaries, companies, contacts,
-              jobs, placements, settings, and every uploaded CV and file. It is kept on the computer HiringPlug runs on (your own
-              computer, if HiringPlug runs there); the newest 14 are kept. Each night only new files are copied: a file that has
+              A backup is a copy of everything in HyPlug: candidates, notes and screening calls, salaries, companies, contacts,
+              jobs, placements, settings, and every uploaded CV and file. It is kept on the computer HyPlug runs on (your own
+              computer, if HyPlug runs there); the newest 14 are kept. Each night only new files are copied: a file that has
               not changed is shared between backups, so they take far less disk than their sizes added up.
             </p>
             <label className="switch-row">
@@ -93,7 +93,7 @@ function ServiceLine({ backups: b }: { backups: Backups }) {
   return (
     <p className="warning small">
       The backup service is not running, so no backup can be made{b.serviceSeenAt ? ` (last seen ${formatWhen(b.serviceSeenAt)})` : ""}.
-      With Docker it is the &quot;backup&quot; service; it starts with HiringPlug.
+      With Docker it is the &quot;backup&quot; service; it starts with HyPlug.
     </p>
   );
 }

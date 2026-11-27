@@ -1,5 +1,5 @@
 // A new contact from their LinkedIn profile: what the companion read (name,
-// current roles), the companies in HiringPlug that may be theirs, and what
+// current roles), the companies in HyPlug that may be theirs, and what
 // happens once the contact is saved (an email guessed from colleagues', then
 // verified; their time at the company checked on LinkedIn, which records
 // since when, or marks them as having left).
@@ -35,7 +35,7 @@ export function roleAt(roles: Role[], companyLinkedin: string | null | undefined
 
 export interface CompanyMatch { id: string; name: string; detail: string | null; samePage: boolean }
 
-/** Companies in HiringPlug that may be where they work: the same LinkedIn page first, then similar names. */
+/** Companies in HyPlug that may be where they work: the same LinkedIn page first, then similar names. */
 export function companiesFor(role: Role): Promise<CompanyMatch[]> {
   return companiesNamed(role.company_name, role.company_url);
 }
@@ -45,7 +45,7 @@ const SUFFIX = /\b(sdn\.?|bhd\.?|berhad|plc|inc\.?|ltd\.?|limited|llc|pte\.?|cor
 export const plainName = (name: string) => name.toLowerCase().replace(SUFFIX, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 /**
- * Companies in HiringPlug that may be the one named (or with this LinkedIn
+ * Companies in HyPlug that may be the one named (or with this LinkedIn
  * page): the same page first, then the same name (suffixes aside), then
  * similar names.
  */

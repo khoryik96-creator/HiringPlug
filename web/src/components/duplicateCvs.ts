@@ -1,4 +1,4 @@
-// Finding CVs already in HiringPlug before uploading: each file's SHA-256 is
+// Finding CVs already in HyPlug before uploading: each file's SHA-256 is
 // worked out here, then the API says which are exactly a CV already there
 // (skip them) and which share a CV's file name (ask first).
 import { api, type Schemas, unwrap } from "../api/client";
@@ -6,7 +6,7 @@ import { getToken } from "../auth";
 
 export type MatchResult = Schemas["DocumentMatchResult"];
 
-/** A file's SHA-256 in hex, as HiringPlug keeps it. */
+/** A file's SHA-256 in hex, as HyPlug keeps it. */
 export async function sha256Of(file: Blob): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");

@@ -144,9 +144,9 @@ describe("top bar", () => {
     await waitFor(() => { expect(document.activeElement).toBe(toggle); });
   });
 
-  it("shows HiringPlug's version (the VERSION file) beside its name, so anyone can tell which update runs", async () => {
+  it("shows HyPlug's version (the VERSION file) beside its name, so anyone can tell which update runs", async () => {
     signedIn(RECRUITER);
-    const version = await screen.findByTitle("HiringPlug version");
+    const version = await screen.findByTitle("HyPlug version");
     expect(version.textContent).toBe(`v${__APP_VERSION__}`);
     expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+$/);
   });

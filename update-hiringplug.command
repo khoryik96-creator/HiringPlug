@@ -1,5 +1,5 @@
 #!/bin/bash
-# Double-click (macOS) to update and start HiringPlug: gets the latest code (if
+# Double-click (macOS) to update and start HyPlug: gets the latest code (if
 # git is installed; otherwise pull in GitHub Desktop first), rebuilds what
 # changed, and opens the app. Your data is kept. Needs Docker Desktop running.
 cd "$(dirname "$0")" || exit 1
@@ -18,11 +18,11 @@ if command -v git >/dev/null 2>&1 && [ -d .git ]; then
   git pull --ff-only || echo "Could not pull (local changes?). Using the code as it is."
 fi
 
-echo "Building and starting HiringPlug (the first time takes a few minutes)..."
-docker compose -f deploy/docker-compose.yml up -d --build --remove-orphans || fail "Docker could not start HiringPlug (see above)."
+echo "Building and starting HyPlug (the first time takes a few minutes)..."
+docker compose -f deploy/docker-compose.yml up -d --build --remove-orphans || fail "Docker could not start HyPlug (see above)."
 
 echo "Waiting for the app..."
 for _ in $(seq 1 60); do curl -sf http://localhost:3000 >/dev/null && break; sleep 2; done
 open http://localhost:3000
-echo "HiringPlug is running at http://localhost:3000 (API docs: http://localhost:8080/docs)."
+echo "HyPlug is running at http://localhost:3000 (API docs: http://localhost:8080/docs)."
 sleep 3

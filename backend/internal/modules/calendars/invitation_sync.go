@@ -33,7 +33,7 @@ func (s *Service) syncInvitationProjection(ctx context.Context, tx pgx.Tx, row s
 	location = bounded(location, 500)
 	formatted := s.refillInterview(row.NotesHtml, meeting)
 	if row.OutlookBody {
-		// Its message was rewritten in Outlook: HiringPlug's copy (the
+		// Its message was rewritten in Outlook: HyPlug's copy (the
 		// instructions, a template) is not sent over it.
 		notes, formatted = row.Notes, row.NotesHtml
 	}

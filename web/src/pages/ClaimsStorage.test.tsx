@@ -75,8 +75,8 @@ describe("Settings › Claims storage", () => {
     await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/claims/storage/retry"); });
   });
 
-  it("asks to connect again when the provider stopped accepting HiringPlug", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(connected({ status: "reconnect", error: "OneDrive no longer accepts HiringPlug's access" })));
+  it("asks to connect again when the provider stopped accepting HyPlug", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(connected({ status: "reconnect", error: "OneDrive no longer accepts HyPlug's access" })));
     renderWithClient(<ClaimsStorage />);
     expect(await screen.findByText("Connect again")).toBeTruthy();
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Connect OneDrive" }).disabled).toBe(false);

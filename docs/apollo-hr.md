@@ -2,12 +2,12 @@
 
 Open **Settings → Integrations → Apollo** (or **Companies → Find HR → Apollo**). Choose **Connect Apollo**, open the
 Apollo sign-in page, approve access with your own Apollo account, then return
-to HiringPlug and choose **Check connection**.
+to HyPlug and choose **Check connection**.
 
-Choose **Work email** on a Find HR result. HiringPlug first checks for a work
+Choose **Work email** on a Find HR result. HyPlug first checks for a work
 address on a contact with that exact LinkedIn profile at that company. If
 there is no usable address, review the person and confirm the Apollo lookup.
-Apollo may use a credit even without returning an email. HiringPlug shows
+Apollo may use a credit even without returning an email. HyPlug shows
 Apollo's verification status and leaves the contact unchanged.
 
 If the result is unconfirmed, use **Check lookup status** to retrieve the
@@ -17,7 +17,7 @@ for that result and any credit use.
 
 ## Deployment
 
-Deploy the [HiringPlug Apollo Worker](../tools/apollo-broker/README.md)
+Deploy the [HyPlug Apollo Worker](../tools/apollo-broker/README.md)
 before enabling this feature. It uses the CV Studio broker's D1 schema,
 approved Apollo partner OAuth client, and exact HTTPS
 `/callback` redirect registered in Apollo. The broker needs
@@ -26,7 +26,7 @@ both the LinkedIn profile and its employer before revealing an address.
 The employer name alone cannot establish a match: the employer's LinkedIn page
 name must match the scanned company page, or LinkedIn's company number must
 (Apollo's `linkedin_uid`, which also covers companies saved by their number,
-`/company/123456/`). HiringPlug uses the Worker's
+`/company/123456/`). HyPlug uses the Worker's
 versioned lookup routes and requires identity verification on a found result.
 
 Set both variables on the API and the Go worker. Docker Compose passes these
@@ -43,22 +43,22 @@ private environment file. Connect each recruiter's own account from Find HR.
 The Apollo application secret and refresh tokens remain on the broker. A
 shared deployment can continue serving CV Studio through its original routes.
 To enable Apollo on a Find HR search made before this release, run a new
-search so HiringPlug can bind the company page used in that scan.
+search so HyPlug can bind the company page used in that scan.
 
 ## Setup checks
 
 - **The broker blocked the request.** Check Cloudflare's security events and
-  its rules for the Worker. HiringPlug uses the user agent that worked with
+  its rules for the Worker. HyPlug uses the user agent that worked with
   the CV Studio broker. An HTML 403 from Cloudflare means the request may
   have stopped before Apollo.
 - **Apollo doesn't recognise the app or denies consent.** Check the partner
   OAuth client, approved scopes, exact registered redirect, and the account's
   Apollo plan and permissions. Then cancel the existing attempt and reconnect.
-- **Apollo says sign-in succeeded, but HiringPlug is still waiting.** Click
+- **Apollo says sign-in succeeded, but HyPlug is still waiting.** Click
   **Check connection** in the browser where you started. If the ten-minute
   window elapsed, sign in again. Verify the Worker origin and deployed callback
-  match the HiringPlug setting if the problem repeats.
-- **An address was withheld.** HiringPlug shows when Apollo returned only a
+  match the HyPlug setting if the problem repeats.
+- **An address was withheld.** HyPlug shows when Apollo returned only a
   personal address, a redacted address or a mismatched profile/employer.
   Broker errors and missing addresses are insufficient to establish credit use.
 
@@ -77,11 +77,11 @@ credit use. A lookup with an uncertain result
 can only be checked, including after repeat clicks. Results from an earlier
 connection stay private to that connection.
 
-If the broker cannot confirm a disconnect, HiringPlug pauses lookups and keeps
+If the broker cannot confirm a disconnect, HyPlug pauses lookups and keeps
 the encrypted proof so **Retry disconnect** can revoke the same connection.
 If the original broker or encryption key is unavailable, revoke the app in
-Apollo and then forget the connection in HiringPlug.
+Apollo and then forget the connection in HyPlug.
 
-HiringPlug ships the Leads schema migration `00156` with Apollo so normal
+HyPlug ships the Leads schema migration `00156` with Apollo so normal
 deployments apply both in order. The migrator also supports databases that
 ran Apollo's `00157` preview before the Leads migration was bundled.

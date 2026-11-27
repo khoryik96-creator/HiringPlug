@@ -83,7 +83,7 @@ describe("checking employment on LinkedIn", () => {
     renderWithClient(<LinkedinChecks companyId="comp_1" />);
     await new Promise((r) => setTimeout(r, 1600));
     fireEvent.click(screen.getByRole("button", { name: "Check employment on LinkedIn" }));
-    expect(screen.getByText(/Install the HiringPlug LinkedIn Companion first/)).toBeTruthy();
+    expect(screen.getByText(/Install the HyPlug LinkedIn Companion first/)).toBeTruthy();
     expect(post).not.toHaveBeenCalled();
   });
 

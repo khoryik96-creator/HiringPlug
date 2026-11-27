@@ -12,12 +12,12 @@ export type Move = Schemas["LinkedinMove"];
 
 const slugOf = (companyUrl: string) => /\/company\/([A-Za-z0-9_-]+)\//.exec(companyUrl)?.[1] ?? "";
 
-/** The company to add them at: one in HiringPlug (found by its LinkedIn page, or chosen by name), or a new one (made when chosen). */
+/** The company to add them at: one in HyPlug (found by its LinkedIn page, or chosen by name), or a new one (made when chosen). */
 type Target = { id: string; name: string; byName?: boolean } | "new";
 
 /**
  * Following a contact who left to where they work now. The company in
- * HiringPlug with the same LinkedIn page is certain, so they are added there
+ * HyPlug with the same LinkedIn page is certain, so they are added there
  * at once; otherwise the companies whose names match are offered, and a new
  * company is made only when the person says so. They are added as a contact
  * there (an email guessed from colleagues', then verified), with a note on the
@@ -92,10 +92,10 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
   const busy = find.isPending || follow.isPending;
   if (choices) {
     return (
-      <span className="follow-choose" role="group" aria-label={`Where ${move.companyName} is in HiringPlug`}>
+      <span className="follow-choose" role="group" aria-label={`Where ${move.companyName} is in HyPlug`}>
         {choices.length > 0
           ? <span className="muted small">Is it one of these?</span>
-          : <span className="muted small">{move.companyName} is not in HiringPlug yet.</span>}
+          : <span className="muted small">{move.companyName} is not in HyPlug yet.</span>}
         {choices.map((c) => (
           <button key={c.id} type="button" className="small-button" disabled={busy} onClick={() => { follow.mutate({ id: c.id, name: c.name, byName: true }); }}>
             Add at {c.name}{c.detail ? ` (${c.detail})` : ""}

@@ -34,7 +34,7 @@ const show = (onLinked = vi.fn()) => {
 };
 
 describe("a lead's company, step 1", () => {
-  it("links the company in HiringPlug that has the LinkedIn page chosen, under another name, instead of adding a second", async () => {
+  it("links the company in HyPlug that has the LinkedIn page chosen, under another name, instead of adding a second", async () => {
     const get = serve({ byPage: [{ id: "comp_mfb", name: "MFB Group" }] });
     const post = vi.spyOn(api, "POST");
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...lead, version: 5, companyId: "comp_mfb" }));
@@ -42,7 +42,7 @@ describe("a lead's company, step 1", () => {
     const form = await screen.findByRole("form", { name: "New company" });
     fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/maju-foods" } });
     fireEvent.click(within(form).getByRole("button", { name: "Add and link" }));
-    expect(await within(form).findByText("MFB Group in HiringPlug has this LinkedIn page.")).toBeTruthy();
+    expect(await within(form).findByText("MFB Group in HyPlug has this LinkedIn page.")).toBeTruthy();
     expect(get).toHaveBeenCalledWith("/v1/companies", { params: { query: { linkedinCompany: "maju-foods", limit: 1 } } });
     expect(post).not.toHaveBeenCalled();
     expect(patch).not.toHaveBeenCalled();
@@ -75,7 +75,7 @@ describe("a lead's company, step 1", () => {
     await screen.findByRole("button", { name: "This one: Maju Food" });
     expect(screen.getByRole("form", { name: "New company" })).toBe(form);
     expect(within(form).getByText(/changed by someone else/)).toBeTruthy();
-    expect(within(form).getByRole("heading", { name: "Maju Food is added to HiringPlug" })).toBeTruthy();
+    expect(within(form).getByRole("heading", { name: "Maju Food is added to HyPlug" })).toBeTruthy();
     expect(within(form).getByLabelText<HTMLInputElement>("Name").disabled).toBe(true);
     expect(within(form).getByLabelText<HTMLInputElement>("LinkedIn page").disabled).toBe(true);
     fireEvent.click(within(form).getByRole("button", { name: "Link to Maju Food" }));
@@ -120,7 +120,7 @@ describe("a lead's company, step 1", () => {
     fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: page } });
     fireEvent.click(within(form).getByRole("button", { name: "Add and link" }));
     fireEvent.click(await within(form).findByRole("button", { name: "Link the lead to MFB Group" }));
-    const owner = within(form).getByText("MFB Group in HiringPlug has this LinkedIn page.").closest("div") as HTMLElement;
+    const owner = within(form).getByText("MFB Group in HyPlug has this LinkedIn page.").closest("div") as HTMLElement;
     expect(await within(owner).findByText(/changed by someone else/)).toBeTruthy();
     expect(screen.getByText("Something went wrong on our side.")).toBeTruthy();
   });

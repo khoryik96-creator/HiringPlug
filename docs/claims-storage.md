@@ -55,9 +55,9 @@ the page) in each app you use.
 | Provider | App | Permissions |
 | --- | --- | --- |
 | OneDrive | the Microsoft app in Settings > Email connection (or `HP_MAIL_MICROSOFT_CLIENT_ID`/`_SECRET`) | `Files.ReadWrite`, `User.Read`, `offline_access` (delegated) |
-| Google Drive | the Google app in Settings > Email connection (or `HP_MAIL_GOOGLE_CLIENT_ID`/`_SECRET`); turn on the Google Drive API | `drive.file` (only the folders and files HiringPlug makes), `email` |
+| Google Drive | the Google app in Settings > Email connection (or `HP_MAIL_GOOGLE_CLIENT_ID`/`_SECRET`); turn on the Google Drive API | `drive.file` (only the folders and files HyPlug makes), `email` |
 | Dropbox | a Dropbox app (scoped access, full Dropbox) set in `HP_DROPBOX_APP_KEY` and `HP_DROPBOX_APP_SECRET` | `account_info.read`, `files.content.write` |
 
-With Google's `drive.file` permission HiringPlug cannot see folders people made
+With Google's `drive.file` permission HyPlug cannot see folders people made
 themselves, so it makes its own top folder (a folder of the same name made by
 hand stays separate).

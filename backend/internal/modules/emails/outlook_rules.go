@@ -95,7 +95,7 @@ func outlookRuleFailure(err error) error {
 	if errors.As(err, &graph) {
 		switch graph.status {
 		case http.StatusForbidden:
-			return apperr.New(api.ErrorCodeOUTLOOKRULESACCESS, "Allow inbox rules to let HiringPlug manage Outlook rules.")
+			return apperr.New(api.ErrorCodeOUTLOOKRULESACCESS, "Allow inbox rules to let HyPlug manage Outlook rules.")
 		case http.StatusNotFound:
 			return apperr.NotFound("Outlook rule")
 		case http.StatusBadRequest:
@@ -281,7 +281,7 @@ func (s *Service) changeOutlookRule(ctx context.Context, p authz.Principal, id s
 			return outlookRuleFailure(err)
 		}
 		if rule.ID != remoteID || rule.IsReadOnly {
-			return apperr.Validation(apperr.FieldErrors{{Field: "rule", Message: "this Outlook rule cannot be changed in HiringPlug"}})
+			return apperr.Validation(apperr.FieldErrors{{Field: "rule", Message: "this Outlook rule cannot be changed in HyPlug"}})
 		}
 		if enabled == nil {
 			if err := s.outlookRequest(ctx, token, http.MethodDelete, target, nil, nil); err != nil {

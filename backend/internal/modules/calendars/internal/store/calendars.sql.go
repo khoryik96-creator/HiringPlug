@@ -194,7 +194,7 @@ UPDATE calendar_event SET title= $1,notes= $2,
  outlook_body=outlook_body OR $3::boolean,
  location= $4,starts_at= $5,ends_at= $6,attendees= $7,
  -- The online meeting as Outlook has it: removed there, its link goes too,
- -- and a later HiringPlug change no longer asks for a Teams meeting.
+ -- and a later HyPlug change no longer asks for a Teams meeting.
  join_url=CASE WHEN $8::boolean THEN coalesce($9,join_url) END,
  teams=teams AND NOT $10::boolean,web_url=coalesce($11,web_url),
  remote_key=$12,remote_snapshot= $13,
@@ -715,7 +715,7 @@ type ClearSourceBusyParams struct {
 	SourceID string
 }
 
-// A hold HiringPlug cancelled frees its time at once, its Outlook copy's too (that copy is being deleted).
+// A hold HyPlug cancelled frees its time at once, its Outlook copy's too (that copy is being deleted).
 func (q *Queries) ClearSourceBusy(ctx context.Context, arg ClearSourceBusyParams) error {
 	_, err := q.db.Exec(ctx, clearSourceBusy, arg.UserID, arg.Source, arg.SourceID)
 	return err
@@ -1224,7 +1224,7 @@ func (q *Queries) LockCalendarUser(ctx context.Context, userID string) error {
 }
 
 const markCalendarConflict = `-- name: MarkCalendarConflict :exec
-UPDATE calendar_event SET sync_status='conflict',sync_error='Outlook changed this meeting. Manage its schedule in HiringPlug, or explicitly keep the HiringPlug schedule.',remote_key=$1,remote_snapshot= $2 WHERE id= $3
+UPDATE calendar_event SET sync_status='conflict',sync_error='Outlook changed this meeting. Manage its schedule in HyPlug, or explicitly keep the HyPlug schedule.',remote_key=$1,remote_snapshot= $2 WHERE id= $3
 `
 
 type MarkCalendarConflictParams struct {
@@ -1513,7 +1513,7 @@ type ReleaseImportedRemoteParams struct {
 	RemoteID     *string
 }
 
-// An Outlook event imported before its HiringPlug receipt arrived (the create
+// An Outlook event imported before its HyPlug receipt arrived (the create
 // succeeded but its answer was lost) gives its identity back to the managed row.
 func (q *Queries) ReleaseImportedRemote(ctx context.Context, arg ReleaseImportedRemoteParams) error {
 	_, err := q.db.Exec(ctx, releaseImportedRemote, arg.UserID, arg.ConnectionID, arg.RemoteID)
@@ -2227,7 +2227,7 @@ type UnreceiptedCalendarEventsParams struct {
 	ConnectionID string
 }
 
-// HiringPlug rows not yet tied to an event in this connection: one may own an
+// HyPlug rows not yet tied to an event in this connection: one may own an
 // Outlook event its lost receipt never named (matched by transaction ID).
 func (q *Queries) UnreceiptedCalendarEvents(ctx context.Context, arg UnreceiptedCalendarEventsParams) ([]CalendarEvent, error) {
 	rows, err := q.db.Query(ctx, unreceiptedCalendarEvents, arg.UserID, arg.ConnectionID)

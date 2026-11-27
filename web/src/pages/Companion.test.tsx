@@ -33,7 +33,7 @@ describe("LinkedIn companion page", () => {
   });
 
   it("opens the companion's own update page when a newer version is ready", async () => {
-    expect(COMPANION_LATEST).toBe(__COMPANION_VERSION__); // the version built with this HiringPlug
+    expect(COMPANION_LATEST).toBe(__COMPANION_VERSION__); // the version built with this HyPlug
     const fake = fakeCompanion((action) => (action === "openUpdater" ? { result: true } : null), "1.4.0");
     stop = fake.stop;
     render(<Companion latest="1.5.0" />);

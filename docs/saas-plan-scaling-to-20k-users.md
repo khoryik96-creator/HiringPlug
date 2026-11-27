@@ -1,12 +1,12 @@
-# Turning HiringPlug into a SaaS: scaling to 20,000 users
+# Turning HyPlug into a SaaS: scaling to 20,000 users
 
-The plan for selling HiringPlug to recruitment agencies and freelance
+The plan for selling HyPlug to recruitment agencies and freelance
 recruiters as a monthly service: what has to change in the app, how to set
 it up at each size, what it costs, and what limits growth.
 
 **The target.** About **1,000 agencies** (freelancers to agencies of 20
 recruiters, about 5 on average), **5,000 to 20,000 users online at the same
-time**. That is more agencies than Malaysia has of HiringPlug's kind: reaching
+time**. That is more agencies than Malaysia has of HyPlug's kind: reaching
 it means selling across Southeast Asia (see [The market](#10-the-market-agencies-you-can-sell-to)).
 The first goals are much smaller: about 10 agencies covers a lean set-up.
 
@@ -23,7 +23,7 @@ room). Providers bill in US dollars, so the ringgit cost moves with the rate.
 
 Contents:
 
-1. [Where HiringPlug stands today](#1-where-hiringplug-stands-today)
+1. [Where HyPlug stands today](#1-where-hiringplug-stands-today)
 2. [Changes for one agency, not all](#2-changes-for-one-agency-not-all)
 3. [What has to change before selling](#3-what-has-to-change-before-selling)
 4. [Set-up at each size, with costs](#4-set-up-at-each-size-with-costs)
@@ -36,7 +36,7 @@ Contents:
 
 ---
 
-## 1. Where HiringPlug stands today
+## 1. Where HyPlug stands today
 
 Already right for a SaaS:
 
@@ -252,7 +252,7 @@ What to do about it:
 
 ## 6. Python or Go?
 
-HiringPlug uses Go for the website's server (API) and most background work,
+HyPlug uses Go for the website's server (API) and most background work,
 and Python for reading CVs, CV Studio's formatting and talking to the AI.
 **Keep Python.** Measured on this project:
 
@@ -341,7 +341,7 @@ uploads and AI calls.
 ## 10. The market: agencies you can sell to
 
 How many recruitment agencies there are in each country, and how many are
-the kind HiringPlug is for: agencies placing professionals and executives
+the kind HyPlug is for: agencies placing professionals and executives
 with companies, and freelance recruiters. Searched November 2026.
 
 **Read the counts with care.** No country publishes a count of that kind of

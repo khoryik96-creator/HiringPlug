@@ -73,7 +73,7 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
       if (started.checks.length === 0) return;
       token.operation = operationId();
       const company = await companionCall<{ company_id: string; company_name?: string }>("companyId", { operation_id: token.operation, company_url: started.companyUrl });
-      // A role typed in on LinkedIn may match by name: the company's in HiringPlug, or its page's.
+      // A role typed in on LinkedIn may match by name: the company's in HyPlug, or its page's.
       const names = [started.companyName, company.company_name ?? ""].filter(Boolean);
       for (const check of started.checks) {
         if (stopped()) break;
@@ -123,11 +123,11 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
     <>
       {help && !companion.ready && (
         <div className="info companion-help" role="status">
-          <p><strong>Install the HiringPlug LinkedIn Companion first.</strong> It reads LinkedIn in this browser, with your LinkedIn sign-in; HiringPlug&apos;s server never does.</p>
+          <p><strong>Install the HyPlug LinkedIn Companion first.</strong> It reads LinkedIn in this browser, with your LinkedIn sign-in; HyPlug&apos;s server never does.</p>
           <ol>
             <li><a href="#/companion">Download it and install it</a> in Chrome or Edge (Settings › LinkedIn companion shows how, step by step).</li>
             <li>Sign in to LinkedIn in this browser.</li>
-            <li>On this tab, click the companion&apos;s icon and <em>Connect this HiringPlug</em>, then try again.</li>
+            <li>On this tab, click the companion&apos;s icon and <em>Connect this HyPlug</em>, then try again.</li>
           </ol>
         </div>
       )}

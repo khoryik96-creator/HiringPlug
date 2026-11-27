@@ -750,7 +750,7 @@ components:
       enum: [google_drive, onedrive, dropbox]
     ClaimStorageStatus:
       type: string
-      description: "disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HiringPlug's access: connect the account again."
+      description: "disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HyPlug's access: connect the account again."
       enum: [disconnected, ok, reconnect]
     ClaimStorageOption:
       type: object

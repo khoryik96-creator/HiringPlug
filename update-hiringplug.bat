@@ -1,5 +1,5 @@
 @echo off
-rem Double-click (Windows) to update and start HiringPlug: gets the latest code (if
+rem Double-click (Windows) to update and start HyPlug: gets the latest code (if
 rem git is installed; otherwise pull in GitHub Desktop first), rebuilds what
 rem changed, and opens the app. Your data is kept. Needs Docker Desktop.
 cd /d "%~dp0"
@@ -39,10 +39,10 @@ git pull --ff-only
 if errorlevel 1 echo Could not pull (local changes?). Using the code as it is.
 :build
 
-echo Building and starting HiringPlug (the first time takes a few minutes)...
+echo Building and starting HyPlug (the first time takes a few minutes)...
 docker compose -f deploy/docker-compose.yml up -d --build --remove-orphans
 if not errorlevel 1 goto wait_app
-echo Problem: Docker could not start HiringPlug (see the messages above).
+echo Problem: Docker could not start HyPlug (see the messages above).
 echo If it mentions dockerDesktopLinuxEngine: open Docker Desktop, wait for "Engine running", and run this again.
 pause
 exit /b 1
@@ -55,5 +55,5 @@ for /l %%i in (1,1,60) do (
 )
 :app_ready
 start "" http://localhost:3000
-echo HiringPlug is running at http://localhost:3000 (API docs: http://localhost:8080/docs).
+echo HyPlug is running at http://localhost:3000 (API docs: http://localhost:8080/docs).
 timeout /t 5 >nul

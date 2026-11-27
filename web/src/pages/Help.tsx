@@ -47,7 +47,7 @@ function HelpIndex({ topics, permissions }: { topics: HelpTopic[]; permissions: 
   return (
     <main className="help-page">
       <h2>Help</h2>
-      <p className="muted">Short guides to HiringPlug. Search, or pick a topic. You only see what your role can use.</p>
+      <p className="muted">Short guides to HyPlug. Search, or pick a topic. You only see what your role can use.</p>
       <form role="search" aria-label="Help" onSubmit={(e) => {
         e.preventDefault();
         const first = hits[0];

@@ -115,7 +115,7 @@ func TestMailServerSettings(t *testing.T) {
 
 	_, err = Load(env(map[string]string{
 		"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp", "HP_SMTP_HOST": "smtp.example.com",
-		"HP_SMTP_FROM": "HiringPlug <x@example.com>", "HP_SMTP_TLS": "maybe", "HP_SMTP_PASSWORD": "hunter2",
+		"HP_SMTP_FROM": "HyPlug <x@example.com>", "HP_SMTP_TLS": "maybe", "HP_SMTP_PASSWORD": "hunter2",
 	}))
 	require.Error(t, err)
 	for _, want := range []string{"HP_SMTP_HOST must be host:port", "HP_SMTP_FROM must be an email address", "HP_SMTP_TLS"} {

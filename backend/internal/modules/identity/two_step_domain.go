@@ -82,8 +82,8 @@ func CheckTOTP(secret, code string, now time.Time, lastStep int64) (step int64, 
 // TOTPURI is what an authenticator app scans (otpauth://), naming the company
 // and the person.
 func TOTPURI(secret, company, email string) string {
-	label := url.PathEscape("HiringPlug (" + company + "):" + email)
-	q := url.Values{"secret": {secret}, "issuer": {"HiringPlug"}, "algorithm": {"SHA1"}, "digits": {"6"}, "period": {"30"}}
+	label := url.PathEscape("HyPlug (" + company + "):" + email)
+	q := url.Values{"secret": {secret}, "issuer": {"HyPlug"}, "algorithm": {"SHA1"}, "digits": {"6"}, "period": {"30"}}
 	return "otpauth://totp/" + label + "?" + q.Encode()
 }
 

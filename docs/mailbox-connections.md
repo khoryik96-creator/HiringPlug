@@ -189,7 +189,7 @@ change or remove the company's Microsoft app here (and turning sign-in on
 waits for a change of the app under way). The nginx proxy keeps this callback
 out of its access log too. Single sign-on trusts the organisation's
 administrators: whoever can reset an Entra account's password, or read a
-mailbox (Exchange administrators), can sign in to HiringPlug as the person
+mailbox (Exchange administrators), can sign in to HyPlug as the person
 it is linked to, or use the links emailed to them (see
 [access-control.md](access-control.md#who-is-calling)). See
 [access-control.md](access-control.md#who-is-calling) for how it is checked.
@@ -202,7 +202,7 @@ through the same connection. Outlook Mail uses the existing delegated Microsoft
 permissions. Shared or delegated mailboxes require a separate workflow.
 Hover over an action icon or focus it with Tab to see its label.
 
-HiringPlug discovers visible folders and reads message delta pages in the Go
+HyPlug discovers visible folders and reads message delta pages in the Go
 worker. Initial indexing covers up to 90 days of mail, subject to Microsoft's
 5,000-result limit for filtered delta queries per folder. Drafts are indexed
 without the date filter. Large mailboxes fill in over several background runs.
@@ -214,7 +214,7 @@ a frame of its own. Pictures from the web load as in Outlook, over https and
 without telling their site which page asked; in **Junk Email** they wait for
 **Show pictures**, so a sender of junk cannot tell the message was opened. Open the message in Outlook for linked items, larger files,
 additional attachments or full history. Message details and files are fetched
-when requested. HiringPlug indexes subject, the sender's name, participants,
+when requested. HyPlug indexes subject, the sender's name, participants,
 dates, flag and folder/read state locally and does not store bodies or
 attachment contents in the inbox index.
 
@@ -226,7 +226,7 @@ holds **New mail**, then **Delete** (to Deleted Items), **Archive** and **Mark
 as read/unread** as icons named in tooltips; **Reply**, **Reply all** and
 **Forward** sit as icons beside the sender.
 
-New messages, replies and forwards are written with HiringPlug's email tools:
+New messages, replies and forwards are written with HyPlug's email tools:
 **templates** (use one: it goes above the quoted message, and fills the subject
 of a new message; save what you wrote as a new template, or save changes to the
 one you used, without the quoted message or your signature), a **candidate for
@@ -246,7 +246,7 @@ candidate where it is, with the source Direct (Other, or the first source, if
 the company has no Direct). The button shows how it goes: orange while
 importing, a green outline and **Uploaded** when done, red and **Failed** when
 it failed. Click it for the candidate it became (new, added to the candidate
-with the same email, or already in HiringPlug), or for the reason and **Try
+with the same email, or already in HyPlug), or for the reason and **Try
 again**. The message in the list is outlined the same way, and the icon beside
 Settings counts the CVs imported and failed since you last opened it (the
 browser tab's title shows the counts too). Which message each import came from
@@ -254,7 +254,7 @@ is kept in this browser, per person (its ids, the file's name and the outcome,
 the latest 100); the candidate comes from the import, which **Import profiles**
 also lists. An import cut off before its file was sent (the tab closed) shows
 as failed, to try again. The server's checks apply: the same file already in
-HiringPlug is not imported again, and a CV with a candidate's email joins that
+HyPlug is not imported again, and a CV with a candidate's email joins that
 candidate; unlike **Import profiles**, no question is asked about files that
 share a name with one already there. The Outlook message stays private.
 
@@ -286,8 +286,8 @@ existing email and calendar permissions still use their own consent.
 Name the rule, pick a synced folder by its full folder path, and enter a sender email address, text
 to find in the subject, or both. When you enter both, both must match. Outlook
 adds the rule after your existing rules and applies it to incoming messages.
-It can do this while HiringPlug is closed. Turn rules on or off, or delete
-them, in HiringPlug. Read-only rules and advanced editing are handled in Outlook.
+It can do this while HyPlug is closed. Turn rules on or off, or delete
+them, in HyPlug. Read-only rules and advanced editing are handled in Outlook.
 
 ### Drafts and scheduled email
 
@@ -300,13 +300,13 @@ up to 10 MB. Use the trash icon beside a file to remove it from the draft.
 Adding a file to a new message first saves it to Outlook Drafts. If you change
 attachments on a scheduled message, review the files and update the schedule.
 Use Outlook to edit inline images or a message that is too long to edit in
-HiringPlug.
+HyPlug.
 
-**Write with HiringPlug** opens the ATS email composer within Outlook Mail.
+**Write with HyPlug** opens the ATS email composer within Outlook Mail.
 Use it for templates, signatures, banners, candidate details, CV selection,
 previews, and AI writing help when enabled. When opened from a candidate or
 contact's Outlook conversations, the composer uses that profile's context.
-These emails follow HiringPlug's usual delivery and ATS history rules.
+These emails follow HyPlug's usual delivery and ATS history rules.
 **Send later** is available from native Outlook drafts.
 
 The **Scheduled** list shows the send time in your time zone. Open the draft
@@ -320,12 +320,12 @@ Allowing inbox rules for the same connected mailbox keeps its scheduled sends.
 Reauthorizing the same Outlook mailbox also keeps drafts, schedules and the
 mail index. Use **Next** or **Previous** to see more sends in the Scheduled list.
 
-The HiringPlug Go worker must be running to send at the chosen time.
+The HyPlug Go worker must be running to send at the chosen time.
 If the worker comes back within 24 hours of the send time, it sends the
 reviewed draft after rechecking access and consent for the To, Cc, and Bcc
 addresses, including unlinked recipients. Later sends need review.
-HiringPlug submits the Outlook draft once and checks the same immutable ID
-for its sent copy. If Outlook's response is lost, HiringPlug checks the
+HyPlug submits the Outlook draft once and checks the same immutable ID
+for its sent copy. If Outlook's response is lost, HyPlug checks the
 receipt without resubmitting. **Check Outlook** means the outcome could not
 be confirmed. **Check Outlook again** checks the original message. If Outlook
 still has the draft, you can review it and verify Sent Items before scheduling

@@ -45,7 +45,7 @@ func restoreTarget(t *testing.T) (string, string) {
 // running, done and failed is put back; the ones that would email, call
 // webhooks or update calendars are held; local work runs again; the
 // restore is recorded, from which server to which.
-func TestHpRestoreHoldsWhatActsOutsideHiringPlug(t *testing.T) {
+func TestHpRestoreHoldsWhatActsOutsideHyPlug(t *testing.T) {
 	ctx := context.Background()
 	tenant := testutil.Current.NewTenant(t)
 	admin := testutil.Current.Admin

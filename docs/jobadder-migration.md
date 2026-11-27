@@ -1,4 +1,4 @@
-# JobAdder migration into HiringPlug
+# JobAdder migration into HyPlug
 
 The goal is an external tool that moves approximately 80,000 candidates and
 all obtainable related JobAdder records/files while retaining source values.
@@ -9,7 +9,7 @@ rename statuses, infer employers or run AI enrichment during migration.
 ## Implemented: read-only discovery
 
 `tools/jobadder-migrator` is an independent Go module and executable. It embeds
-a small browser interface, listens on loopback and needs no Docker, HiringPlug
+a small browser interface, listens on loopback and needs no Docker, HyPlug
 database or Python worker. Its initial release provides:
 
 - JobAdder OAuth with state validation, encrypted refresh credentials and an
@@ -57,8 +57,8 @@ flowchart LR
   Raw --> Check[Coverage and integrity reconciliation]
   State --> Check
   Check --> Plan[Reviewed destination projection]
-  Plan --> Import[HiringPlug migration API]
-  Import --> HP[HiringPlug records and relationships]
+  Plan --> Import[HyPlug migration API]
+  Import --> HP[HyPlug records and relationships]
   HP --> Verify[Reconciliation and cutover report]
 ```
 
@@ -93,22 +93,22 @@ counts alone. Do not browse/scrape around API permissions.
 ### 2. Preview the destination without changing source values
 
 Maintain two layers: immutable original JobAdder evidence and a separate,
-versioned HiringPlug projection. Map destination IDs without replacing source
+versioned HyPlug projection. Map destination IDs without replacing source
 IDs, labels or raw values. Unsupported fields remain accessible in source
 metadata or a source-record view; they are not silently discarded. Preserve
 original authors/timestamps even when authors no longer have active accounts.
 
 Use `(source account, entity type, source ID)` as the migration identity.
-An email address is not a safe deduplication key. Existing HiringPlug uniqueness
+An email address is not a safe deduplication key. Existing HyPlug uniqueness
 constraints require explicit conflict handling: show conflicts for review,
 retain the complete source record and do not overwrite an existing candidate
 or company. No automatic merge, typo correction, salary recalculation,
 industry recognition, CV parsing or outgoing emails.
 
-### 3. HiringPlug import boundary
+### 3. HyPlug import boundary
 
 Build an authenticated Go migration module through contracts first, following
-AGENTS.md. The external tool must not write directly to HiringPlug tables.
+AGENTS.md. The external tool must not write directly to HyPlug tables.
 Tenant-scoped permissions, compensation privacy, row-level security and audit
 rules apply to imported records too. Never place salary values in audit logs.
 
@@ -151,4 +151,4 @@ The local interface requires a random session key, rejects other origins/hosts
 and never follows provider redirects with bearer credentials. API business
 calls are GET only; token requests are POST to JobAdder's authorization server.
 There is no telemetry or AI traffic. A Windows package needs only the executable,
-launchers and instructions, not the HiringPlug source tree.
+launchers and instructions, not the HyPlug source tree.

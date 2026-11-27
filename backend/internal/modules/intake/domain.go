@@ -7,7 +7,7 @@ const (
 	Added   = "added"   // the file went to the candidate who already has its email
 	Unread  = "unread"  // a new candidate named after the file; its details could not be read
 	Failed  = "failed"  // not a CV file
-	// Duplicate: exactly a CV already in HiringPlug; skipped, no candidate made.
+	// Duplicate: exactly a CV already in HyPlug; skipped, no candidate made.
 	Duplicate = "duplicate"
 )
 

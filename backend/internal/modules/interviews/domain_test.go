@@ -74,9 +74,9 @@ func TestApplyOutlookChange(t *testing.T) {
 	d := Details{Title: "Technical interview", StartsAt: start, Duration: 45, Mode: "video", Location: ptr("Room 4"), Interviewers: []string{"u1"}, Status: "scheduled"}
 	minutes := func(n int) *int { return &n }
 	_, errs := ApplyOutlookChange(d, OutlookChange{Duration: minutes(4)})
-	assert.Error(t, errs.Err(), "shorter than HiringPlug schedules")
+	assert.Error(t, errs.Err(), "shorter than HyPlug schedules")
 	_, errs = ApplyOutlookChange(d, OutlookChange{Duration: minutes(481)})
-	assert.Error(t, errs.Err(), "longer than HiringPlug schedules")
+	assert.Error(t, errs.Err(), "longer than HyPlug schedules")
 
 	got, errs := ApplyOutlookChange(d, OutlookChange{Title: ptr("   ")})
 	assert.NoError(t, errs.Err())

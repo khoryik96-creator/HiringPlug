@@ -1458,7 +1458,7 @@ dialog.hr-apollo-dialog { width: min(29rem, calc(100% - 2rem)); max-height: calc
 .splitter:focus-visible { outline: none; }
 /* Following a leaver: the companies here that may be their new one, or making it. */
 .follow-choose { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
-/* Find HR › In HiringPlug: the contact they are or may be, with their email */
+/* Find HR › In HyPlug: the contact they are or may be, with their email */
 .hr-match { display: grid; gap: 0.15rem; justify-items: start; min-width: 12rem; }
 .hr-match-name { font-weight: 600; }
 .hr-match-left { color: #b45309; font-weight: 600; }

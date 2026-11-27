@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ -z "${CODESPACE_NAME:-}" ]]; then
-  echo "Run this updater in the HiringPlug GitHub Codespace." >&2
+  echo "Run this updater in the HyPlug GitHub Codespace." >&2
   exit 1
 fi
 
@@ -14,7 +14,7 @@ fi
 
 exec {HIRINGPLUG_CODESPACE_START_FD}>../.hiringplug-codespace.lock
 if ! flock -n "$HIRINGPLUG_CODESPACE_START_FD"; then
-  echo "Waiting for HiringPlug startup or another update to finish…"
+  echo "Waiting for HyPlug startup or another update to finish…"
   flock "$HIRINGPLUG_CODESPACE_START_FD"
 fi
 export HIRINGPLUG_CODESPACE_START_FD

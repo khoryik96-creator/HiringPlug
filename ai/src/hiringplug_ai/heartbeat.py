@@ -1,5 +1,5 @@
 """Says every half minute that the AI worker runs, and which version of
-HiringPlug it runs (the VERSION file), through server_process_seen(): Settings
+HyPlug it runs (the VERSION file), through server_process_seen(): Settings
 > System shows an AI worker that stopped, or one still on the old version
 after an update. A report that fails is logged and tried at the next beat."""
 

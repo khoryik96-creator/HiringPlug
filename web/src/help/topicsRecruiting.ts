@@ -27,7 +27,7 @@ export const RECRUITING_TOPICS: HelpTopic[] = [
           "The icons on the right open Outlook Mail, the Calendar, your notifications (the bell), this help (?) and Settings.",
           "Settings has a search box: type what you want to do, such as \"connect Outlook\" or \"who can see salary\".",
           "On a phone, the pages, your account and Sign out are under the Menu button.",
-          "Your version of HiringPlug is shown beside its name in the top bar.",
+          "Your version of HyPlug is shown beside its name in the top bar.",
         ],
       },
     ],

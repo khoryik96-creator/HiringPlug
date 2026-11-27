@@ -56,7 +56,7 @@ func (s *Storage) spec(provider string) oauthSpec {
 	e := s.config.Endpoints
 	switch provider {
 	case GoogleDrive:
-		// drive.file: only the folders and files HiringPlug makes, nothing else in the drive.
+		// drive.file: only the folders and files HyPlug makes, nothing else in the drive.
 		return oauthSpec{e.GoogleAuthorize, e.GoogleToken, "openid email https://www.googleapis.com/auth/drive.file",
 			url.Values{"access_type": {"offline"}, "prompt": {"consent select_account"}}}
 	case Dropbox:
@@ -96,7 +96,7 @@ func (e *providerError) Error() string {
 	case e.Status == 0:
 		return name + " could not be reached; the upload will be tried again"
 	case e.reconnect():
-		return name + " no longer accepts HiringPlug's access: connect the account again in Settings > Claims storage"
+		return name + " no longer accepts HyPlug's access: connect the account again in Settings > Claims storage"
 	case e.Status == 507 || e.Reason == "insufficient_space" || e.Reason == "storageQuotaExceeded":
 		return name + " is full: free some space, then try the uploads again"
 	}

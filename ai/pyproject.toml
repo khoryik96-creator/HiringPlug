@@ -1,7 +1,7 @@
 [project]
 name = "hiringplug-ai"
 version = "0.1.0"
-description = "HiringPlug AI worker: CV text extraction and OCR now; parsing, formatting and matching next."
+description = "HyPlug AI worker: CV text extraction and OCR now; parsing, formatting and matching next."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

@@ -158,7 +158,7 @@ func (s *Service) save(ctx context.Context, p authz.Principal, id string, versio
 				return apperr.Validation(apperr.FieldErrors{{Field: "teams", Message: "a Teams meeting cannot be removed after creation; cancel the appointment instead"}})
 			}
 			if before.Source != "local" {
-				return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this interview or booking in its original HiringPlug screen, or open an external event in Outlook.")
+				return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this interview or booking in its original HyPlug screen, or open an external event in Outlook.")
 			}
 			row, err = q.UpdateCalendarEvent(ctx, store.UpdateCalendarEventParams{ID: id, ExpectedVersion: int32(version), Title: in.Title, Notes: in.Notes, KeepNotesHtml: in.NotesHTML == nil, NotesHtml: htmlOrNil(in.NotesHTML), Location: in.Location, StartsAt: in.Start, EndsAt: in.End, TimeZone: in.TimeZone, AllDay: in.AllDay, Teams: in.Teams, Attendees: people, SyncStatus: sync}) //nolint:gosec // range checked above
 			if database.IsNoRows(err) {
@@ -199,7 +199,7 @@ func (s *Service) action(ctx context.Context, p authz.Principal, id string, vers
 			return err
 		}
 		if row.Source == invitationSource || row.Source == "outlook" || (!retry && row.Source != "local") {
-			return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this event in its source calendar or HiringPlug screen.")
+			return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this event in its source calendar or HyPlug screen.")
 		}
 		conn, err := q.CalendarConnection(ctx, p.UserID)
 		connected := err == nil

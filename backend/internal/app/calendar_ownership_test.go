@@ -155,7 +155,7 @@ func TestCalendarAJustConnectedCalendarIsNotReportedAsUnsynced(t *testing.T) {
 	assert.Equal(t, 201, res.Status, "%s", res.Body)
 }
 
-// An interviewer taken off a panel is free again as soon as HiringPlug says
+// An interviewer taken off a panel is free again as soon as HyPlug says
 // so, even while Outlook has not yet deleted the copy.
 func TestCalendarARemovedPanelMemberIsFreeBeforeOutlookDeletesTheCopy(t *testing.T) {
 	t.Parallel()

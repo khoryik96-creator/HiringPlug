@@ -181,7 +181,7 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 			}
 			conn, err := q.SaveCalendarConnection(ctx, store.SaveCalendarConnectionParams{SubjectID: profile.ID, Address: profile.Address, AppClientID: app.ClientID, CalendarID: profile.CalendarID, CalendarName: profile.CalendarName, TeamsAvailable: profile.Teams, SealedTokens: sealed})
 			if database.IsUniqueViolation(err, "calendar_account_owner") {
-				return authorizationProblem("This Outlook calendar is already connected to another HiringPlug account in this agency.")
+				return authorizationProblem("This Outlook calendar is already connected to another HyPlug account in this agency.")
 			}
 			if err != nil {
 				return err
@@ -242,7 +242,7 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 }
 func (s *Service) disconnect(ctx context.Context, p authz.Principal) error {
 	return s.network(ctx, p.TenantID, p.UserID, false, func(ctx context.Context, conn *pgx.Conn) error {
-		// The interviews and bookings HiringPlug put into Outlook come out:
+		// The interviews and bookings HyPlug put into Outlook come out:
 		// nothing would update them once disconnected. (Events the person
 		// made themselves stay: they are theirs.) Only those Outlook really
 		// deleted are forgotten; the others keep their link, so reconnecting
@@ -313,7 +313,7 @@ func (s *Service) liveConnection(ctx context.Context, conn *pgx.Conn, p authz.Pr
 	return row, err
 }
 
-// pushedHolds are the interview and booking holds HiringPlug put into c.
+// pushedHolds are the interview and booking holds HyPlug put into c.
 func (s *Service) pushedHolds(ctx context.Context, conn *pgx.Conn, c store.CalendarConnection) ([]store.CalendarEvent, error) {
 	var holds []store.CalendarEvent
 	err := database.InTx(ctx, conn, authz.System(c.TenantID), func(tx pgx.Tx) error {

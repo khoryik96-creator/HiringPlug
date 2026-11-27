@@ -25,7 +25,7 @@ describe("following a contact who left", () => {
     renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
     expect(screen.getByText(/Now Head of HR at/).textContent).toContain("since Sep 2025");
     fireEvent.click(screen.getByRole("button", { name: "Add at Acme Bhd" }));
-    expect(await screen.findByText("Acme Bhd is not in HiringPlug yet.")).toBeTruthy();
+    expect(await screen.findByText("Acme Bhd is not in HyPlug yet.")).toBeTruthy();
     expect(post).not.toHaveBeenCalled(); // nothing made until asked
     fireEvent.click(screen.getByRole("button", { name: "Create Acme Bhd and add them" }));
     expect((await screen.findByRole("status")).textContent).toContain("Added: Ana Lim at Acme Bhd (new company, with a lead note)");

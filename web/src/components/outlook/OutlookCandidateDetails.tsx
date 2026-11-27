@@ -1,4 +1,4 @@
-// Candidates' details in an Outlook message, as HiringPlug's client email
+// Candidates' details in an Outlook message, as HyPlug's client email
 // writes them: a block each (or one table) with the details chosen, salary
 // included for roles that may see salaries, put where the cursor is; and
 // each candidate's CV, attached to the message from their row.

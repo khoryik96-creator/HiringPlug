@@ -59,7 +59,7 @@ var Coverage = []string{
 	"CV/file bytes and versions, folder memberships, company/contact/job/application/placement attachments, invoices, timesheets, rate cards, requisition forms/approval history and other per-record relationships still require deeper inventory.",
 	"Payroll/billing requires candidate-level discovery and is not requested during this count-only inventory; access and coverage have not been verified.",
 	"Email/SMS bodies, complete stage histories, deleted/purged records and any data not exposed to this account require separate access/export checks. Unavailable is never reported as zero.",
-	"Original JSON responses are retained byte for byte. No source fields are mapped, cleaned, merged or sent to AI or HiringPlug.",
+	"Original JSON responses are retained byte for byte. No source fields are mapped, cleaned, merged or sent to AI or HyPlug.",
 	"Known unpaged definition envelopes are counted from their items. Unexpected pagination requires review; record-level custom-field values are not exported by discovery.",
 	"Inventory requests occur at different times; changing counts are not a transactionally consistent JobAdder snapshot.",
 }

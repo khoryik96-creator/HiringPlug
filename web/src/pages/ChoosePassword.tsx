@@ -52,7 +52,7 @@ export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedI
         <h2 className="sign-in-title">Connect Microsoft sign-in</h2>
         {microsoft === "none" ? <p role="alert">{l.companyName} does not sign in with Microsoft any more. <a href="#/">Go to sign in</a></p> : (
           <>
-            <p>Sign in with your Microsoft work account to connect it to your HiringPlug account at <strong>{l.companyName}</strong>. From then on it signs you in.</p>
+            <p>Sign in with your Microsoft work account to connect it to your HyPlug account at <strong>{l.companyName}</strong>. From then on it signs you in.</p>
             <p className="muted">{l.name} · {l.email}</p>
             <MicrosoftButton label="Connect with Microsoft" from={() => ({ invite: token })} />
             <p className="muted small">The link works once. If you did not expect it, close this page and tell an owner.</p>

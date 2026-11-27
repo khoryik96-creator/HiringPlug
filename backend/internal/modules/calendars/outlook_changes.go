@@ -1,6 +1,6 @@
 package calendars
 
-// Changes the organizer makes in Outlook to a meeting HiringPlug sent. An
+// Changes the organizer makes in Outlook to a meeting HyPlug sent. An
 // interview invitation takes them in, and so does its interview (title, place,
 // instructions, time) through the interviews module; nothing is sent back to
 // Outlook, which already sent the update. A deleted invitation, or one whose
@@ -30,7 +30,7 @@ import (
 )
 
 // mergeManaged handles an Outlook change to an invitation or a hold (any
-// source but "local"), once it is known to be new and nothing of HiringPlug's
+// source but "local"), once it is known to be new and nothing of HyPlug's
 // is on its way to Outlook.
 func (s *Service) mergeManaged(ctx context.Context, tx pgx.Tx, tenant string, row store.CalendarEvent, e graphEvent, missingAttendee bool) error {
 	q := store.New(tx)
@@ -48,7 +48,7 @@ func (s *Service) mergeManaged(ctx context.Context, tx pgx.Tx, tenant string, ro
 	known := knownEvent(row)
 	diff := diffOutlook(row, known, e, start, end)
 	if teamsArrived(row, known, e) {
-		// Outlook filled in the Teams meeting HiringPlug asked for: the join
+		// Outlook filled in the Teams meeting HyPlug asked for: the join
 		// details it added to the message, and its Teams place, are no
 		// organizer change (what the organizer changed besides is).
 		diff = withoutTeamsArrival(diff, *known, e)
@@ -114,9 +114,9 @@ func (s *Service) takeHoldChange(ctx context.Context, tx pgx.Tx, row store.Calen
 // interviews and see this one (its candidate in their scope, not binned), and
 // only into a scheduled interview. Otherwise it is as before: a move waits for
 // review, anything else is left. It never waits for the interview's lock: a
-// HiringPlug edit or a calendar job holding it may be waiting for this
+// HyPlug edit or a calendar job holding it may be waiting for this
 // invitation's row, which this refresh may already have written. A busy
-// interview, or one with a HiringPlug change not yet sent, is left for the
+// interview, or one with a HyPlug change not yet sent, is left for the
 // next refresh (when both sides changed, that change meets Outlook's and is
 // flagged for review).
 func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant string, row store.CalendarEvent, e graphEvent, snapshot []byte, known *graphEvent, diff outlookDiff, conflict func() error) error {
@@ -167,10 +167,10 @@ func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant st
 		return err
 	}
 	if !meeting.Scheduled {
-		return notTaken() // completed, no-show or cancelled: HiringPlug no longer schedules it
+		return notTaken() // completed, no-show or cancelled: HyPlug no longer schedules it
 	}
 	if meeting.Version != int(row.SourceVersion) {
-		return nil // a HiringPlug change not projected yet
+		return nil // a HyPlug change not projected yet
 	}
 	body := strings.TrimSpace(e.Body.Content)
 	// Only a plain invitation's message is its instructions: a formatted one
@@ -208,7 +208,7 @@ func (s *Service) takeInvitationChange(ctx context.Context, tx pgx.Tx, tenant st
 				return nil
 			}
 			if diff.Time {
-				return conflict() // a time HiringPlug does not schedule (not scheduled any more, too long)
+				return conflict() // a time HyPlug does not schedule (not scheduled any more, too long)
 			}
 			refused = true
 		} else if err != nil {

@@ -248,7 +248,7 @@ only code that touches it). In CV Studio's own order:
    runs CV Studio's identity sweep over all of the file's text (body,
    headers, footers, properties, link addresses; runs joined as Word shows
    them) and refuses it when the sweep would still change anything; Go then
-   checks it for the candidate's name, email and phone as HiringPlug holds
+   checks it for the candidate's name, email and phone as HyPlug holds
    them, by the same name rules (below), and never saves one that shows them.
    File names follow CV Studio's ("Hyppies CV - Name.docx"): "Contoh
    Recruitment CV - Siti Aisyah.docx", and for a blind CV "Contoh Recruitment

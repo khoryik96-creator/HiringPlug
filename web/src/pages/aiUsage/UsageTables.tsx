@@ -42,7 +42,7 @@ function PersonTable({ usage }: { usage: Usage }) {
         <tbody>
           {usage.byPerson.map((p) => (
             <tr key={p.userId ?? "automatic"}>
-              <td>{p.userId === null ? <span title="What HiringPlug did on its own, e.g. reading CVs as they arrive">Automatic</span> : p.name}</td>
+              <td>{p.userId === null ? <span title="What HyPlug did on its own, e.g. reading CVs as they arrive">Automatic</span> : p.name}</td>
               <td className="num">{allTokens(p.uses)}</td>
               <td className="num">{allTokens(p.tokens)}</td>
               <td className="num">{costText(p.cost, currency)}</td>

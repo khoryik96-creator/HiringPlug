@@ -13,7 +13,7 @@ import { securityHeaders } from "./securityHeaders.ts";
 const api = process.env.HP_DEV_API ?? "http://localhost:8080";
 
 export default defineConfig({
-  // HiringPlug's version (the VERSION file, raised with every update), shown in the top bar.
+  // HyPlug's version (the VERSION file, raised with every update), shown in the top bar.
   define: { __APP_VERSION__: JSON.stringify(readFileSync(new URL("../VERSION", import.meta.url), "utf8").trim()) },
   // The LinkedIn companion, zipped for its download button (Settings › LinkedIn companion).
   plugins: [react(), companionZip(new URL("../extension/linkedin-companion/", import.meta.url).pathname)],

@@ -21,7 +21,7 @@ async function request(path, body) {
         }
         catch {
             if (response.status === 401)
-                message = 'Open HiringPlug Migration.url from your workspace to reconnect this browser.';
+                message = 'Open HyPlug Migration.url from your workspace to reconnect this browser.';
         }
         throw new Error(message);
     }

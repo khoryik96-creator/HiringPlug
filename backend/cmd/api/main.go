@@ -1,4 +1,4 @@
-// Command api serves the HiringPlug HTTP API. Configuration comes from HP_*
+// Command api serves the HyPlug HTTP API. Configuration comes from HP_*
 // environment variables (see .env.example).
 package main
 

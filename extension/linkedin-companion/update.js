@@ -1,5 +1,5 @@
 // The update page: finds the newest companion among the connected
-// HiringPlugs, writes it into the companion's folder (remembered once
+// HyPlugs, writes it into the companion's folder (remembered once
 // chosen) and reloads the companion (see updater.js).
 const {newer, check, widens, folderVersion, write, latest} = globalThis.hiringplugUpdater;
 const $ = id => document.getElementById(id);
@@ -44,7 +44,7 @@ async function checkFolder(dir) {
 }
 
 async function choose() {
-  if (!window.showDirectoryPicker) throw new Error('This browser cannot edit a folder from a page: update it by hand (download it again from HiringPlug).');
+  if (!window.showDirectoryPicker) throw new Error('This browser cannot edit a folder from a page: update it by hand (download it again from HyPlug).');
   const dir = await window.showDirectoryPicker({id: 'hiringplug-companion', mode: 'readwrite'});
   await checkFolder(dir);
   await stored(dir);
@@ -65,10 +65,10 @@ $('update').addEventListener('click', async () => {
     await checkFolder(dir);
     check(offer.bundle);
     const wider = widens(JSON.parse(offer.bundle.files['manifest.json']), chrome.runtime.getManifest());
-    if (wider.length) throw new Error(`This update asks for more access (${wider.join(', ')}): download it from HiringPlug and load it by hand, so the browser shows what it asks for.`);
+    if (wider.length) throw new Error(`This update asks for more access (${wider.join(', ')}): download it from HyPlug and load it by hand, so the browser shows what it asks for.`);
     say(`Writing version ${offer.bundle.version}…`);
     await write(dir, offer.bundle.files);
-    say(`Updated to ${offer.bundle.version}. The companion restarts now: refresh your HiringPlug tabs.`);
+    say(`Updated to ${offer.bundle.version}. The companion restarts now: refresh your HyPlug tabs.`);
     setTimeout(() => chrome.runtime.reload(), 800); // the browser loads the folder again (this tab closes)
   } catch (e) {
     if (e.name !== 'AbortError') say(e.message || String(e), true);
@@ -79,9 +79,9 @@ $('update').addEventListener('click', async () => {
 (async () => {
   await showFolder();
   const origins = (await chrome.storage.local.get('hiringplugOrigins')).hiringplugOrigins || [];
-  if (!origins.length) { $('versions').textContent = `Version ${installed}. Connect a HiringPlug first (the companion's icon on its tab).`; return; }
+  if (!origins.length) { $('versions').textContent = `Version ${installed}. Connect a HyPlug first (the companion's icon on its tab).`; return; }
   const found = await latest(origins);
-  if (!found) { $('versions').textContent = `Version ${installed}. The connected HiringPlug did not answer: try again later.`; return; }
+  if (!found) { $('versions').textContent = `Version ${installed}. The connected HyPlug did not answer: try again later.`; return; }
   if (!newer(found.bundle.version, installed)) { $('versions').textContent = `Version ${installed}: up to date.`; return; }
   const wider = widens(JSON.parse(found.bundle.files['manifest.json']), chrome.runtime.getManifest());
   if (wider.length) {

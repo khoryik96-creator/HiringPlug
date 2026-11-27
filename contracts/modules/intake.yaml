@@ -125,7 +125,7 @@ components:
         file; added = the file went to the candidate who already has its email;
         unread = a new candidate named after the file (its details could not
         be read: fill them in); failed = not a CV file (see error);
-        duplicate = exactly the same file is already in HiringPlug (candidateId
+        duplicate = exactly the same file is already in HyPlug (candidateId
         is whose): skipped, no new candidate.
       enum: [reading, created, added, unread, failed, duplicate]
     CvImportItem:

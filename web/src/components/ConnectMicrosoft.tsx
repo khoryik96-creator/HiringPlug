@@ -26,7 +26,7 @@ export function ConnectMicrosoft({ me }: { me: Schemas["Me"] }) {
       ) : (
         <>
           <p>
-            Connect your Microsoft work account to sign in to HiringPlug with it.
+            Connect your Microsoft work account to sign in to HyPlug with it.
             {me.role === "owner" && " As an owner, you connect it here, once: an account is never connected to an owner just because its email matches."}
           </p>
           {asking ? <Prove hasPassword={me.hasPassword} onCancel={() => { setAsking(false); }} /> : (

@@ -7,12 +7,12 @@ import { companionCan } from "../components/linkedinCompany";
 import "./companionPage.css";
 
 export const COMPANION_DOWNLOAD = "/linkedin-companion.zip";
-/** The version built with this HiringPlug (companionZip.ts). */
+/** The version built with this HyPlug (companionZip.ts). */
 export const COMPANION_LATEST = __COMPANION_VERSION__;
 /** From this version the companion updates itself (its Update page). */
 const SELF_UPDATING = "1.4.0";
 
-/** latest: the version to offer (the one built with this HiringPlug; tests choose another). */
+/** latest: the version to offer (the one built with this HyPlug; tests choose another). */
 export function Companion({ latest = COMPANION_LATEST }: { latest?: string }) {
   const companion = useCompanion();
   const [opened, setOpened] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function Companion({ latest = COMPANION_LATEST }: { latest?: string }) {
       <h2>LinkedIn companion</h2>
       <p className="muted">
         A small add-on for Chrome or Edge. It reads LinkedIn in your own browser, with your own LinkedIn sign-in, to check
-        whether contacts still work at a company and to fill a new company in from its LinkedIn page. HiringPlug&apos;s server
+        whether contacts still work at a company and to fill a new company in from its LinkedIn page. HyPlug&apos;s server
         never reads LinkedIn, and the companion sends no messages.
       </p>
       <section className="panel companion-card" aria-label="Download">
@@ -54,8 +54,8 @@ export function Companion({ latest = COMPANION_LATEST }: { latest?: string }) {
           <li><strong>Unzip</strong> the download (double-click it). Keep the <code>hiringplug-linkedin-companion</code> folder somewhere it can stay, e.g. Documents: the browser runs it from there.</li>
           <li>In Chrome open <code>chrome://extensions</code> (in Edge, <code>edge://extensions</code>) in the address bar.</li>
           <li>Turn on <strong>Developer mode</strong> (top right in Chrome, left side in Edge), then click <strong>Load unpacked</strong> and choose the unzipped folder.</li>
-          <li>Click the puzzle-piece icon beside the address bar and <strong>pin</strong> HiringPlug LinkedIn Companion, so its icon stays in view.</li>
-          <li>Sign in to LinkedIn in this browser. Then come back to this HiringPlug tab, click the companion&apos;s icon and <strong>Connect this HiringPlug</strong>; allow it when the browser asks. The status above turns to “Connected”.</li>
+          <li>Click the puzzle-piece icon beside the address bar and <strong>pin</strong> HyPlug LinkedIn Companion, so its icon stays in view.</li>
+          <li>Sign in to LinkedIn in this browser. Then come back to this HyPlug tab, click the companion&apos;s icon and <strong>Connect this HyPlug</strong>; allow it when the browser asks. The status above turns to “Connected”.</li>
           <li>To <strong>update</strong> it later: <strong>Update the companion</strong> here (it shows when a newer version is ready), or <em>Check for an update</em> under the companion&apos;s icon. The first time, choose the companion&apos;s folder and allow editing it; after that it is one click, and it restarts by itself. (A companion older than {SELF_UPDATING}: download it again, replace the folder&apos;s contents and click ↻ on its card in the extensions page, this last time.)</li>
         </ol>
         <p className="muted small">Once connected: on a company&apos;s contacts, <em>Check employment on LinkedIn</em>; adding a company with its LinkedIn page, <em>Fill in from LinkedIn</em>.</p>

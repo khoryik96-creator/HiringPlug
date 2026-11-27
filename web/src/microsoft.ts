@@ -51,7 +51,7 @@ export async function newBinding(connecting = false): Promise<string> {
 
 function needsHttps(): void {
   if (typeof crypto === "undefined" || !("subtle" in crypto)) {
-    throw new Error("Signing in with Microsoft needs the secure (https) address of HiringPlug.");
+    throw new Error("Signing in with Microsoft needs the secure (https) address of HyPlug.");
   }
 }
 

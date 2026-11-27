@@ -13,7 +13,7 @@ x-module:
       description: Upload candidate documents.
       roles: [owner, admin, recruiter, sourcer]
     documents:delete:
-      description: "Delete formatted CVs (made by HiringPlug); candidates' own CVs are always kept."
+      description: "Delete formatted CVs (made by HyPlug); candidates' own CVs are always kept."
       roles: [owner, admin, recruiter, sourcer]
   errorCodes:
     DOCUMENT_LIMIT:
@@ -120,7 +120,7 @@ paths:
     post:
       operationId: findDocumentMatches
       tags: [documents]
-      summary: CVs already in HiringPlug like the files about to be uploaded
+      summary: CVs already in HyPlug like the files about to be uploaded
       description: >
         For each file (its name and SHA-256, worked out before uploading):
         a CV with exactly the same content (sameContent: skip it), and CVs
@@ -253,7 +253,7 @@ paths:
       operationId: deleteDocument
       tags: [documents]
       summary: Delete a formatted CV (its file and PDF copy too)
-      description: Only CVs HiringPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
+      description: Only CVs HyPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
       x-permission: documents:delete
       responses:
         '204': { description: Deleted }

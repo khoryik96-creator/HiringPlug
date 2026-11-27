@@ -193,7 +193,7 @@ func nullableString(v interface{ Get() (string, error) }) *string {
 	return nil
 }
 
-// hrScanToAPI shows a scan, best first, with who in HiringPlug each person
+// hrScanToAPI shows a scan, best first, with who in HyPlug each person
 // is (the same LinkedIn profile) or may be (the same or a similar name),
 // anywhere in the agency, with that contact's company and email.
 func (s *Service) hrScanToAPI(ctx context.Context, tx pgx.Tx, row store.HrScan) (api.HrScan, error) {

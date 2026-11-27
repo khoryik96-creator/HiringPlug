@@ -63,7 +63,7 @@ test('a role still drawing its dates is waited for, by name too', () => {
   assert.equal(reader.readHRJoined(profile, 'https://www.linkedin.com/company/paynet/', '555', ['Payments Network Malaysia']).wait, 'dates');
 });
 
-// HiringPlug's company reader (company.js) on a LinkedIn companies search, laid
+// HyPlug's company reader (company.js) on a LinkedIn companies search, laid
 // out as LinkedIn draws its result cards (invented companies).
 const companySource = readFileSync(new URL('../company.js', import.meta.url), 'utf8');
 const searchURL = name => 'https://www.linkedin.com/search/results/companies/?keywords=' + encodeURIComponent(name) + '&origin=SWITCH_SEARCH_VERTICAL';

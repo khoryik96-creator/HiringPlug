@@ -137,9 +137,9 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 		return Invitation{}, err
 	}
 	role := strings.ReplaceAll(member.Role, "_", " ")
-	body := "Hello " + member.Name + ",\n\n" + p.Name + " invited you to join " + company.Name + " on HiringPlug as " + role +
-		".\n\nChoose your password here (the link works for 7 days):\n" + link + "\n\nHiringPlug"
-	if err := m.mailer.Notify(ctx, tx, p.TenantID, []string{member.Email}, p.Name+" invited you to "+company.Name+" on HiringPlug", body); err != nil {
+	body := "Hello " + member.Name + ",\n\n" + p.Name + " invited you to join " + company.Name + " on HyPlug as " + role +
+		".\n\nChoose your password here (the link works for 7 days):\n" + link + "\n\nHyPlug"
+	if err := m.mailer.Notify(ctx, tx, p.TenantID, []string{member.Email}, p.Name+" invited you to "+company.Name+" on HyPlug", body); err != nil {
 		return Invitation{}, err
 	}
 	return Invitation{Member: member, Link: link, ExpiresAt: expires, Emailed: true}, nil

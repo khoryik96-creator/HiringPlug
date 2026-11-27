@@ -118,8 +118,8 @@ it("outlines the message a CV came from, and counts imports beside Settings", as
 });
 
 it("puts the counts in the tab's title, and takes them out", () => {
-  expect(titleWithCounts("HiringPlug", { importing: 1, done: 2, failed: 1 })).toBe("(1… 2✓ 1✗) HiringPlug");
-  expect(titleWithCounts("(1… 2✓ 1✗) HiringPlug", { importing: 0, done: 0, failed: 0 })).toBe("HiringPlug");
+  expect(titleWithCounts("HyPlug", { importing: 1, done: 2, failed: 1 })).toBe("(1… 2✓ 1✗) HyPlug");
+  expect(titleWithCounts("(1… 2✓ 1✗) HyPlug", { importing: 0, done: 0, failed: 0 })).toBe("HyPlug");
 });
 
 it("shows an import cut off on its way (the tab closed) as failed, to try again", async () => {
@@ -165,13 +165,13 @@ it("reads finished imports once, not on every page", async () => {
 
 it("takes the counts out of the tab's title when the badge goes (signed out)", async () => {
   serveImport(importItem("created"));
-  document.title = "HiringPlug";
+  document.title = "HyPlug";
   window.localStorage.setItem("hiringplug.outlook.cvImports", JSON.stringify([{ userId: me.user.id, messageId: "omg_test", attachmentId: "cvFile",
     fileName: "Nadia.PDF", status: "failed", error: "Not a CV.", at: "2026-11-20T05:00:00Z", seen: false }]));
   const view = render(<QueryClientProvider client={new QueryClient()}><CvImportIndicator userId={me.user.id} /></QueryClientProvider>);
-  await waitFor(() => { expect(document.title).toBe("(1✗) HiringPlug"); });
+  await waitFor(() => { expect(document.title).toBe("(1✗) HyPlug"); });
   view.unmount();
-  expect(document.title).toBe("HiringPlug");
+  expect(document.title).toBe("HyPlug");
 });
 
 it("downloads every file at once with two or more, and opens a PDF to view instead of downloading it", async () => {

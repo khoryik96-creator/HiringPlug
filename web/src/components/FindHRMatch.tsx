@@ -1,4 +1,4 @@
-// Find HR › In HiringPlug: who a person found is (the same LinkedIn profile)
+// Find HR › In HyPlug: who a person found is (the same LinkedIn profile)
 // or may be (the same or a similar name), anywhere in the agency, with that
 // contact's company and email, so their work email is known before anything
 // is looked up.
@@ -11,7 +11,7 @@ type Person = Schemas["HrScanPerson"];
 type Match = Schemas["HrScanMatch"];
 
 const KIND: Record<Match["kind"], { label: string; tip: string }> = {
-  profile: { label: "In HiringPlug", tip: "A contact with this LinkedIn profile" },
+  profile: { label: "In HyPlug", tip: "A contact with this LinkedIn profile" },
   same_name: { label: "Same name", tip: "A contact with the same name, in any order (titles and bin/binti aside): may be them" },
   similar_name: { label: "Similar name", tip: "A contact whose name is inside this one, or this one inside theirs: may be them" },
 };
@@ -22,11 +22,11 @@ const CHECK: Partial<Record<NonNullable<Match["emailCheckStatus"]>, string>> = {
 
 const stop = (e: MouseEvent) => { e.stopPropagation(); };
 
-/** Their work email is in HiringPlug already: this profile, at this company, a work (not free mail) address. */
+/** Their work email is in HyPlug already: this profile, at this company, a work (not free mail) address. */
 export const workEmailKnown = (p: Person) =>
   !!p.match && p.match.kind === "profile" && p.match.sameCompany && !!p.match.email && !p.match.emailPersonal;
 
-/** The "In HiringPlug" cell: New, or the contact they are or may be, with their email. */
+/** The "In HyPlug" cell: New, or the contact they are or may be, with their email. */
 export function HRMatch({ person }: { person: Person }) {
   const m = person.match;
   if (!m) return <span className="hr-chip new">New</span>;
@@ -49,14 +49,14 @@ export function HRMatch({ person }: { person: Person }) {
   );
 }
 
-/** How many found are in HiringPlug, may be, or are new. */
+/** How many found are in HyPlug, may be, or are new. */
 export function HRMatchSummary({ people }: { people: Person[] }) {
   const known = people.filter((p) => p.match?.kind === "profile").length;
   const maybe = people.filter((p) => p.match && p.match.kind !== "profile").length;
   const emails = people.filter((p) => p.match?.email).length;
   return (
     <span className="muted small hr-match-summary">
-      {known} in HiringPlug · {maybe} may be · {people.length - known - maybe} new{emails > 0 && <> · {emails} with an email</>}
+      {known} in HyPlug · {maybe} may be · {people.length - known - maybe} new{emails > 0 && <> · {emails} with an email</>}
     </span>
   );
 }

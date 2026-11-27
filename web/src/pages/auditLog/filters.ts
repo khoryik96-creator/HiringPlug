@@ -8,7 +8,7 @@ import type { Schemas } from "../../api/client";
 export type Tab = "changes" | "salary";
 export type Filters = { who: string; what: string; from: string; to: string };
 
-/** The actor id of what HiringPlug did on its own. */
+/** The actor id of what HyPlug did on its own. */
 export const AUTOMATIC = "system";
 export const PAGE_SIZE = 50;
 export const auditLogKey = ["audit-log"] as const;

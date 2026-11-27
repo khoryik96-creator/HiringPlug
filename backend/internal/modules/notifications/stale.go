@@ -42,7 +42,7 @@ func DigestWith(items []Item, stale Stale, publicURL string) (subject, body stri
 	note := plural(stale.Contacts+stale.Companies, "record", "records") + " not touched for a year"
 	if !ok {
 		return "This month: " + note, "Good morning." + "\n" + part +
-			"\nTo choose what you get, or stop these emails: Settings > Your account > Notifications.\n\nHiringPlug", true
+			"\nTo choose what you get, or stop these emails: Settings > Your account > Notifications.\n\nHyPlug", true
 	}
 	const foot = "\nTo choose what you get"
 	at := strings.Index(body, foot)

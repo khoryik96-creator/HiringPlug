@@ -2,7 +2,7 @@
 # See contracts/README.md for the format.
 x-module:
   name: identity
-  description: Tenants (companies using HiringPlug), their users, and who is signed in.
+  description: Tenants (companies using HyPlug), their users, and who is signed in.
   permissions:
     identity.team:manage:
       description: Invite people, change roles, deactivate and reactivate users, and put them in teams.
@@ -47,7 +47,7 @@ x-module:
       description: The company requires signing in with Microsoft. Passwords (signing in, password resets and links, sessions signed in with a password) then work only for owners.
     PASSWORD_NOT_SET:
       status: 422
-      description: You sign in with Microsoft and have no HiringPlug password to check or change. A password reset link sets one, unless the company requires Microsoft.
+      description: You sign in with Microsoft and have no HyPlug password to check or change. A password reset link sets one, unless the company requires Microsoft.
     TOO_MANY_ATTEMPTS:
       status: 429
       description: Too many attempts from this address or for this email; wait and try again.
@@ -506,10 +506,10 @@ paths:
       summary: Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners; not yourself)
       description: >-
         For someone whose Microsoft account was unlinked, or whose sign-in
-        name differs from their HiringPlug email. Signing in with Microsoft
+        name differs from their HyPlug email. Signing in with Microsoft
         from the link links the account to them: an account of the company's
         organisation, connected to nobody else there. The link goes only to
-        their HiringPlug email, never to whoever sends it (it would let them
+        their HyPlug email, never to whoever sends it (it would let them
         sign in as that person). Yourself: connect from Your account. A newer
         link replaces the older one. Audited (user.microsoft_reconnect_sent).
       x-permission: identity.team:manage

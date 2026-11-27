@@ -2,7 +2,7 @@
 
 The international (Singapore) endpoint: keys made in Model Studio's
 international console work there, and CVs stay out of mainland China.
-Thinking is off: HiringPlug's prompts ask for short, structured answers, and
+Thinking is off: HyPlug's prompts ask for short, structured answers, and
 some Qwen 3 models refuse a non-streamed request while they think.
 """
 

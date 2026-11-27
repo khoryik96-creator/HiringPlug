@@ -170,7 +170,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
     await waitFor(() => { expect(row("new.pdf").textContent).toContain("Reading…"); });
   });
 
-  it("skips files already in HiringPlug and asks about ones with the same name", async () => {
+  it("skips files already in HyPlug and asks about ones with the same name", async () => {
     reads([]);
     const match = (fileName: string) => ({ documentId: "doc_1", candidateId: "cand_9", candidateName: "Nurul Huda", fileName, createdAt: "2026-11-03T02:00:00Z" });
     const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/document-matches"

@@ -93,7 +93,7 @@ function LeadRow({ lead: l, canManage, open, onSaved, onFindHR }: {
   });
   return (
     <tr className={open ? "lead-open" : undefined}>
-      <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : <><strong>{l.companyName}</strong><div className="muted small">not in HiringPlug yet</div></>}</td>
+      <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : <><strong>{l.companyName}</strong><div className="muted small">not in HyPlug yet</div></>}</td>
       <td>{l.url && /^https?:\/\//i.test(l.url) ? <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a> : l.title}{l.notes && <div className="muted">{l.notes}</div>}</td>
       <td>{l.location}</td>
       <td className="muted">{formatDay((l.postedAt ?? l.firstSeenAt).slice(0, 10))}{l.closedAt && <> · closed</>}</td>

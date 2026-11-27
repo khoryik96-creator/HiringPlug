@@ -189,7 +189,7 @@ function Setup({ storage: s }: { storage: Storage }) {
       </p>
       <ul className="small">
         <li><strong>Google Drive</strong> and <strong>OneDrive</strong> connect through the Google and Microsoft apps in Settings &gt; Email connection.
-          Add the redirect URL above to them; for Google, turn on the Google Drive API. HiringPlug sees only the folders it makes.</li>
+          Add the redirect URL above to them; for Google, turn on the Google Drive API. HyPlug sees only the folders it makes.</li>
         <li><strong>Dropbox</strong> uses the server&apos;s Dropbox app (HP_DROPBOX_APP_KEY and HP_DROPBOX_APP_SECRET), with the
           permissions account_info.read and files.content.write.</li>
       </ul>

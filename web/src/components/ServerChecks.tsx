@@ -21,7 +21,7 @@ function processRow(p: Process, version: string): { look: Look; state: string; d
     case "running":
       return { look: "ok", state: "Running", detail: `Version ${p.version ?? "?"}, started ${p.startedAt ? formatWhen(p.startedAt) : "?"}.` };
     case "old_version":
-      return { look: "bad", state: "Old version", detail: `Runs ${p.version ?? "?"}, the rest of HiringPlug ${version}: restart it after the update.` };
+      return { look: "bad", state: "Old version", detail: `Runs ${p.version ?? "?"}, the rest of HyPlug ${version}: restart it after the update.` };
     case "stopped":
       return { look: "bad", state: "Stopped", detail: `Last checked in ${p.seenAt ? formatWhen(p.seenAt) : "?"}: ${WORK[p.name]}.` };
     case "never_seen":
@@ -52,7 +52,7 @@ export function ServerChecks({ checks }: { checks: Checks }) {
     <section className="panel server-checks" aria-label="Server checks">
       <h3>Server checks</h3>
       <p className={allWell ? "muted" : "warning"} role="status">
-        {allWell ? `All is well. HiringPlug ${checks.version}.` : `Something needs looking at. HiringPlug ${checks.version}.`}
+        {allWell ? `All is well. HyPlug ${checks.version}.` : `Something needs looking at. HyPlug ${checks.version}.`}
       </p>
       <div className="table-scroll">
         <table>

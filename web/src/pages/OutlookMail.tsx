@@ -175,14 +175,14 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
         {folders.map((f) => <option key={f.id} value={f.id}>{f.name}{f.unread > 0 ? ` (${String(f.unread)})` : ""}</option>)}
       </select>}
       <IconActions label="Outlook actions">
-        {data?.enabled && <IconButton label="Write with HiringPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />}
+        {data?.enabled && <IconButton label="Write with HyPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />}
         <IconButton label={scheduled ? "Back to mail" : "Scheduled"} icon={<ClockIcon />} pressed={scheduled}
           onClick={() => { setScheduled(!scheduled); }} />
         {data?.enabled && <>
           {!docked && <IconLink label="Inbox rules" icon={<StepsIcon />} href="#/outlook?rules=1" />}
           <IconButton label="Refresh" icon={<RefreshIcon />} disabled={sync.isPending} onClick={() => { sync.mutate(false); }} />
           {!docked && <IconButton label="Turn off sync" icon={<PowerIcon />} danger disabled={sync.isPending} onClick={() => {
-            if (window.confirm("Turn off Outlook sync? Pending sends will be cancelled and HiringPlug’s profile links removed. Mail and drafts stay in Outlook.")) sync.mutate(true);
+            if (window.confirm("Turn off Outlook sync? Pending sends will be cancelled and HyPlug’s profile links removed. Mail and drafts stay in Outlook.")) sync.mutate(true);
           }} />}
         </>}
       </IconActions>

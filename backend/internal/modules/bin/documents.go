@@ -13,7 +13,7 @@ import (
 )
 
 func (s *Service) recordDocument(ctx context.Context, tx pgx.Tx, tenantID, id, name, actorID string) error {
-	actor := "HiringPlug"
+	actor := "HyPlug"
 	if actorID != "" {
 		names, err := s.deps.Users.UserNames(ctx, tx, []string{actorID})
 		if err != nil {

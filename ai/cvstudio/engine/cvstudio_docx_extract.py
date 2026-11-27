@@ -154,7 +154,7 @@ def _merge_bullet_level_lists(*lists):
     return [{"text": k, "level": v} for k, v in best.items() if v >= 1]
 
 
-# Copied from app.py:12462-12498 (HiringPlug: levels follow how deep each
+# Copied from app.py:12462-12498 (HyPlug: levels follow how deep each
 # bullet sits on the page, not Word's raw level number).
 def _extract_docx_bullet_levels(file_bytes):
     """Map nested list paragraphs to their indent level.

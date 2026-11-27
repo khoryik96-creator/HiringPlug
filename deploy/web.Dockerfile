@@ -5,7 +5,7 @@ WORKDIR /web
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
-# vite.config.ts reads HiringPlug's version (shown in the top bar) and the security headers (for `vite preview`).
+# vite.config.ts reads HyPlug's version (shown in the top bar) and the security headers (for `vite preview`).
 COPY VERSION /VERSION
 COPY deploy/security-headers.conf /deploy/security-headers.conf
 # The LinkedIn companion, zipped into the app for its download button.

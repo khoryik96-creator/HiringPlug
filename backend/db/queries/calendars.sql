@@ -129,7 +129,7 @@ ON CONFLICT(tenant_id,user_id,source,source_id) DO UPDATE SET title=excluded.tit
 -- name: UpdateManagedFromOutlook :exec
 UPDATE calendar_event SET title= @title,notes= @notes,notes_html=CASE WHEN @plain_body::boolean THEN NULL ELSE notes_html END,location= @location,starts_at= @starts_at,ends_at= @ends_at,all_day= @all_day,attendees= @attendees,status= @status,remote_key=sqlc.narg(remote_key),web_url=sqlc.narg(web_url),join_url=sqlc.narg(join_url),version=version+1,sent_version=version+1,remote_snapshot= @remote_snapshot,sync_status='synced',sync_error=NULL WHERE id= @id AND version=sent_version;
 -- name: MarkCalendarConflict :exec
-UPDATE calendar_event SET sync_status='conflict',sync_error='Outlook changed this meeting. Manage its schedule in HiringPlug, or explicitly keep the HiringPlug schedule.',remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot WHERE id= @id;
+UPDATE calendar_event SET sync_status='conflict',sync_error='Outlook changed this meeting. Manage its schedule in HyPlug, or explicitly keep the HyPlug schedule.',remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot WHERE id= @id;
 -- name: RemoteEventsInWindow :many
 SELECT * FROM calendar_event WHERE user_id= @user_id AND remote_connection= @connection_id AND remote_id IS NOT NULL AND starts_at< @to_time::timestamptz AND ends_at> @from_time::timestamptz;
 -- name: RemoveImportedCalendarEvent :exec
@@ -172,7 +172,7 @@ SELECT pg_advisory_unlock(hashtextextended('calendar-network:' || @tenant_id::te
 
 -- name: ClearManagedBusy :exec
 DELETE FROM outlook_busy WHERE user_id= @user_id AND origin='local' AND source= @source AND source_id= @source_id;
--- A hold HiringPlug cancelled frees its time at once, its Outlook copy's too (that copy is being deleted).
+-- A hold HyPlug cancelled frees its time at once, its Outlook copy's too (that copy is being deleted).
 -- name: ClearSourceBusy :exec
 DELETE FROM outlook_busy WHERE user_id= @user_id AND source= @source AND source_id= @source_id;
 -- name: SaveManagedBusy :exec
@@ -184,13 +184,13 @@ SELECT * FROM calendar_connection WHERE user_id= @user_id;
 -- name: PrepareCalendarTargets :exec
 UPDATE calendar_event SET sync_status='pending' WHERE user_id=app_current_user() AND source<>'outlook' AND sync_status='local';
 
--- An Outlook event imported before its HiringPlug receipt arrived (the create
+-- An Outlook event imported before its HyPlug receipt arrived (the create
 -- succeeded but its answer was lost) gives its identity back to the managed row.
 -- name: ReleaseImportedRemote :exec
 DELETE FROM calendar_event WHERE user_id= @user_id AND remote_connection= @connection_id AND remote_id= @remote_id AND source='outlook';
 -- name: ReleaseImportedBusy :exec
 DELETE FROM outlook_busy WHERE user_id= @user_id AND origin='outlook' AND source='outlook' AND source_id= @remote_id;
--- HiringPlug rows not yet tied to an event in this connection: one may own an
+-- HyPlug rows not yet tied to an event in this connection: one may own an
 -- Outlook event its lost receipt never named (matched by transaction ID).
 -- name: UnreceiptedCalendarEvents :many
 SELECT * FROM calendar_event WHERE user_id= @user_id AND source<>'outlook' AND (remote_id IS NULL OR remote_connection IS DISTINCT FROM @connection_id::text) AND updated_at> now()-interval '120 days';
@@ -216,7 +216,7 @@ UPDATE calendar_event SET title= @title,notes= @notes,
  outlook_body=outlook_body OR @outlook_body::boolean,
  location= @location,starts_at= @starts_at,ends_at= @ends_at,attendees= @attendees,
  -- The online meeting as Outlook has it: removed there, its link goes too,
- -- and a later HiringPlug change no longer asks for a Teams meeting.
+ -- and a later HyPlug change no longer asks for a Teams meeting.
  join_url=CASE WHEN @online::boolean THEN coalesce(sqlc.narg(join_url),join_url) END,
  teams=teams AND NOT @teams_off::boolean,web_url=coalesce(sqlc.narg(web_url),web_url),
  remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot,

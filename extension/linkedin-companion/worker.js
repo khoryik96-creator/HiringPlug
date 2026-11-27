@@ -1,19 +1,19 @@
 /*
- * HiringPlug LinkedIn companion: in the recruiter's own browser, reads from a
+ * HyPlug LinkedIn companion: in the recruiter's own browser, reads from a
  * contact's LinkedIn profile the dates of their time at one company, from
  * a company's About page its name, industry, size and website, and pages of
  * a people search at a company (Find HR), the companies a companies search
  * shows for a name (Find HR for a lead), and a person's name and current
  * roles (a new contact), for the
- * HiringPlug address the recruiter connected (and no other site). Adapted
+ * HyPlug address the recruiter connected (and no other site). Adapted
  * from CV Studio's LinkedIn companion (its employment check); reader.js is
  * CV Studio's reader, unchanged.
  *
  * - One read at a time. Each opens LinkedIn in a new background tab that the
  *   companion owns, and closes it afterwards, unless the recruiter looked at
  *   it (then it is theirs and stays open). It never touches other tabs.
- * - Like CV Studio, it puts the HiringPlug tab that asked and the tabs it
- *   opens in one "HiringPlug" tab group (in that window). Grouping is only
+ * - Like CV Studio, it puts the HyPlug tab that asked and the tabs it
+ *   opens in one "HyPlug" tab group (in that window). Grouping is only
  *   for looks: it gives no authority, and a check never fails because of it.
  * - Bounded: up to 100 half-second polls per read, 8 scrolls, 40 reads of
  *   the page; it stops at a sign-in, check or restriction page.
@@ -115,21 +115,21 @@ async function inject(tabId, func, args, message) {
   } catch { throw safeError(message); }
 }
 
-// Puts a tab we opened in the asking HiringPlug tab's group (or a new
-// "HiringPlug" group with it), in the same window only.
+// Puts a tab we opened in the asking HyPlug tab's group (or a new
+// "HyPlug" group with it), in the same window only.
 async function group(tabId, sourceId) {
   if (typeof chrome.tabs.group !== 'function' || typeof chrome.tabGroups?.update !== 'function') return;
   try {
     const tab = await chrome.tabs.get(tabId);
     let anchor = null;
-    try { anchor = await chrome.tabs.get(sourceId); } catch { /* the HiringPlug tab was closed */ }
+    try { anchor = await chrome.tabs.get(sourceId); } catch { /* the HyPlug tab was closed */ }
     if (anchor && anchor.windowId !== tab.windowId) anchor = null;
     if (anchor && Number.isInteger(anchor.groupId) && anchor.groupId >= 0) {
       if (tab.groupId !== anchor.groupId) await chrome.tabs.group({tabIds: [tabId], groupId: anchor.groupId});
       return;
     }
     const groupId = await chrome.tabs.group({tabIds: anchor ? [anchor.id, tabId] : [tabId], createProperties: {windowId: tab.windowId}});
-    await chrome.tabGroups.update(groupId, {title: 'HiringPlug', color: 'purple'});
+    await chrome.tabGroups.update(groupId, {title: 'HyPlug', color: 'purple'});
   } catch { /* only for looks */ }
 }
 
@@ -181,7 +181,7 @@ async function currentRoles(tabId, url, leftCompany) {
 
 // LinkedIn's number for a company, from its People page header.
 async function companyId(op, args) {
-  if (!companyRe.test(args.company_url || '')) throw safeError("Add the company's LinkedIn page in HiringPlug first.");
+  if (!companyRe.test(args.company_url || '')) throw safeError("Add the company's LinkedIn page in HyPlug first.");
   const value = await withTab(op, args.company_url + 'people/', tabId => inject(tabId, expected => {
     try { return globalThis.SourcerReader.readHRCompany(expected, '', true); } catch { return {failed: true}; }
   }, [args.company_url], 'The LinkedIn company page could not be read.'));
@@ -220,7 +220,7 @@ async function peoplePage(op, args) {
   if (!/^[0-9]{1,24}$/.test(args.company_id || '') || !text(args.company_name, 200) || !text(args.query, 300) || !text(args.keywords, 800) ||
       !Number.isInteger(args.page) || args.page < 1 || args.page > 10 ||
       (args.geo_id !== undefined && (!/^[0-9]{1,24}$/.test(args.geo_id) || !text(args.country, 100)))) {
-    throw safeError('Start Find HR from the company in HiringPlug.');
+    throw safeError('Start Find HR from the company in HyPlug.');
   }
   const url = new URL('https://www.linkedin.com/search/results/people/');
   url.searchParams.set('currentCompany', JSON.stringify([args.company_id]));
@@ -255,7 +255,7 @@ async function employment(op, args) {
   if (!profileRe.test(args.url || '') || !companyRe.test(args.company_url || '') || !/^[0-9]{1,24}$/.test(args.company_id || '')) {
     throw safeError('Choose a contact with a LinkedIn profile, at a company with a LinkedIn page.');
   }
-  // The company's names (in HiringPlug, on LinkedIn), for a role linked to no LinkedIn page.
+  // The company's names (in HyPlug, on LinkedIn), for a role linked to no LinkedIn page.
   const names = Array.isArray(args.company_names)
     ? args.company_names.filter(n => typeof n === 'string' && n.trim() && n.length <= 200).slice(0, 3) : [];
   let moves = [];
@@ -266,7 +266,7 @@ async function employment(op, args) {
     }, [args.url, args.company_url, args.company_id, names], 'The LinkedIn profile could not be read.');
     // Every role shown with its dates, none at the company's page: twice in a row, so not a page still drawing.
     if (read?.absent === true) { // (a role matching by name is never absent)
-      if (++absent >= 2) throw safeError("Their LinkedIn Experience shows no role at this company's LinkedIn page, nor one typed in under the company's name. Check the company's LinkedIn page and name in HiringPlug, or update the contact by hand.");
+      if (++absent >= 2) throw safeError("Their LinkedIn Experience shows no role at this company's LinkedIn page, nor one typed in under the company's name. Check the company's LinkedIn page and name in HyPlug, or update the contact by hand.");
       return {loading: true};
     }
     absent = 0;
@@ -291,7 +291,7 @@ async function employment(op, args) {
     ...(value.by_name === true && names.length && now !== null ? {matched_by_name: true} : {}), ...(now === false ? {moved_to: moves} : {})};
 }
 
-// HiringPlug's company reader (company.js) once per page, then the read.
+// HyPlug's company reader (company.js) once per page, then the read.
 async function injectCompany(tabId, func, args, message) {
   try {
     const [present] = await chrome.scripting.executeScript({target: {tabId}, func: () => !!globalThis.HiringplugCompany});
@@ -312,9 +312,9 @@ function companyPage(value) {
 }
 
 // The companies a LinkedIn companies search shows for a name (Find HR for a
-// lead whose company is not in HiringPlug yet): up to five, each with its page.
+// lead whose company is not in HyPlug yet): up to five, each with its page.
 async function companySearch(op, args) {
-  if (typeof args.name !== 'string' || !args.name.trim() || args.name.length > 200) throw safeError('Start the search from HiringPlug.');
+  if (typeof args.name !== 'string' || !args.name.trim() || args.name.length > 200) throw safeError('Start the search from HyPlug.');
   const name = args.name.replace(/\s+/g, ' ').trim();
   const url = new URL('https://www.linkedin.com/search/results/companies/');
   url.searchParams.set('keywords', name);
@@ -336,7 +336,7 @@ async function companySearch(op, args) {
   return {companies};
 }
 
-// What a company's About page says of it, for a new company in HiringPlug.
+// What a company's About page says of it, for a new company in HyPlug.
 async function companyAbout(op, args) {
   if (!companyRe.test(args.company_url || '')) throw safeError("Enter the company's LinkedIn page (linkedin.com/company/…) first.");
   const value = await withTab(op, args.company_url + 'about/', tabId => injectCompany(tabId, u => {
@@ -354,11 +354,11 @@ async function companyAbout(op, args) {
 
 async function handle(message, sender) {
   if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0 || !(await connectedOrigins()).includes(sender.origin)) {
-    throw safeError('Connect this HiringPlug first: click the companion icon in its tab.');
+    throw safeError('Connect this HyPlug first: click the companion icon in its tab.');
   }
   const {action, args = {}} = message || {};
   if (action === 'status') return {version: chrome.runtime.getManifest().version, busy: !!current};
-  if (action === 'openUpdater') { // HiringPlug's "Update the companion": the update page, beside its tab
+  if (action === 'openUpdater') { // HyPlug's "Update the companion": the update page, beside its tab
     await chrome.tabs.create({url: chrome.runtime.getURL('update.html'), windowId: sender.tab.windowId, index: sender.tab.index + 1});
     return true;
   }
@@ -367,7 +367,7 @@ async function handle(message, sender) {
     return true;
   }
   if (!['companyId', 'employment', 'companyAbout', 'companySearch', 'peoplePage', 'profile'].includes(action)) throw safeError('The companion does not know this action. Update it.');
-  if (!operationRe.test(args.operation_id || '')) throw safeError('Start the check from HiringPlug.');
+  if (!operationRe.test(args.operation_id || '')) throw safeError('Start the check from HyPlug.');
   if (current) throw safeError('The companion is busy with another check. Wait for it, or stop it.');
   const op = {operation: args.operation_id, cancelled: false, rolePolls: 0, source: {id: sender.tab.id, windowId: sender.tab.windowId}};
   current = op;

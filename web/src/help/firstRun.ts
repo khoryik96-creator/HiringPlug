@@ -21,7 +21,7 @@ export interface Step {
 export const STEPS: readonly Step[] = [
   {
     id: "company", title: "Add your company's details", action: "Open Invoicing", href: "#/invoicing",
-    text: "Your address, registration and bank details, for the invoices HiringPlug sends. Your agency's name is under Settings › General.",
+    text: "Your address, registration and bank details, for the invoices HyPlug sends. Your agency's name is under Settings › General.",
     needs: ["settings:manage", "placements:read"],
     done: async () => unwrap(await api.GET("/v1/invoice-settings")).version > 0,
   },

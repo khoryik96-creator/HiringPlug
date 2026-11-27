@@ -229,7 +229,7 @@ func (s *Storage) Authorize(ctx context.Context, p authz.Principal, provider str
 }
 
 // Park keeps the code the provider sent back (the callback is public: the
-// browser comes back without HiringPlug's sign-in), for the person who
+// browser comes back without HyPlug's sign-in), for the person who
 // started the sign-in to finish with the ticket returned.
 func (s *Storage) Park(ctx context.Context, state, code, denied string) (string, error) {
 	claim, err := s.readState(state)

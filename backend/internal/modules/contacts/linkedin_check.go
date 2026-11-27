@@ -1,7 +1,7 @@
 package contacts
 
 // LinkedIn checks: where a company's contacts work, read from their LinkedIn
-// profiles by the HiringPlug LinkedIn companion, a browser extension in the
+// profiles by the HyPlug LinkedIn companion, a browser extension in the
 // recruiter's own browser (the server never reads LinkedIn). The server makes
 // one check per contact, bound to the contact, their profile and the
 // company's LinkedIn page; only whoever asked may answer it, within 15
@@ -44,7 +44,7 @@ type LinkedinCheckRequest struct {
 // LinkedinChecks are the checks started for a company (or one contact).
 type LinkedinChecks struct {
 	CompanyURL  string
-	CompanyName string // in HiringPlug, for a role linked to no LinkedIn page
+	CompanyName string // in HyPlug, for a role linked to no LinkedIn page
 	Checks      []LinkedinCheckRequest
 	Skipped     []LinkedinCheckRequest // no usable profile address
 }
@@ -227,7 +227,7 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 	return out, err
 }
 
-// markLeft sets a contact to "has left" if they still work there per HiringPlug,
+// markLeft sets a contact to "has left" if they still work there per HyPlug,
 // at the same company, with the profile the check read.
 func (s *Service) markLeft(ctx context.Context, q *store.Queries, check store.ContactLinkedinCheck) (bool, error) {
 	row, err := q.GetContact(ctx, check.ContactID)

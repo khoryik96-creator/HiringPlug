@@ -1,5 +1,5 @@
 -- contact_linkedin_check: where a contact works, read from their LinkedIn
--- profile by the HiringPlug LinkedIn companion (a browser extension in the
+-- profile by the HyPlug LinkedIn companion (a browser extension in the
 -- recruiter's own browser). The server makes each check, bound to the
 -- contact, their profile and the company's LinkedIn page, and takes back only
 -- the dates of the contact's time at that exact company: joined, left and

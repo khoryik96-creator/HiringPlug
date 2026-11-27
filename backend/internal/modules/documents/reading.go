@@ -45,7 +45,7 @@ const (
 	// server's own "not found", a refused link, and (before 1.47.0) any 404.
 	missingReason = "file missing"
 	expiredReason = "link expired"
-	foreignReason = "other than HiringPlug's file server"
+	foreignReason = "other than HyPlug's file server"
 	legacyMissing = "HTTP 404"
 	legacyGone    = "HTTP 410"
 )

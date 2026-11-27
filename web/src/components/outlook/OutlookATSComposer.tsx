@@ -9,7 +9,7 @@ export function OutlookATSComposer({ profile, permissions, onClose }: {
 }) {
   return <OutlookDialog className="outlook-draft-dialog outlook-ats-compose" labelledBy="outlook-ats-heading" onCancel={onClose}>
     <div className="row spread outlook-draft-head">
-      <h3 id="outlook-ats-heading">Write with HiringPlug</h3>
+      <h3 id="outlook-ats-heading">Write with HyPlug</h3>
       <IconButton label="Close" icon={<CloseIcon />} onClick={onClose} />
     </div>
     <EmailComposer {...profile} iconTools permissions={permissions} canManageTemplates={permissions.includes("emails.templates:manage")}

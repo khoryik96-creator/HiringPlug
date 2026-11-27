@@ -1,4 +1,4 @@
-// Command hp is the HiringPlug admin tool.
+// Command hp is the HyPlug admin tool.
 //
 //	hp migrate                         apply database migrations (uses HP_DATABASE_ADMIN_URL)
 //	hp bootstrap                       migrate, then create/update the login roles in HP_DATABASE_URL and HP_AI_DATABASE_URL

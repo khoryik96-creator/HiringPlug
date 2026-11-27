@@ -17,7 +17,7 @@ x-module:
   errorCodes:
     CALENDAR_EVENT_READ_ONLY:
       status: 409
-      description: Manage linked interviews and bookings in their original HiringPlug screen; external Outlook events
+      description: Manage linked interviews and bookings in their original HyPlug screen; external Outlook events
         are read-only here.
     CALENDAR_NOT_CONNECTED:
       status: 409
@@ -265,7 +265,7 @@ paths:
       operationId: retryCalendarEvent
       tags:
       - calendars
-      summary: Retry a failed write or explicitly keep the HiringPlug schedule after an Outlook change
+      summary: Retry a failed write or explicitly keep the HyPlug schedule after an Outlook change
       x-permission: calendars:use
       responses:
         '200':
@@ -577,7 +577,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting.
+          description: When HyPlug last took a change made in Outlook to this HyPlug-sent meeting.
     CalendarEventList:
       type: object
       required:

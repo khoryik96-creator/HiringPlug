@@ -20,7 +20,7 @@ export function authLinkRoute(hash: string): { kind: "invite" | "reset" | "recon
   return kind && token ? { kind: kind as "invite" | "reset" | "reconnect", token } : null;
 }
 
-// A new browser tab of HiringPlug (a record's tab dragged out, a link opened
+// A new browser tab of HyPlug (a record's tab dragged out, a link opened
 // in a new tab) takes the sign-in of a tab already signed in, asked over this
 // website's own channel (no other website can hear it); with none open, it
 // asks to sign in as before. Closing every tab still signs out.

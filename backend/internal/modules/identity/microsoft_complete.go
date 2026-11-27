@@ -19,10 +19,10 @@ import (
 )
 
 var microsoftMessages = map[string]string{
-	ReasonNotOnTeam:         "Your Microsoft account isn't on the HiringPlug team. Ask an owner to invite you.",
+	ReasonNotOnTeam:         "Your Microsoft account isn't on the HyPlug team. Ask an owner to invite you.",
 	ReasonOtherOrganisation: "This Microsoft account belongs to another organisation. Sign in with your work account at this company.",
 	ReasonPersonalAccount:   "This is a personal Microsoft account. Sign in with your work account.",
-	ReasonConnectFirst: "This Microsoft account has to be connected to your HiringPlug account on purpose before it signs you in: sign in with your password, " +
+	ReasonConnectFirst: "This Microsoft account has to be connected to your HyPlug account on purpose before it signs you in: sign in with your password, " +
 		"then use Your account › Connect Microsoft sign-in, or ask an owner to send you a link to connect it.",
 	ReasonLinkedElsewhere:  "This Microsoft account is already connected to someone else on the team. Use your own work account.",
 	ReasonAlreadyConnected: "Another Microsoft account is already connected to you. Ask an owner to unlink it on the Team page first.",

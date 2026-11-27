@@ -17,7 +17,7 @@ function AppSource({ s }: { s: Settings }) {
     return <p>Uses the Microsoft app already set up for Outlook in <a href="#/email-connection">Settings › Email connection</a>. Add this address to it in Microsoft Entra once (Authentication › Web › Redirect URIs):</p>;
   }
   if (s.appSource === "server") {
-    return <p>Uses this server&apos;s Microsoft app, set up by whoever runs HiringPlug. Ask them to add this address to it in Microsoft Entra once (Authentication › Web › Redirect URIs):</p>;
+    return <p>Uses this server&apos;s Microsoft app, set up by whoever runs HyPlug. Ask them to add this address to it in Microsoft Entra once (Authentication › Web › Redirect URIs):</p>;
   }
   return (
     <p>
@@ -80,13 +80,13 @@ function SettingsForm({ saved }: { saved: Settings }) {
         <CopyButton text={saved.callbackUrl} what="redirect address" />
       </div>
       {/^http:\/\/(?!localhost[:/])/.test(saved.callbackUrl) && (
-        <p className="ms-https">Microsoft accepts only https addresses (localhost aside): HiringPlug needs its https address (HP_PUBLIC_URL) first.</p>
+        <p className="ms-https">Microsoft accepts only https addresses (localhost aside): HyPlug needs its https address (HP_PUBLIC_URL) first.</p>
       )}
       {saved.clientId && <p className="muted small">Application (client) ID: <code>{saved.clientId}</code></p>}
       {saved.acctClaimMissing && (
         <p className="warning ms-claims-warning" role="alert">
           <strong>Add the <code>acct</code> optional claim in Microsoft Entra.</strong> The last sign-in with Microsoft came without it, so
-          HiringPlug cannot tell your organisation&apos;s guests from its members, and links no account to the team by its address:
+          HyPlug cannot tell your organisation&apos;s guests from its members, and links no account to the team by its address:
           people connect theirs from Your account, or with an invitation or a link from the Team page, until it is added
           (App registrations › your app › Token configuration › Add optional claim › ID › <code>acct</code>).
         </p>

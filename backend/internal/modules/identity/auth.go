@@ -272,7 +272,7 @@ func (m *Module) ChangePassword(ctx context.Context, p authz.Principal, current,
 }
 
 func passwordNotSet() error {
-	return apperr.New(api.ErrorCodePASSWORDNOTSET, "You sign in with Microsoft and have no HiringPlug password. To add one, use Forgot password on the sign-in page.")
+	return apperr.New(api.ErrorCodePASSWORDNOTSET, "You sign in with Microsoft and have no HyPlug password. To add one, use Forgot password on the sign-in page.")
 }
 
 // PasswordLink makes a link for a user to choose a password, valid for

@@ -84,7 +84,7 @@ func (s *Service) AddFile(ctx context.Context, p authz.Principal, importID, file
 			msg := "Not a CV file that can be read: PDF, Word, text (.txt, .rtf, .odt) or a picture (PNG, JPG, TIFF, BMP, WEBP)."
 			params.Status, params.Error = Failed, &msg
 		case same: // exactly a CV already here: skipped, linked to whose it is
-			msg := "Already in HiringPlug: the same file as " + sameName + "'s CV (" + sameFile + "). Skipped."
+			msg := "Already in HyPlug: the same file as " + sameName + "'s CV (" + sameFile + "). Skipped."
 			if r := []rune(msg); len(r) > 500 {
 				msg = string(r[:500])
 			}

@@ -1,4 +1,4 @@
-// HiringPlug's email tools in the Outlook Mail editor (new mail, reply,
+// HyPlug's email tools in the Outlook Mail editor (new mail, reply,
 // reply all, forward): templates (use, save, save as new, delete), a
 // candidate whose details fill fields such as [Expected salary], banners,
 // the person's signature (candidates' CVs are attached from their details).
@@ -73,7 +73,7 @@ export function OutlookComposeTools({ data, html, subject, permissions, candidat
     onSuccess: async () => { await client.invalidateQueries({ queryKey: emailTemplatesKey }); setPicked(""); setName(""); },
   });
   return (
-    <fieldset className="full outlook-compose-tools" disabled={disabled} aria-label="HiringPlug tools">
+    <fieldset className="full outlook-compose-tools" disabled={disabled} aria-label="HyPlug tools">
       <div className="row outlook-tools-row">
         <select aria-label="Template" value={picked} onChange={(e) => { choose(e.target.value); }}>
           <option value="">Template…</option>

@@ -89,9 +89,9 @@ func outlookSendDead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
 	}
 	switch row.Status {
 	case "scheduled":
-		return finishOutlookSend(ctx, tx, row, "needs_review", "HiringPlug could not process the scheduled send. Review it before scheduling again.")
+		return finishOutlookSend(ctx, tx, row, "needs_review", "HyPlug could not process the scheduled send. Review it before scheduling again.")
 	case "confirming":
-		return finishOutlookSend(ctx, tx, row, "uncertain", "HiringPlug could not confirm the send. Check Outlook Drafts and Sent Items.")
+		return finishOutlookSend(ctx, tx, row, "uncertain", "HyPlug could not confirm the send. Check Outlook Drafts and Sent Items.")
 	default:
 		return nil
 	}
@@ -254,7 +254,7 @@ func (s *Service) submitOutlookLocked(ctx context.Context, conn *pgx.Conn, tenan
 		switch graph.status {
 		case 429:
 			// Graph explicitly refused this attempt before accepting the message.
-			if err := settleOutlook(ctx, conn, p, row, "scheduled", "Outlook is throttling sends. HiringPlug will retry."); err != nil {
+			if err := settleOutlook(ctx, conn, p, row, "scheduled", "Outlook is throttling sends. HyPlug will retry."); err != nil {
 				return err
 			}
 			return retryOutlook(sendErr)

@@ -93,7 +93,7 @@ func (m *Module) linkMicrosoft(ctx context.Context, tx pgx.Tx, q *store.Queries,
 	if err != nil {
 		return err
 	}
-	return m.mailer.Notify(ctx, tx, u.TenantID, []string{u.Email}, "Microsoft sign-in connected to your HiringPlug account", linkedEmail(u.Name, company.Name, id, how))
+	return m.mailer.Notify(ctx, tx, u.TenantID, []string{u.Email}, "Microsoft sign-in connected to your HyPlug account", linkedEmail(u.Name, company.Name, id, how))
 }
 
 // linkedEmail tells someone a Microsoft account was linked to them.
@@ -108,9 +108,9 @@ func linkedEmail(name, company string, id entra.Identity, how string) string {
 		linkedBySelf:       "from Your account",
 		linkedByReconnect:  "with the link an owner sent you to connect it",
 	}[how]
-	return "Hello " + name + ",\n\nThe Microsoft account " + account + " was connected to your HiringPlug account at " + company +
-		" (" + when + "). It can now sign in to HiringPlug as you.\n\n" +
-		"Not you? Tell an owner at " + company + " at once: they can unlink it on the Team page.\n\nHiringPlug"
+	return "Hello " + name + ",\n\nThe Microsoft account " + account + " was connected to your HyPlug account at " + company +
+		" (" + when + "). It can now sign in to HyPlug as you.\n\n" +
+		"Not you? Tell an owner at " + company + " at once: they can unlink it on the Team page.\n\nHyPlug"
 }
 
 func notWithAPIKey() error {

@@ -233,7 +233,7 @@ func TestOutlookMailSyncActionsAndProfilePrivacy(t *testing.T) {
 	refreshed := listMail(profile, token)
 	require.Len(t, refreshed.Items, 1)
 	require.Equal(t, item.Id, refreshed.Items[0].Id)
-	assert.False(t, refreshed.Items[0].IsRead, "read status changes made in Outlook sync into HiringPlug")
+	assert.False(t, refreshed.Items[0].IsRead, "read status changes made in Outlook sync into HyPlug")
 	require.Equal(t, 204, a.request("DELETE", "/v1/mailbox", token, nil).Status)
 	require.False(t, listMail(root, token).Connected)
 	var count int

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url": "https://www.linkedin.com/company/maju-logistik/about/"}
 // The LinkedIn companion's company.js (extension/linkedin-companion): what a
-// company's About page says of it, for a new company in HiringPlug.
+// company's About page says of it, for a new company in HyPlug.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";

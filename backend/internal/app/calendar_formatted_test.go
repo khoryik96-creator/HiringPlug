@@ -46,7 +46,7 @@ func TestAppointmentsKeepFormattedNotesAndOptionalAttendees(t *testing.T) {
 	for _, bad := range []string{"<script", "onerror", "onclick", "<img", "tracker.test"} {
 		assert.NotContains(t, saved, bad)
 	}
-	assert.Equal(t, "Agenda\nOpen roles\nBrief\nBye", event.Notes, "the plain text, for HiringPlug and Outlook's text")
+	assert.Equal(t, "Agenda\nOpen roles\nBrief\nBye", event.Notes, "the plain text, for HyPlug and Outlook's text")
 	require.Len(t, event.Attendees, 2)
 	assert.Nil(t, event.Attendees[0].Optional)
 	assert.True(t, *event.Attendees[1].Optional)
@@ -136,8 +136,8 @@ func TestInterviewInvitationsCarryAFormattedMessageAndOptionalAttendees(t *testi
 	f.mu.Unlock()
 }
 
-// What Outlook does to an appointment never undoes HiringPlug's formatted
-// notes unless it changed the body itself, and HiringPlug sends the body
+// What Outlook does to an appointment never undoes HyPlug's formatted
+// notes unless it changed the body itself, and HyPlug sends the body
 // again only when it changed it.
 func TestFormattedNotesSurviveOutlookRepliesAndAreSentOnlyWhenChanged(t *testing.T) {
 	t.Parallel()
@@ -192,7 +192,7 @@ func TestFormattedNotesSurviveOutlookRepliesAndAreSentOnlyWhenChanged(t *testing
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	f.mu.Lock()
-	assert.NotContains(t, f.lastPatch, "body", "Outlook's body is not replaced when HiringPlug did not change it")
+	assert.NotContains(t, f.lastPatch, "body", "Outlook's body is not replaced when HyPlug did not change it")
 	f.mu.Unlock()
 	got = read()
 	assert.Equal(t, "<p><b>Agenda</b></p><ul><li>Open roles</li></ul>", got.NotesHtml.MustGet())

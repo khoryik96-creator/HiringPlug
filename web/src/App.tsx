@@ -104,8 +104,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
     <div className={showMailDock ? "app-shell calendar-docked mail-docked" : showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
       <SessionKeeper onSignOut={() => { forgetTabs(); void endSession().finally(onSignOut); }} />
       <header className={menuOpen ? "topbar menu-open" : "topbar"} inert={calendarModal}>
-        <span className="brand">Hiring<span>Plug</span></span>
-        <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>
+        <span className="brand">Hy<span>Plug</span></span>
+        <span className="app-version" title="HyPlug version">v{__APP_VERSION__}</span>
         <MainMenu routes={menu("main", permissions)} current={route.section} />
         <div className="topbar-tools">
           {canUseMail && <a className="settings-link topbar-shortcut" href="#/outlook" aria-label="Outlook" title="Outlook"

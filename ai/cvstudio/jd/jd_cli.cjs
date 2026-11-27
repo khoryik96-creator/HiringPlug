@@ -1,5 +1,5 @@
 'use strict';
-// HiringPlug's adapter (new glue, not CV Studio code): CV Studio's JD blinding
+// HyPlug's adapter (new glue, not CV Studio code): CV Studio's JD blinding
 // functions and prompt, unchanged, for the Python AI worker. It reads one
 // JSON request on stdin, {"op": ..., ...}, and writes one JSON answer.
 //

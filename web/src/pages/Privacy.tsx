@@ -92,7 +92,7 @@ function OpenRequest({ r }: { r: Request }) {
       </div>
       {r.details && <div className="muted small">{r.details}</div>}
       {r.kind === "withdraw_consent" && <div className="muted small">Done also marks them do not contact (emails to them are refused).</div>}
-      {r.kind === "removal" && <div className="muted small">HiringPlug does not delete anything: say below what you did.</div>}
+      {r.kind === "removal" && <div className="muted small">HyPlug does not delete anything: say below what you did.</div>}
       <form className="row" onSubmit={(e) => { e.preventDefault(); decide.mutate({ status: "done", outcome }); }}>
         <input required aria-label="What was done" placeholder="Outcome" maxLength={2000} value={outcome}
           onChange={(e) => { setOutcome(e.target.value); }} />

@@ -2,7 +2,7 @@
 
 Open the calendar icon beside **Settings** to view your private calendar.
 Month, Week, Day and Agenda show local appointments, Outlook events and the
-person's HiringPlug interviews and booked calls. Email connections continue to
+person's HyPlug interviews and booked calls. Email connections continue to
 work independently. **Day** and **Week** show hourly slots in your browser's
 time zone, with all-day events above them. Click an empty hour to start an
 appointment.
@@ -23,7 +23,7 @@ appointment.
    Grant admin consent if the organization requires it. These are user calendar
    permissions, not organization-wide application permissions.
 4. Each person opens Calendar and clicks **Connect Outlook**, approves access
-   and returns to their original signed-in HiringPlug account. Calendar consent
+   and returns to their original signed-in HyPlug account. Calendar consent
    is separate from mailbox consent. Existing email connections need no change.
 
 The connection uses the Microsoft account's editable **default calendar**.
@@ -38,7 +38,7 @@ shared/delegated calendars are not included.
   day through 94 days after it. Manual Refresh queues another read. The screen
   labels this window and warns when navigating beyond it. A full Outlook history
   import and webhook subscriptions are not part of this integration.
-- Outlook events are read-only in HiringPlug; **Open in Outlook** opens them at
+- Outlook events are read-only in HyPlug; **Open in Outlook** opens them at
   their source. Recurring occurrences come from Microsoft's calendarView.
 - **New appointment** and **Schedule interview** open the same Outlook-style
   composer: Send (or Save when no one is invited) and Discard in a toolbar,
@@ -53,13 +53,13 @@ shared/delegated calendars are not included.
   meeting** open the service to make one. The link is kept in the location,
   after the place and separated by ";" as Outlook writes several locations, so
   Outlook and the candidate's calendar show their own Join button and
-  HiringPlug shows **Join Google Meet / Zoom / Teams**. An interview can also
+  HyPlug shows **Join Google Meet / Zoom / Teams**. An interview can also
   be another link, in person (an address) or by phone.
 - The body is formatted as in an email (bold, italic, underline, lists, links,
   fonts and colours, from the email editor's toolbar) and goes to Outlook as
   the event's HTML body, kept to text formatting and links (no images or
-  scripts); HiringPlug keeps its plain text beside it. The body is sent to
-  Outlook only when it was written in HiringPlug, so changing an
+  scripts); HyPlug keeps its plain text beside it. The body is sent to
+  Outlook only when it was written in HyPlug, so changing an
   appointment's time never replaces a body edited in Outlook, and a reply or
   other change in Outlook leaves the formatted notes; a body rewritten in
   Outlook replaces them (as plain text). Attendee addresses are checked as
@@ -79,16 +79,16 @@ shared/delegated calendars are not included.
   contact]) is still in the message. The formatted message is the Outlook
   invitation's body; when it goes with an invitation it is not also stored as
   the interview's instructions, and without one it is. The interview fields a template filled in (time,
-  length, how, where) are marked, and HiringPlug fills them again when the
+  length, how, where) are marked, and HyPlug fills them again when the
   interview moves (even made bold), so the invitation never names its old
   time or place; text typed by hand stays as written, and a message that
   would grow past the size limit stays as it was. A Teams invitation's message stays as it
-  was first sent (Outlook keeps the join details in it, so HiringPlug never
+  was first sent (Outlook keeps the join details in it, so HyPlug never
   replaces it): Outlook still moves the meeting and tells the candidate, and
   the composer says so when such an interview is moved. A sent invitation's
   message and optional attendees are changed in Outlook, not on a retry (the
   same first request again is simply answered); those Outlook changes show in
-  HiringPlug, and a later HiringPlug change keeps the message rewritten there.
+  HyPlug, and a later HyPlug change keeps the message rewritten there.
 - Scheduling an interview with Outlook connected sends the candidate's Outlook
   invitation in the same step (the **Outlook invitation** toggle, its reminder
   and **Email candidate a day before** sit in the toolbar as icons), with any
@@ -96,12 +96,12 @@ shared/delegated calendars are not included.
   cannot be sent (no valid candidate address, for example) the interview is
   still scheduled and the reason is shown; it can be sent later from the
   interview.
-- Own HiringPlug appointments can be created, edited and cancelled. Adding
+- Own HyPlug appointments can be created, edited and cancelled. Adding
   attendees explicitly sends Microsoft invitations; changing or cancelling them
   sends updates/cancellations. The form names these actions. Ordinary appointments
   have no attendees. Local appointments work without a Microsoft connection.
 - Interviews and candidate-booked calls produce private Outlook holds for each
-  active participating HiringPlug user with calendar access. Moves, cancellations
+  active participating HyPlug user with calendar access. Moves, cancellations
   and panel changes update/remove those holds. Holds never invite candidates.
   The existing candidate ICS/email invitation flow remains. A booking host whose
   Outlook is working receives the native hold instead of another ICS email copy;
@@ -112,7 +112,7 @@ shared/delegated calendars are not included.
   interview when the connected default calendar supports Teams. The reminder
   choice sets the Outlook event reminder. Each attendee's calendar keeps its
   own notification settings.
-- HiringPlug updates that invitation when the interview moves (and a move
+- HyPlug updates that invitation when the interview moves (and a move
   made in Outlook moves the interview) and asks Outlook
   to cancel it when the interview is cancelled. The original organizer and
   candidate address are pinned. A disconnected or switched account, a changed
@@ -123,24 +123,24 @@ shared/delegated calendars are not included.
   Microsoft returns the link. The panel's day-before email includes it if the
   link is available when the reminder runs.
 - **Outlook invitation** shows the candidate's latest reply from the organizer's
-  calendar sync (a reply Outlook reports that HiringPlug does not know leaves
+  calendar sync (a reply Outlook reports that HyPlug does not know leaves
   the last one shown). **Email candidate a day before** opts into a separate
   reminder, sent as the organizer's email (from their connected mailbox, else
   the configured mail server; replies go to them) and listed on the candidate's
   Emails tab. The organizer can turn it off
-  from the invitation panel. Moving an interview (in HiringPlug or in Outlook) moves the reminder. At delivery
-  HiringPlug checks the latest schedule, organizer, address, known RSVP, and
+  from the invitation panel. Moving an interview (in HyPlug or in Outlook) moves the reminder. At delivery
+  HyPlug checks the latest schedule, organizer, address, known RSVP, and
   consent. If an interview is first invited within 24 hours, the email can go
   once Outlook confirms the invitation, while the interview is over an hour
   away. The reminder includes the Teams link when available. A reminder no
   longer due is dropped, not listed as a failed email.
 - Deleting a candidate for good (or their pipeline entry) cancels their Outlook
-  invitations, and removes HiringPlug's copy (it holds the candidate's address)
+  invitations, and removes HyPlug's copy (it holds the candidate's address)
   once Outlook confirms. A conflict stays marked once; a sync with nothing new
   in Outlook does not mark it again.
 - An Outlook change to an own appointment is reflected on the next refresh.
   So is a change the organizer makes in Outlook to an interview invitation
-  HiringPlug sent (1.43.0), with nothing sent back: people added or removed
+  HyPlug sent (1.43.0), with nothing sent back: people added or removed
   (other than the candidate), title, place or online link, notes, and time.
   The interview takes the title, place and time, and the notes as its
   instructions for a plain invitation (not a formatted or Teams message); a
@@ -149,13 +149,13 @@ shared/delegated calendars are not included.
   event and the interview show **Changed in Outlook** and when. People added
   in Outlook are on the invitation, not the interview's panel. Deleting the
   invitation in Outlook, removing the candidate from it, or a change made at
-  the same time in HiringPlug is still flagged for review and never cancels
+  the same time in HyPlug is still flagged for review and never cancels
   the interview. A change is taken only while the organizer may still
   schedule interviews and sees the candidate, and only for an interview still
   scheduled (a completed one moved in Outlook is flagged). A booking or panel
   hold keeps a rename, place or notes changed in Outlook (people added there
   stay in Outlook, so a hold made again never invites them); a hold moved or
-  deleted there is flagged (it is one person's copy). **Keep HiringPlug details & sync** explicitly resolves a
+  deleted there is flagged (it is one person's copy). **Keep HyPlug details & sync** explicitly resolves a
   conflict. Concurrent edits use versions and Outlook conditional writes.
 - Booking pages and interview clash checks use Outlook busy intervals. While a
   sync is late, failing or needs reconnecting, the last known busy times still
@@ -171,7 +171,7 @@ shared/delegated calendars are not included.
 - An appointment Outlook has, marked Free there, does not block the time: once
   Outlook shows it, Outlook's busy time governs (the interval kept while it was
   on its way is dropped). Interview and booking holds always block, until
-  HiringPlug takes someone off them: then they are free at once, even while
+  HyPlug takes someone off them: then they are free at once, even while
   Outlook has not deleted its copy yet.
 - A hold whose interview or booking is gone (deleted with its candidate, or a
   link no longer booked) never blocks a time, is hidden from the calendar, and
@@ -184,11 +184,11 @@ shared/delegated calendars are not included.
   moves forward in its source's version: an older job never cancels or brings
   back what a newer one decided.
 
-Disconnect deletes from Outlook the interview and booking holds HiringPlug put
+Disconnect deletes from Outlook the interview and booking holds HyPlug put
 there (nothing would update them afterwards), then removes encrypted tokens,
 the imported Outlook cache and Outlook availability. Appointments the person
 made themselves stay in Outlook. Microsoft has no API to revoke one app's
-refresh token: HiringPlug erases it; to withdraw consent entirely, remove the
+refresh token: HyPlug erases it; to withdraw consent entirely, remove the
 app at myaccount.microsoft.com > Apps (or an admin in Entra). An identity-only
 connection tombstone preserves remote event links for a same-account reconnect.
 Only the holds Outlook confirmed deleted lose their link (and get a new
@@ -199,7 +199,7 @@ the old account only after the new connection is saved, so a switch that fails
 (that calendar is a colleague's) leaves the old Outlook as it was, and makes
 them in the new one; it blocks automatic rerouting of existing
 attendee invitations (review and explicitly retry those from the new account).
-One Outlook calendar can belong to only one HiringPlug user per agency.
+One Outlook calendar can belong to only one HyPlug user per agency.
 
 ## Implementation and privacy
 

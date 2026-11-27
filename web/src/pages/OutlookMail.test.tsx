@@ -119,8 +119,8 @@ it("opens the existing ATS composer and its profile context from Outlook", async
   ));
   const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], fieldValues: {} }));
   renderWithClient(<OutlookMail permissions={["candidates:read", "documents:read", "emails.templates:create"]} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Write with HiringPlug" }));
-  expect(screen.getByRole("dialog", { name: "Write with HiringPlug" })).toBeTruthy();
+  fireEvent.click(await screen.findByRole("button", { name: "Write with HyPlug" }));
+  expect(screen.getByRole("dialog", { name: "Write with HyPlug" })).toBeTruthy();
   expect(screen.getByLabelText("Template")).toBeTruthy();
   expect(screen.getByText("Candidates and CVs (0)")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Preview email" })).toBeTruthy();

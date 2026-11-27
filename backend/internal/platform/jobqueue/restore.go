@@ -19,7 +19,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 )
 
-// Outbound are the kinds held after a restore: they act outside HiringPlug
+// Outbound are the kinds held after a restore: they act outside HyPlug
 // (send, write to another system, spend money), or read another system with
 // the restored sign-ins and act on what they find. Everything else is
 // local (reading CVs, PDF copies, search by meaning, saving results) and

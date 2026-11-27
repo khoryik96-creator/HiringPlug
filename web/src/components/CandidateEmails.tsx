@@ -52,7 +52,7 @@ export function CandidateEmails({ candidateId, email, permissions, writing: cont
 export function SentEmails({ emails }: { emails: Schemas["Email"][] | undefined }) {
   return (
     <>
-      {emails?.length === 0 && <p className="muted">No emails sent from HiringPlug yet.</p>}
+      {emails?.length === 0 && <p className="muted">No emails sent from HyPlug yet.</p>}
       {emails?.map((e) => (
         <details key={e.id} className="email">
           <summary>

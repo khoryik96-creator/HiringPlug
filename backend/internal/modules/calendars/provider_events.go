@@ -221,7 +221,7 @@ func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
 	delete(patch, "transactionId")
 	var sent graphEvent
 	_ = json.Unmarshal(row.RemoteSnapshot, &sent)
-	// Formatted notes are sent only when HiringPlug changed them (Outlook rewrites
+	// Formatted notes are sent only when HyPlug changed them (Outlook rewrites
 	// HTML, so they cannot be compared with what it holds).
 	formatted := row.NotesHtml != nil && *row.NotesHtml != ""
 	// A message rewritten in Outlook stays as Outlook has it.
@@ -231,9 +231,9 @@ func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
 	}
 	// The people of an interview invitation or hold are sent only when they
 	// are not those Outlook last had: people added in Outlook stay, even
-	// those HiringPlug cannot read.
+	// those HyPlug cannot read.
 	if row.Source != "local" && len(row.RemoteSnapshot) > 0 && sent.ID != "" && sameAttendees(sent.attendees(), row.Attendees) ||
-		row.Source == "interview" || row.Source == "booking" { // a hold has no people of HiringPlug's: those added in Outlook stay
+		row.Source == "interview" || row.Source == "booking" { // a hold has no people of HyPlug's: those added in Outlook stay
 		delete(patch, "attendees")
 	}
 	return json.Marshal(patch)

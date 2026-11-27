@@ -175,7 +175,7 @@ describe("company form", () => {
     cleanup();
     renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
     change("LinkedIn page", "linkedin.com/company/maju-logistik");
-    expect(await screen.findByText(/With the HiringPlug LinkedIn companion/, {}, { timeout: 3000 })).toBeTruthy();
+    expect(await screen.findByText(/With the HyPlug LinkedIn companion/, {}, { timeout: 3000 })).toBeTruthy();
   });
 });
 
@@ -204,7 +204,7 @@ describe("Fill in from LinkedIn, by CV Studio's companion rules", () => {
     stopCompanion = fake.stop;
     renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
     change("LinkedIn page", "linkedin.com/company/maju-logistik");
-    expect(await screen.findByText(/Update the HiringPlug LinkedIn companion/)).toBeTruthy();
+    expect(await screen.findByText(/Update the HyPlug LinkedIn companion/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Fill in from LinkedIn" })).toBeNull();
   });
 });

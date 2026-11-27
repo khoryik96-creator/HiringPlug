@@ -1,4 +1,4 @@
-# HiringPlug AI worker (Python)
+# HyPlug AI worker (Python)
 
 Processes jobs on the `ai` queue: reading CVs (text extraction and OCR) now;
 CV parsing, formatting, blind CVs and matching next. See

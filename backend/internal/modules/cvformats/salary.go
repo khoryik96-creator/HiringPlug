@@ -14,7 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salaryview"
 )
 
-// IncludesSalary reports whether a document is a formatted CV HiringPlug
+// IncludesSalary reports whether a document is a formatted CV HyPlug
 // made with the candidate's salary, in the caller's transaction (false for
 // any other document, or one the user may not see).
 func (m *Module) IncludesSalary(ctx context.Context, tx pgx.Tx, documentID string) (bool, error) {

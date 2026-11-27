@@ -1,7 +1,7 @@
 # Apollo Cloudflare Worker
 
 This Worker is based on the broker supplied in the reviewed CV Studio
-handover. HiringPlug uses protocol 2 for work-email lookup and revocation.
+handover. HyPlug uses protocol 2 for work-email lookup and revocation.
 The existing CV Studio routes and D1 schema remain compatible.
 
 For an existing approved broker, deploy `worker.mjs` with Wrangler to the same Worker
@@ -15,7 +15,7 @@ For a new deployment, use a D1 binding named `DB` initialized with
 must contain 64 random hexadecimal digits. Register `PUBLIC_ORIGIN/callback`
 with the approved Apollo OAuth app and keep the key when deploying updates.
 Schedule the Worker's cleanup handler for expired flows, accounts, and
-lookup records. HiringPlug's server settings are in the
+lookup records. HyPlug's server settings are in the
 [setup guide](../../docs/apollo-hr.md).
 
 Run the broker tests with Node 22.13 or newer (they use the built-in

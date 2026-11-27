@@ -62,7 +62,7 @@ export function LinkedinPageFinder({ name, value, onChange, disabled = false }: 
           onClick={() => { search.mutate(); }}>{search.isPending ? "Finding…" : "Find on LinkedIn"}</button>}
       </div>
       {wrong && <p className="warning small">That is not a LinkedIn company page (linkedin.com/company/…).</p>}
-      {companion.ready === false && <p className="muted small">Paste its LinkedIn page. With the LinkedIn companion installed, HiringPlug finds it from the name.</p>}
+      {companion.ready === false && <p className="muted small">Paste its LinkedIn page. With the LinkedIn companion installed, HyPlug finds it from the name.</p>}
       {companion.ready === true && !canSearch && <p className="muted small">Paste its LinkedIn page, or update the LinkedIn companion to {SEARCH_NEEDS} to find it from the name.</p>}
       <ErrorMessage error={search.error} />
       {found?.length === 0 && <p className="muted small">LinkedIn found no company by this name. Paste its page instead.</p>}

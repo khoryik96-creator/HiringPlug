@@ -1,13 +1,15 @@
 /*
- * The companion updates itself from the HiringPlug it is connected to (no
- * store, no download): HiringPlug serves /linkedin-companion.json (the
+ * The companion updates itself from the HyPlug it is connected to (no
+ * store, no download): HyPlug serves /linkedin-companion.json (the
  * version and files built with it); the update page writes those files into
  * the folder the browser loads the companion from (chosen once; the browser
  * asks to allow writing) and reloads it. Only files: nothing fetched is run
  * before the browser loads the folder again, as when updating by hand.
  */
 (() => {
-  const NAME = 'HiringPlug LinkedIn Companion';
+  // The product was renamed HyPlug: the companion's listed name changes once every companion
+  // takes either (from 1.7.0), so an update under either name is this companion.
+  const NAMES = ['HyPlug LinkedIn Companion', 'HiringPlug LinkedIn Companion'];
   // The companion's own kinds of file, in folders of plain names (no "..", no hidden files).
   const PATH = /^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.(js|json|html|css|md|txt)$/i;
 
@@ -24,7 +26,7 @@
   /** The bundle's file paths, once it is known to be this companion at its stated version. */
   function check(bundle) {
     if (!bundle || typeof bundle.version !== 'string' || !/^\d+(\.\d+){0,3}$/.test(bundle.version) || !bundle.files || typeof bundle.files !== 'object') {
-      throw new Error('This HiringPlug did not send a companion to update to.');
+      throw new Error('This HyPlug did not send a companion to update to.');
     }
     const paths = Object.keys(bundle.files);
     for (const p of paths) {
@@ -32,7 +34,7 @@
     }
     let manifest;
     try { manifest = JSON.parse(bundle.files['manifest.json']); } catch { throw new Error('The update has no manifest.'); }
-    if (manifest.name !== NAME || manifest.version !== bundle.version) throw new Error('The update is not this companion.');
+    if (!NAMES.includes(manifest.name) || manifest.version !== bundle.version) throw new Error('The update is not this companion.');
     return paths;
   }
 
@@ -61,7 +63,7 @@
     try {
       const file = await (await dir.getFileHandle('manifest.json')).getFile();
       const manifest = JSON.parse(await file.text());
-      return manifest.name === NAME && typeof manifest.version === 'string' ? manifest.version : null;
+      return NAMES.includes(manifest.name) && typeof manifest.version === 'string' ? manifest.version : null;
     } catch {
       return null;
     }
@@ -112,7 +114,7 @@
     }
   }
 
-  /** The newest companion among the connected HiringPlugs, with where it came from (null if none answered). */
+  /** The newest companion among the connected HyPlugs, with where it came from (null if none answered). */
   async function latest(origins, get = fetch) {
     let best = null;
     for (const origin of origins) {
@@ -122,10 +124,10 @@
         const bundle = await res.json();
         check(bundle);
         if (!best || newer(bundle.version, best.bundle.version)) best = {origin, bundle};
-      } catch { /* that HiringPlug has no companion to offer */ }
+      } catch { /* that HyPlug has no companion to offer */ }
     }
     return best;
   }
 
-  globalThis.hiringplugUpdater = {NAME, newer, check, widens, folderVersion, write, latest};
+  globalThis.hiringplugUpdater = {NAMES, newer, check, widens, folderVersion, write, latest};
 })();

@@ -291,7 +291,7 @@ func TestADeadLinkSaysReadItAgainNotUploadItAgain(t *testing.T) {
 	c := a.createCandidate(token, map[string]any{"firstName": "Ravi"})
 	for reason, want := range map[string]string{
 		"LinkExpiredError: link expired (HTTP 403): the file's link no longer works; read it again":                                  "The file's link expired before the reader could fetch it (the file itself is fine). Read it again.",
-		"DownloadError: download failed: answer 404 from something other than HiringPlug's file server (check HP_INTERNAL_BASE_URL)": "The CV's text could not be read: the reader stopped after several tries. Read it again; if it fails again, upload the file again.",
+		"DownloadError: download failed: answer 404 from something other than HyPlug's file server (check HP_INTERNAL_BASE_URL)": "The CV's text could not be read: the reader stopped after several tries. Read it again; if it fails again, upload the file again.",
 	} {
 		res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.pdf", pdfWith(reason))
 		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)

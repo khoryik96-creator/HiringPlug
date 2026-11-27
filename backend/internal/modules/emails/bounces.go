@@ -1,7 +1,7 @@
 package emails
 
 // Real bounces: after an email goes through a connected Microsoft 365
-// mailbox (which HiringPlug may read), its inbox is looked at twice for
+// mailbox (which HyPlug may read), its inbox is looked at twice for
 // bounce notices ("Undeliverable: ...") naming one of the email's
 // recipients. Those recipients are kept on the email, and their contact's
 // mailbox is marked as bouncing. The notices themselves are not kept.
@@ -39,7 +39,7 @@ var bounceSubject = regexp.MustCompile(`(?i)^\s*(undeliverable|undelivered mail 
 // a plain-text notice); a tag naming one (a mailto: link) is kept, harmlessly.
 var tags = regexp.MustCompile(`(?s)<[^>@]*>`)
 
-// ProviderMicrosoft is the mailbox provider whose inbox HiringPlug may read
+// ProviderMicrosoft is the mailbox provider whose inbox HyPlug may read
 // (Mail.ReadWrite); Gmail and SMTP mailboxes are connected to send only.
 const ProviderMicrosoft = "microsoft"
 
@@ -172,7 +172,7 @@ func (s *Service) bounceNotices(ctx context.Context, sendURL, token string, sinc
 	return out, nil
 }
 
-// readableMailbox returns the mailbox an email went through, if HiringPlug
+// readableMailbox returns the mailbox an email went through, if HyPlug
 // may read its inbox and it is still the sender's.
 func readableMailbox(ctx context.Context, q *store.Queries, e store.Email) (store.EmailMailbox, bool, error) {
 	if e.MailboxRef == nil {
@@ -218,7 +218,7 @@ func (s *Service) scanBounces(ctx context.Context, tx pgx.Tx, job jobqueue.Job) 
 	}
 	row, ok, err := readableMailbox(ctx, q, e)
 	if !ok || err != nil {
-		return err // disconnected since, or a mailbox HiringPlug cannot read
+		return err // disconnected since, or a mailbox HyPlug cannot read
 	}
 	token, err := s.mailboxAccess(ctx, row)
 	if errors.Is(err, mail.ErrPermanent) { // to be connected again: nothing to retry here

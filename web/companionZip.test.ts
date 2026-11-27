@@ -42,7 +42,9 @@ describe("the companion download", () => {
     expect(Object.keys(bundle.files).sort()).toEqual(zipped);
     const manifest = JSON.parse(bundle.files["manifest.json"] ?? "{}") as { version?: string; name?: string };
     expect(bundle.version).toBe(manifest.version);
-    expect(manifest.name).toBe("HiringPlug LinkedIn Companion"); // what the companion's updater accepts
+    // What installed companions' updaters accept: the listed name changes to HyPlug's
+    // once every companion takes either name (1.7.0 onwards).
+    expect(manifest.name).toBe("HiringPlug LinkedIn Companion");
     expect(Object.keys(bundle.files)).toContain("update.html");
     // Every path is one the updater writes (extension/linkedin-companion/updater.js).
     for (const p of Object.keys(bundle.files)) expect(p).toMatch(/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.(js|json|html|css|md|txt)$/i);

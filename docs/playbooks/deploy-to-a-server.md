@@ -1,6 +1,6 @@
-# Put HiringPlug on a server (your agency online)
+# Put HyPlug on a server (your agency online)
 
-This puts HiringPlug on a rented server so your team opens it in the browser
+This puts HyPlug on a rented server so your team opens it in the browser
 from anywhere, at your own web address, with the padlock (HTTPS). It takes an
 afternoon. Your part is creating accounts; the commands below can be copied
 as they are.
@@ -32,7 +32,7 @@ In your domain's DNS settings, add an **A record**: name `app` (or whatever
 you chose), value the server's IP address (from the provider's page). It can
 take up to an hour to work. HTTPS cannot start before it does.
 
-## 3. Install Docker and get HiringPlug
+## 3. Install Docker and get HyPlug
 
 Sign in to the server (the provider shows how: `ssh root@<server-ip>`), then:
 
@@ -112,7 +112,7 @@ Notes:
 sh deploy/update-server.sh
 ```
 
-The first build takes 5–10 minutes. It ends with "HiringPlug is running at
+The first build takes 5–10 minutes. It ends with "HyPlug is running at
 https://app.youragency.com". If a setting is missing or still a practice one,
 the app says which: read it with
 `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml logs api`.
@@ -195,7 +195,7 @@ did:
   every company's, and `hp jobs release -yes` or `hp jobs cancel -yes` (add a
   job's id for one) settles them. After a restore from another server the
   alert email waits until none is held, 72 hours at most. Work that stays
-  inside HiringPlug (reading CVs, PDF copies, search by meaning) runs again
+  inside HyPlug (reading CVs, PDF copies, search by meaning) runs again
   by itself. `hp restore -yes -resume-outbound NAME` lets the outbound kinds
   run at once, and `-resume-paid-ai` the paid AI work (and leaves paid AI
   on): only when you know they did not happen.

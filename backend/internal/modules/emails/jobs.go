@@ -137,7 +137,7 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job, payl
 			return err
 		}
 	}
-	if sendErr == nil && provider == ProviderMicrosoft { // a mailbox HiringPlug may read: look for bounces later
+	if sendErr == nil && provider == ProviderMicrosoft { // a mailbox HyPlug may read: look for bounces later
 		if err := scheduleBounceScans(ctx, tx, job.TenantID, e.ID); err != nil {
 			return err
 		}

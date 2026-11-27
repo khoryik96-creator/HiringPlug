@@ -1,8 +1,8 @@
-// GitHub Codespaces: HiringPlug's Docker stack (the same one a server runs),
+// GitHub Codespaces: HyPlug's Docker stack (the same one a server runs),
 // for trying it out and collecting comments. See
 // docs/playbooks/try-it-on-codespaces.md.
 {
-  "name": "HiringPlug (try it out)",
+  "name": "HyPlug (try it out)",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
@@ -10,7 +10,7 @@
   "hostRequirements": { "cpus": 4, "memory": "8gb", "storage": "32gb" },
   "forwardPorts": [3000, 8025],
   "portsAttributes": {
-    "3000": { "label": "HiringPlug", "onAutoForward": "notify" },
+    "3000": { "label": "HyPlug", "onAutoForward": "notify" },
     "8025": { "label": "Emails the app sent (Mailpit)", "onAutoForward": "silent" }
   },
   "postStartCommand": "bash .devcontainer/start.sh"

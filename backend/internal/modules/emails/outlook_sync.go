@@ -98,7 +98,7 @@ func (s *Service) syncOutlook(ctx context.Context, tx pgx.Tx, job jobqueue.Job) 
 				next = now.Add(20 * time.Second)
 			} else if errors.As(err, &graph) {
 				logx.From(ctx).Warn("outlook mail: sync failed", "mailbox_id", box.ID, "status", graph.status, "reason", outlookReason(graph))
-				message := "Outlook could not sync (" + outlookReason(graph) + "). HiringPlug will retry."
+				message := "Outlook could not sync (" + outlookReason(graph) + "). HyPlug will retry."
 				if graph.status == 401 || graph.status == 403 {
 					message = "Outlook denied mailbox access. Reconnect in Email connection."
 				}

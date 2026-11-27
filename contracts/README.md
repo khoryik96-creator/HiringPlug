@@ -1,6 +1,6 @@
 # The API contract
 
-`contracts/` is the single source of truth for HiringPlug's API and its job
+`contracts/` is the single source of truth for HyPlug's API and its job
 messages. The Go server types, the TypeScript client and the Python models are
 all generated from it, so the three languages cannot disagree.
 

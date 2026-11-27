@@ -1,5 +1,5 @@
 #!/bin/sh
-# On the server: get the latest version and restart HiringPlug with it.
+# On the server: get the latest version and restart HyPlug with it.
 #   sh deploy/update-server.sh
 # Your data is kept (the database, files and backups live in Docker volumes and
 # the backups folder). Settings come from deploy/.env (see
@@ -23,7 +23,7 @@ domain=$(sh deploy/env-value.sh HP_DOMAIN deploy/.env)
 i=0
 while [ "$i" -lt 60 ]; do
   if curl -sf -o /dev/null "https://$domain/health/ready"; then
-    echo "HiringPlug is running at https://$domain"
+    echo "HyPlug is running at https://$domain"
     exit 0
   fi
   i=$((i + 1))

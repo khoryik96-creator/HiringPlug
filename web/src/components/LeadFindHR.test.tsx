@@ -18,8 +18,8 @@ describe("a lead's Find HR panel", () => {
     show();
     expect(screen.getByRole("heading", { name: "Find HR · Contoh Logistik Sdn Bhd" })).toBeTruthy();
     const same = (await screen.findByText("Contoh Logistics Berhad")).closest("li") as HTMLElement;
-    expect(same.textContent).toContain("in HiringPlug · similar name");
-    expect(screen.getByText("in HiringPlug · same name · Shah Alam")).toBeTruthy();
+    expect(same.textContent).toContain("in HyPlug · similar name");
+    expect(screen.getByText("in HyPlug · same name · Shah Alam")).toBeTruthy();
     expect(get).toHaveBeenCalledWith("/v1/companies/named-like", { params: { query: { name: "Contoh Logistik Sdn Bhd" } } });
     // A company with the same name: adding a new one waits behind a link.
     expect(screen.queryByRole("form", { name: "New company" })).toBeNull();
@@ -39,7 +39,7 @@ describe("a lead's Find HR panel", () => {
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...lead, companyId: "comp_9" }));
     show();
     const form = await screen.findByRole("form", { name: "New company" });
-    expect(screen.getByText("No company in HiringPlug has this name or one like it.")).toBeTruthy();
+    expect(screen.getByText("No company in HyPlug has this name or one like it.")).toBeTruthy();
     fireEvent.change(within(form).getByLabelText("Name"), { target: { value: "Contoh Logistik" } });
     expect(within(form).getByRole("heading", { name: "Add Contoh Logistik as a new company" })).toBeTruthy();
     fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/contoh-logistik" } });
@@ -204,7 +204,7 @@ describe("a lead's Find HR panel", () => {
     const form = await screen.findByRole("form", { name: "Its LinkedIn page" });
     fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/contoh-logistik" } });
     fireEvent.click(within(form).getByRole("button", { name: "Save page" }));
-    expect(await within(form).findByText(/Contoh Group in HiringPlug has this LinkedIn page/)).toBeTruthy();
+    expect(await within(form).findByText(/Contoh Group in HyPlug has this LinkedIn page/)).toBeTruthy();
     expect(get).toHaveBeenCalledWith("/v1/companies", { params: { query: { linkedinCompany: "contoh-logistik", limit: 1 } } });
     expect(within(form).getByRole("link", { name: "Open Contoh Group ↗" }).getAttribute("href")).toBe("#/companies/comp_7");
     expect(within(form).getByRole<HTMLButtonElement>("button", { name: "Save page" }).disabled).toBe(true);
@@ -239,7 +239,7 @@ describe("a lead's Find HR panel", () => {
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(company));
     show({ companyId: "comp_1" });
     const form = await screen.findByRole("form", { name: "Its LinkedIn page" });
-    expect(form.textContent).toContain("Its link in HiringPlug, https://lnkd.in/contoh, is not a LinkedIn company page.");
+    expect(form.textContent).toContain("Its link in HyPlug, https://lnkd.in/contoh, is not a LinkedIn company page.");
     fireEvent.change(within(form).getByLabelText("LinkedIn page"), { target: { value: "linkedin.com/company/contoh-logistik" } });
     fireEvent.click(within(form).getByRole("button", { name: "Save page" }));
     expect(await within(form).findByText("Replace https://lnkd.in/contoh with https://www.linkedin.com/company/contoh-logistik/?")).toBeTruthy();

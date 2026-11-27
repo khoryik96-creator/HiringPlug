@@ -129,7 +129,7 @@ describe("back from Microsoft", () => {
     arrive(`ticket=${TICKET}`);
     vi.spyOn(api, "POST").mockResolvedValue(failure("MICROSOFT_SIGN_IN_FAILED", "x", { reason: "not_on_team" }, 401));
     renderWithClient(<MicrosoftSignIn onSignedIn={vi.fn()} />);
-    expect((await screen.findByRole("alert")).textContent).toBe("Your Microsoft account isn't on this HiringPlug team yet. Ask an owner to invite you.");
+    expect((await screen.findByRole("alert")).textContent).toBe("Your Microsoft account isn't on this HyPlug team yet. Ask an owner to invite you.");
   });
 
   it("asks which company for an account at several, and finishes with the new ticket", async () => {
@@ -193,7 +193,7 @@ describe("back from connecting an account (Your account)", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(connected);
     const onSignedIn = vi.fn();
     renderWithClient(<MicrosoftSignIn onSignedIn={onSignedIn} />);
-    expect((await screen.findByText(/Your Microsoft account is connected/)).textContent).toContain("you can sign in to HiringPlug with it");
+    expect((await screen.findByText(/Your Microsoft account is connected/)).textContent).toContain("you can sign in to HyPlug with it");
     expect(post).toHaveBeenCalledTimes(1);
     expect(post.mock.calls[0]?.[0]).toBe("/v1/me/microsoft/complete");
     expect(sentBody(post)).toEqual({ ticket: TICKET, binding: VALUE });

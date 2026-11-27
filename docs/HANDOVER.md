@@ -1,6 +1,6 @@
 # Handover (22 Nov 2026, version 1.37.0)
 
-For the next developer or AI helper picking up HiringPlug, a recruitment
+For the next developer or AI helper picking up HyPlug, a recruitment
 agency system for recruiters in Malaysia. Read in this order:
 
 1. [AGENTS.md](../AGENTS.md): the rules (most enforced by `task verify`).

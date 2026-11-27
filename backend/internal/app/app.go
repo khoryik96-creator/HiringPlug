@@ -1,4 +1,4 @@
-// Package app starts HiringPlug: it reads the configuration, connects to the
+// Package app starts HyPlug: it reads the configuration, connects to the
 // database, wires the modules, and runs either the HTTP API or the worker.
 package app
 

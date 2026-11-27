@@ -94,7 +94,7 @@ func TestFindHRReadsPageByPageResumesWhereAPageFailedAndKnowsWhoIsAContact(t *te
 // the same LinkedIn profile however it is written, the same name in another
 // order or form (bin/binti, Mohd, titles), or one name inside the other, and
 // shows the likeliest contact with their company and email.
-func TestFindHRShowsWhoIsInHiringPlugAndTheirEmail(t *testing.T) {
+func TestFindHRShowsWhoIsInHyPlugAndTheirEmail(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
@@ -125,7 +125,7 @@ func TestFindHRShowsWhoIsInHiringPlugAndTheirEmail(t *testing.T) {
 	kumar := match["Kumar Selvam"]
 	assert.Equal(t, api.HrScanMatchKindProfile, kumar.Kind, "the same profile, whatever its letter case")
 	assert.Equal(t, "kumar@contoh.example", kumar.Email.MustGet())
-	assert.Equal(t, "Contoh Holdings", kumar.CompanyName, "at another company in HiringPlug")
+	assert.Equal(t, "Contoh Holdings", kumar.CompanyName, "at another company in HyPlug")
 	assert.False(t, kumar.SameCompany)
 	assert.Equal(t, "HR Director", kumar.Title.MustGet())
 

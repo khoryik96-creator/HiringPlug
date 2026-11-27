@@ -155,7 +155,7 @@ export function MyTwoStep({ hasPassword = true }: { hasPassword?: boolean }) {
           {" "}{s.recoveryCodesLeft} recovery {s.recoveryCodesLeft === 1 ? "code" : "codes"} left.</>
         : <><span className="badge draft">Off</span> {hasPassword
           ? "Add an authenticator app so a stolen password alone cannot sign in as you."
-          : "You sign in with Microsoft, which checks it is you with your work account's own security (HiringPlug's code is not asked then). Add an app only if you will also sign in with a password."}</>}
+          : "You sign in with Microsoft, which checks it is you with your work account's own security (HyPlug's code is not asked then). Add an app only if you will also sign in with a password."}</>}
         {s.required && <span className="muted"> Your company requires it.</span>}</p>}
       {codes && <RecoveryCodes codes={codes} />}
       {s && mode === "" && (

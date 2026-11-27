@@ -54,7 +54,7 @@ func ReminderText(d Details, app Application, interviewers []string, loc *time.L
 	}
 	b.WriteString("Interviewers: " + strings.Join(interviewers, ", ") + "\n\n")
 	b.WriteString("The candidate's profile and CV, and your feedback after the interview:\n")
-	b.WriteString(publicURL + "/#/candidates/" + app.CandidateID + "\n\nHiringPlug")
+	b.WriteString(publicURL + "/#/candidates/" + app.CandidateID + "\n\nHyPlug")
 	return subject, b.String()
 }
 

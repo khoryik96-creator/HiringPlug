@@ -110,7 +110,7 @@ func asciiJSON(v any) string {
 
 const googleFolder = "application/vnd.google-apps.folder"
 
-// Google Drive: folders are found or made one by one (HiringPlug sees only
+// Google Drive: folders are found or made one by one (HyPlug sees only
 // what it made: the drive.file permission), then the file is uploaded in a
 // resumable session.
 func (s *Storage) putGoogle(ctx context.Context, token string, folders []string, name, contentType string, data []byte) (remoteFile, error) {

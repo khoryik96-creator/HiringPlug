@@ -2,7 +2,7 @@ package calendars
 
 // Formatted notes: what HTML an appointment's or invitation's body may hold
 // (text formatting, lists, alignment and links; nothing that runs or loads
-// from elsewhere), and their plain text, which HiringPlug shows and compares
+// from elsewhere), and their plain text, which HyPlug shows and compares
 // with Outlook's.
 
 import (

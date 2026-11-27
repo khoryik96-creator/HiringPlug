@@ -79,7 +79,7 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 				return err
 			}
 		}
-		// A HiringPlug appointment cancelled here (a panel member taken off, say)
+		// A HyPlug appointment cancelled here (a panel member taken off, say)
 		// no longer counts while its Outlook copy waits to be deleted.
 		if !e.IsCancelled && e.ShowAs != "free" && start.Before(to) && end.After(from) && (unknown || row.Status == "active") {
 			busy.Starts = append(busy.Starts, start)
@@ -180,7 +180,7 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, c store.CalendarCo
 	}
 	// Outlook answers with the body as text. Only a body changed in Outlook since
 	// the last receipt replaces the notes (and their formatting): a reply or
-	// another change leaves HiringPlug's formatted notes as they are.
+	// another change leaves HyPlug's formatted notes as they are.
 	var known graphEvent
 	bodyChanged := strings.TrimSpace(e.Body.Content) != strings.TrimSpace(row.Notes)
 	if json.Unmarshal(row.RemoteSnapshot, &known) == nil && len(row.RemoteSnapshot) > 0 {

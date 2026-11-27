@@ -22,11 +22,11 @@ it("says when an interview invitation was changed in Outlook, and that Outlook's
   const when = `${dateLabel(new Date(invitation.outlookChangedAt ?? ""))} ${timeLabel(invitation.outlookChangedAt ?? "")}`;
   expect(screen.getByText(`Changed in Outlook ${when}`)).toBeTruthy();
   expect(screen.getByText(/panel\.guest@example\.test/)).toBeTruthy();
-  expect(screen.getByText("Changes made in Outlook are taken into the interview on the next refresh. Cancel it in HiringPlug.")).toBeTruthy();
+  expect(screen.getByText("Changes made in Outlook are taken into the interview on the next refresh. Cancel it in HyPlug.")).toBeTruthy();
 });
 
 it("says nothing about Outlook changes for a meeting never changed there", () => {
   renderWithClient(<EventDetails event={{ ...invitation, source: "interview", outlookChangedAt: null }} onClose={none} onEdit={none} onChanged={none} />);
   expect(screen.queryByText(/Changed in Outlook/)).toBeNull();
-  expect(screen.getByText("Change this meeting in its HiringPlug interview or booking link.")).toBeTruthy();
+  expect(screen.getByText("Change this meeting in its HyPlug interview or booking link.")).toBeTruthy();
 });

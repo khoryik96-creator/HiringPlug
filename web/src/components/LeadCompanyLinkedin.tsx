@@ -1,5 +1,5 @@
 // Leads › Find HR: a linked company without a LinkedIn company page in
-// HiringPlug. Its page is pasted or found, checked against the companies that
+// HyPlug. Its page is pasted or found, checked against the companies that
 // have it already, and saved; a link that is not a company page (lnkd.in, a
 // showcase or school page) is shown and replaced only once the user says so.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,7 +14,7 @@ import { LinkedinPageFinder } from "./LinkedinPageFinder";
 export function CompanyLinkedin({ company, canUpdate }: { company: Company; canUpdate: boolean }) {
   const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
-  // A company in HiringPlug has the page chosen already: saving it here would make a second.
+  // A company in HyPlug has the page chosen already: saving it here would make a second.
   const [pageOwner, setPageOwner] = useState<{ page: string; id: string; name: string } | null>(null);
   // The page that would replace the company's link, waiting for a yes.
   const [replacing, setReplacing] = useState<string | null>(null);
@@ -50,11 +50,11 @@ export function CompanyLinkedin({ company, canUpdate }: { company: Company; canU
   const page = companyPage(url);
   const samePage = pageOwner && pageOwner.page === page ? pageOwner : null;
   const confirming = replacing !== null && replacing === page;
-  const notAPage = current && <p className="warning small">Its link in HiringPlug, <code>{current}</code>, is not a LinkedIn company page.</p>;
+  const notAPage = current && <p className="warning small">Its link in HyPlug, <code>{current}</code>, is not a LinkedIn company page.</p>;
   if (!canUpdate) {
     return current
       ? <>{notAPage}<p className="muted small">Changing it needs the permission to edit companies.</p></>
-      : <p className="muted small">{company.name} has no LinkedIn page in HiringPlug yet, and adding it needs the permission to edit companies.</p>;
+      : <p className="muted small">{company.name} has no LinkedIn page in HyPlug yet, and adding it needs the permission to edit companies.</p>;
   }
   return (
     <form className="lead-hr-step" aria-label="Its LinkedIn page" onSubmit={(e) => { e.preventDefault(); save.mutate(false); }}>
@@ -63,7 +63,7 @@ export function CompanyLinkedin({ company, canUpdate }: { company: Company; canU
       <LinkedinPageFinder name={company.name} value={url} onChange={setUrl} disabled={save.isPending} />
       {samePage && (
         <div className="warning small" role="status">
-          <p>{samePage.name} in HiringPlug has this LinkedIn page. Choose another page, or merge the two companies.</p>
+          <p>{samePage.name} in HyPlug has this LinkedIn page. Choose another page, or merge the two companies.</p>
           <a href={`#/companies/${samePage.id}`} target="_blank" rel="noreferrer">Open {samePage.name} ↗</a>
         </div>
       )}

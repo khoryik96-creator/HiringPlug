@@ -365,7 +365,7 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 	}
 	sender := n.SenderName
 	if sender == "" {
-		sender = "HiringPlug"
+		sender = "HyPlug"
 	}
 	sentBy := n.SentBy
 	if n.AccountNotice { // by the system, from the server's mail (Notice.AccountNotice)

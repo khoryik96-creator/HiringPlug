@@ -2,10 +2,10 @@
 # DO NOT EDIT: change those files instead, then run `task gen`.
 openapi: 3.0.3
 info:
-  title: HiringPlug API
+  title: HyPlug API
   version: 0.1.0
   description: |
-    The HiringPlug applicant tracking system API.
+    The HyPlug applicant tracking system API.
 
     **Authentication.** Send `Authorization: Bearer <token>` on every request.
 
@@ -97,7 +97,7 @@ x-error-codes:
   CALENDAR_EVENT_READ_ONLY:
     module: calendars
     status: 409
-    description: Manage linked interviews and bookings in their original HiringPlug screen; external Outlook events are read-only here.
+    description: Manage linked interviews and bookings in their original HyPlug screen; external Outlook events are read-only here.
   CALENDAR_NOT_CONNECTED:
     module: calendars
     status: 409
@@ -301,7 +301,7 @@ x-error-codes:
   PASSWORD_NOT_SET:
     module: identity
     status: 422
-    description: You sign in with Microsoft and have no HiringPlug password to check or change. A password reset link sets one, unless the company requires Microsoft.
+    description: You sign in with Microsoft and have no HyPlug password to check or change. A password reset link sets one, unless the company requires Microsoft.
   PAYLOAD_TOO_LARGE:
     module: shared
     status: 413
@@ -338,7 +338,7 @@ x-error-codes:
     module: shortlists
     status: 422
     description: |
-      The CV chosen for a candidate cannot go to a client: it is not a formatted CV made by HiringPlug, it includes the salary, or it shows the candidate's email or phone. `details.candidateId` names them.
+      The CV chosen for a candidate cannot go to a client: it is not a formatted CV made by HyPlug, it includes the salary, or it shows the candidate's email or phone. `details.candidateId` names them.
   SHORTLIST_DO_NOT_CONTACT:
     module: shortlists
     status: 422
@@ -1275,7 +1275,7 @@ paths:
       operationId: retryCalendarEvent
       tags:
         - calendars
-      summary: Retry a failed write or explicitly keep the HiringPlug schedule after an Outlook change
+      summary: Retry a failed write or explicitly keep the HyPlug schedule after an Outlook change
       x-permission: calendars:use
       responses:
         '200':
@@ -3012,7 +3012,7 @@ paths:
       tags: [contacts]
       summary: Start checking on LinkedIn where a company's contacts (or one contact) work
       description: >
-        For each contact with a LinkedIn profile, a check bound to the contact, their profile and the company's LinkedIn page. The recruiter's HiringPlug LinkedIn companion (a browser extension) reads the dates of their time at that company from the profile and answers each check within 15 minutes. LinkedIn is never read by the server.
+        For each contact with a LinkedIn profile, a check bound to the contact, their profile and the company's LinkedIn page. The recruiter's HyPlug LinkedIn companion (a browser extension) reads the dates of their time at that company from the profile and answers each check within 15 minutes. LinkedIn is never read by the server.
 
       x-permission: contacts:update
       requestBody:
@@ -3501,7 +3501,7 @@ paths:
     post:
       operationId: findDocumentMatches
       tags: [documents]
-      summary: CVs already in HiringPlug like the files about to be uploaded
+      summary: CVs already in HyPlug like the files about to be uploaded
       description: >
         For each file (its name and SHA-256, worked out before uploading): a CV with exactly the same content (sameContent: skip it), and CVs with the same file name (sameName: ask). With candidateId, only that candidate's; without, any candidate's you may see.
 
@@ -3616,7 +3616,7 @@ paths:
       operationId: deleteDocument
       tags: [documents]
       summary: Delete a formatted CV (its file and PDF copy too)
-      description: Only CVs HiringPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
+      description: Only CVs HyPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
       x-permission: documents:delete
       responses:
         '204': {description: Deleted}
@@ -5828,7 +5828,7 @@ paths:
       tags: [identity]
       summary: Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners; not yourself)
       description: >-
-        For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HiringPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
+        For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HyPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HyPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
       x-permission: identity.team:manage
       responses:
         '201':
@@ -11179,7 +11179,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting.
+          description: When HyPlug last took a change made in Outlook to this HyPlug-sent meeting.
     CalendarEventList:
       type: object
       required:
@@ -12271,7 +12271,7 @@ components:
       enum: [google_drive, onedrive, dropbox]
     ClaimStorageStatus:
       type: string
-      description: "disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HiringPlug's access: connect the account again."
+      description: "disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HyPlug's access: connect the account again."
       enum: [disconnected, ok, reconnect]
     ClaimStorageOption:
       type: object
@@ -12884,7 +12884,7 @@ components:
         duplicateName: {type: string, nullable: true}
         match:
           nullable: true
-          description: The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none.
+          description: The contact in HyPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none.
           allOf: [{$ref: '#/components/schemas/HrScanMatch'}]
     HrScanMatch:
       type: object
@@ -12900,9 +12900,9 @@ components:
         name: {type: string}
         title: {type: string, nullable: true}
         companyId: {type: string}
-        companyName: {type: string, description: The company the contact is at in HiringPlug.}
+        companyName: {type: string, description: The company the contact is at in HyPlug.}
         sameCompany: {type: boolean, description: The contact is at the company searched.}
-        email: {type: string, nullable: true, description: Their email in HiringPlug.}
+        email: {type: string, nullable: true, description: Their email in HyPlug.}
         emailCheckStatus:
           nullable: true
           allOf: [{$ref: '#/components/schemas/EmailCheckStatus'}]
@@ -13232,7 +13232,7 @@ components:
       required: [companyUrl, companyName, checks, skipped]
       properties:
         companyUrl: {type: string, description: "The company's LinkedIn page, https://www.linkedin.com/company/.../"}
-        companyName: {type: string, description: "The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name."}
+        companyName: {type: string, description: "The company's name in HyPlug: a role linked to no LinkedIn page may match it by name."}
         checks:
           type: array
           items: {$ref: '#/components/schemas/ContactLinkedinCheckRequest'}
@@ -15662,7 +15662,7 @@ components:
     CvImportItemStatus:
       type: string
       description: >
-        reading = being read; created = a new candidate, filled in from the file; added = the file went to the candidate who already has its email; unread = a new candidate named after the file (its details could not be read: fill them in); failed = not a CV file (see error); duplicate = exactly the same file is already in HiringPlug (candidateId is whose): skipped, no new candidate.
+        reading = being read; created = a new candidate, filled in from the file; added = the file went to the candidate who already has its email; unread = a new candidate named after the file (its details could not be read: fill them in); failed = not a CV file (see error); duplicate = exactly the same file is already in HyPlug (candidateId is whose): skipped, no new candidate.
 
       enum: [reading, created, added, unread, failed, duplicate]
     CvImportItem:
@@ -16163,7 +16163,7 @@ components:
         myFeedbackDue: {type: boolean, description: 'You interview on it, it has taken place, and you have not given feedback.'}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
-        outlookChangedAt: {type: string, format: date-time, nullable: true, description: 'When HiringPlug last took a change its organizer made in Outlook to this interview.'}
+        outlookChangedAt: {type: string, format: date-time, nullable: true, description: 'When HyPlug last took a change its organizer made in Outlook to this interview.'}
     InterviewList:
       type: object
       required: [items]
@@ -18854,7 +18854,7 @@ components:
       type: object
       required: [version, processes, files, freeBytes, totalBytes, problems]
       properties:
-        version: {type: string, description: "The version of HiringPlug the API runs (the VERSION file)."}
+        version: {type: string, description: "The version of HyPlug the API runs (the VERSION file)."}
         processes:
           type: array
           description: The background worker and the AI worker, as each last reported (every half minute).
@@ -18895,7 +18895,7 @@ components:
         held:
           type: array
           description: >-
-            Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany).
+            Jobs a restore held because they act outside HyPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany).
           items: {$ref: '#/components/schemas/HeldJob'}
         heldEveryCompany:
           type: boolean
@@ -19689,7 +19689,7 @@ x-permissions:
     roles: [owner, admin, recruiter, sourcer]
   documents:delete:
     module: documents
-    description: Delete formatted CVs (made by HiringPlug); candidates' own CVs are always kept.
+    description: Delete formatted CVs (made by HyPlug); candidates' own CVs are always kept.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
   documents:read:
@@ -20413,7 +20413,7 @@ x-modules:
   - name: folders
     description: 'Folders of candidates, contacts or companies: each person makes their own, puts records in and takes them out, and may share a folder with others of the same agency, who can then add and remove records too. Only its owner renames, deletes or shares it.'
   - name: identity
-    description: Tenants (companies using HiringPlug), their users, and who is signed in.
+    description: Tenants (companies using HyPlug), their users, and who is signed in.
   - name: industries
     description: Editable industries and subindustries shared by candidates and companies.
   - name: intake

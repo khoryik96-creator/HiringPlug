@@ -64,13 +64,13 @@ HP_DB_API_PASSWORD=<letters and digits>
 HP_DB_AI_PASSWORD=<letters and digits>
 ```
 
-With `HP_ENV=production` HiringPlug refuses to start while any of them is
+With `HP_ENV=production` HyPlug refuses to start while any of them is
 still a published default. `HP_PUBLIC_URL` is the address others type to open
 the app (links in emails use it), e.g. `http://192.168.1.10:3000`: on an
 office network plain http is accepted; an address on the internet must be
 https, with a real mail server (see deploy-to-a-server.md). Set the database passwords before the first start
 (the admin password is fixed when the database is first created; if you set
-HP_DB_ADMIN_PASSWORD later, HiringPlug stops with a message saying so: change
+HP_DB_ADMIN_PASSWORD later, HyPlug stops with a message saying so: change
 it inside the database first, with
 `docker compose -f deploy/docker-compose.yml exec postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<new>'"`). The
 database, the API port and the mail catcher listen on the machine itself only;

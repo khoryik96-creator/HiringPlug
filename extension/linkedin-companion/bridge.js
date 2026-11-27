@@ -1,5 +1,5 @@
 /*
- * Runs on the HiringPlug address the recruiter connected (no other site):
+ * Runs on the HyPlug address the recruiter connected (no other site):
  * passes the page's requests to the companion and its answers back, to this
  * page only. The page asks with window.postMessage(
  *   {source: 'hiringplug-app', type: 'call', id, action, args}, location.origin).

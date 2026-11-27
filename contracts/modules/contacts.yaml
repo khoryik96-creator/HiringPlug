@@ -386,7 +386,7 @@ paths:
       description: >
         For each contact with a LinkedIn profile, a check bound to the contact,
         their profile and the company's LinkedIn page. The recruiter's
-        HiringPlug LinkedIn companion (a browser extension) reads the dates of
+        HyPlug LinkedIn companion (a browser extension) reads the dates of
         their time at that company from the profile and answers each check
         within 15 minutes. LinkedIn is never read by the server.
       x-permission: contacts:update
@@ -811,7 +811,7 @@ components:
         duplicateName: { type: string, nullable: true }
         match:
           nullable: true
-          description: The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none.
+          description: The contact in HyPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none.
           allOf: [{ $ref: '#/components/schemas/HrScanMatch' }]
     HrScanMatch:
       type: object
@@ -829,9 +829,9 @@ components:
         name: { type: string }
         title: { type: string, nullable: true }
         companyId: { type: string }
-        companyName: { type: string, description: The company the contact is at in HiringPlug. }
+        companyName: { type: string, description: The company the contact is at in HyPlug. }
         sameCompany: { type: boolean, description: The contact is at the company searched. }
-        email: { type: string, nullable: true, description: Their email in HiringPlug. }
+        email: { type: string, nullable: true, description: Their email in HyPlug. }
         emailCheckStatus:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/EmailCheckStatus' }]
@@ -1173,7 +1173,7 @@ components:
       required: [companyUrl, companyName, checks, skipped]
       properties:
         companyUrl: { type: string, description: "The company's LinkedIn page, https://www.linkedin.com/company/.../" }
-        companyName: { type: string, description: "The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name." }
+        companyName: { type: string, description: "The company's name in HyPlug: a role linked to no LinkedIn page may match it by name." }
         checks:
           type: array
           items: { $ref: '#/components/schemas/ContactLinkedinCheckRequest' }

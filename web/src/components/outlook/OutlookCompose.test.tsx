@@ -48,7 +48,7 @@ function serve(sig = signature) {
   ));
 }
 
-describe("HiringPlug tools in the Outlook editor", () => {
+describe("HyPlug tools in the Outlook editor", () => {
   it("adds the signature to a new message, with a line above it to write on", async () => {
     serve();
     renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} permissions={["candidates:read"]} />);
@@ -65,7 +65,7 @@ describe("HiringPlug tools in the Outlook editor", () => {
     await waitFor(() => { expect(bodiesTo(post, "/v1/email-previews")).not.toHaveLength(0); });
     expect(bodiesTo(post, "/v1/email-previews")[0]).toMatchObject({ candidateId: "cand_safwat" });
     expect(bodiesTo(post, "/v1/email-previews")[0]).not.toHaveProperty("includeSalary"); // not read until a salary field is in
-    const tools = screen.getByRole("group", { name: "HiringPlug tools" });
+    const tools = screen.getByRole("group", { name: "HyPlug tools" });
     fireEvent.change(await within(tools).findByLabelText("Template"), { target: { value: "etp_profiles" } });
     fireEvent.click(within(tools).getByRole("button", { name: "Use template" }));
     const message = screen.getByRole("textbox", { name: "Message" });

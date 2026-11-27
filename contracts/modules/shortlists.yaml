@@ -24,7 +24,7 @@ x-module:
     SHORTLIST_CV_NOT_SHAREABLE:
       status: 422
       description: >
-        The CV chosen for a candidate cannot go to a client: it is not a formatted CV made by HiringPlug,
+        The CV chosen for a candidate cannot go to a client: it is not a formatted CV made by HyPlug,
         it includes the salary, or it shows the candidate's email or phone. `details.candidateId` names them.
     SHORTLIST_CLOSED:
       status: 409

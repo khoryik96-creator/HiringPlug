@@ -228,7 +228,7 @@ func TestRepairNeverFollowsALinkSwappedInWhileItRuns(t *testing.T) {
 	require.NoError(t, os.Mkdir(sub, 0o755))
 	inner := filepath.Join(sub, "inner")
 	for _, p := range []string{secret, inner} {
-		require.NoError(t, os.WriteFile(p, []byte("not HiringPlug's"), 0o644))
+		require.NoError(t, os.WriteFile(p, []byte("not HyPlug's"), 0o644))
 		require.NoError(t, os.Chmod(p, 0o644))
 	}
 	for _, p := range []string{secret, sub, inner} {

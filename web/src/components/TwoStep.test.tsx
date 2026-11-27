@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 const fill = (label: string, value: string) => { fireEvent.change(screen.getByLabelText(label), { target: { value } }); };
-const setup = { secret: "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", uri: "otpauth://totp/HiringPlug%20%28Contoh%29:siti@contoh.my?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=HiringPlug" };
+const setup = { secret: "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", uri: "otpauth://totp/HyPlug%20%28Contoh%29:siti@contoh.my?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=HyPlug" };
 const session = { token: "tok_9", expiresAt: "2026-11-23T00:00:00Z" };
 
 describe("two-step sign-in", () => {
@@ -101,7 +101,7 @@ describe("your two-step sign-in", () => {
     const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ enabled: false, enabledAt: null, recoveryCodesLeft: 0, required: false }));
     renderWithClient(<MyTwoStep hasPassword={false} />);
     const off = await screen.findByText(/You sign in with Microsoft/);
-    expect(off.textContent).toContain("HiringPlug's code is not asked then");
+    expect(off.textContent).toContain("HyPlug's code is not asked then");
     expect(screen.queryByText(/stolen password/)).toBeNull();
     cleanup();
     get.mockResolvedValue(ok({ enabled: true, enabledAt: "2026-11-20T00:00:00Z", recoveryCodesLeft: 4, required: false }));

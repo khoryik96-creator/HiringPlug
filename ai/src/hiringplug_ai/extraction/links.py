@@ -4,7 +4,7 @@ Many CVs show only the word "LinkedIn" (or an icon) where the address is a
 hyperlink: in a PDF a link annotation (/URI), in Word a hyperlink
 relationship. Kano adds those addresses to the text it reads ("Embedded PDF
 links"), LinkedIn first, so the CV reader finds the profile without an AI.
-HiringPlug does the same for PDF and Word files."""
+HyPlug does the same for PDF and Word files."""
 
 from __future__ import annotations
 

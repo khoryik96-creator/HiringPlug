@@ -138,7 +138,7 @@ func (s *Service) reconcileSource(ctx context.Context, tx pgx.Tx, tenant, kind, 
 // busyRows are when users are busy by their calendars: what Outlook said at
 // its last sync, kept while a sync is late or failing (a broken connection
 // never blocks booking or scheduling; Conflicts reports it instead), and
-// HiringPlug's own appointments. A hold whose interview or booking is gone
+// HyPlug's own appointments. A hold whose interview or booking is gone
 // (deleted with its candidate, say) is ignored and cleared.
 func (s *Service) busyRows(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptKind, exceptID string) ([]store.CalendarBusyRowsRow, error) {
 	q := store.New(tx)

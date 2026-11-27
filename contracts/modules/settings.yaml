@@ -445,7 +445,7 @@ components:
       type: object
       required: [version, processes, files, freeBytes, totalBytes, problems]
       properties:
-        version: { type: string, description: "The version of HiringPlug the API runs (the VERSION file)." }
+        version: { type: string, description: "The version of HyPlug the API runs (the VERSION file)." }
         processes:
           type: array
           description: The background worker and the AI worker, as each last reported (every half minute).
@@ -488,7 +488,7 @@ components:
         held:
           type: array
           description: >-
-            Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks,
+            Jobs a restore held because they act outside HyPlug (emails, calendar updates, webhooks,
             automations...) or ask a paid AI: they run only once released (oldest first, at most 200).
             The company's own; every company's for the agency that runs the server (heldEveryCompany).
           items: { $ref: '#/components/schemas/HeldJob' }

@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Update HiringPlug from main",
+      "label": "Update HyPlug from main",
       "type": "process",
       "command": "bash",
       "args": ["${workspaceFolder}/.devcontainer/update.sh"],

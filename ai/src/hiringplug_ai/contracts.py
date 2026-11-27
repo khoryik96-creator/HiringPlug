@@ -1290,9 +1290,7 @@ class CalendarEvent(BaseModel):
     editable: bool
     outlookChangedAt: Annotated[
         AwareDatetime | None,
-        Field(
-            description="When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting."
-        ),
+        Field(description="When HyPlug last took a change made in Outlook to this HyPlug-sent meeting."),
     ]
 
 
@@ -8492,9 +8490,9 @@ class HrScanMatch(BaseModel):
     name: str
     title: Annotated[str | None, Field(...)]
     companyId: str
-    companyName: Annotated[str, Field(description="The company the contact is at in HiringPlug.")]
+    companyName: Annotated[str, Field(description="The company the contact is at in HyPlug.")]
     sameCompany: Annotated[bool, Field(description="The contact is at the company searched.")]
-    email: Annotated[str | None, Field(description="Their email in HiringPlug.")]
+    email: Annotated[str | None, Field(description="Their email in HyPlug.")]
     emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
     emailPersonal: Annotated[
         bool,
@@ -8555,7 +8553,7 @@ class ContactLinkedinChecksStarted(BaseModel):
     companyName: Annotated[
         str,
         Field(
-            description="The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name."
+            description="The company's name in HyPlug: a role linked to no LinkedIn page may match it by name."
         ),
     ]
     checks: list[ContactLinkedinCheckRequest]
@@ -9235,9 +9233,7 @@ class Interview(BaseModel):
     updatedAt: AwareDatetime
     outlookChangedAt: Annotated[
         AwareDatetime | None,
-        Field(
-            description="When HiringPlug last took a change its organizer made in Outlook to this interview."
-        ),
+        Field(description="When HyPlug last took a change its organizer made in Outlook to this interview."),
     ]
 
 
@@ -9892,7 +9888,7 @@ class BookingLink(BaseModel):
 
 
 class ServerChecks(BaseModel):
-    version: Annotated[str, Field(description="The version of HiringPlug the API runs (the VERSION file).")]
+    version: Annotated[str, Field(description="The version of HyPlug the API runs (the VERSION file).")]
     processes: Annotated[
         list[ServerProcess],
         Field(
@@ -9924,7 +9920,7 @@ class SystemStatus(BaseModel):
     held: Annotated[
         list[HeldJob],
         Field(
-            description="Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany)."
+            description="Jobs a restore held because they act outside HyPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany)."
         ),
     ]
     heldEveryCompany: Annotated[
@@ -10150,7 +10146,7 @@ class HrScanPerson(BaseModel):
     match: Annotated[
         HrScanMatch | None,
         Field(
-            description="The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none."
+            description="The contact in HyPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none."
         ),
     ]
 

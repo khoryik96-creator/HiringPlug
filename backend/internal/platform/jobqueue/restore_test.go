@@ -39,7 +39,7 @@ func statusOf(t *testing.T, id string) (status string, attempts int) {
 }
 
 // IMP-002: a restore with jobs waiting, running, done and failed holds the
-// ones that act outside HiringPlug (whatever their state, waiting or
+// ones that act outside HyPlug (whatever their state, waiting or
 // running), makes interrupted local work ready again, leaves finished jobs
 // alone, and no worker takes a held job until it is released.
 func TestARestoreHoldsOutboundJobsAndResumesLocalOnes(t *testing.T) {

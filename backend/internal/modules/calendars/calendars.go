@@ -164,7 +164,7 @@ func (m *Module) Conflicts(ctx context.Context, tx pgx.Tx, users []string, from,
 }
 
 // Connected is whether the user's Outlook is working, so it sends them their
-// invitations; with a failing or broken connection HiringPlug emails them.
+// invitations; with a failing or broken connection HyPlug emails them.
 func (m *Module) Connected(ctx context.Context, tx pgx.Tx, user string) (bool, error) {
 	rows, err := store.New(tx).OutlookHealthForUsers(ctx, []string{user})
 	if err != nil {

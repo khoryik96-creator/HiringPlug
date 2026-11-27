@@ -1,6 +1,6 @@
 package contacts
 
-// Who in HiringPlug a person Find HR found is, or may be: the rule that picks
+// Who in HyPlug a person Find HR found is, or may be: the rule that picks
 // the likeliest contact among those the database offers (ContactsLike), as a
 // pure function.
 

@@ -77,10 +77,10 @@ owners; nobody for someone whose role is above their own, nor for themselves)
 sends one from the Team page
 (`POST /v1/team/{userId}/microsoft/reconnect`, `identity.team:manage`,
 audited `user.microsoft_reconnect_sent`); it is emailed to the person's
-HiringPlug address only, never shown to whoever sent it, works once for 7
+HyPlug address only, never shown to whoever sent it, works once for 7
 days, and signing in with Microsoft from it (or from an invitation) links the
 account to that person **whatever its address**: for someone whose UPN is not
-their HiringPlug email, who would otherwise be locked out once Microsoft is
+their HyPlug email, who would otherwise be locked out once Microsoft is
 required. A sign-in started from a link keeps it (`microsoft_sign_in_flow.link_id`)
 and finishes only with that very link, held, unused, unexpired, of the same
 kind and theirs (an invitation accepted with a password meanwhile, or a link
@@ -154,7 +154,7 @@ sign-in is on, only owners may change or remove the company's Microsoft app
   office signs in all morning and neither way uses up the other's. The email
   typed when starting is only a hint, so it counts against no limit of the
   email's (it would use up password sign-in's for that address).
-- *Sessions.* HiringPlug's own token says how it was signed in (`amr`: `pwd`
+- *Sessions.* HyPlug's own token says how it was signed in (`amr`: `pwd`
   or `microsoft`). Microsoft sign-ins skip the two-step code (password sign-ins
   still need it). An owner can **require** Microsoft: then signing in with a
   password, two-step codes for a password sign-in begun before, password reset
@@ -184,11 +184,11 @@ sign-in is on, only owners may change or remove the company's Microsoft app
 - *Who can always get in: Entra and Exchange administrators.* Single sign-on
   trusts the company's Microsoft organisation. Whoever administers it can
   reset the password of the Entra account linked to anyone (an owner too) and
-  sign in to HiringPlug as them, and whoever can read a team member's mailbox
+  sign in to HyPlug as them, and whoever can read a team member's mailbox
   (an Exchange administrator, or a mail rule) can use the invitation, reset
-  and reconnect links emailed to them. HiringPlug cannot tell these from the
+  and reconnect links emailed to them. HyPlug cannot tell these from the
   person: give those roles only to people the company would trust with every
-  HiringPlug account, keep owners' two-step sign-in on (it guards their
+  HyPlug account, keep owners' two-step sign-in on (it guards their
   password, Your account › Connect, and resets), and watch the audit log
   (`user.microsoft_linked`, `user.microsoft_reconnect_sent`) and the emails it
   sends for links nobody asked for.

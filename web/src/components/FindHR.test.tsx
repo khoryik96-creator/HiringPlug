@@ -50,8 +50,8 @@ describe("Find HR", () => {
     expect(farah.getAttribute("href")).toBe("https://www.linkedin.com/in/farah");
     expect(farah.getAttribute("target")).toBe("_blank");
     expect(farah.closest("tr")?.textContent).toContain("Mar 2023");
-    // Who they are in HiringPlug, wherever in the agency, with the email to use.
-    const kumar = screen.getByRole("link", { name: "In HiringPlug" });
+    // Who they are in HyPlug, wherever in the agency, with the email to use.
+    const kumar = screen.getByRole("link", { name: "In HyPlug" });
     expect(kumar.getAttribute("href")).toBe("#/contacts/ct_1");
     const kumarRow = kumar.closest("tr") as HTMLElement;
     expect(kumarRow.textContent).toContain("HR Director · at Contoh Holdings");
@@ -62,7 +62,7 @@ describe("Find HR", () => {
     expect(aisha.textContent).toContain("aisha@majubank.my may not arrive");
     expect(aisha.textContent).toContain("1 more contact may be them");
     expect(aisha.textContent).not.toContain("at Maju Bank Berhad"); // the company searched goes without saying
-    expect(screen.getByText("1 in HiringPlug · 1 may be · 2 new · 2 with an email")).toBeTruthy();
+    expect(screen.getByText("1 in HyPlug · 1 may be · 2 new · 2 with an email")).toBeTruthy();
     // Copying an email does not choose the row.
     fireEvent.click(screen.getByRole("button", { name: "aisha@majubank.my: copy email" }));
     expect(aisha.closest("tr")?.getAttribute("aria-selected")).toBe("false");
@@ -71,7 +71,7 @@ describe("Find HR", () => {
     expect(screen.getByText("Nurul Huda")).toBeTruthy();
   });
 
-  it("offers no Apollo lookup for a work email HiringPlug has already", async () => {
+  it("offers no Apollo lookup for a work email HyPlug has already", async () => {
     const known = person({ url: "https://www.linkedin.com/in/ana", name: "Ana Lim", contactId: "ct_3",
       match: match({ contactId: "ct_3", name: "Ana Lim", companyId: "comp_1", companyName: "Maju Bank Berhad", sameCompany: true, email: "ana@majubank.my" }) });
     const personal = person({ url: "https://www.linkedin.com/in/raj", name: "Raj Kumar", contactId: "ct_4",

@@ -77,7 +77,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
 | 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles, each company's own permissions and candidate scope per role, teams, owners |
 
-**Version.** The top bar shows HiringPlug's version beside its name (the
+**Version.** The top bar shows HyPlug's version beside its name (the
 `VERSION` file, raised with every update), so anyone can tell which update
 their copy runs. **Ad blockers.** No class or id in the app looks like an
 advert (`ad-…`, `adv-…`, `sponsor…`): blockers hide those on every site, and
@@ -411,7 +411,7 @@ set up, nothing starts and the form says so. `POST /v1/studio-cvs/batch`.
 **Deleting a formatted CV ✅**: its "..." menu has "Delete this formatted CV"
 (after a confirmation; `documents:delete`, recruiters and up). Its Word file
 and PDF copy are removed and the deletion is in the audit log. Only CVs
-HiringPlug made can be deleted: the candidate's own files are always kept.
+HyPlug made can be deleted: the candidate's own files are always kept.
 
 **Formatted CVs ✅.** "Make formatted CV" (candidate page, CVs and documents)
 fills the candidate's profile, work history and education into a Word
@@ -806,7 +806,7 @@ for each of their jobs, with **Score fit** / **Score again**.
   the details left empty (phone, address, city, country, size, registration
   number, description) and replaces a guessed name with the company's own;
   what was typed stays, and differences are suggestions. The server never
-  reads LinkedIn; with the HiringPlug LinkedIn companion in the recruiter's
+  reads LinkedIn; with the HyPlug LinkedIn companion in the recruiter's
   browser, **Fill in from LinkedIn** reads the company's About page there
   (name, size, website, overview; CV Studio's access rules stop it at any
   sign-in, check or restriction). LinkedIn's industry is kept only as a hint.
@@ -869,7 +869,7 @@ for each of their jobs, with **Score fit** / **Score again**.
   mailbox (kept 4 hours). Contacts whose email bounces are marked in red in the
   company's contacts, with a count. Servers often block port 25 from homes
   and clouds: then every answer is "not confirmed", never a wrong "bounces".
-- **Employment check on LinkedIn** ✅ (CV Studio's, with the **HiringPlug
+- **Employment check on LinkedIn** ✅ (CV Studio's, with the **HyPlug
   LinkedIn companion**, `extension/linkedin-companion`; each person downloads
   it from **Settings › LinkedIn companion**, which shows the install steps and
   whether this browser is connected; the zip is built with the web app, so it
@@ -877,7 +877,7 @@ for each of their jobs, with **Score fit** / **Score again**.
   companion** there, when a newer one is ready, writes the new version into
   its folder, chosen once, and restarts it, with no download): **Check employment on
   LinkedIn** on a company's contacts (or **Check on LinkedIn now** on one
-  contact). The companion, a browser extension connected to this HiringPlug
+  contact). The companion, a browser extension connected to this HyPlug
   only, reads each contact's LinkedIn profile in the recruiter's own browser
   (with their LinkedIn sign-in; the server never reads LinkedIn), in a
   background tab it closes afterwards, unless the recruiter looked at it. It
@@ -891,7 +891,7 @@ for each of their jobs, with **Score fit** / **Score again**.
   left** (audited; change it back with Edit); unclear changes nothing. The
   company's contacts show what LinkedIn showed under each status. A role
   typed in on LinkedIn (linked to no company page, shown with a grey logo)
-  matches by the company's exact name, in HiringPlug or on its LinkedIn page
+  matches by the company's exact name, in HyPlug or on its LinkedIn page
   (case, punctuation and legal suffixes such as Sdn Bhd aside; never a similar
   name): the result says "matched by the company's name" and never marks the
   contact as left (mark them yourself with Edit if right). When their
@@ -987,7 +987,7 @@ private networks. Next: licensed job-data providers.
 **Find HR for a lead** ✅ (1.41.0): each lead has a **Find HR** button
 (for those who may read companies and contacts) that opens a panel beside the
 list, so you can work down the leads without leaving the page. A lead not yet
-linked asks first which company it is: those in HiringPlug with the same name
+linked asks first which company it is: those in HyPlug with the same name
 (legal form, case and accents aside: "MAJU FOODS BERHAD" is "Maju Foods Bhd")
 or a much alike one are offered, up to five; **This one** links the lead.
 Otherwise **Add it as a new company**: its name, and its LinkedIn page, which
@@ -1153,7 +1153,7 @@ running.
   applications get no new interviews. An interviewer already booked at that
   time is a clash, shown with the other interview, and "Schedule anyway"
   overrides it. An interview's Outlook invitation changed in Outlook (people
-  added, a new time, place, title or notes) shows in HiringPlug on the next
+  added, a new time, place, title or notes) shows in HyPlug on the next
   refresh, the interview moving with it (1.43.0). Interviews are changed, marked done, "did not come" or
   cancelled, and every one has "Add to calendar" (an .ics file for Outlook,
   Google or Apple Calendar; importing it again after a change updates the
@@ -1259,7 +1259,7 @@ running.
 - **A new contact from LinkedIn** ✅: on the Add contact form, their
   LinkedIn profile and "Fill in from LinkedIn" (the companion, 1.3) fill in
   their name and job title from the profile and say where LinkedIn shows them
-  now and since when; the companies in HiringPlug that may be theirs are
+  now and since when; the companies in HyPlug that may be theirs are
   offered, the one with the same LinkedIn page first (then similar names).
   An email that belongs to a contact already is flagged as you type it. Once
   saved, a contact with no email gets one guessed from colleagues' (then
@@ -1275,18 +1275,18 @@ running.
   are ranked A (recruitment and HR leads), B (HR managers and partners), C;
   former staff and interns are hidden. Each is checked against every contact
   in the agency, and the likeliest one is shown with their company, job title,
-  email (click to copy) and whether they left: **In HiringPlug** (the same
+  email (click to copy) and whether they left: **In HyPlug** (the same
   LinkedIn profile, however its address is written), **Same name** (the same
   words in any order, accents, punctuation, titles such as Dato' or Dr,
   bin/binti, credentials and "(She/Her)" aside, with Mohd, Md and Abd read as
   Muhammad and Abdul) or **Similar name** (one name inside the other, two
   words or more: "Aisyah Ahmad", "Nur Aisyah binti Ahmad"). Other contacts
   who may also be them are counted. Above the list: how many are in
-  HiringPlug, may be, or are new. Each recruiter connects their own Apollo
+  HyPlug, may be, or are new. Each recruiter connects their own Apollo
   account in **Settings › Integrations** (or from Find HR), which also says how
   the server is set up for it when it is not (docs/apollo-hr.md; 1.39.0).
   Apollo's **Work email** is not offered for
-  someone whose work address HiringPlug has at this company already. From
+  someone whose work address HyPlug has at this company already. From
   Leads, a lead's company has the same Find HR. Clicking a row
   chooses it (All / None too); clicking a name opens their LinkedIn profile.
   Chosen people get their joining dates read from their profile (only those
@@ -2002,7 +2002,7 @@ to see it, `interview_prep:manage` to change it).
 
 ## Data protection (PDPA) ✅
 
-Malaysia's Personal Data Protection Act, for the candidates you hold. **HiringPlug
+Malaysia's Personal Data Protection Act, for the candidates you hold. **HyPlug
 never deletes or anonymises anything by itself, and keeps records until you
 decide otherwise**: it shows you what needs deciding and records what you did.
 
@@ -2070,7 +2070,7 @@ contact, company or job anywhere opens it as a tab here, behind the page you
 are on, not as a browser tab, tinted and in bold with a dot in its colour
 until you look at it (1.48.0); middle-click on a tab goes to it. Drag a tab
 (or a link) to the browser's tab bar to open the record in a new browser tab: a new tab takes the
-sign-in of a HiringPlug tab already open (with none open, it asks to sign in;
+sign-in of a HyPlug tab already open (with none open, it asks to sign in;
 closing every tab still signs out). The tabs are the signed-in user's own,
 forgotten on signing out, and the same in every window; closing the page you
 typed into asks first.
@@ -2119,7 +2119,7 @@ notice across the app says paid AI is paused.
 **Server checks** (1.52.0; the agency that runs the server only) say whether
 the background worker and the AI worker run (each reports every half minute;
 "Stopped" after two minutes of silence) and on the same version as the rest
-of HiringPlug ("Old version": restart it after an update), whether the API
+of HyPlug ("Old version": restart it after an update), whether the API
 can save and open files in the files folder (it writes, reads back and
 removes a small file each time the page loads), the disk's free space, and
 what the alert emails report now. "Not seen" is a worker that never reported:
@@ -2180,7 +2180,7 @@ contract. ✅ People sign in with email and password; owners and admins invite
 them, change roles and deactivate them on the **Team** page; "Forgot your
 password?" emails a reset link; everyone changes their password under their
 name. ✅ A sign-in lasts 12 hours and is renewed quietly (the same session)
-while someone is using HiringPlug; after they have been away, the last five
+while someone is using HyPlug; after they have been away, the last five
 minutes count down with **Stay signed in** before they are signed out. ✅ **Two-step sign-in**: a code from an authenticator app after the
 password (set up under Your account with a QR code, ten recovery codes);
 owners can require it for everyone, and owners and admins reset it for
@@ -2239,11 +2239,11 @@ the window (adding needs permission to add templates, changing or deleting to
 manage them). In Settings › WhatsApp templates the fields go in where the
 cursor is. Numbers saved
 without a country code are read as `HP_DEFAULT_PHONE_REGION`'s. Nothing is
-sent by HiringPlug itself, so no WhatsApp Business account is needed.
+sent by HyPlug itself, so no WhatsApp Business account is needed.
 
 ## On a phone ✅
 
-Below 700px wide the top bar is one row: HiringPlug, Outlook, Calendar,
+Below 700px wide the top bar is one row: HyPlug, Outlook, Calendar,
 Settings and a **Menu** button, which opens the pages, your account and
 Sign out (it closes on going to a page). The candidate, company and contact
 lists become cards (the name, then what is filled in); the jobs grid keeps
@@ -2265,7 +2265,7 @@ a short one shows both on one line, and a month day shows three meetings with
 "+2 more" opening the day. Today returns to the current date.
 Calendar supports local appointments,
 Microsoft default-calendar connection, Teams when supported, and Outlook busy-time
-checks for interviews and booking links. HiringPlug meetings sync as private holds;
+checks for interviews and booking links. HyPlug meetings sync as private holds;
 candidate invitations retain their existing flow. Attendee invitations on ordinary
 appointments are explicit. See [calendar.md](calendar.md) for setup, privacy,
 synchronization behavior and the sync window.
@@ -2313,7 +2313,7 @@ submitted again replaces its file; a withdrawn or deleted claim's file is
 removed. Each
 claim shows whether its receipt is in the drive (with a link), uploading, or
 why it failed; Settings counts the uploads and tries failed ones again. When
-the provider stops accepting HiringPlug's access, the page asks to connect
+the provider stops accepting HyPlug's access, the page asks to connect
 again, and connecting uploads what was waiting. See
 [claims-storage.md](claims-storage.md) for setup.
 
@@ -2326,7 +2326,7 @@ each sender, subject and date, and a reading pane showing the message in its
 own formatting (tables, colours, signature logos and banners; in Junk Email,
 pictures from the web load only on **Show pictures**). Browse, search by subject, name or address, delete,
 archive, move, flag, mark read or unread, and reply in the original thread.
-Replies, forwards and new messages use HiringPlug's email tools: templates
+Replies, forwards and new messages use HyPlug's email tools: templates
 (use, save, save as new, delete), candidate fields including salary, banners,
 your own signature (Settings > Your account), and Send later; **Candidate
 details & CVs** puts candidates in as a block each (or one table) with the

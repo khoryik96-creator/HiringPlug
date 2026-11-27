@@ -1,5 +1,5 @@
 // Settings > System after a restore: the jobs it held because they act
-// outside HiringPlug (emails, calendar updates, webhooks, automations). They
+// outside HyPlug (emails, calendar updates, webhooks, automations). They
 // were waiting in the backup, so they may have happened already: each runs
 // only once someone releases it, or never if cancelled.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ export function RestoreNotice({ restore }: { restore: Status["restore"] }) {
     // Another company on the server: only that some of its jobs wait, and how many.
     return (
       <p className="warning" role="status">
-        The server was restored from a backup {formatWhen(restore.restoredAt)}: {many} of your company that act outside HiringPlug
+        The server was restored from a backup {formatWhen(restore.restoredAt)}: {many} of your company that act outside HyPlug
         or ask a paid AI wait for you to release or cancel them, below.
       </p>
     );
@@ -28,7 +28,7 @@ export function RestoreNotice({ restore }: { restore: Status["restore"] }) {
   }
   return (
     <p className="warning" role="status">
-      Restored {formatWhen(restore.restoredAt)} from {from} ({restore.backupName}): {many} that act outside HiringPlug or ask a
+      Restored {formatWhen(restore.restoredAt)} from {from} ({restore.backupName}): {many} that act outside HyPlug or ask a
       paid AI wait for someone to release or cancel them, in every company on the server (below, or <code>hp jobs</code> on the
       server).{restore.fromAnotherServer ? " The server's alert emails wait until then, 72 hours at most." : ""}
     </p>

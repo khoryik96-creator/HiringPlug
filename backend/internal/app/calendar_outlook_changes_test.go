@@ -36,7 +36,7 @@ func outlookTime(at time.Time) map[string]any {
 	return map[string]any{"dateTime": at.UTC().Format("2006-01-02T15:04:05"), "timeZone": "UTC"}
 }
 
-// event is the organizer's HiringPlug calendar event of this kind (the invitation, or a hold).
+// event is the organizer's HyPlug calendar event of this kind (the invitation, or a hold).
 func (c candidateFollowUp) event(source string) api.CalendarEvent {
 	c.t.Helper()
 	now := time.Now().UTC()
@@ -91,7 +91,7 @@ func emailsOf(e api.CalendarEvent) []string {
 	return out
 }
 
-func TestOutlookPeopleAddedToAnInterviewInvitationShowInHiringPlug(t *testing.T) {
+func TestOutlookPeopleAddedToAnInterviewInvitationShowInHyPlug(t *testing.T) {
 	t.Parallel()
 	c := startOutlookInvitation(t, outlookInvite{})
 	patches := c.patches()
@@ -104,7 +104,7 @@ func TestOutlookPeopleAddedToAnInterviewInvitationShowInHiringPlug(t *testing.T)
 	assert.EqualValues(t, "sent", c.invitation().Status, "a person added in Outlook is not the candidate taken off")
 	assert.Equal(t, patches, c.patches(), "nothing is sent back to Outlook")
 	version, sent, status, _ := c.stored("interview_invitation")
-	assert.Equal(t, version, sent, "Outlook's change is not HiringPlug's to send")
+	assert.Equal(t, version, sent, "Outlook's change is not HyPlug's to send")
 	assert.Equal(t, "synced", status)
 	state := c.reply("accepted")
 	require.NotNil(t, state.CandidateResponse)
@@ -127,7 +127,7 @@ func TestOutlookPeopleAddedToAnInterviewInvitationShowInHiringPlug(t *testing.T)
 	runCoreJobsUntilIdle(t, c.a, c.tenant)
 	c.f.mu.Lock()
 	assert.Equal(t, moved.Format("2006-01-02T15:04:05"), c.f.lastPatch["start"].(map[string]any)["dateTime"])
-	assert.NotContains(t, c.f.lastPatch, "attendees", "a move does not send HiringPlug's list of people over Outlook's")
+	assert.NotContains(t, c.f.lastPatch, "attendees", "a move does not send HyPlug's list of people over Outlook's")
 	for _, e := range c.f.events {
 		assert.Len(t, e["attendees"], 2, "the person added in Outlook stays invited")
 	}
@@ -199,7 +199,7 @@ func TestOutlookNotesOfATeamsOrFormattedInvitationStayOutOfInstructions(t *testi
 		})
 		event := c.event("interview_invitation")
 		assert.Equal(t, "Rewritten in Outlook.", event.Notes)
-		assert.True(t, event.NotesHtml.IsNull(), "Outlook's message replaces HiringPlug's formatted one")
+		assert.True(t, event.NotesHtml.IsNull(), "Outlook's message replaces HyPlug's formatted one")
 		assert.Equal(t, "Please bring your portfolio.", c.interview().Instructions.MustGet(), "a whole message is not the instructions")
 
 		iv := c.interview()
@@ -237,7 +237,7 @@ func TestOutlookDeletedOrCandidateRemovedStillFlagged(t *testing.T) {
 			t.Parallel()
 			c := startOutlookInvitation(t, outlookInvite{})
 			edit(c)
-			assert.EqualValues(t, "conflict", c.invitation().Status, "cancelling the interview is HiringPlug's call")
+			assert.EqualValues(t, "conflict", c.invitation().Status, "cancelling the interview is HyPlug's call")
 			iv := c.interview()
 			assert.EqualValues(t, "scheduled", iv.Status)
 			assert.Equal(t, c.iv.Title, iv.Title)

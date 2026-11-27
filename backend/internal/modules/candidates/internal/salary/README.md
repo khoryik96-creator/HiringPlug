@@ -6,7 +6,7 @@ Reference entry points: `calcFixedSalaryDetailed`, `applyExpectedPercentIncremen
 `applyExpectedSameAsCurrentRule`, `applySalaryCurrencyRule` and rate detection.
 The reference's original 148 checks passed before adaptation.
 
-HiringPlug uses deterministic Go code only. Salary is never sent to AI. The
+HyPlug uses deterministic Go code only. Salary is never sent to AI. The
 calculator previews values; the explicit, versioned screening-call transaction
 saves them. Raw descriptions stay in the existing protected compensation table.
 

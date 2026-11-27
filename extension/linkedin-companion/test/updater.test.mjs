@@ -1,4 +1,4 @@
-// The companion's self-update: which bundles it accepts from HiringPlug, and
+// The companion's self-update: which bundles it accepts from HyPlug, and
 // how it writes them into its folder (a fake folder, as the browser gives one).
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -8,7 +8,8 @@ import vm from 'node:vm';
 const context = vm.createContext({});
 context.globalThis = context;
 vm.runInContext(readFileSync(new URL('../updater.js', import.meta.url), 'utf8'), context);
-const {newer, check, widens: widensIn, folderVersion, write, latest, NAME} = context.hiringplugUpdater;
+const {newer, check, widens: widensIn, folderVersion, write, latest, NAMES} = context.hiringplugUpdater;
+const NAME = 'HiringPlug LinkedIn Companion'; // the listed name until every companion takes either
 const widens = (next, current) => Array.from(widensIn(next, current)); // an array of this realm, for deepEqual
 
 const manifest = (version, name = NAME) => JSON.stringify({manifest_version: 3, name, version});
@@ -35,6 +36,13 @@ function folder(files = {}, log = [], name = 'hiringplug-linkedin-companion', pr
     },
   };
 }
+
+test("takes an update under the product's new name (HyPlug) as well as its old one", () => {
+  assert.deepEqual([...NAMES], ['HyPlug LinkedIn Companion', 'HiringPlug LinkedIn Companion']);
+  for (const name of NAMES) {
+    assert.doesNotThrow(() => check({version: '1.8.0', files: {'manifest.json': manifest('1.8.0', name), 'worker.js': '//'}}));
+  }
+});
 
 test('knows which version is newer', () => {
   assert.equal(newer('1.4.0', '1.3.9'), true);
@@ -94,7 +102,7 @@ test('writes the files into the folder, its manifest last, making folders as nee
   assert.equal(dir.files['worker.js'], '// v1.4.0');
 });
 
-test('takes the newest companion among the connected HiringPlugs, ignoring any that fail or send something else', async () => {
+test('takes the newest companion among the connected HyPlugs, ignoring any that fail or send something else', async () => {
   const answers = {
     'https://a.test/linkedin-companion.json': {ok: true, json: async () => bundle('1.4.0')},
     'https://b.test/linkedin-companion.json': {ok: true, json: async () => bundle('1.5.0')},

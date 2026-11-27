@@ -1,4 +1,4 @@
-# Working on HiringPlug (for people and AI agents)
+# Working on HyPlug (for people and AI agents)
 
 Read this before changing code. The rules exist so that adding or fixing one
 thing never breaks another. Most are enforced by `task verify`; the rest are
@@ -7,7 +7,7 @@ checked in review.
 ## Commands
 
 - `task verify` before every push. It must pass. Commit any files it regenerates.
-- Raise `VERSION` (major.minor.patch, shown beside HiringPlug's name in the top
+- Raise `VERSION` (major.minor.patch, shown beside HyPlug's name in the top
   bar) with every update pushed to main: the patch number for fixes, the minor
   for new features, so anyone can tell which update they are running.
 - ShellCheck is required by `task lint:shell` (Debian/Ubuntu:
@@ -84,7 +84,7 @@ web/src/                     the React app
 
 ## Working alongside other helpers
 
-Several AI helpers work on HiringPlug at once, on different accounts, and
+Several AI helpers work on HyPlug at once, on different accounts, and
 cannot see each other except through GitHub. So:
 
 - **Before starting**, `git fetch` and read

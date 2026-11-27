@@ -1,5 +1,5 @@
 // Leads › Find HR, step 1: which company the lead is. The companies already
-// in HiringPlug with the same or a similar name, to link the lead to, or the
+// in HyPlug with the same or a similar name, to link the lead to, or the
 // lead's company added as a new one (with its LinkedIn page) and linked.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -31,7 +31,7 @@ export function LeadCompanyChoice({ lead, permissions, onLinked, onSaved }: {
   const [addAnyway, setAddAnyway] = useState(false);
   // Added already, then the link failed: trying again only links it (its name and page are kept).
   const [created, setCreated] = useState<Company | null>(null);
-  // A company in HiringPlug has the LinkedIn page chosen, under another name.
+  // A company in HyPlug has the LinkedIn page chosen, under another name.
   const [pageOwner, setPageOwner] = useState<{ page: string; id: string; name: string } | null>(null);
 
   const linkTo = async (companyId: string) => {
@@ -91,15 +91,15 @@ export function LeadCompanyChoice({ lead, permissions, onLinked, onSaved }: {
       <ErrorMessage error={matches.error}>
         <button type="button" className="doc-btn" disabled={matches.isFetching} onClick={() => { void matches.refetch(); }}>Try again</button>
       </ErrorMessage>
-      {matches.isPending && <p className="muted small">Looking for it in HiringPlug…</p>}
-      {matches.isSuccess && items.length === 0 && <p className="muted small">No company in HiringPlug has this name or one like it.</p>}
+      {matches.isPending && <p className="muted small">Looking for it in HyPlug…</p>}
+      {matches.isSuccess && items.length === 0 && <p className="muted small">No company in HyPlug has this name or one like it.</p>}
       {items.length > 0 && (
         <ul className="lead-hr-matches">
           {items.map((m) => (
             <li key={m.id}>
               <div>
                 <strong>{m.name}</strong>
-                <div className="muted small">in HiringPlug · {m.sameName ? "same name" : "similar name"}{m.city ? ` · ${m.city}` : ""}</div>
+                <div className="muted small">in HyPlug · {m.sameName ? "same name" : "similar name"}{m.city ? ` · ${m.city}` : ""}</div>
               </div>
               {canLink && <button type="button" className="doc-btn primary" disabled={busy} aria-label={`This one: ${m.name}`}
                 onClick={() => { link.mutate({ companyId: m.id, from: `match:${m.id}` }); }}>This one</button>}
@@ -113,7 +113,7 @@ export function LeadCompanyChoice({ lead, permissions, onLinked, onSaved }: {
       )}
       {canLink && showAdd && (canAdd ? (
         <form className="lead-hr-new" aria-label="New company" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
-          <h4>{created ? `${created.name} is added to HiringPlug` : `Add ${name.trim() || lead.companyName} as a new company`}</h4>
+          <h4>{created ? `${created.name} is added to HyPlug` : `Add ${name.trim() || lead.companyName} as a new company`}</h4>
           {created && <p className="muted small">The lead is not linked to it yet.</p>}
           <label className="field">Name
             <input required maxLength={200} value={created ? created.name : name} disabled={busy || created !== null} onChange={(e) => { setName(e.target.value); }} />
@@ -121,7 +121,7 @@ export function LeadCompanyChoice({ lead, permissions, onLinked, onSaved }: {
           <LinkedinPageFinder name={name} value={created ? (created.linkedinUrl ?? "") : linkedin} onChange={setLinkedin} disabled={busy || created !== null} />
           {samePage && (
             <div className="warning small" role="status">
-              <p>{samePage.name} in HiringPlug has this LinkedIn page.</p>
+              <p>{samePage.name} in HyPlug has this LinkedIn page.</p>
               <button type="button" className="doc-btn" disabled={busy} onClick={() => { link.mutate({ companyId: samePage.id, from: "page" }); }}>Link the lead to {samePage.name}</button>
               {linkError("page")}
             </div>

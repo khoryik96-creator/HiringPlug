@@ -156,7 +156,7 @@ func TestARealBounceInTheSendersOutlookMarksTheContactsMailboxAsGone(t *testing.
 	assert.Equal(t, api.MailboxCheckStatusAccepted, a.contact(stranger, other.Id).MailboxCheck.MustGet().Status)
 }
 
-func TestEmailsSentFromAMailboxHiringPlugCannotReadAreNotScannedForBounces(t *testing.T) {
+func TestEmailsSentFromAMailboxHyPlugCannotReadAreNotScannedForBounces(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)

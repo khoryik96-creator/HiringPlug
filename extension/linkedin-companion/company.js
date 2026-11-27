@@ -1,8 +1,8 @@
 /*
- * HiringPlug: on a LinkedIn company's About page, what the page itself says
+ * HyPlug: on a LinkedIn company's About page, what the page itself says
  * of the company: its name, industry, company size, website and
  * headquarters, and its overview. Read in a background tab the companion
- * opened at that exact company page, for a new company in HiringPlug.
+ * opened at that exact company page, for a new company in HyPlug.
  * On a LinkedIn companies search (readSearch), the companies it shows, each
  * with its own LinkedIn page, for a lead whose company is not yet linked.
  * Written in the style of CV Studio's reader: only the page asked for, only

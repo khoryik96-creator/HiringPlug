@@ -42,7 +42,7 @@ func renameAndMoveInOutlook(c candidateFollowUp) {
 
 // A change in Outlook is taken as its organizer's: one who may no longer
 // schedule interviews, or no longer sees this one, changes nothing in
-// HiringPlug; a move waits for review as before.
+// HyPlug; a move waits for review as before.
 func TestOutlookChangeIsTakenOnlyWhileTheOrganizerMayMakeIt(t *testing.T) {
 	t.Parallel()
 	defaults := authz.PermissionsForRole(api.RoleRecruiter)
@@ -72,7 +72,7 @@ func TestOutlookChangeIsTakenOnlyWhileTheOrganizerMayMakeIt(t *testing.T) {
 	}
 }
 
-// An interview HiringPlug no longer schedules (done, or the candidate did not
+// An interview HyPlug no longer schedules (done, or the candidate did not
 // come) and then moved in Outlook is flagged, never left unseen.
 func TestOutlookMoveOfAnInterviewNoLongerScheduledIsFlagged(t *testing.T) {
 	t.Parallel()

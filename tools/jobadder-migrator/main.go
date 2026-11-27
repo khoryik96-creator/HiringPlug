@@ -1,4 +1,4 @@
-// HiringPlug Migration: standalone, read-only JobAdder discovery. No HiringPlug
+// HyPlug Migration: standalone, read-only JobAdder discovery. No HyPlug
 // database, API, Python worker or Docker dependency is required.
 package main
 
@@ -63,14 +63,14 @@ func run() error {
 		a.clientHTTP = &http.Client{Transport: demoTransport{}}
 		a.pace = 25 * time.Millisecond
 	}
-	launch := filepath.Join(*dir, "HiringPlug Migration.url")
+	launch := filepath.Join(*dir, "HyPlug Migration.url")
 	if err = os.WriteFile(launch, []byte("[InternetShortcut]\nURL="+a.origin+"/#"+a.session+"\n"), 0600); err != nil {
 		return fmt.Errorf("private browser launch shortcut could not be created")
 	}
 	defer os.Remove(launch)
-	fmt.Println("HiringPlug Migration is running locally. Open the HiringPlug Migration.url shortcut in your workspace if the browser does not open.")
+	fmt.Println("HyPlug Migration is running locally. Open the HyPlug Migration.url shortcut in your workspace if the browser does not open.")
 	if *demo {
-		fmt.Println("DEMO: synthetic records only. No JobAdder or HiringPlug connection.")
+		fmt.Println("DEMO: synthetic records only. No JobAdder or HyPlug connection.")
 	}
 	if !*noBrowser {
 		openBrowser(a.origin + "/#" + a.session)

@@ -1,6 +1,6 @@
 // Package authn checks who is calling: it verifies signed bearer tokens (JWT).
 //
-// Every token is HiringPlug's own, signed with a shared secret (`hp token`
+// Every token is HyPlug's own, signed with a shared secret (`hp token`
 // mints one for development). Signing in with Microsoft checks Microsoft's
 // token once (platform/entra) and then issues one of these, which says how
 // the person signed in (amr).

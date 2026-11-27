@@ -96,7 +96,7 @@ func (s *Service) access(ctx context.Context, conn *pgx.Conn, expected store.Cal
 			return err
 		}
 		if !active {
-			return &reconnectError{"Calendar access is no longer enabled for this HiringPlug user"}
+			return &reconnectError{"Calendar access is no longer enabled for this HyPlug user"}
 		}
 		app, err := s.deps.Apps.MicrosoftApp(ctx, tx, row.TenantID)
 		if err != nil {

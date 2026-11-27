@@ -75,10 +75,10 @@ func (m *Module) RequestReset(ctx context.Context, clientAddr, email string) err
 				return err
 			}
 			if PasswordRefused(u.MicrosoftRequired, u.Role) { // no link: how to sign in instead
-				body := "Hello " + a.UserName + ",\n\nSomeone (hopefully you) asked to reset your HiringPlug password at " + a.TenantName +
+				body := "Hello " + a.UserName + ",\n\nSomeone (hopefully you) asked to reset your HyPlug password at " + a.TenantName +
 					".\n\n" + a.TenantName + " signs in with Microsoft, so there is no password to reset: choose Sign in with Microsoft at\n" +
-					m.publicURL + "\n\nHiringPlug"
-				if err := m.mailer.Notify(ctx, tx, a.TenantID, []string{email}, "Signing in to HiringPlug", body); err != nil {
+					m.publicURL + "\n\nHyPlug"
+				if err := m.mailer.Notify(ctx, tx, a.TenantID, []string{email}, "Signing in to HyPlug", body); err != nil {
 					return err
 				}
 				return audit.Record(ctx, tx, audit.Entry{Action: "user.reset_refused", EntityType: "user", EntityID: a.UserID,
@@ -88,10 +88,10 @@ func (m *Module) RequestReset(ctx context.Context, clientAddr, email string) err
 			if err != nil {
 				return err
 			}
-			body := "Hello " + a.UserName + ",\n\nSomeone (hopefully you) asked to reset your HiringPlug password at " + a.TenantName +
+			body := "Hello " + a.UserName + ",\n\nSomeone (hopefully you) asked to reset your HyPlug password at " + a.TenantName +
 				".\n\nChoose a new password here (the link works for one hour):\n" + link +
-				"\n\nIf it was not you, ignore this email: your password stays as it is.\n\nHiringPlug"
-			if err := m.mailer.Notify(ctx, tx, a.TenantID, []string{email}, "Reset your HiringPlug password", body); err != nil {
+				"\n\nIf it was not you, ignore this email: your password stays as it is.\n\nHyPlug"
+			if err := m.mailer.Notify(ctx, tx, a.TenantID, []string{email}, "Reset your HyPlug password", body); err != nil {
 				return err
 			}
 			return audit.Record(ctx, tx, audit.Entry{Action: "user.reset_requested", EntityType: "user", EntityID: a.UserID})

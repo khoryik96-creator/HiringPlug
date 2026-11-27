@@ -1,4 +1,4 @@
-# HiringPlug documentation: start here
+# HyPlug documentation: start here
 
 Read in this order. Each page is short and links to the next.
 
@@ -19,7 +19,7 @@ Read in this order. Each page is short and links to the next.
 
 - [HANDOVER.md](HANDOVER.md): where the work stands and what is next (read first when picking the project up).
 - [WORKING-ON.md](WORKING-ON.md): who is changing what right now (read before starting a task).
-- [Turning HiringPlug into a SaaS: scaling to 20,000 users](saas-plan-scaling-to-20k-users.md): what to change, set-up and costs at each size, Python or Go.
+- [Turning HyPlug into a SaaS: scaling to 20,000 users](saas-plan-scaling-to-20k-users.md): what to change, set-up and costs at each size, Python or Go.
 - [Profit Planner](https://claude.ai/artifact/SXZUgNHU16BkqiUHX6uU2G) (source: [pricing-calculator.html](pricing-calculator.html)): prices, users, costs and tax in, margin, break-even and a forecast out.
 
 - [Industries and subindustries](industries.md): catalogue settings, employer recognition and legacy data.

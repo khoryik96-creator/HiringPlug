@@ -1,7 +1,7 @@
 package main
 
 // After a restore: the database brought up to date, the restore recorded,
-// and the jobs that act outside HiringPlug held until someone releases them
+// and the jobs that act outside HyPlug held until someone releases them
 // (jobqueue.HoldAfterRestore).
 
 import (
@@ -98,13 +98,13 @@ func jobsSummary(r jobqueue.Restored, after jobqueue.AfterRestore) string {
 	}
 	switch {
 	case after.HeldTotal() == 0 && (!r.Resumed || !r.ResumedPaidAI):
-		b.WriteString("jobs: none waiting acts outside HiringPlug or asks a paid AI: nothing held\n")
+		b.WriteString("jobs: none waiting acts outside HyPlug or asks a paid AI: nothing held\n")
 	case after.HeldTotal() > 0:
 		parts := make([]string, len(after.Held))
 		for i, h := range after.Held {
 			parts[i] = fmt.Sprintf("%s %d", h.Kind, h.Count)
 		}
-		fmt.Fprintf(&b, "jobs: held %d that act outside HiringPlug or ask a paid AI (%s) until someone releases or cancels them: `hp jobs list`, then `hp jobs release -yes` or `hp jobs cancel -yes` (every company), or each company in Settings > System\n",
+		fmt.Fprintf(&b, "jobs: held %d that act outside HyPlug or ask a paid AI (%s) until someone releases or cancels them: `hp jobs list`, then `hp jobs release -yes` or `hp jobs cancel -yes` (every company), or each company in Settings > System\n",
 			after.HeldTotal(), strings.Join(parts, ", "))
 		if r.FromAnotherServer() {
 			fmt.Fprintf(&b, "jobs: the server's alert email waits until then (%d hours at most)\n", int(jobqueue.AlertsWaitFor.Hours()))

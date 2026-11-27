@@ -84,7 +84,7 @@ func TestCalendarTransientPushRetriesAndConflictsNeedExplicitResolution(t *testi
 	version, status := calendarEventState(t, event.Id)
 	require.Equal(t, "synced", status)
 	input["version"] = version
-	input["title"] = "Changed in HiringPlug"
+	input["title"] = "Changed in HyPlug"
 	r = a.request("PUT", "/v1/calendar/events/"+event.Id, token, input)
 	require.Equal(t, 200, r.Status, "%s", r.Body)
 	f.mu.Lock()

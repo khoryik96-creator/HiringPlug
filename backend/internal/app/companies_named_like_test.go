@@ -24,7 +24,7 @@ func (a *testApp) namedLike(token, name string) []api.CompanyNamedLike {
 }
 
 // A lead's company ("MAJU FOODS BERHAD") finds the company already in
-// HiringPlug under another legal form first, then names much like it; never
+// HyPlug under another legal form first, then names much like it; never
 // another tenant's companies or what is in the Bin.
 func TestCompaniesNamedLikeALeadsCompany(t *testing.T) {
 	t.Parallel()

@@ -1,4 +1,4 @@
-// Package buildinfo is the version of HiringPlug a program was built from
+// Package buildinfo is the version of HyPlug a program was built from
 // (the VERSION file, raised with every update): Settings › System compares
 // the workers' with the API's, so a worker still on the old version after an
 // update shows.

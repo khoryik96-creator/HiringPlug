@@ -50,11 +50,11 @@ export function ApolloConnectionDialog({ connection, onClose }: { connection: Re
   return <ApolloDialog title="Apollo connection" onClose={onClose}>
     <ErrorMessage error={change.error ?? connection.error} />
     {connection.isPending && <p role="status">Checking connection…</p>}
-    {state === "disabled" && <p>Ask your HiringPlug administrator to configure the Apollo sign-in broker.</p>}
+    {state === "disabled" && <p>Ask your HyPlug administrator to configure the Apollo sign-in broker.</p>}
     {state === "connected" && <p>Connected as <strong>{current?.accountName}</strong>.</p>}
     {state === "expired" && <p>Your Apollo sign-in has expired. Disconnect it, then connect again.</p>}
     {state === "failed" && <p>Apollo didn’t finish sign-in. Cancel this attempt, then connect again.</p>}
-    {state === "disconnected_locally" && <p>HiringPlug stopped lookups. Retry disconnecting to end access at the broker.</p>}
+    {state === "disconnected_locally" && <p>HyPlug stopped lookups. Retry disconnecting to end access at the broker.</p>}
     {state === "pending" && <p>Open Apollo to sign in, then return here to check your connection.</p>}
     <div className="row hr-apollo-actions">
       {state === "pending" && current?.authorizationUrl &&
@@ -77,7 +77,7 @@ export function ApolloConnectionDialog({ connection, onClose }: { connection: Re
 const issues: Partial<Record<Lookup["state"], string>> = {
   ineligible: "Apollo lookup is available for people who may still work at this company.",
   rescan: "Run a new Find HR search to verify this company’s LinkedIn page before using Apollo.",
-  disabled: "Ask your HiringPlug administrator to configure Apollo.",
+  disabled: "Ask your HyPlug administrator to configure Apollo.",
   disconnected: "Connect your own Apollo account first.",
   previous_connection: "This person already had a lookup on another connection. Check Apollo for the result and any credit use.",
   busy: "Another lookup is in progress on this Apollo connection.",
@@ -146,10 +146,10 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
   return <ApolloDialog title="Work email" onClose={onClose}>
     <p className="hr-apollo-person"><strong>{person.name}</strong> · {companyName}</p>
     <ErrorMessage error={change.error ?? lookup.error} />
-    {lookup.isPending && <p role="status">Checking HiringPlug…</p>}
+    {lookup.isPending && <p role="status">Checking HyPlug…</p>}
     {result && <div aria-live="polite">
       {result.email && <p className="hr-apollo-address"><strong>{result.email}</strong><br />
-        <span className="muted">{result.state === "existing" ? "Already in HiringPlug. No Apollo credit used." : statusLabel[result.emailStatus ?? "unknown"]}</span></p>}
+        <span className="muted">{result.state === "existing" ? "Already in HyPlug. No Apollo credit used." : statusLabel[result.emailStatus ?? "unknown"]}</span></p>}
       {issues[result.state] && <p>{result.state === "cancelled" && result.reason ? absent[result.reason] : issues[result.state]}</p>}
       {result.state === "not_found" && <p>{absent[result.reason ?? "email_not_returned"]} Check Apollo for any credit use.</p>}
       {(result.state === "ready" || result.state === "cancelled") && result.confirmation && <>

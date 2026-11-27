@@ -66,7 +66,7 @@ func TestTheSameCVIsNeverUploadedTwice(t *testing.T) {
 		assert.True(t, got.Items[0].SameContent.IsNull(), "with candidateId, only that candidate's CVs")
 	})
 
-	t.Run("an import skips a file already in HiringPlug", func(t *testing.T) {
+	t.Run("an import skips a file already in HyPlug", func(t *testing.T) {
 		res := a.request(http.MethodPost, "/v1/cv-imports", token, map[string]any{"source": "linkedin"})
 		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
 		var imp api.CvImport

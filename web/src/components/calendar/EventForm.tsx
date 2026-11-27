@@ -140,7 +140,7 @@ export function EventForm({ event, date, startAtSlot = false, connection, onClos
         </Row>
         <Row icon={<NotesIcon />} label="Details" className="composer-notes">
           <ComposeBody html={message.html} resetKey={message.reset} onChange={write} />
-          {event?.teams && <small className="composer-hint">Changed notes stay in HiringPlug: Outlook keeps this Teams meeting&apos;s own notes, which hold its join details.</small>}
+          {event?.teams && <small className="composer-hint">Changed notes stay in HyPlug: Outlook keeps this Teams meeting&apos;s own notes, which hold its join details.</small>}
           {errors.notes && <small className="error">{errors.notes}</small>}
         </Row>
         {errors.notesHtml && <small className="error" role="alert">{errors.notesHtml}</small>}

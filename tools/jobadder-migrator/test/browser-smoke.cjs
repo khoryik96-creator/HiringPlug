@@ -1,4 +1,4 @@
-// Synthetic-only UI check. No JobAdder or HiringPlug credentials are used.
+// Synthetic-only UI check. No JobAdder or HyPlug credentials are used.
 const { chromium, expect } = require('../../../web/node_modules/@playwright/test');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
@@ -29,7 +29,7 @@ async function start(demo) {
         await fs.rm(dir, { recursive: true, force: true });
         if(forced) throw Error('Discovery tool did not stop cleanly');
     }
-    const file = path.join(dir, ...(demo ? ['demo'] : []), 'HiringPlug Migration.url');
+    const file = path.join(dir, ...(demo ? ['demo'] : []), 'HyPlug Migration.url');
     for (let i = 0; i < 100 && !startupError && proc.exitCode === null; i++) {
         try {
             const url = (await fs.readFile(file, 'utf8')).split('URL=')[1].trim();

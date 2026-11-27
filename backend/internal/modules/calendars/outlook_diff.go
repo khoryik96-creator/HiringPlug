@@ -34,7 +34,7 @@ func (d outlookDiff) fields() []string {
 // diffOutlook compares an event as Outlook has it now with known, the last
 // receipt (Outlook rewrites what it is sent: a Teams location, an HTML
 // message as text, spaces), or with the row when there is none. The time is
-// compared with the row's, as HiringPlug schedules it.
+// compared with the row's, as HyPlug schedules it.
 func diffOutlook(row store.CalendarEvent, known *graphEvent, e graphEvent, start, end time.Time) outlookDiff {
 	d := outlookDiff{Time: e.IsAllDay != row.AllDay || !start.Equal(row.StartsAt) || !end.Equal(row.EndsAt)}
 	body := strings.TrimSpace(e.Body.Content)
@@ -54,7 +54,7 @@ func diffOutlook(row store.CalendarEvent, known *graphEvent, e graphEvent, start
 	return d
 }
 
-// teamsArrived: Outlook filled in the Teams meeting HiringPlug asked for after
+// teamsArrived: Outlook filled in the Teams meeting HyPlug asked for after
 // the last receipt. It writes the join details into the message and may set
 // the place, which the organizer did not change.
 func teamsArrived(row store.CalendarEvent, known *graphEvent, e graphEvent) bool {

@@ -46,7 +46,7 @@ var words = func() nameWords {
 	return w
 }()
 
-// Lineage words HiringPlug always treated as not identifying alone, besides
+// Lineage words HyPlug always treated as not identifying alone, besides
 // CV Studio's (bt, s/o, d/o, al, el, de).
 var moreParticles = []string{"bt", "s/o", "d/o", "al", "el", "de"}
 

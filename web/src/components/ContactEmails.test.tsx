@@ -23,7 +23,7 @@ describe("emailing a client's contact", () => {
       ? { subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: { "[First name]": "Aisyah", "[Client company]": "Contoh Berhad" } }
       : { id: "eml_1" }))) as never);
     renderWithClient(<ContactEmails contactId="cont_1" email="aisyah@contoh.test" permissions={["emails:read", "emails:send"]} />);
-    expect(await screen.findByText("No emails sent from HiringPlug yet.")).toBeTruthy();
+    expect(await screen.findByText("No emails sent from HyPlug yet.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Write email" }));
     expect(screen.getByLabelText<HTMLInputElement>("To").value).toBe("aisyah@contoh.test");
     expect(screen.queryByRole("button", { name: "+ Booking link" }), "booking links are for candidates").toBeNull();

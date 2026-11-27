@@ -40,7 +40,7 @@ func (f *msTest) reconnectLink(token, userID string) string {
 	return m[len(m)-1][1]
 }
 
-// Someone whose Microsoft sign-in name is not their HiringPlug email (or
+// Someone whose Microsoft sign-in name is not their HyPlug email (or
 // whose account was unlinked) is not locked out once Microsoft is required:
 // an owner sends them a link, and signing in with Microsoft from it links
 // the account to them, whatever its address. Once, for 7 days, an account

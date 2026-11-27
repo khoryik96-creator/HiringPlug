@@ -1,6 +1,6 @@
 package documents
 
-// Deleting a formatted CV: one HiringPlug made can go (with its stored file
+// Deleting a formatted CV: one HyPlug made can go (with its stored file
 // and PDF copy); the candidate's own files are always kept.
 
 import (

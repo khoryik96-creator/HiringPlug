@@ -1,4 +1,4 @@
-# Shared part of the HiringPlug API contract.
+# Shared part of the HyPlug API contract.
 #
 # Do not put module endpoints here: each module has its own file in
 # contracts/modules/. `task gen` merges this file and every module file into
@@ -6,10 +6,10 @@
 # server, the TypeScript client and the Python models are generated.
 openapi: 3.0.3
 info:
-  title: HiringPlug API
+  title: HyPlug API
   version: 0.1.0
   description: |
-    The HiringPlug applicant tracking system API.
+    The HyPlug applicant tracking system API.
 
     **Authentication.** Send `Authorization: Bearer <token>` on every request.
 

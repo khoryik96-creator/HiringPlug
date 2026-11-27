@@ -130,7 +130,7 @@ export function AiEmailHelp({ recipient, subject, html, applicationId, names, on
           {written.data?.status === "failed" && <p className="warning small" role="alert">The AI could not write it: {written.data.error}</p>}
           {tooLong && (
             <p className="warning small" role="alert">
-              The AI is taking too long (it may be down): try again in a few minutes, or ask whoever runs HiringPlug to check the AI worker.
+              The AI is taking too long (it may be down): try again in a few minutes, or ask whoever runs HyPlug to check the AI worker.
             </p>
           )}
           {result && (

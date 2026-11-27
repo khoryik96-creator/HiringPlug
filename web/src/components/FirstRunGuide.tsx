@@ -42,7 +42,7 @@ export function FirstRunGuide({ permissions }: { permissions: readonly Permissio
     <section className="panel first-run" aria-labelledby="first-run-title">
       <div className="first-run-head">
         <div>
-          <h3 id="first-run-title">Get HiringPlug ready</h3>
+          <h3 id="first-run-title">Get HyPlug ready</h3>
           <p className="muted">A few steps for a new company. Each ticks itself once it is done.</p>
         </div>
         <button type="button" className="link small" onClick={() => { hide.mutate(true); }}>Hide checklist</button>

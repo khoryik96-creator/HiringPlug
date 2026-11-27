@@ -2,11 +2,11 @@ package identity
 
 // Linking a Microsoft account through a link: an invitation, or a reconnect
 // link an owner sends from the Team page (someone whose account was
-// unlinked, or whose sign-in name is not their HiringPlug email). Signing in
+// unlinked, or whose sign-in name is not their HyPlug email). Signing in
 // with Microsoft from the link links the account to that person, whatever
 // its address: an account of the company's organisation, linked to nobody
 // else there. Like an invitation, a reconnect link works once, for 7 days,
-// and is emailed to the person's HiringPlug address.
+// and is emailed to the person's HyPlug address.
 
 import (
 	"context"
@@ -123,10 +123,10 @@ func (m *Module) SendMicrosoftReconnectLink(ctx context.Context, p authz.Princip
 		if err != nil {
 			return err
 		}
-		body := "Hello " + u.Name + ",\n\n" + p.Name + " sent you a link to connect your Microsoft work account to HiringPlug at " + company.Name +
+		body := "Hello " + u.Name + ",\n\n" + p.Name + " sent you a link to connect your Microsoft work account to HyPlug at " + company.Name +
 			", so you can sign in with it.\n\nOpen it and sign in with Microsoft (the link works once, for 7 days):\n" + link +
-			"\n\nIf you did not expect this, ignore it and tell " + p.Name + ".\n\nHiringPlug"
-		if err := m.mailer.Notify(ctx, tx, p.TenantID, []string{u.Email}, "Connect Microsoft sign-in to HiringPlug at "+company.Name, body); err != nil {
+			"\n\nIf you did not expect this, ignore it and tell " + p.Name + ".\n\nHyPlug"
+		if err := m.mailer.Notify(ctx, tx, p.TenantID, []string{u.Email}, "Connect Microsoft sign-in to HyPlug at "+company.Name, body); err != nil {
 			return err
 		}
 		out = ReconnectLink{ExpiresAt: expires, Emailed: true}

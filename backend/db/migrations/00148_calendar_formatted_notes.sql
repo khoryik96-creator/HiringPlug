@@ -1,6 +1,6 @@
 -- calendars: an appointment's or interview invitation's notes, formatted
 -- (bold, lists, links...), sent to Outlook as the event's HTML body. notes
--- keeps their plain text (shown in HiringPlug, compared with Outlook's).
+-- keeps their plain text (shown in HyPlug, compared with Outlook's).
 -- An interview invitation keeps the candidate as its one required attendee
 -- and may have up to 20 optional ones (Outlook's Optional: the meeting's Cc).
 -- Committed migrations are never edited (CI enforces this): add a new file.

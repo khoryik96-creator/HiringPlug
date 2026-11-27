@@ -64,15 +64,15 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
 
 const check = {action: 'employment', args: {operation_id: op, url: profile, company_url: company, company_id: '123456'}};
 
-test('only the connected HiringPlug may use it', async () => {
+test('only the connected HyPlug may use it', async () => {
   const b = browser();
-  assert.match((await b.send(check, 'https://evil.test')).error, /Connect this HiringPlug/);
+  assert.match((await b.send(check, 'https://evil.test')).error, /Connect this HyPlug/);
   assert.equal((await b.send({action: 'status'})).result.version, '1.0.0');
 });
 
-test('HiringPlug opens the update page beside its tab (the connected HiringPlug only)', async () => {
+test('HyPlug opens the update page beside its tab (the connected HyPlug only)', async () => {
   const b = browser();
-  assert.match((await b.send({action: 'openUpdater'}, 'https://evil.test')).error, /Connect this HiringPlug/);
+  assert.match((await b.send({action: 'openUpdater'}, 'https://evil.test')).error, /Connect this HyPlug/);
   assert.equal((await b.send({action: 'openUpdater'})).result, true);
   const page = [...b.tabs.values()].find(t => t.url === 'chrome-extension://companion/update.html');
   assert.ok(page, 'the update page opened');
@@ -87,18 +87,18 @@ test('reads the dates of the time at the company in a background tab, then close
   assert.deepEqual({...dates}, {url: profile, company_url: company, company_id: '123456', joined: '2019-04', left: '2025-08', current: false});
   assert.equal(moved.length, 0, 'no current role elsewhere shown');
   assert.deepEqual(opened, {url: profile + '/details/experience/', active: false});
-  assert.equal(b.tabs.size, 1, 'its tab is closed (the HiringPlug tab stays)');
+  assert.equal(b.tabs.size, 1, 'its tab is closed (the HyPlug tab stays)');
 });
 
-test('like CV Studio, keeps the HiringPlug tab and the tabs it opens in one "HiringPlug" group', async () => {
+test('like CV Studio, keeps the HyPlug tab and the tabs it opens in one "HyPlug" group', async () => {
   const seen = [];
   const b = browser({page: tab => { seen.push({group: tab.groupId, opener: tab.openerTabId, window: tab.windowId}); return {joined: '2021', left: '', current: true}; }});
   await b.send(check);
   await b.send(check);
   assert.equal(b.groups.size, 1, 'one group, reused');
   const [[id, props]] = [...b.groups];
-  assert.deepEqual({...props}, {title: 'HiringPlug', color: 'purple'});
-  assert.equal(b.tabs.get(1).groupId, id, 'with the HiringPlug tab');
+  assert.deepEqual({...props}, {title: 'HyPlug', color: 'purple'});
+  assert.equal(b.tabs.get(1).groupId, id, 'with the HyPlug tab');
   assert.deepEqual(seen, [{group: id, opener: 1, window: 7}, {group: id, opener: 1, window: 7}]);
   const plain = browser({grouping: false});
   assert.equal((await plain.send(check)).result.current, false, 'grouping is only for looks: the check still runs');
@@ -297,10 +297,10 @@ test("finds a company's LinkedIn page from its name: up to five companies, each 
     'no company found is an answer, and a name with & or ? stays one search word');
 });
 
-test('a companies search needs a name from HiringPlug, and stops at a sign-in page', async () => {
+test('a companies search needs a name from HyPlug, and stops at a sign-in page', async () => {
   for (const name of [undefined, '', '   ', 7, 'x'.repeat(201), ['Contoh']]) {
     const b = browser();
-    assert.match((await b.send({action: 'companySearch', args: {operation_id: op, name}})).error, /Start the search from HiringPlug/, String(name));
+    assert.match((await b.send({action: 'companySearch', args: {operation_id: op, name}})).error, /Start the search from HyPlug/, String(name));
     assert.equal(b.tabs.size, 1, 'no tab opened');
   }
   const signIn = browser({page: () => ({failed: true})});

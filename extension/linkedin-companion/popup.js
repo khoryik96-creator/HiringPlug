@@ -1,4 +1,4 @@
-// Connects the HiringPlug in the current tab: asks the browser for access to
+// Connects the HyPlug in the current tab: asks the browser for access to
 // that one address, and runs bridge.js there (now and on every visit).
 const ORIGINS_KEY = 'hiringplugOrigins';
 const status = document.getElementById('status');
@@ -40,14 +40,14 @@ document.getElementById('connect').addEventListener('click', async () => {
     const url = new URL(tab?.url || '');
     if (url.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(url.hostname)) origin = url.origin;
   } catch { /* not a web page */ }
-  if (!origin || origin === 'https://www.linkedin.com') { status.textContent = 'Open HiringPlug in this tab first.'; return; }
+  if (!origin || origin === 'https://www.linkedin.com') { status.textContent = 'Open HyPlug in this tab first.'; return; }
   if (!await chrome.permissions.request({origins: [pattern(origin)]})) { status.textContent = 'Not connected: access was not allowed.'; return; }
   await chrome.scripting.unregisterContentScripts({ids: [scriptId(origin)]}).catch(() => {});
   await chrome.scripting.registerContentScripts([{id: scriptId(origin), matches: [pattern(origin)], js: ['bridge.js'], runAt: 'document_idle'}]);
   await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ['bridge.js']});
   const all = await origins();
   if (!all.includes(origin)) await chrome.storage.local.set({[ORIGINS_KEY]: [...all, origin]});
-  status.textContent = 'Connected. Go back to HiringPlug.';
+  status.textContent = 'Connected. Go back to HyPlug.';
   await show();
 });
 

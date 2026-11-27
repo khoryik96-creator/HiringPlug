@@ -67,7 +67,7 @@ func TestTheAgencyRunningTheServerSeesItsChecks(t *testing.T) {
 	assert.Equal(t, api.ServerProcessNameAiWorker, ai.Name)
 	assert.Equal(t, api.ServerProcessStateOldVersion, ai.State)
 	assert.Equal(t, "1.0.0", ai.Version.MustGet())
-	assert.Equal(t, []string{"The AI worker still runs version 1.0.0, the rest of HiringPlug " + buildinfo.Version() +
+	assert.Equal(t, []string{"The AI worker still runs version 1.0.0, the rest of HyPlug " + buildinfo.Version() +
 		": restart it after the update."}, problemsAbout(sc.Problems, "worker"))
 
 	// The AI worker stopped reporting.

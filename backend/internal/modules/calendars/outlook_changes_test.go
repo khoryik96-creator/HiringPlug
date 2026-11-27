@@ -72,11 +72,11 @@ func TestPatchKeepsThePeopleOutlookHas(t *testing.T) {
 		RemoteSnapshot: []byte(`{"id":"e1","attendees":[{"emailAddress":{"address":"guest@example.test"},"type":"optional"},{"emailAddress":{"address":"nadia@example.test"},"type":"required"},{"emailAddress":{"address":"not an address"},"type":"required"}]}`)}
 	out, err := patchBody(row, []byte(`{"subject":"x","attendees":[]}`))
 	require.NoError(t, err)
-	assert.NotContains(t, string(out), "attendees", "the people Outlook has (even one HiringPlug cannot read) stay")
+	assert.NotContains(t, string(out), "attendees", "the people Outlook has (even one HyPlug cannot read) stay")
 	row.Attendees = []byte(`[{"email":"nadia@example.test"}]`)
 	out, err = patchBody(row, []byte(`{"subject":"x","attendees":[]}`))
 	require.NoError(t, err)
-	assert.Contains(t, string(out), "attendees", "people HiringPlug changed are sent")
+	assert.Contains(t, string(out), "attendees", "people HyPlug changed are sent")
 	row.Source = "local"
 	row.Attendees = []byte(`[{"email":"nadia@example.test"},{"email":"guest@example.test","optional":true}]`)
 	out, err = patchBody(row, []byte(`{"subject":"x","attendees":[]}`))

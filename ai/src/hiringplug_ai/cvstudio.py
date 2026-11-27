@@ -62,7 +62,7 @@ def parse_prompt(correct_language: bool) -> str:
 
 
 def blind_prompt(neutral_gender: bool) -> str:
-    """CV Studio's blind prompt, then HiringPlug's structure and masking guardrails."""
+    """CV Studio's blind prompt, then HyPlug's structure and masking guardrails."""
     prompt = str(BLIND_SYSTEM_PROMPT)
     if neutral_gender:
         prompt += "\n\n" + str(BLIND_CANDIDATE_GENDER_NEUTRALIZATION_INSTRUCTION).strip()
@@ -146,7 +146,7 @@ def blind_refusal(exc: Exception) -> str | None:
 
 def after_blind(blinded: dict[str, Any], prepared: dict[str, Any]) -> dict[str, Any]:
     """CV Studio's five checks after the AI's anonymised answer, in its order,
-    against the prepared CV it was given; around them HiringPlug's guardrails
+    against the prepared CV it was given; around them HyPlug's guardrails
     (cvstudio_blind_guard): titles and dates the AI kept word for word as
     formatted, a word a mask cut in two given back ("Digital" never
     "[Company]gital"), jobs kept apart. Nothing the AI masked is copied back."""

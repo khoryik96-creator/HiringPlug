@@ -219,12 +219,12 @@ func (w *Watcher) Check(ctx context.Context) error {
 
 func (w *Watcher) message(all, due []Problem, over []string) mail.Message {
 	var b strings.Builder
-	subject := "HiringPlug: all clear"
+	subject := "HyPlug: all clear"
 	if len(all) > 0 { // some fixed, some still there
-		subject = fmt.Sprintf("HiringPlug: %d fixed, %d still to do on the server", len(over), len(all))
+		subject = fmt.Sprintf("HyPlug: %d fixed, %d still to do on the server", len(over), len(all))
 	}
 	if len(due) > 0 {
-		subject = fmt.Sprintf("HiringPlug needs you: %d problem(s) on the server", len(all))
+		subject = fmt.Sprintf("HyPlug needs you: %d problem(s) on the server", len(all))
 		b.WriteString("The server needs someone:\n\n")
 		for _, p := range all {
 			fmt.Fprintf(&b, "- %s\n", p.Text)
@@ -240,5 +240,5 @@ func (w *Watcher) message(all, due []Problem, over []string) mail.Message {
 		}
 	}
 	fmt.Fprintf(&b, "\nServer: %s (Settings > System shows more).\n", w.Server)
-	return mail.Message{FromName: "HiringPlug server", To: w.To, Subject: subject, Body: b.String()}
+	return mail.Message{FromName: "HyPlug server", To: w.To, Subject: subject, Body: b.String()}
 }

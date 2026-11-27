@@ -2,7 +2,7 @@ package documents
 
 // The same CV is never uploaded twice: a file with exactly the content of one
 // a candidate already has is refused, an import skips a file already in
-// HiringPlug, and the composer of an upload can ask first about CVs with the
+// HyPlug, and the composer of an upload can ask first about CVs with the
 // same file name (the SHA-256 of each file is worked out before sending it).
 
 import (
@@ -21,7 +21,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
-// Match is a CV already in HiringPlug like a file about to be uploaded.
+// Match is a CV already in HyPlug like a file about to be uploaded.
 type Match struct {
 	DocumentID, CandidateID, CandidateName, FileName string
 	CreatedAt                                        time.Time

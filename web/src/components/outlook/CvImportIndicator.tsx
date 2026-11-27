@@ -10,7 +10,7 @@ import { useTopbarPanel } from "../topbarPanel";
 import { CvImportOutcome } from "./ImportCvButton";
 import { markCvImportsSeen, stateOf, useCvImports } from "./outlookCvImports";
 
-/** The tab's title with the counts in front: "(1… 2✓ 1✗) HiringPlug". */
+/** The tab's title with the counts in front: "(1… 2✓ 1✗) HyPlug". */
 export function titleWithCounts(title: string, counts: { importing: number; done: number; failed: number }): string {
   const bare = title.replace(/^\([^)]*[…✓✗][^)]*\) /, "");
   const parts = [counts.importing && `${String(counts.importing)}…`, counts.done && `${String(counts.done)}✓`, counts.failed && `${String(counts.failed)}✗`].filter(Boolean);

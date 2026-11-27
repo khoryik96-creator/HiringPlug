@@ -150,7 +150,7 @@ type OutlookChange struct {
 
 // ApplyOutlookChange takes an Outlook change into an interview, bounded to
 // what the interview holds (Outlook allows longer text): an empty title keeps
-// the old one, and a length HiringPlug does not schedule is refused.
+// the old one, and a length HyPlug does not schedule is refused.
 func ApplyOutlookChange(d Details, c OutlookChange) (Details, apperr.FieldErrors) {
 	if c.Title != nil {
 		if title := strings.Join(strings.Fields(*c.Title), " "); title != "" {

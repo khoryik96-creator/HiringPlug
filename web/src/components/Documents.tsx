@@ -35,7 +35,7 @@ const kindOf = (d: Document) => fileKind(d.contentType);
 /**
  * A candidate's CVs on their CV & files tab: upload, reading status (polled while the AI worker reads
  * or parses them), the text, and the details parsed from it for review. Their
- * own CVs first, then the ones HiringPlug made.
+ * own CVs first, then the ones HyPlug made.
  */
 export function Documents({ candidate, canUpload, canEdit, permissions = [] }: { candidate: Candidate; canUpload: boolean; canEdit: boolean; permissions?: Permission[] }) {
   const [picked, setPicked] = useState<string>();

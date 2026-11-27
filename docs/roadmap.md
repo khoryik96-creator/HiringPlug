@@ -74,6 +74,7 @@ five are being built now; the rest are queued in this order.
 | ✅ 1.53.0 | **Mail dock**: the Outlook mailbox (inbox, folders, reading, replying) docked on the right beside any page, one dock at a time with the calendar's. Fix: a job title or employer with no spaces wraps inside the candidate header's tile | The mail could only be read on its own page; such a title ran over the next tile |
 | ✅ 1.54.0 | **Outlook attachments as in Outlook**: Download all (one .zip), a PDF or picture opens to view on a click; after Send the mail stays where you were | Each file downloaded one by one, a PDF only by downloading it; Send jumped to the Scheduled list |
 | ✅ 1.55.0 | **Stale records**: contacts and companies nobody touched for a year (no edit, note, email or job; a contact touched touches its company; automatic checks do not count) get a "Not touched in a year" tag and filter on their lists (and in exports), and the first morning email of each month counts them with links | Data went out of date quietly |
+| ✅ 1.56.0 | **Renamed HyPlug** in everything people see: the app, its emails, page titles, Help, the companion's text, the docs. Kept: formatted CVs (the agency's branding), hidden names (Go module, database, `HP_*` settings, Python package, saved keys), and what other systems rely on (webhook headers `X-HiringPlug-*`, the web client names, calendar PRODIDs, the JobAdder tool's program and workspace). The LinkedIn companion takes updates under either name from 1.7.0; its listed name changes in a later release | The product's name changed |
 | ⬜ | Single sign-on (Microsoft, Google) | After two-step sign-in |
 | ⬜ | Cloud readiness: files in object storage, sign-in limits in PostgreSQL, key rotation, metrics and alerts (Phase 7) | Needed to host many agencies |
 | ⬜ | Accessibility and visual checks in the browser tests | Screens are checked by hand |
@@ -171,7 +172,7 @@ sign-in (1.7).
 - **The AI provider and hosting region** for DeepSeek (steps 5.3 and 5.4 are built and switched off until then): its address, key and model name, set as `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL` with `HP_AI_PROVIDER=openai_compatible`.
 - **Calendar sync** (step 4.3): a Google Cloud OAuth app and/or a Microsoft
   Entra app registration (client ID and secret), and the address people reach
-  HiringPlug at (for the sign-in redirect).
+  HyPlug at (for the sign-in redirect).
 - **Replies in the app** (step 4.3): either each user connects their mailbox
   (Google / Microsoft sign-in), or replies go to one shared inbox the app reads
   (its IMAP settings).

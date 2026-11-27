@@ -1,5 +1,5 @@
 /*
- * HiringPlug: on a LinkedIn profile's Experience page, the roles shown as
+ * HyPlug: on a LinkedIn profile's Experience page, the roles shown as
  * current ("… – Present") at other companies, each with its company's exact
  * LinkedIn page: where a contact who left works now. Read in the same
  * background tab, right after CV Studio's reader (reader.js) has read their

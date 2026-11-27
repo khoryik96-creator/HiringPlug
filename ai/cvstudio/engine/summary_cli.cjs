@@ -1,5 +1,5 @@
 'use strict';
-// HiringPlug's adapter (new glue, not CV Studio code): CV Studio's "About Him /
+// HyPlug's adapter (new glue, not CV Studio code): CV Studio's "About Him /
 // Her" summary helpers from vendor/cvstudio/candidate-summary.js, unchanged,
 // for the Python AI worker. That file is browser code: it is loaded in a
 // sandbox where the page (document, window, storage) is a stand-in that does

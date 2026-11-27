@@ -1,7 +1,7 @@
 package cvformats
 
 // Which formatted CVs may go to a client (a client shortlist link): one
-// HiringPlug made, without the salary, showing neither the candidate's
+// HyPlug made, without the salary, showing neither the candidate's
 // email nor phone.
 
 import (
@@ -32,7 +32,7 @@ type ClientCV struct {
 // caller's transaction. When it may not, reason says why, in words for the
 // recruiter ("includes the salary: ...").
 func (m *Module) ForClient(ctx context.Context, tx pgx.Tx, p authz.Principal, candidateID, documentID string) (ClientCV, string, error) {
-	const notMade = "is not a formatted CV made by HiringPlug: make a blind or formatted CV for them first"
+	const notMade = "is not a formatted CV made by HyPlug: make a blind or formatted CV for them first"
 	if salary, err := m.IncludesSalary(ctx, tx, documentID); err != nil || salary { // said before its file is read (refused to some)
 		return ClientCV{}, "includes the salary: make one without it", err
 	}
@@ -59,7 +59,7 @@ func (m *Module) ForClient(ctx context.Context, tx pgx.Tx, p authz.Principal, ca
 	}
 	leaks, err := Leaks(f.Data, IdentityOf(cand))
 	if err != nil {
-		return ClientCV{}, notMade, nil //nolint:nilerr // not a Word file HiringPlug made
+		return ClientCV{}, notMade, nil //nolint:nilerr // not a Word file HyPlug made
 	}
 	if slices.Contains(leaks, "email") || slices.Contains(leaks, "phone") {
 		return ClientCV{}, "shows their email or phone number: make one without contact details, or a blind one", nil

@@ -1,4 +1,4 @@
-// The HiringPlug LinkedIn companion (extension/linkedin-companion): a browser
+// The HyPlug LinkedIn companion (extension/linkedin-companion): a browser
 // extension that reads LinkedIn in the recruiter's own browser. Its bridge,
 // on this page, answers window messages; this is the page's side.
 import { useEffect, useState } from "react";
@@ -13,7 +13,7 @@ const fromCompanion = (e: MessageEvent): Reply | null => {
   return e.source === window && e.origin === window.location.origin && data?.source === COMPANION ? data : null;
 };
 
-/** Whether the companion is installed and connected to this HiringPlug (null while asking). */
+/** Whether the companion is installed and connected to this HyPlug (null while asking). */
 export function useCompanion(): { ready: boolean | null; version: string | null } {
   const [state, setState] = useState<{ ready: boolean | null; version: string | null }>({ ready: null, version: null });
   useEffect(() => {

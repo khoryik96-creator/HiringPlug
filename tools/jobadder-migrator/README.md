@@ -1,14 +1,14 @@
-# HiringPlug Migration: JobAdder discovery
+# HyPlug Migration: JobAdder discovery
 
 A separate Go application with a local browser interface. This first release
 inventories accessible JobAdder resources and saves the original discovery
 responses. **It does not yet export 80,000 candidate records, download CVs or
-import anything into HiringPlug.** No source records are modified.
+import anything into HyPlug.** No source records are modified.
 
 ## Windows: run the packaged tool
 
 1. Extract the ZIP to a local folder. Keep the executable, launchers and this
-   README together. No Docker, Go, Python or HiringPlug installation is needed.
+   README together. No Docker, Go, Python or HyPlug installation is needed.
 2. Double-click **Demo.bat** to try synthetic sample data without credentials.
    Close its console before opening the real tool on the same port.
 3. Double-click **Start.bat** for your real account. Keep the console open.
@@ -20,7 +20,7 @@ import anything into HiringPlug.** No source records are modified.
 
 The default workspace is `%APPDATA%\HiringPlugMigration`. Demo data lives in its
 separate `demo` subfolder. The browser opens automatically; if it does not, open
-`HiringPlug Migration.url` inside the workspace while the console is running.
+`HyPlug Migration.url` inside the workspace while the console is running.
 That shortcut contains a private local session key: do not share it.
 
 Press Ctrl+C to stop. Reopen with the same workspace and passphrase, then use
@@ -122,7 +122,7 @@ separate JobAdder export. The coverage report lists these gaps explicitly.
   and omit its WAL files. Replacing the executable does not reset the workspace.
 - API resource calls use GET only. OAuth token exchange/refresh uses POST to
   JobAdder's authorization server; it does not write business records. There
-  are no HiringPlug writes, AI calls, analytics or background CV parsing.
+  are no HyPlug writes, AI calls, analytics or background CV parsing.
 
 ## Develop and verify
 
@@ -152,4 +152,4 @@ pause/resume, denied-access reporting, downloads and mobile layout. It does not
 test real JobAdder consent or promise that every account exposes every endpoint.
 
 The full migration architecture and remaining stages are documented in
-`docs/jobadder-migration.md` in the HiringPlug repository.
+`docs/jobadder-migration.md` in the HyPlug repository.

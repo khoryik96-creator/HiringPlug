@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts HiringPlug in a codespace: its own random secrets (made once), the
+# Starts HyPlug in a codespace: its own random secrets (made once), the
 # Docker stack, and on the first start an agency whose owner chooses a
 # password from a link. Runs at every start of the codespace; safe to rerun.
 set -euo pipefail
@@ -38,10 +38,10 @@ fi
 
 for _ in $(seq 60); do docker info >/dev/null 2>&1 && break; sleep 2; done
 compose=(docker compose -f deploy/docker-compose.yml)
-echo "Starting HiringPlug (the first start builds it: about 10 minutes)..."
+echo "Starting HyPlug (the first start builds it: about 10 minutes)..."
 if ! "${compose[@]}" up -d --build --wait postgres mailpit api worker ai-worker web; then
   echo
-  echo "HiringPlug did not start. What the database set-up (bootstrap) said:"
+  echo "HyPlug did not start. What the database set-up (bootstrap) said:"
   "${compose[@]}" logs --no-color --tail 30 bootstrap || true
   echo "Run this script again to retry: bash .devcontainer/start.sh"
   exit 1
@@ -52,10 +52,10 @@ agencies=$("${compose[@]}" exec -T postgres psql -U postgres -d hiringplug -Atc 
 if [ "$agencies" = "0" ]; then
   email=$(git config user.email || true)
   name=$(git config user.name || true)
-  "${compose[@]}" run --rm -T bootstrap /app/hp tenant -name "HiringPlug trial" \
+  "${compose[@]}" run --rm -T bootstrap /app/hp tenant -name "HyPlug trial" \
     -owner-email "${email:-owner@example.com}" -owner-name "${name:-Owner}" > "$link_file"
 fi
 echo
-echo "HiringPlug is running: ${HP_PUBLIC_URL:-http://localhost:3000}"
+echo "HyPlug is running: ${HP_PUBLIC_URL:-http://localhost:3000}"
 [ -f "$link_file" ] && cat "$link_file"
 echo "Sign-in details are kept in $link_file. A new password link: bash .devcontainer/password-link.sh"

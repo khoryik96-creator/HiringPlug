@@ -274,7 +274,7 @@ export function ChangePassword({ hasPassword = true }: { hasPassword?: boolean }
     return (
       <section className="panel" aria-label="Your password">
         <h3>Your password</h3>
-        <p>You sign in with Microsoft, so there is no HiringPlug password to change.</p>
+        <p>You sign in with Microsoft, so there is no HyPlug password to change.</p>
       </section>
     );
   }

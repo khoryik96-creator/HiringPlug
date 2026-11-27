@@ -77,7 +77,7 @@ func backupOwner() (uid, gid int, set bool, err error) {
 // filesOwner reads who the uploaded files belong to: the user the API and
 // workers run as (HP_FILES_OWNER, else HP_BACKUP_OWNER: in Docker both are
 // 65532:65532). nil: neither is set, and restored files stay this
-// process's own (running HiringPlug as yourself, without Docker).
+// process's own (running HyPlug as yourself, without Docker).
 func filesOwner() (*backup.Owner, error) {
 	if os.Getenv("HP_FILES_OWNER") != "" {
 		return ownerSetting("HP_FILES_OWNER")

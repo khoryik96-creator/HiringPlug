@@ -119,7 +119,7 @@ func TestOutlookInterviewCandidateRSVPAndMovingReminder(t *testing.T) {
 		require.EqualValues(t, expected, *state.CandidateResponse)
 	}
 	c.reply("accepted")
-	state := c.reply("organizer") // an answer HiringPlug does not map
+	state := c.reply("organizer") // an answer HyPlug does not map
 	require.NotNil(t, state.CandidateResponse, "an answer we do not know leaves the last one")
 	require.EqualValues(t, "accepted", *state.CandidateResponse)
 	res := c.a.request(http.MethodPatch, c.path, c.user, map[string]any{

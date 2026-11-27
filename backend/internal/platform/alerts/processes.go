@@ -72,7 +72,7 @@ func processProblems(procs []ProcessState, version string) []Problem {
 				"%s has not checked in since %s: the work it does waits.", ProcessName(p.Name), p.SeenAt.Format(time.RFC1123))})
 		case OldVersion:
 			out = append(out, Problem{"process-version-" + p.Name, fmt.Sprintf(
-				"%s still runs version %s, the rest of HiringPlug %s: restart it after the update.", ProcessName(p.Name), p.Version, version)})
+				"%s still runs version %s, the rest of HyPlug %s: restart it after the update.", ProcessName(p.Name), p.Version, version)})
 		}
 	}
 	return out

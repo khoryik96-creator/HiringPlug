@@ -118,7 +118,7 @@ func serveDocs(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	_, _ = w.Write([]byte(`<!doctype html>
 <html>
-  <head><title>HiringPlug API</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
+  <head><title>HyPlug API</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
   <body>
     <script id="api-reference" data-url="/openapi.json"></script>
     <script src="` + docsScript + `" integrity="` + docsScriptHash + `" crossorigin="anonymous"></script>

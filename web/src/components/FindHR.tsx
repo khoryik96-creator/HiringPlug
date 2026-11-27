@@ -201,7 +201,7 @@ export function FindHR({ company, canCreate, canUseApollo, compact = false }: { 
         </div>
         <div className="table-scroll">
           <table className="hr-people">
-            <thead><tr><th>Person</th><th>Fit</th><th>Joined</th><th>In HiringPlug</th></tr></thead>
+            <thead><tr><th>Person</th><th>Fit</th><th>Joined</th><th>In HyPlug</th></tr></thead>
             <tbody>
               {visible.map((p) => (
                 <tr key={p.url} className={`${picked.includes(p.url) ? "picked" : ""}${p.contactId ? " have" : ""}`} aria-selected={picked.includes(p.url)}
@@ -214,7 +214,7 @@ export function FindHR({ company, canCreate, canUseApollo, compact = false }: { 
                   <td className="nowrap">{p.joined ? linkedinDates(p.joined) : p.current === false ? <span className="muted">left {linkedinDates(p.left)}</span> : <span className="muted">—</span>}</td>
                   <td>
                     <HRMatch person={p} />
-                    {/* No Apollo credit for a work email HiringPlug has already. */}
+                    {/* No Apollo credit for a work email HyPlug has already. */}
                     {canUseApollo && apollo.data && apollo.data.state !== "disabled" && p.current !== false && !workEmailKnown(p) &&
                       <button type="button" className="link small hr-email-action" aria-label={`Work email for ${p.name}`}
                         onClick={(e) => { e.stopPropagation(); setApolloPerson(p); }}>Work email</button>}

@@ -20,7 +20,7 @@ export const STATUS_TEXT: Record<Status, string> = {
   added: "Added to existing candidate",
   unread: "New candidate — fill in the details",
   failed: "Failed",
-  duplicate: "Skipped: already in HiringPlug",
+  duplicate: "Skipped: already in HyPlug",
 };
 const BADGE: Record<Status, string> = { reading: "queued", created: "valid", added: "unknown", unread: "risky", failed: "invalid", duplicate: "closed" };
 
@@ -80,7 +80,7 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
     refetchInterval: (q) => (q.state.data?.some((i) => i.counts.reading > 0) ? 3000 : false),
   });
 
-  // Step one: look for CVs already in HiringPlug; import at once when nothing needs asking.
+  // Step one: look for CVs already in HyPlug; import at once when nothing needs asking.
   const check = useMutation({
     mutationFn: async (request: ImportRequest) => {
       if (getToken() !== sessionToken) throw new Error("Your sign-in changed. Open the page again before importing.");
@@ -182,13 +182,13 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
       </div>}
       {review && review.skipped.length > 0 && (
         <div className="dup-ask" role="status" aria-label="Skipped files">
-          <p><strong>Skipped {review.skipped.length === 1 ? "1 file" : `${String(review.skipped.length)} files`}</strong>: exactly the same file is already in HiringPlug.</p>
+          <p><strong>Skipped {review.skipped.length === 1 ? "1 file" : `${String(review.skipped.length)} files`}</strong>: exactly the same file is already in HyPlug.</p>
           <ul>{review.skipped.map((x) => <li key={x.file.name}>{x.file.name}: <a href={`#/candidates/${x.match.candidateId}`}>{matchText(x.match)}</a></li>)}</ul>
         </div>
       )}
       {review && review.asks.length > 0 && (
         <div className="dup-ask" role="group" aria-label="Files with the same name as a CV already here">
-          <p>These have the same name as a CV already in HiringPlug, with other content. Tick the ones to import anyway:</p>
+          <p>These have the same name as a CV already in HyPlug, with other content. Tick the ones to import anyway:</p>
           {review.asks.map((x, i) => (
             <label key={x.file.name} className="check">
               <input type="checkbox" checked={x.upload} disabled={busy}

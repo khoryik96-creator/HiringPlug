@@ -21,7 +21,7 @@ export function CvImportOutcome({ view }: { view: CvImportView }) {
     case "created": return <span>New candidate: {who}</span>;
     case "unread": return <span>New candidate (fill in the details): {who}</span>;
     case "added": return <span>Added to {who}</span>;
-    case "duplicate": return <span>Already in HiringPlug: {who}</span>;
+    case "duplicate": return <span>Already in HyPlug: {who}</span>;
     case "failed":
     case "error": return <span className="error">{view.error ?? "The CV could not be imported."}</span>;
   }

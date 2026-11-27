@@ -2,7 +2,7 @@
 -- the job table as it was: emails waiting to be sent, calendar updates,
 -- webhooks, automations. Put back (on another server, or this one after
 -- they had already happened), they would run again. So `hp restore` moves
--- the waiting and running jobs of the kinds that act outside HiringPlug to
+-- the waiting and running jobs of the kinds that act outside HyPlug to
 -- a new status, held, which no worker claims (the claim functions take
 -- pending and running jobs only), until someone releases or cancels them
 -- in Settings > System (or with hp jobs). Paid AI work waiting in the

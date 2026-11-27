@@ -63,7 +63,7 @@ func TestChallengesAreSignedAndShortLived(t *testing.T) {
 
 func TestTheAppIsToldTheCompanyAndPerson(t *testing.T) {
 	uri := TOTPURI("ABC", "Hyppies Sdn Bhd", "siti@hyppies.example")
-	assert.True(t, strings.HasPrefix(uri, "otpauth://totp/HiringPlug%20%28Hyppies%20Sdn%20Bhd%29:siti@hyppies.example?"), uri)
+	assert.True(t, strings.HasPrefix(uri, "otpauth://totp/HyPlug%20%28Hyppies%20Sdn%20Bhd%29:siti@hyppies.example?"), uri)
 	assert.Contains(t, uri, "secret=ABC")
-	assert.Contains(t, uri, "issuer=HiringPlug")
+	assert.Contains(t, uri, "issuer=HyPlug")
 }

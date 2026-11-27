@@ -35,7 +35,7 @@ export function ApolloIntegration() {
       {!state ? (connection.error ? <p className="error small">Apollo could not be checked just now.</p> : <p className="muted small" role="status">Checking Apollo…</p>)
         : state === "disabled" ? (
         <div className="small">
-          <p>To turn it on, whoever runs your HiringPlug server sets these two settings (on the API and the worker) and restarts it:</p>
+          <p>To turn it on, whoever runs your HyPlug server sets these two settings (on the API and the worker) and restarts it:</p>
           <pre className="code-block">HP_APOLLO_BROKER_URL=https://&lt;your-worker&gt;.workers.dev{"\n"}HP_APOLLO_KEYS_SECRET=&lt;a random secret of 32+ characters&gt;</pre>
           <p className="muted">The broker is the small Apollo sign-in service in tools/apollo-broker (see its README). Then each recruiter connects here.</p>
         </div>

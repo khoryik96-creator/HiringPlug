@@ -1,6 +1,6 @@
 # Architecture
 
-HiringPlug is **one codebase split into strict modules** (a *modular
+HyPlug is **one codebase split into strict modules** (a *modular
 monolith*), written in three languages, each where it is strongest:
 
 - **Go** runs the API, the business rules, the database and core background
@@ -211,7 +211,7 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   tries left; on its last attempt the claim ends it (dead, migration 00202),
   and its dead-job handler runs, so a job that kills its worker never loops.
 - **Held after a restore.** `hp restore` moves the waiting and running jobs
-  that act outside HiringPlug (`jobqueue.Outbound`: emails, calendar
+  that act outside HyPlug (`jobqueue.Outbound`: emails, calendar
   updates, webhooks, automations, uploads, paid lookups, and reads with the
   restored sign-ins) and the paid AI work (`jobqueue.PaidAI`, and CV and job
   description readings that ask the AI) to `held`, which no claim takes, and

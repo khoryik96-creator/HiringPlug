@@ -33,7 +33,7 @@ func (e *providerError) Error() string {
 		return "Outlook did not allow calendar access; reconnect and approve calendar permissions"
 	}
 	if e.Status == 412 {
-		return "Outlook changed this event; review it before keeping the HiringPlug schedule"
+		return "Outlook changed this event; review it before keeping the HyPlug schedule"
 	}
 	return fmt.Sprintf("Outlook calendar request failed (HTTP %d)", e.Status)
 }

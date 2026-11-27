@@ -25,7 +25,7 @@ SECRET = "sig=0123456789abcdef"
 
 class _Answer(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        # /files/<status>[/missing]: /missing answers as HiringPlug's file server does for a file not there.
+        # /files/<status>[/missing]: /missing answers as HyPlug's file server does for a file not there.
         parts = self.path.split("?")[0].split("/")
         status = int(parts[2])
         self.send_response(status)

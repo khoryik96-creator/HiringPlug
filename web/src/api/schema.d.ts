@@ -621,7 +621,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry a failed write or explicitly keep the HiringPlug schedule after an Outlook change */
+        /** Retry a failed write or explicitly keep the HyPlug schedule after an Outlook change */
         post: operations["retryCalendarEvent"];
         delete?: never;
         options?: never;
@@ -1769,7 +1769,7 @@ export interface paths {
         put?: never;
         /**
          * Start checking on LinkedIn where a company's contacts (or one contact) work
-         * @description For each contact with a LinkedIn profile, a check bound to the contact, their profile and the company's LinkedIn page. The recruiter's HiringPlug LinkedIn companion (a browser extension) reads the dates of their time at that company from the profile and answers each check within 15 minutes. LinkedIn is never read by the server.
+         * @description For each contact with a LinkedIn profile, a check bound to the contact, their profile and the company's LinkedIn page. The recruiter's HyPlug LinkedIn companion (a browser extension) reads the dates of their time at that company from the profile and answers each check within 15 minutes. LinkedIn is never read by the server.
          */
         post: operations["startContactLinkedinChecks"];
         delete?: never;
@@ -2110,7 +2110,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * CVs already in HiringPlug like the files about to be uploaded
+         * CVs already in HyPlug like the files about to be uploaded
          * @description For each file (its name and SHA-256, worked out before uploading): a CV with exactly the same content (sameContent: skip it), and CVs with the same file name (sameName: ask). With candidateId, only that candidate's; without, any candidate's you may see.
          */
         post: operations["findDocumentMatches"];
@@ -2202,7 +2202,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a formatted CV (its file and PDF copy too)
-         * @description Only CVs HiringPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
+         * @description Only CVs HyPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
          */
         delete: operations["deleteDocument"];
         options?: never;
@@ -3468,7 +3468,7 @@ export interface paths {
         put?: never;
         /**
          * Email someone a link to (re)connect their Microsoft account, whatever its address (7 days, once; only owners for owners; not yourself)
-         * @description For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HiringPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HiringPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
+         * @description For someone whose Microsoft account was unlinked, or whose sign-in name differs from their HyPlug email. Signing in with Microsoft from the link links the account to them: an account of the company's organisation, connected to nobody else there. The link goes only to their HyPlug email, never to whoever sends it (it would let them sign in as that person). Yourself: connect from Your account. A newer link replaces the older one. Audited (user.microsoft_reconnect_sent).
          */
         post: operations["sendMicrosoftReconnectLink"];
         delete?: never;
@@ -7031,7 +7031,7 @@ export interface components {
             editable: boolean;
             /**
              * Format: date-time
-             * @description When HiringPlug last took a change made in Outlook to this HiringPlug-sent meeting.
+             * @description When HyPlug last took a change made in Outlook to this HyPlug-sent meeting.
              */
             outlookChangedAt: string | null;
         };
@@ -7771,7 +7771,7 @@ export interface components {
         /** @enum {string} */
         ClaimStorageProvider: "google_drive" | "onedrive" | "dropbox";
         /**
-         * @description disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HiringPlug's access: connect the account again.
+         * @description disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HyPlug's access: connect the account again.
          * @enum {string}
          */
         ClaimStorageStatus: "disconnected" | "ok" | "reconnect";
@@ -8243,7 +8243,7 @@ export interface components {
             /** @description A contact with the same or a similar name (a possible duplicate), when none has their profile. */
             duplicateOf: string | null;
             duplicateName: string | null;
-            /** @description The contact in HiringPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none. */
+            /** @description The contact in HyPlug who is, or may be, this person (the likeliest), anywhere in the agency; null for none. */
             match: components["schemas"]["HrScanMatch"] | null;
         };
         HrScanMatch: {
@@ -8256,11 +8256,11 @@ export interface components {
             name: string;
             title: string | null;
             companyId: string;
-            /** @description The company the contact is at in HiringPlug. */
+            /** @description The company the contact is at in HyPlug. */
             companyName: string;
             /** @description The contact is at the company searched. */
             sameCompany: boolean;
-            /** @description Their email in HiringPlug. */
+            /** @description Their email in HyPlug. */
             email: string | null;
             emailCheckStatus: components["schemas"]["EmailCheckStatus"] | null;
             /** @description The email is at a free mail service (gmail.com and the like): their own, not their work address. */
@@ -8521,7 +8521,7 @@ export interface components {
         ContactLinkedinChecksStarted: {
             /** @description The company's LinkedIn page, https://www.linkedin.com/company/.../ */
             companyUrl: string;
-            /** @description The company's name in HiringPlug: a role linked to no LinkedIn page may match it by name. */
+            /** @description The company's name in HyPlug: a role linked to no LinkedIn page may match it by name. */
             companyName: string;
             checks: components["schemas"]["ContactLinkedinCheckRequest"][];
             /** @description Contacts not checked this time, and why. */
@@ -10048,7 +10048,7 @@ export interface components {
         /** @example cvf_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CvImportItemId: string;
         /**
-         * @description reading = being read; created = a new candidate, filled in from the file; added = the file went to the candidate who already has its email; unread = a new candidate named after the file (its details could not be read: fill them in); failed = not a CV file (see error); duplicate = exactly the same file is already in HiringPlug (candidateId is whose): skipped, no new candidate.
+         * @description reading = being read; created = a new candidate, filled in from the file; added = the file went to the candidate who already has its email; unread = a new candidate named after the file (its details could not be read: fill them in); failed = not a CV file (see error); duplicate = exactly the same file is already in HyPlug (candidateId is whose): skipped, no new candidate.
          * @enum {string}
          */
         CvImportItemStatus: "reading" | "created" | "added" | "unread" | "failed" | "duplicate";
@@ -10422,7 +10422,7 @@ export interface components {
             updatedAt: string;
             /**
              * Format: date-time
-             * @description When HiringPlug last took a change its organizer made in Outlook to this interview.
+             * @description When HyPlug last took a change its organizer made in Outlook to this interview.
              */
             outlookChangedAt: string | null;
         };
@@ -12599,7 +12599,7 @@ export interface components {
             userId: string;
         };
         ServerChecks: {
-            /** @description The version of HiringPlug the API runs (the VERSION file). */
+            /** @description The version of HyPlug the API runs (the VERSION file). */
             version: string;
             /** @description The background worker and the AI worker, as each last reported (every half minute). */
             processes: components["schemas"]["ServerProcess"][];
@@ -12633,7 +12633,7 @@ export interface components {
             paidAi: components["schemas"]["PaidAiSwitch"];
             /** @description Checks of the server itself (its workers, files folder and disk, and what the alert emails would report); only for the agency that runs the server (heldEveryCompany), null for others. */
             server: components["schemas"]["ServerChecks"] | null;
-            /** @description Jobs a restore held because they act outside HiringPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany). */
+            /** @description Jobs a restore held because they act outside HyPlug (emails, calendar updates, webhooks, automations...) or ask a paid AI: they run only once released (oldest first, at most 200). The company's own; every company's for the agency that runs the server (heldEveryCompany). */
             held: components["schemas"]["HeldJob"][];
             /** @description The person runs the server (an owner or admin of HP_BACKUP_TENANT's agency, or of the only one): held lists every company's held jobs, and releasing or cancelling them all acts on every company. */
             heldEveryCompany: boolean;

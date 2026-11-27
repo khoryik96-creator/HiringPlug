@@ -36,7 +36,7 @@ describe("System › server checks", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(status({ heldEveryCompany: true, server: server() })));
     renderWithClient(<System />);
     const panel = await screen.findByRole("region", { name: "Server checks" });
-    expect(panel.textContent).toContain("All is well. HiringPlug 1.52.0.");
+    expect(panel.textContent).toContain("All is well. HyPlug 1.52.0.");
     expect(panel.textContent).toContain("40.0 GB free of 100.0 GB.");
     expect(panel.textContent).toContain("Files can be saved and opened.");
   });
@@ -47,14 +47,14 @@ describe("System › server checks", () => {
       server: server({
         processes: [running("worker"), { ...running("ai-worker", "1.51.0"), state: "old_version" }],
         files: "cannot write: permission denied",
-        problems: ["The AI worker still runs version 1.51.0, the rest of HiringPlug 1.52.0: restart it after the update."],
+        problems: ["The AI worker still runs version 1.51.0, the rest of HyPlug 1.52.0: restart it after the update."],
       }),
     })));
     renderWithClient(<System />);
     const panel = await screen.findByRole("region", { name: "Server checks" });
     expect(panel.textContent).toContain("Something needs looking at.");
     expect(panel.textContent).toContain("Old version");
-    expect(panel.textContent).toContain("Runs 1.51.0, the rest of HiringPlug 1.52.0: restart it after the update.");
+    expect(panel.textContent).toContain("Runs 1.51.0, the rest of HyPlug 1.52.0: restart it after the update.");
     expect(panel.textContent).toContain("Files cannot be saved or opened: cannot write: permission denied");
     expect(screen.getByText(/The AI worker still runs version 1\.51\.0/, { selector: "li" })).toBeTruthy();
   });

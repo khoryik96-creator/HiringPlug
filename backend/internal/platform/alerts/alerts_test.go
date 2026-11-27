@@ -73,7 +73,7 @@ func TestTheServerSaysWhenItNeedsSomeone(t *testing.T) {
 	require.Len(t, box.got, 1)
 	sent := box.got[0]
 	assert.Equal(t, []string{"it@agency.test"}, sent.To)
-	assert.Equal(t, "HiringPlug needs you: 3 problem(s) on the server", sent.Subject)
+	assert.Equal(t, "HyPlug needs you: 3 problem(s) on the server", sent.Subject)
 	assert.Contains(t, sent.Body, "rclone: access denied")
 	assert.Contains(t, sent.Body, "3.0 GB free of 100.0 GB")
 	assert.Contains(t, sent.Body, "https://app.agency.test")
@@ -96,7 +96,7 @@ func TestTheServerSaysWhenItNeedsSomeone(t *testing.T) {
 	require.Len(t, box.got, 3)
 	assert.Contains(t, box.got[2].Body, "Over now:")
 	assert.Contains(t, box.got[2].Body, "rclone: access denied")
-	assert.Equal(t, "HiringPlug: 2 fixed, 1 still to do on the server", box.got[2].Subject, "a task still failed in the last day")
+	assert.Equal(t, "HyPlug: 2 fixed, 1 still to do on the server", box.got[2].Subject, "a task still failed in the last day")
 	require.NoError(t, w.Check(ctx))
 	assert.Len(t, box.got, 3)
 }
