@@ -20,16 +20,20 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
+### Stage categories (1st, 2nd, Final Interview)
+- Who: Claude (account B)
+- Branch: claude/brave-thompson-k08hlg (worked locally, merged when verified)
+- Touches: pipeline module (stage_category table, migration 00207, stages, moves), reports funnel, web Settings › Pipeline stages, StepsEditor, PipelineBoard, CandidateApplications, Reports
+- Started: 27 Nov 2026    Last update: 27 Nov 2026
+- State: verifying 1.57.0
+- Next: merge when `task verify` passes; then remove this entry.
+
 ### Post-migration fixes and the HyPlug rename (taken over)
 - Who: Claude (account B), taken over from Claude (account A) on 26 Nov at the owner's request
 - Branch: claude/brave-thompson-k08hlg
 - Touches: the product's name everywhere people see it (1.56.0, the rename), then the PDF text reader
 - Started: 25 Nov 2026    Last update: 27 Nov 2026
-- State: merged: 1.50.1 (held repeating jobs), 1.51.0 (P1), 1.52.0 (server checks), 1.53.0 (mail dock, header wrap),
-  1.54.0 (Download all, view attachments, stay after Send), 1.55.0 (stale records: tag, filter, monthly email line).
-  The owner said go on the rename (27 Nov). Waiting on the owner: the CV whose PDF reads without spaces ("DatabaseAdministrator").
-- Next:
-  1. The rename (1.56.0) is merging. Left for later: the LinkedIn companion's listed name (manifest "name") becomes
-     "HyPlug LinkedIn Companion" once companions run 1.7.0 (its updater takes either name from then on).
-  2. With the owner's CV: PDF text read without word gaps (pdfplumber x_tolerance in ai/.../extraction/columns.py),
-     re-checked against the 31 sample CVs.
+- State: merged: 1.50.1 to 1.55.0, the rename 1.56.0, 1.56.1 (the committed migrations 1.56.0 changed put back),
+  1.56.2 (PDFs saved without spaces between words read right; the owner's CV).
+- Next: the LinkedIn companion's listed name (manifest "name") becomes "HyPlug LinkedIn Companion" once companions
+  run 1.7.0 (its updater takes either name from then on).
