@@ -44,7 +44,8 @@ it("offers Create job to anyone who may add jobs, on a received message (not a d
     items: [{ id: "jd", fileName: "Finance Manager JD.pdf", sizeBytes: 9000, downloadable: true, savable: true }], more: false,
   }))) as never);
   const view = renderWithClient(<OutlookAttachments messageId="omg_1" />); // no CV imports for them
-  expect(await screen.findByRole("button", { name: "Create a job from Finance Manager JD.pdf" })).toBeTruthy();
+  const create = await screen.findByRole("button", { name: "Create a job from Finance Manager JD.pdf" });
+  expect([create.textContent, create.getAttribute("data-tip")], "an icon, named by its tooltip").toEqual(["", "Create job"]);
   view.rerender(<OutlookAttachments messageId="omg_1" remove={{ disabled: false, onPick: vi.fn() }} />); // their own draft
   await waitFor(() => { expect(screen.queryByRole("button", { name: "Create a job from Finance Manager JD.pdf" })).toBeNull(); });
 });

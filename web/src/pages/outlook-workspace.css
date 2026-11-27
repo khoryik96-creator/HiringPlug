@@ -249,6 +249,10 @@ summary.icon-action.disabled { opacity: .45; cursor: default; }
   font-weight: 600; font-size: .9rem; cursor: pointer; list-style: none; border: 1.5px solid var(--line, #ded8eb); background: var(--surface, #fff);
 }
 .outlook-import::-webkit-details-marker { display: none; }
+/* As icons (Import CV, Create job): square, the state's colour on the outline. */
+.outlook-import.icon-action { width: 36px; padding: 0; justify-content: center; gap: 0; position: relative; }
+.outlook-import.icon-action:not(.importing, .done, .failed) { border-color: transparent; background: none; } /* plain like Download until it is doing something */
+.outlook-attachments-more { margin-top: .25rem; font-weight: 600; }
 .outlook-import svg { width: 19px; height: 19px; }
 .outlook-import.importing { border-color: #f59e0b; background: #fff7e6; color: #b45309; }
 .outlook-import.done { border-color: #22c55e; color: #15803d; }

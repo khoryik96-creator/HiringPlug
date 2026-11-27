@@ -13,6 +13,9 @@ import { ImportCvButton } from "./ImportCvButton";
 
 type Attachment = Schemas["OutlookAttachment"];
 
+/** How many files show before "Show all" (as Outlook folds a long list). */
+export const FIRST_FILES = 4;
+
 /** What the viewer can show in the app (as Outlook previews them): a PDF or a picture; null for anything else. */
 export function viewableType(fileName: string): string | null {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
@@ -56,6 +59,9 @@ export function OutlookAttachments({ messageId, canImportCv = false, userId, rem
     mutationFn: () => downloadFrom(outlookAttachmentsZipPath(messageId), "Attachments.zip", "application/zip"),
   });
   const [viewing, setViewing] = useState<Attachment | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const files = attachments.data?.items ?? [];
+  const shown = showAll ? files : files.slice(0, FIRST_FILES);
   const several = !remove && (attachments.data?.items.filter((f) => f.downloadable).length ?? 0) > 1;
   const downloadAll = several && <button type="button" className="secondary small" disabled={all.isPending}
     onClick={() => { all.mutate(); }}><DownloadIcon /> {all.isPending ? "Downloading…" : "Download all"}</button>;
@@ -69,8 +75,8 @@ export function OutlookAttachments({ messageId, canImportCv = false, userId, rem
     </ErrorMessage>
     <ErrorMessage error={download.error} />
     {!quietWhenEmpty && attachments.data?.items.length === 0 && !attachments.data.more && <p className="muted">No files attached.</p>}
-    {!!attachments.data?.items.length && <ul>
-      {attachments.data.items.map((file) => <li key={file.id}>
+    {shown.length > 0 && <ul>
+      {shown.map((file) => <li key={file.id}>
         <span>{file.downloadable && viewableType(file.fileName)
           ? <button type="button" className="link outlook-attachment-open" title="Open to view" onClick={() => { setViewing(file); }}><strong>{file.fileName}</strong></button>
           : <strong>{file.fileName}</strong>} <small className="muted">{attachmentSize(file.sizeBytes)}</small></span>
@@ -86,6 +92,11 @@ export function OutlookAttachments({ messageId, canImportCv = false, userId, rem
         </div>
       </li>)}
     </ul>}
+    {files.length > FIRST_FILES && (
+      <button type="button" className="link outlook-attachments-more" aria-expanded={showAll} onClick={() => { setShowAll(!showAll); }}>
+        {showAll ? "Show fewer" : `Show all ${String(files.length)} attachments`}
+      </button>
+    )}
     {attachments.data?.more && <p className="muted">Open in Outlook to see the remaining attachments.</p>}
     {viewing && <FileViewer title={viewing.fileName} path={outlookAttachmentFilePath(messageId, viewing.id)}
       type={viewableType(viewing.fileName) ?? "application/pdf"} onClose={() => { setViewing(null); }}

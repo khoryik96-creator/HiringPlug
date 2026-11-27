@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { fetchFile, outlookAttachmentFilePath } from "../../api/files";
 import type { Schemas } from "../../api/client";
-import { BriefcaseIcon } from "../ActionIcons";
+import { BriefcaseIcon, IconButton } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 import { handJd } from "../jdHandover";
 
@@ -22,10 +22,8 @@ export function CreateJobButton({ messageId, file }: { messageId: string; file: 
     },
   });
   return <>
-    <button type="button" className="outlook-import outlook-create-job" aria-label={`Create a job from ${file.fileName}`}
-      title="Create a job from this job description" disabled={open.isPending} onClick={() => { open.mutate(); }}>
-      <BriefcaseIcon /> {open.isPending ? "Opening…" : "Create job"}
-    </button>
+    <IconButton className="outlook-import outlook-create-job" label={`Create a job from ${file.fileName}`}
+      tip={open.isPending ? "Opening…" : "Create job"} icon={<BriefcaseIcon />} disabled={open.isPending} onClick={() => { open.mutate(); }} />
     <ErrorMessage error={open.error} />
   </>;
 }

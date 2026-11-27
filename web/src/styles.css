@@ -204,6 +204,22 @@ main.list-page { max-width: 1600px; padding: 0 1.5rem; }
 .rich-box { min-height: 12rem; border: 1.5px solid var(--accent); border-radius: 8px; padding: 0.75rem; background: #fff; font-family: Calibri, Arial, sans-serif; font-size: 12pt; overflow-wrap: anywhere; }
 .rich-box img { max-width: 100%; }
 .attachments ul.plain, ul.plain { list-style: none; padding-left: 0; margin: 0.25rem 0; }
+/* An email's attachments: one tidy row (title, how many, Attach files), then the files as chips. */
+.email-attachments { display: grid; gap: 0.45rem; padding: 0.6rem 0.75rem; border: 1px solid var(--line, #e5e7eb); border-radius: 10px; background: var(--surface, #fff); }
+.email-attachments-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.email-attachments-title { font-weight: 600; }
+.email-attachments-head > button { margin-left: auto; display: inline-flex; align-items: center; gap: 0.35rem; }
+.email-attachments-head svg, .file-chip svg { width: 16px; height: 16px; }
+.email-attachments-cvs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.file-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.file-chip-group { display: inline-flex; gap: 0.3rem; }
+.file-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.4rem 0.2rem 0.6rem; border: 1px solid var(--line, #e5e7eb); border-radius: 999px;
+  background: var(--surface-2, #f8f7fc); font-size: 0.85rem; max-width: 100%; overflow-wrap: anywhere; }
+.file-chip.choice { cursor: pointer; padding-right: 0.7rem; }
+.file-chip.choice input { margin: 0; }
+.file-chip.choice.on { border-color: var(--accent, #6d4fd8); background: var(--accent-soft, #efeafd); }
+.file-chip-remove { border: 0; background: none; padding: 0 0.3rem; min-height: 0; font-size: 1.05rem; line-height: 1; color: var(--muted, #6b7280); cursor: pointer; }
+.file-chip-remove:hover { color: #b91c1c; }
 .email-preview { border: 1px dashed #9ca3af; border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; background: #fff; }
 /* Badge text in the shade of its background, so labels read as one colour. */
 .badge:is(.extracted, .sent, .valid, .open, .placed, .published, .completed, .approved, .accepted, .done, .fit-strong, .reco-shortlist) { color: #166534; }

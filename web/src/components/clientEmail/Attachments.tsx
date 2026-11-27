@@ -1,16 +1,18 @@
 // What goes with the email: the candidate's CVs from the ATS (a formatted CV
 // as PDF too, once made) and files from the computer.
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import { api, type Schemas, throwFor, unwrap } from "../../api/client";
 import { getToken } from "../../auth";
+import { PaperclipIcon } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 
 export type CvChoice = Schemas["EmailCvAttachment"];
 type Upload = Schemas["EmailAttachment"];
 
 const SOURCE: Record<string, string> = { original: "Original", jobstreet: "JobStreet", linkedin: "LinkedIn", formatted: "Formatted", other: "Other" };
-const mb = (bytes: number) => `${(bytes / 1048576).toFixed(bytes < 104858 ? 2 : 1)} MB`;
+const mb = (bytes: number) => bytes < 1048576 ? `${String(Math.max(1, Math.round(bytes / 1024)))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
 
 export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUploads, others = 0, onBusy }: {
   candidateId: string;
@@ -50,45 +52,54 @@ export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUpl
   };
   const count = cvs.length + uploads.length;
 
+  const input = useRef<HTMLInputElement>(null);
+  const ats = canSeeCvs ? docs.data ?? [] : [];
+
   return (
-    <fieldset className="attachments">
-      <legend>Attachments · up to 10 files, 20 MB in all ({count + others} chosen)</legend>
+    <section className="email-attachments" aria-label="Attachments">
+      <div className="email-attachments-head">
+        <span className="email-attachments-title">Attachments</span>
+        <span className="muted small">{count + others} of 10 · 20 MB in all</span>
+        <button type="button" className="secondary small" disabled={upload.isPending} onClick={() => { input.current?.click(); }}>
+          <PaperclipIcon /> {upload.isPending ? "Uploading…" : "Attach files"}
+        </button>
+        <input ref={input} type="file" multiple hidden aria-label="Attach files" onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          if (files.length > 0) upload.mutate(files);
+          e.target.value = "";
+        }} />
+      </div>
       {canSeeCvs && (
-        <div>
+        <div className="email-attachments-cvs">
           <span className="muted small">From the ATS</span>
-          {docs.data?.length === 0 && <p className="muted small">This candidate has no CV yet.</p>}
-          <ul className="plain">
-            {docs.data?.map((d) => (
-              <li key={d.id}>
-                <label><input type="checkbox" checked={has(d.id, false)} onChange={() => { toggle(d.id, false); }} /> {SOURCE[d.source] ?? d.source}: {d.fileName} <span className="muted">({mb(d.sizeBytes)})</span></label>
-                {d.source === "formatted" && d.pdfStatus === "ready" && (
-                  <label> <input type="checkbox" checked={has(d.id, true)} onChange={() => { toggle(d.id, true); }} /> as PDF</label>
-                )}
-              </li>
-            ))}
-          </ul>
+          {docs.data?.length === 0 && <span className="muted small">This candidate has no CV yet.</span>}
+          {ats.map((d) => (
+            <span key={d.id} className="file-chip-group">
+              <label className={`file-chip choice${has(d.id, false) ? " on" : ""}`}>
+                <input type="checkbox" checked={has(d.id, false)} onChange={() => { toggle(d.id, false); }} />
+                {SOURCE[d.source] ?? d.source}: {d.fileName} <span className="muted">({mb(d.sizeBytes)})</span>
+              </label>
+              {d.source === "formatted" && d.pdfStatus === "ready" && (
+                <label className={`file-chip choice${has(d.id, true) ? " on" : ""}`}>
+                  <input type="checkbox" checked={has(d.id, true)} onChange={() => { toggle(d.id, true); }} /> as PDF
+                </label>
+              )}
+            </span>
+          ))}
         </div>
       )}
-      <div>
-        <label className="row">
-          <span className="muted small">From your computer</span>
-          <input type="file" multiple aria-label="Attach files" onChange={(e) => {
-            const files = [...(e.target.files ?? [])];
-            if (files.length > 0) upload.mutate(files);
-            e.target.value = "";
-          }} />
-        </label>
-        {upload.isPending && <p className="muted small">Uploading…</p>}
-        <ul className="plain">
+      {uploads.length > 0 && (
+        <ul className="file-chips" aria-label="Files attached">
           {uploads.map((u) => (
-            <li key={u.id}>
-              {u.fileName} <span className="muted">({mb(u.sizeBytes)})</span>{" "}
-              <button type="button" className="link" onClick={() => { onUploads(uploads.filter((x) => x.id !== u.id)); }}>Remove</button>
+            <li key={u.id} className="file-chip">
+              <PaperclipIcon /> {u.fileName} <span className="muted">({mb(u.sizeBytes)})</span>
+              <button type="button" className="file-chip-remove" aria-label={`Remove ${u.fileName}`}
+                onClick={() => { onUploads(uploads.filter((x) => x.id !== u.id)); }}>×</button>
             </li>
           ))}
         </ul>
-        <ErrorMessage error={upload.error} />
-      </div>
-    </fieldset>
+      )}
+      <ErrorMessage error={upload.error} />
+    </section>
   );
 }

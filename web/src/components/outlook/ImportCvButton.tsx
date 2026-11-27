@@ -1,7 +1,7 @@
-// Import CV on an Outlook attachment: one click imports it as a candidate.
-// The button shows how it goes (orange while importing, a green outline and
-// "Uploaded" when done, a red outline and "Failed"); clicking it then shows
-// the candidate to open, or why it failed and Try again.
+// Import CV on an Outlook attachment (an icon): one click imports it as a
+// candidate. The icon shows how it goes (orange while importing, a green
+// tick when done, a red alert when it failed, each with its tooltip);
+// clicking it then shows the candidate to open, or why it failed and Try again.
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
@@ -39,16 +39,16 @@ export function ImportCvButton({ userId, messageId, file }: { userId: string; me
     void importOutlookCv(client, { userId, messageId, attachmentId: file.id, fileName: file.fileName, source: emailSource(fs.options("candidate_source", null)) });
   };
   if (!view) {
-    return <button type="button" className="outlook-import" aria-label={`Import ${file.fileName} as a candidate`} onClick={start}>
-      <PersonPlusIcon /> Import CV
+    return <button type="button" className="icon-action outlook-import" aria-label={`Import ${file.fileName} as a candidate`} data-tip="Import CV" onClick={start}>
+      <PersonPlusIcon />
     </button>;
   }
   const state = stateOf(view.status);
   return (
     <details ref={panel} className="outlook-import-wrap">
-      <summary className={`outlook-import ${state}`} aria-label={`${CAPTION[state]}: ${file.fileName}`} aria-busy={state === "importing"}>
+      <summary className={`icon-action outlook-import ${state}`} aria-label={`${CAPTION[state]}: ${file.fileName}`} data-tip={`CV ${CAPTION[state].toLowerCase()}`}
+        aria-busy={state === "importing"}>
         {state === "importing" ? <span className="outlook-import-spinner" aria-hidden="true" /> : state === "done" ? <CheckIcon /> : <AlertIcon />}
-        {CAPTION[state]}
       </summary>
       <div className="outlook-import-panel" role="status">
         <CvImportOutcome view={view} />

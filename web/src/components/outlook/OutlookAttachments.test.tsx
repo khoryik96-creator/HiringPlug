@@ -76,6 +76,7 @@ it("imports a CV in place: importing, then Uploaded, with the candidate to open"
   renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv userId={me.user.id} />);
   const start = await screen.findByRole("button", { name: "Import Nadia.PDF as a candidate" });
   expect(screen.queryByRole("button", { name: /Import (Work samples|Large CV)/ }), "only CV files Outlook can hand over").toBeNull();
+  expect([start.textContent, start.getAttribute("data-tip")], "an icon, named by its tooltip").toEqual(["", "Import CV"]);
   fireEvent.click(start);
 
   const importing = await screen.findByLabelText("Importing…: Nadia.PDF");
@@ -206,4 +207,27 @@ it("offers no Download all for a single file", async () => {
   renderWithClient(<OutlookAttachments messageId="omg_test" />);
   await screen.findByRole("button", { name: "Download CV.pdf" });
   expect(screen.queryByRole("button", { name: "Download all" })).toBeNull();
+});
+
+it("shows the first 4 of many attachments, and all of them on Show all", async () => {
+  const items = Array.from({ length: 7 }, (_, i) => ({ id: `f${String(i)}`, fileName: `File ${String(i + 1)}.pdf`, sizeBytes: 1000, downloadable: true, savable: true }));
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ items, more: false }));
+  renderWithClient(<OutlookAttachments messageId="omg_many" />);
+  const box = await screen.findByRole("region", { name: "Attachments" });
+  await within(box).findByText("File 1.pdf");
+  expect(within(box).getAllByRole("listitem")).toHaveLength(4);
+  expect(within(box).queryByText("File 5.pdf")).toBeNull();
+  expect(within(box).getByRole("button", { name: /Download all/ }), "Download all still takes every file").toBeTruthy();
+  fireEvent.click(within(box).getByRole("button", { name: "Show all 7 attachments" }));
+  expect(within(box).getAllByRole("listitem")).toHaveLength(7);
+  fireEvent.click(within(box).getByRole("button", { name: "Show fewer" }));
+  expect(within(box).getAllByRole("listitem")).toHaveLength(4);
+});
+
+it("shows no Show all with 4 attachments or fewer", async () => {
+  const items = Array.from({ length: 4 }, (_, i) => ({ id: `f${String(i)}`, fileName: `File ${String(i + 1)}.pdf`, sizeBytes: 1000, downloadable: true, savable: true }));
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ items, more: false }));
+  renderWithClient(<OutlookAttachments messageId="omg_four" />);
+  await screen.findByText("File 4.pdf");
+  expect(screen.queryByRole("button", { name: /Show all/ })).toBeNull();
 });

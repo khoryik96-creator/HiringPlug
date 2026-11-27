@@ -76,6 +76,9 @@ describe("emailing the client", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "eat_1", fileName: "JD.pdf", contentType: "application/pdf", sizeBytes: 2048 }), { status: 201 })));
     fireEvent.change(within(panel).getByLabelText("Attach files"), { target: { files: [new File(["%PDF"], "JD.pdf")] } });
     expect(await within(panel).findByText("JD.pdf")).toBeTruthy();
+    const box = within(panel).getByRole("region", { name: "Attachments" });
+    expect(within(box).getByText("3 of 10 · 20 MB in all"), "two CVs and the file, counted in one line").toBeTruthy();
+    expect(within(box).getByRole("button", { name: "Remove JD.pdf" }), "each file a chip with its own remove").toBeTruthy();
 
     fireEvent.click(within(panel).getByRole("button", { name: "Send email" }));
     await waitFor(() => { expect(post.mock.calls.some((c) => c[0] === "/v1/emails")).toBe(true); });
