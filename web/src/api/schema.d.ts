@@ -8187,11 +8187,15 @@ export interface components {
             profileUrl: string;
             /** @description Required for unlock. Use the value from preview. */
             confirmation?: string;
+            /** @description With save, the contact's current email the person agreed to replace. Without it, a contact that has an email is never changed. */
+            replace?: string;
         };
         ApolloLookup: {
             /** @enum {string} */
             state: "existing" | "ready" | "ineligible" | "rescan" | "disabled" | "disconnected" | "busy" | "previous_connection" | "queued" | "sending" | "found" | "not_found" | "mismatch" | "pending" | "unconfirmed" | "auth_required" | "limited" | "cancelled";
             email?: string;
+            /** @description After save: the email the contact already has. It was kept; save again with replace set to it to put Apollo's address in its place. */
+            contactEmail?: string;
             confirmation?: string;
             /** @enum {string} */
             emailStatus?: "verified" | "unverified" | "catch_all" | "unavailable" | "user_managed" | "unknown";

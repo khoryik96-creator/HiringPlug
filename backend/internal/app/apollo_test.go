@@ -251,10 +251,38 @@ func TestFindHRApolloChecksExistingAndRecoversWithoutRepeatingThePaidCall(t *tes
 	assert.Equal(t, api.ApolloLookupStateExisting, afterSave.State, "now in HyPlug: no credit for it again")
 	var onContact api.Contact
 	a.request(http.MethodGet, "/v1/contacts/"+senContact.Id, recruiter, nil).JSON(&onContact)
-	email, err := onContact.Email.Get()
+	senEmail, err := onContact.Email.Get()
 	require.NoError(t, err)
-	assert.Equal(t, "sen@maju.example", email)
+	assert.Equal(t, "sen@maju.example", senEmail)
 	assert.EqualValues(t, 3, revealed.Load(), "saving never asks Apollo again")
+
+	// A contact that has an email is never overwritten without asking.
+	farahContact := a.createContact(recruiter, map[string]any{"companyId": bank.Id, "firstName": "Farah", "lastName": "Aziz",
+		"linkedinUrl": "https://www.linkedin.com/in/farah", "email": "farah.aziz@gmail.com"})
+	asked := save("farah")
+	require.Equal(t, http.StatusOK, asked.Status, "%s", asked.Body)
+	var question api.ApolloLookup
+	asked.JSON(&question)
+	require.NotNil(t, question.ContactEmail, "it says what the contact has")
+	assert.Equal(t, "farah.aziz@gmail.com", *question.ContactEmail)
+	contactEmail := func(id string) string {
+		var c api.Contact
+		a.request(http.MethodGet, "/v1/contacts/"+id, recruiter, nil).JSON(&c)
+		email, _ := c.Email.Get()
+		return email
+	}
+	assert.Equal(t, "farah.aziz@gmail.com", contactEmail(farahContact.Id), "kept")
+	stale := "someone.else@gmail.com"
+	assert.Equal(t, http.StatusOK, a.request(http.MethodPost, base, recruiter, api.ApolloLookupRequest{Action: api.ApolloLookupRequestActionSave,
+		ProfileUrl: "https://www.linkedin.com/in/farah", Replace: &stale}).Status)
+	assert.Equal(t, "farah.aziz@gmail.com", contactEmail(farahContact.Id), "agreeing to replace another address replaces nothing")
+	replaced := a.request(http.MethodPost, base, recruiter, api.ApolloLookupRequest{Action: api.ApolloLookupRequestActionSave,
+		ProfileUrl: "https://www.linkedin.com/in/farah", Replace: question.ContactEmail})
+	require.Equal(t, http.StatusOK, replaced.Status, "%s", replaced.Body)
+	assert.Equal(t, "farah@maju.example", contactEmail(farahContact.Id), "replaced once asked")
+	// Back to a personal address, so Farah's lookup is still shown below.
+	_, err = testutil.Current.Admin.Exec(t.Context(), "UPDATE contact SET email='farah.aziz@gmail.com' WHERE id=$1", farahContact.Id)
+	require.NoError(t, err)
 
 	disconnect := map[string]string{"action": "disconnect"}
 	assert.Equal(t, "disconnected_locally", a.request(http.MethodPost, connection, recruiter, disconnect).Map()["state"])

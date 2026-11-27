@@ -65,6 +65,21 @@ describe("Apollo work email", () => {
     expect(screen.queryByRole("button", { name: "Save to contact" })).toBeNull();
   });
 
+  it("asks before replacing an email the contact already has", async () => {
+    const post = serve((body) => body.action === "save" && !body.replace
+      ? { state: "found", email: "farah@maju.example", emailStatus: "verified", contactEmail: "farah.aziz@gmail.com" }
+      : body.action === "save" ? { state: "existing", email: "farah@maju.example" }
+        : { state: "found", email: "farah@maju.example", emailStatus: "verified" });
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Save to contact" }));
+    expect(await screen.findByText(/Replace it with farah@maju.example\?/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Keep farah.aziz@gmail.com" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    expect(await screen.findByText("Already in HyPlug. No Apollo credit used.")).toBeTruthy();
+    const replaced = post.mock.calls.map((c) => (c[1] as { body: LookupRequest }).body).find((b) => b.replace);
+    expect(replaced?.replace).toBe("farah.aziz@gmail.com");
+  });
+
   it("keeps checking a lookup confirmed after the dialog has been open a while", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let state: Lookup["state"] = "ready";

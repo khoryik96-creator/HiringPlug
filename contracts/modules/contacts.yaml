@@ -702,6 +702,10 @@ components:
           description: save puts the work email Apollo found on this person's contact (needs contacts:update).
         profileUrl: { type: string, minLength: 1, maxLength: 500 }
         confirmation: { type: string, pattern: '^[a-f0-9]{64}$', description: Required for unlock. Use the value from preview. }
+        replace:
+          type: string
+          maxLength: 254
+          description: With save, the contact's current email the person agreed to replace. Without it, a contact that has an email is never changed.
     ApolloLookup:
       type: object
       required: [state]
@@ -710,6 +714,7 @@ components:
           type: string
           enum: [existing, ready, ineligible, rescan, disabled, disconnected, busy, previous_connection, queued, sending, found, not_found, mismatch, pending, unconfirmed, auth_required, limited, cancelled]
         email: { type: string }
+        contactEmail: { type: string, description: "After save: the email the contact already has. It was kept; save again with replace set to it to put Apollo's address in its place." }
         confirmation: { type: string }
         emailStatus:
           type: string

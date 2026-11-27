@@ -116,9 +116,9 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
 }) {
   const cache = useQueryClient();
   const key = ["hr-apollo-lookup", companyId, person.url] as const;
-  const send = async (action: LookupAction, confirmation?: string, signal?: AbortSignal) => unwrap(
+  const send = async (action: LookupAction, confirmation?: string, signal?: AbortSignal, replace?: string) => unwrap(
     await api.POST("/v1/companies/{companyId}/hr-scan/apollo", {
-      params: { path: { companyId } }, body: { profileUrl: person.url, action, confirmation }, signal,
+      params: { path: { companyId } }, body: { profileUrl: person.url, action, confirmation, replace }, signal,
     }),
   );
   const [polling, setPolling] = useState(true);
@@ -132,7 +132,7 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
     return () => { window.clearTimeout(stop); };
   }, [confirmed]);
   const change = useMutation({
-    mutationFn: ({ action, confirmation }: { action: LookupAction; confirmation?: string }) => send(action, confirmation),
+    mutationFn: ({ action, confirmation, replace }: { action: LookupAction; confirmation?: string; replace?: string }) => send(action, confirmation, undefined, replace),
     onMutate: async () => { await cache.cancelQueries({ queryKey: key }); },
     onSuccess: (next, { action }) => {
       cache.setQueryData(key, next);
@@ -158,8 +158,17 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
     {result && <div aria-live="polite">
       {result.email && <p className="hr-apollo-address"><strong>{result.email}</strong><br />
         <span className="muted">{result.state === "existing" ? "Already in HyPlug. No Apollo credit used." : statusLabel[result.emailStatus ?? "unknown"]}</span></p>}
-      {result.state === "found" && <button type="button" className="primary" disabled={change.isPending}
+      {result.state === "found" && !result.contactEmail && <button type="button" className="primary" disabled={change.isPending}
         onClick={() => { change.mutate({ action: "save" }); }}>{change.isPending ? "Saving…" : "Save to contact"}</button>}
+      {result.state === "found" && result.contactEmail && <>
+        {/* Never overwrite an email without asking. */}
+        <p>The contact already has <strong>{result.contactEmail}</strong>. Replace it with {result.email}?</p>
+        <div className="row hr-apollo-actions">
+          <button type="button" className="primary" disabled={change.isPending}
+            onClick={() => { change.mutate({ action: "save", replace: result.contactEmail }); }}>{change.isPending ? "Replacing…" : "Replace"}</button>
+          <button type="button" disabled={change.isPending} onClick={onClose}>Keep {result.contactEmail}</button>
+        </div>
+      </>}
       {issues[result.state] && <p>{(result.state === "cancelled" || result.state === "limited") && result.reason ? absent[result.reason] : issues[result.state]}</p>}
       {result.state === "not_found" && <p>{absent[result.reason ?? "email_not_returned"]} Check Apollo for any credit use.</p>}
       {(result.state === "ready" || result.state === "cancelled") && result.confirmation && <>

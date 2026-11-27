@@ -10,8 +10,9 @@ there is no usable address, review the person and confirm the Apollo lookup.
 Apollo may use a credit even without returning an email. HyPlug shows
 Apollo's verification status. **Save to contact** puts the address on the
 person's contact (the one active contact with that LinkedIn profile at the
-company, while it has no email), checked and verified like a typed address;
-it never replaces an email the contact already has.
+company), checked and verified like a typed address. When that contact
+already has an email, HyPlug asks first: **Replace** puts Apollo's address
+in its place, **Keep** leaves the contact as it is.
 
 If the result is unconfirmed, use **Check lookup status** to retrieve the
 original result. The broker retains its lookup status for 24 hours. After

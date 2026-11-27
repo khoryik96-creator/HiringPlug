@@ -2356,6 +2356,13 @@ class ApolloLookupRequest(BaseModel):
         str | None,
         Field(description="Required for unlock. Use the value from preview.", pattern="^[a-f0-9]{64}$"),
     ] = None
+    replace: Annotated[
+        str | None,
+        Field(
+            description="With save, the contact's current email the person agreed to replace. Without it, a contact that has an email is never changed.",
+            max_length=254,
+        ),
+    ] = None
 
 
 class State1(StrEnum):
@@ -2406,6 +2413,12 @@ class Reason1(StrEnum):
 class ApolloLookup(BaseModel):
     state: State1
     email: str | None = None
+    contactEmail: Annotated[
+        str | None,
+        Field(
+            description="After save: the email the contact already has. It was kept; save again with replace set to it to put Apollo's address in its place."
+        ),
+    ] = None
     confirmation: str | None = None
     emailStatus: EmailStatus | None = None
     reason: Reason1 | None = None
