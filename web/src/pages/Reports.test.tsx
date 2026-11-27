@@ -14,9 +14,9 @@ afterEach(() => {
 const report = (over: Partial<Schemas["Report"]> = {}): Schemas["Report"] => ({
   from: "2026-08-06", to: "2026-11-03", feesHidden: false,
   funnel: [
-    { stage: "applied", reached: 4, percentOfPrevious: null }, { stage: "screening", reached: 3, percentOfPrevious: 75 },
-    { stage: "submitted", reached: 3, percentOfPrevious: 100 }, { stage: "interview", reached: 3, percentOfPrevious: 100 },
-    { stage: "offer", reached: 2, percentOfPrevious: 67 }, { stage: "placed", reached: 2, percentOfPrevious: 100 },
+    { stage: "applied", category: "applied", label: "Applied", reached: 4, percentOfPrevious: null }, { stage: "screening", category: "screening", label: "Screening", reached: 3, percentOfPrevious: 75 },
+    { stage: "submitted", category: "submitted", label: "Submitted", reached: 3, percentOfPrevious: 100 }, { stage: "interview", category: "interview", label: "Interview", reached: 3, percentOfPrevious: 100 },
+    { stage: "offer", category: "offer", label: "Offer", reached: 2, percentOfPrevious: 67 }, { stage: "placed", category: "placed", label: "Placed", reached: 2, percentOfPrevious: 100 },
   ],
   sources: [{ source: "jobstreet", applications: 4, interviewed: 2, placed: 1 }, { source: "unknown", applications: 1, interviewed: 0, placed: 0 }],
   recruiters: [{ recruiterId: "usr_1", recruiterName: "Aina", placements: 2, fellThrough: 1, fees: [{ currency: "MYR", amount: "35400.00" }] }],

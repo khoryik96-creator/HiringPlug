@@ -6,8 +6,7 @@ import { api, type Schemas, unwrap } from "../../api/client";
 import { jobStagesKey, stageTemplatesKey } from "../../api/keys";
 import { ErrorMessage } from "../ErrorMessage";
 import { fieldErrors } from "../forms";
-import { STANDARD } from "./columns";
-import { type Draft, draftsOf, StepsEditor } from "./StepsEditor";
+import { type Draft, draftsOf, StepsEditor, stepsBody } from "./StepsEditor";
 
 type JobStages = Schemas["JobStages"];
 
@@ -50,7 +49,7 @@ export function JobStagesControl({ jobId, stages, canChange }: { jobId: string; 
   const chosen = stages.source === "default" ? "default" : stages.source === "template" ? `t:${stages.templateId ?? ""}` : stages.source === "standard" ? "default" : "custom";
   const choose = (value: string) => {
     if (value === "default") save.mutate({});
-    else if (value === "standard") save.mutate({ steps: STANDARD.map(({ key, label, stage }) => ({ key, label, stage })) });
+    else if (value === "standard" && templates.data) save.mutate({ steps: stepsBody(draftsOf(templates.data.standard)) });
     else if (value.startsWith("t:")) save.mutate({ templateId: value.slice(2) });
   };
   return (
@@ -74,7 +73,7 @@ export function JobStagesControl({ jobId, stages, canChange }: { jobId: string; 
           {editing ? (
             <form aria-label="This job's stages" onSubmit={(e) => {
               e.preventDefault();
-              save.mutate({ templateId: stages.source === "template" || stages.source === "custom" ? stages.templateId : null, steps: editing.map(({ key, label, stage }) => ({ key, label, stage })) });
+              save.mutate({ templateId: stages.source === "template" || stages.source === "custom" ? stages.templateId : null, steps: stepsBody(editing) });
             }}>
               <StepsEditor steps={editing} onChange={setEditing} errors={errors} />
               <p className="muted small">Candidates in a stage you remove stay in the first stage of the same kind. Only this job changes.</p>

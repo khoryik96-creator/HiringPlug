@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const app: Application = {
   channel: null, id: "appl_1", version: 3, jobId: "jo_1", jobTitle: "Auditor", companyId: "comp_1", companyName: "Contoh Berhad",
   candidateId: "cand_1", candidateName: "Siti Aminah", candidateTitle: null, candidateAvailability: null, stage: "applied",
-  reason: null, reasonNote: null, stageChangedAt: "2026-11-20T00:00:00Z", createdAt: "2026-11-20T00:00:00Z", updatedAt: "2026-11-20T00:00:00Z",
+  reason: null, reasonNote: null, category: null, stageChangedAt: "2026-11-20T00:00:00Z", createdAt: "2026-11-20T00:00:00Z", updatedAt: "2026-11-20T00:00:00Z",
 };
 
 describe("taking a candidate off a job", () => {

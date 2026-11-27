@@ -37,6 +37,7 @@ type Application struct {
 	CandidateID string
 	Channel     *string
 	Stages      []string
+	Categories  []string // the category of each of Stages ("": its kind's first)
 }
 
 // Placed is an application's first move to placed (pipeline module).
@@ -56,6 +57,8 @@ type Deps struct {
 	Applications interface {
 		Facts(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Application, error)
 		FirstPlaced(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Placed, error)
+		// Categories are the company's stage categories, in order.
+		Categories(ctx context.Context, tx pgx.Tx) ([]Category, error)
 	}
 	// Sources returns where each candidate came from (candidates module).
 	Sources interface {

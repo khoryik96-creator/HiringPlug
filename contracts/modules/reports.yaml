@@ -176,9 +176,11 @@ components:
         feesHidden: { type: boolean, description: "Fees are left out (placements.fees:read is needed)." }
     FunnelStage:
       type: object
-      required: [stage, reached, percentOfPrevious]
+      required: [stage, category, label, reached, percentOfPrevious]
       properties:
         stage: { $ref: '#/components/schemas/Stage' }
+        category: { type: string, description: "The category (StageCategory.key); a row per category, in the company's order." }
+        label: { type: string, description: The category's name. }
         reached: { type: integer }
         percentOfPrevious:
           type: integer

@@ -14,7 +14,7 @@ beforeEach(() => { localStorage.removeItem("hp.pipelineView"); });
 const ago = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 const app = (n: number, stage: Application["stage"], days: number): Application => ({
   id: `appl_${String(n)}`, version: 2, jobId: "jo_1", jobTitle: "Risk Analyst", companyId: "comp_1", companyName: "Contoh", candidateId: `cand_${String(n)}`,
-  candidateName: `Person ${String(n)}`, candidateTitle: "Analyst", candidateAvailability: null, stage, reason: null, reasonNote: null, channel: null,
+  candidateName: `Person ${String(n)}`, candidateTitle: "Analyst", candidateAvailability: null, stage, reason: null, reasonNote: null, category: null, channel: null,
   stageChangedAt: ago(days), createdAt: ago(30), updatedAt: ago(1),
 });
 
@@ -35,7 +35,7 @@ describe("pipeline steps", () => {
     expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(["Person 2", "Person 5", "Person 3"]); // longest waiting first
     fireEvent.click(within(rows[0] as HTMLElement).getByRole("button", { name: "Interview" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
-    expect(sentBody(post)).toEqual({ version: 2, stage: "interview" });
+    expect(sentBody(post)).toEqual({ version: 2, stage: "interview", step: "interview" }); // names the stage (one per category)
 
     fireEvent.click(within(stages).getByRole("tab", { name: /All/ }));
     expect(within(screen.getByRole("list", { name: "Everyone" })).getAllByRole("listitem")).toHaveLength(5);

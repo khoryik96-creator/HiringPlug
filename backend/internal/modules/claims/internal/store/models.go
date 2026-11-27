@@ -139,9 +139,10 @@ type Application struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	// NULL when a recruiter added the candidate
-	Channel *string
-	Binned  bool
-	Step    *string
+	Channel  *string
+	Binned   bool
+	Step     *string
+	Category *string
 }
 
 type ApplicationStageChange struct {
@@ -152,6 +153,8 @@ type ApplicationStageChange struct {
 	ToStage       string
 	ChangedAt     time.Time
 	ChangedBy     *string
+	FromCategory  *string
+	ToCategory    *string
 }
 
 type AssistantAnswer struct {
@@ -1838,6 +1841,16 @@ type ServerProcess struct {
 	Version   string
 	StartedAt time.Time
 	SeenAt    time.Time
+}
+
+type StageCategory struct {
+	TenantID  string
+	Key       string
+	Label     string
+	Kind      string
+	Position  int32
+	UpdatedBy string
+	UpdatedAt time.Time
 }
 
 type StageTemplate struct {

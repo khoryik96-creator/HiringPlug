@@ -51,6 +51,7 @@ export const emailBannersKey = ["email-banners"] as const;
 export const policiesKey = ["settings", "policies"] as const;
 export const screeningCallsKey = (candidateId: string) => ["screening-calls", candidateId] as const;
 export const stageTemplatesKey = ["stage-templates"] as const;
+export const stageCategoriesKey = ["stage-categories"] as const;
 export const jobStagesKey = (jobId: string) => ["job-stages", jobId] as const;
 export const clientShortlistsKey = (jobId: string) => ["client-shortlists", jobId] as const;
 export const whatsAppTemplatesKey = ["whatsapp-templates"] as const;

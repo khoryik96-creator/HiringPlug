@@ -51,12 +51,12 @@ func TestReports(t *testing.T) {
 
 	day := func(d int) string { return time.Now().UTC().AddDate(0, 0, d).Format(time.DateOnly) }
 	r := a.report(token, "?from="+day(-30)+"&to="+day(1))
-	reached := map[api.Stage]int{}
+	reached := map[string]int{}
 	for _, f := range r.Funnel {
-		reached[f.Stage] = f.Reached
+		reached[f.Category] = f.Reached
 	}
-	assert.Equal(t, map[api.Stage]int{"applied": 3, "screening": 2, "submitted": 2, "interview": 2, "offer": 1, "placed": 1}, reached,
-		"the furthest stage reached: Siti was interviewed before being rejected")
+	assert.Equal(t, map[string]int{"applied": 3, "screening": 2, "submitted": 2, "interview": 2, "interview_2": 1, "interview_final": 1, "offer": 1, "placed": 1}, reached,
+		"the furthest stage reached: Siti was interviewed (1st round) before being rejected; Wei was placed, so passed every round")
 	assert.Equal(t, []api.SourceRow{
 		{Source: "jobstreet", Applications: 2, Interviewed: 1, Placed: 0},
 		{Source: "linkedin", Applications: 1, Interviewed: 1, Placed: 1},

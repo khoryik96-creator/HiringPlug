@@ -10,11 +10,11 @@ import (
 
 // ListStageTemplates handles GET /v1/stage-templates.
 func (h *HTTP) ListStageTemplates(ctx context.Context, _ api.ListStageTemplatesRequestObject) (api.ListStageTemplatesResponseObject, error) {
-	list, err := h.svc.Templates(ctx, authz.MustFromContext(ctx))
+	list, standard, err := h.svc.Templates(ctx, authz.MustFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListStageTemplates200JSONResponse{Items: make([]api.StageTemplate, len(list)), Standard: stepsToAPI(StandardSteps())}
+	out := api.ListStageTemplates200JSONResponse{Items: make([]api.StageTemplate, len(list)), Standard: stepsToAPI(standard)}
 	for i, t := range list {
 		out.Items[i] = templateToAPI(t)
 	}
@@ -90,6 +90,9 @@ func stepsFromAPI(in []api.StageStepInput) []Step {
 		if s.Key != nil {
 			out[i].Key = *s.Key
 		}
+		if s.Category != nil {
+			out[i].Category = *s.Category
+		}
 	}
 	return out
 }
@@ -97,7 +100,7 @@ func stepsFromAPI(in []api.StageStepInput) []Step {
 func stepsToAPI(in []Step) []api.StageStep {
 	out := make([]api.StageStep, len(in))
 	for i, s := range in {
-		out[i] = api.StageStep{Key: s.Key, Label: s.Label, Stage: api.OpenStage(s.Stage)}
+		out[i] = api.StageStep{Key: s.Key, Label: s.Label, Stage: api.OpenStage(s.Stage), Category: s.Category}
 	}
 	return out
 }

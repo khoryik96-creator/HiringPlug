@@ -1046,6 +1046,20 @@ running.
   follow the job's stages; a candidate in a stage that was removed stays in
   the first stage of the same kind, or, with none of that kind left, in a
   column of that kind until they move on.
+- **Stage categories** ✅: every stage falls under a category, which the
+  report's pipeline conversion counts by and a candidate's stage tag shows.
+  Out of the box: Applied, Screening, Submitted, **1st Interview**, **2nd
+  Interview**, **Final Interview**, Offer and Placed; a job with no template
+  has one stage per category, so its board shows each interview round.
+  Settings › Pipeline stages › **Categories** lists them by the kind each
+  counts as; owners (and roles given "Change the stage categories",
+  `pipeline.categories:manage`, in Roles and access) rename, add, order and
+  remove them. A category keeps its kind, each kind keeps one, and one still
+  used by a stage or an open candidate cannot be removed. In a template or a
+  job's own stages, each stage picks its category ("falls under"). A move
+  between rounds (1st to 2nd Interview) is in the stage history, and the
+  report counts who reached each round (a candidate further on passed the
+  rounds before).
 - **The job page** ✅: the pipeline comes first, across the width of the
   screen, with the possible candidates folded under it; the rest is in tabs
   under it, like a candidate's: **Notes & activity**, **Job details** (and its

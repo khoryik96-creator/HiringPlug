@@ -46,7 +46,7 @@ func TestStageTemplates(t *testing.T) {
 
 	js := a.jobStages(recruiter, job.Id)
 	assert.Equal(t, api.JobStagesSourceStandard, js.Source)
-	assert.Equal(t, []string{"Applied", "Screening", "Submitted", "Interview", "Offer", "Placed"}, labels(js.Steps))
+	assert.Equal(t, []string{"Applied", "Screening", "Submitted", "1st Interview", "2nd Interview", "Final Interview", "Offer", "Placed"}, labels(js.Steps))
 
 	assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/stage-templates", recruiter, map[string]any{"name": "x", "steps": techSteps}).Status, "owners and admins")
 	bad := a.request(http.MethodPost, "/v1/stage-templates", admin, map[string]any{"name": " ", "steps": []map[string]any{{"label": "Offer", "stage": "offer"}, {"label": "Screen", "stage": "screening"}}})
@@ -100,7 +100,7 @@ func TestStageTemplates(t *testing.T) {
 		a.request(http.MethodGet, "/v1/stage-templates", recruiter, nil).JSON(&list)
 		require.Len(t, list.Items, 1)
 		assert.Equal(t, 1, list.Items[0].JobCount)
-		assert.Len(t, list.Standard, 6)
+		assert.Len(t, list.Standard, 8, "one per category")
 
 		require.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, "/v1/stage-templates/"+tech.Id, admin, nil).Status)
 		kept := a.jobStages(recruiter, other.Id)

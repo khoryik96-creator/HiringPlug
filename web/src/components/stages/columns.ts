@@ -20,8 +20,8 @@ export interface Column {
   step?: string;
 }
 
-/** The standard stages, one of each kind. */
-export const STANDARD: Step[] = OPEN_STAGES.map((st) => ({ key: st, label: STAGE[st], stage: st }));
+/** The standard stages, one of each kind (until the company's, one per category, are loaded). */
+export const STANDARD: Step[] = OPEN_STAGES.map((st) => ({ key: st, label: STAGE[st], stage: st, category: st }));
 
 export function useJobStages(jobId: string) {
   return useQuery({

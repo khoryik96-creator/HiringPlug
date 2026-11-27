@@ -33,3 +33,16 @@
   .steps-row { grid-template-columns: 10px 1fr; }
   .steps-row select, .steps-actions, .steps-error { grid-column: 2; }
 }
+
+/* Settings › Pipeline stages › Categories: grouped by the kind each counts as. */
+.stage-categories { margin: 0.8rem 0 1rem; }
+.category-groups { display: grid; grid-template-columns: 1fr; gap: 0.5rem; margin: 0.6rem 0; }
+.category-group { display: grid; grid-template-columns: 11rem 1fr; align-items: start; gap: 0.75rem; margin: 0; padding: 0.45rem 0;
+  border-top: 1px solid var(--border, #e5e7eb); }
+.category-group:first-child { border-top: 0; }
+.category-kind { font-weight: 600; font-size: 0.85rem; color: var(--muted, #6b7280); padding-top: 0.3rem; }
+.category-group dd { margin: 0; }
+.category-group .stage-chips, .category-group .steps-rows { margin: 0; }
+.stage-chips.plain .stage-chip { counter-increment: none; padding-left: 0.65rem; }
+.stage-chips.plain .stage-chip::before { content: none; }
+@media (max-width: 640px) { .category-group { grid-template-columns: 1fr; gap: 0.3rem; } }

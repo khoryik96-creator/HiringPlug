@@ -17,7 +17,7 @@ import { hashParam } from "../hashQuery";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { AddCandidate, FoldedLines, longestFirst, PipelineSteps, usePipelineView, useUpcoming } from "./PipelineViews";
 import { needsDetails, StagePrompt } from "./StagePrompt";
-import { type Column, columnOf, columnsFor, ownStages, STANDARD, useJobStages } from "./stages/columns";
+import { type Column, columnOf, columnsFor, STANDARD, useJobStages } from "./stages/columns";
 import { JobStagesControl } from "./stages/JobStagesControl";
 import { type MoveRequest, useMoveApplication, useMoveApplications } from "./useMoveApplication";
 
@@ -59,8 +59,9 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], onClientLink
   const upcoming = useUpcoming(permissions, now);
   const closed = apps.filter((a) => a.stage === "rejected" || a.stage === "withdrawn");
   const active = apps.filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn");
-  // The job's own stages (else the standard ones), and a column for anyone in a kind it no longer has.
-  const columns = columnsFor(stages.data?.steps ?? STANDARD, list.counts ?? active, ownStages(stages.data?.source));
+  // The job's stages (the standard ones: one per category), and a column for anyone in a kind it no longer has.
+  // Moves name the stage (a column) once they are loaded, so 2nd Interview is not taken for the 1st.
+  const columns = columnsFor(stages.data?.steps ?? STANDARD, list.counts ?? active, stages.data !== undefined);
   const inColumn = (key: string) => active.filter((a) => columnOf(a, columns)?.key === key);
   const grouped = (column: Column) => list.counts?.filter((row) => columnOf(row, columns)?.key === column.key);
   const countOf = (column: Column) => grouped(column)?.reduce((n, row) => n + row.count, 0) ?? inColumn(column.key).length;

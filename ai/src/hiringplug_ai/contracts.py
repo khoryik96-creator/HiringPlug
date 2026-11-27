@@ -100,6 +100,7 @@ class Permission(StrEnum):
     offers_approve = "offers:approve"
     offers_manage = "offers:manage"
     offers_read = "offers:read"
+    pipeline_categories_manage = "pipeline.categories:manage"
     pipeline_templates_manage = "pipeline.templates:manage"
     pipeline_read = "pipeline:read"
     pipeline_update = "pipeline:update"
@@ -143,6 +144,7 @@ class ErrorCode(StrEnum):
     CALENDAR_NOT_CONNECTED = "CALENDAR_NOT_CONNECTED"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
+    CATEGORY_IN_USE = "CATEGORY_IN_USE"
     CLAIM_DUPLICATE = "CLAIM_DUPLICATE"
     CLAIM_STORAGE_NOT_CONNECTED = "CLAIM_STORAGE_NOT_CONNECTED"
     CLAIM_WRONG_STATUS = "CLAIM_WRONG_STATUS"
@@ -6342,10 +6344,71 @@ class OpenStage(StrEnum):
     placed = "placed"
 
 
+class StageCategoryKey(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A category's key; the six standard ones are keyed by their kind (interview, offer...).",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ]
+
+
+class StageCategory(BaseModel):
+    key: StageCategoryKey
+    label: Annotated[str, Field(max_length=40, min_length=1)]
+    kind: OpenStage
+
+
+class StageCategories(BaseModel):
+    items: Annotated[
+        list[StageCategory],
+        Field(
+            description="In order; grouped by kind (applied ... placed), in the company's order within a kind."
+        ),
+    ]
+    version: Annotated[
+        str,
+        Field(
+            description="Send it back when saving: another save in between is refused (CONFLICT_STALE_VERSION)."
+        ),
+    ]
+
+
+class StageCategoryInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: StageCategoryKey | None = None
+    label: Annotated[str, Field(max_length=60)]
+    kind: OpenStage
+
+
+class StageCategoriesInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    items: Annotated[
+        list[StageCategoryInput],
+        Field(
+            description="In order. An item with a key changes that category (its kind must stay); one without is new.",
+            max_length=40,
+            min_length=6,
+        ),
+    ]
+    version: str
+
+
 class StageStep(BaseModel):
     key: Annotated[str, Field(description="Stays the same when renamed.", pattern="^[a-z0-9_]{1,40}$")]
     label: Annotated[str, Field(max_length=40, min_length=1)]
     stage: OpenStage
+    category: Annotated[
+        StageCategoryKey,
+        Field(
+            description="The category it falls under (of its kind); its kind's standard one unless chosen."
+        ),
+    ]
 
 
 class StageStepInput(BaseModel):
@@ -6361,6 +6424,10 @@ class StageStepInput(BaseModel):
     ] = None
     label: Annotated[str, Field(max_length=60)]
     stage: OpenStage
+    category: Annotated[
+        StageCategoryKey | None,
+        Field(description="A category of the same kind; left out, the kind's standard one."),
+    ] = None
 
 
 class StageTemplate(BaseModel):
@@ -6504,6 +6571,12 @@ class Application(BaseModel):
         ),
     ]
     stage: Stage
+    category: Annotated[
+        str | None,
+        Field(
+            description="The category its stage falls under (StageCategory.key); null when closed (rejected, withdrawn)."
+        ),
+    ]
     step: Annotated[
         str | None,
         Field(
@@ -6994,6 +7067,11 @@ class CandidateDataExport(BaseModel):
 
 class FunnelStage(BaseModel):
     stage: Stage
+    category: Annotated[
+        str,
+        Field(description="The category (StageCategory.key); a row per category, in the company's order."),
+    ]
+    label: Annotated[str, Field(description="The category's name.")]
     reached: int
     percentOfPrevious: Annotated[
         int | None,

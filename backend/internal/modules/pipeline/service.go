@@ -65,7 +65,11 @@ func (s *Service) Add(ctx context.Context, p authz.Principal, jobID, candidateID
 			return errs.Err()
 		}
 		q := store.New(tx)
-		row, err := q.InsertApplication(ctx, store.InsertApplicationParams{JobOrderID: jobID, CandidateID: candidateID, Stage: stage})
+		category, err := s.appCategory(ctx, tx, jobID, stage, nil)
+		if err != nil {
+			return err
+		}
+		row, err := q.InsertApplication(ctx, store.InsertApplicationParams{JobOrderID: jobID, CandidateID: candidateID, Stage: stage, Category: category})
 		if database.IsNoRows(err) { // already on this job
 			existing, findErr := q.FindApplication(ctx, store.FindApplicationParams{JobOrderID: jobID, CandidateID: candidateID})
 			if findErr != nil {
@@ -119,11 +123,11 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 		if err != nil {
 			return err
 		}
+		js, err := s.jobStages(ctx, tx, current.JobID)
+		if err != nil {
+			return err
+		}
 		if move.Step != nil { // one of the job's own stages, of the kind moved to
-			js, err := s.jobStages(ctx, tx, current.JobID)
-			if err != nil {
-				return err
-			}
 			if _, ok := StepFor(js.Steps, *move.Step, move.To); !ok {
 				var errs apperr.FieldErrors
 				errs.Add("step", "is not one of this job's "+move.To+" stages")
@@ -131,9 +135,13 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 			}
 		}
 		if changed {
+			cats, _, err := categories(ctx, tx)
+			if err != nil {
+				return err
+			}
 			row, err = q.MoveApplication(ctx, store.MoveApplicationParams{
 				ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
-				Stage: move.To, Step: move.Step, Reason: move.Reason, ReasonNote: move.Note,
+				Stage: move.To, Step: move.Step, Category: AppCategory(js.Steps, cats, move.To, move.Step), Reason: move.Reason, ReasonNote: move.Note,
 			})
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("application")
@@ -277,7 +285,7 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, rows []store.Application
 
 func fromRow(r store.Application) Application {
 	return Application{
-		ID: r.ID, Version: int(r.Version), JobID: r.JobOrderID, CandidateID: r.CandidateID, Stage: r.Stage, Step: r.Step,
+		ID: r.ID, Version: int(r.Version), JobID: r.JobOrderID, CandidateID: r.CandidateID, Stage: r.Stage, Step: r.Step, Category: r.Category,
 		Reason: r.Reason, ReasonNote: r.ReasonNote, Channel: r.Channel, StageChangedAt: r.StageChangedAt, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }

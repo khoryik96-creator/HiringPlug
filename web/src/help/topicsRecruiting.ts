@@ -185,7 +185,10 @@ export const RECRUITING_TOPICS: HelpTopic[] = [
       {
         heading: "Pipeline stages",
         needs: ["pipeline.templates:manage"],
-        points: ["Settings › Pipeline stages changes the names and steps of your pipeline."],
+        points: [
+          "Settings › Pipeline stages changes the names and steps of your pipeline.",
+          "Each stage falls under a category (1st, 2nd or Final Interview...), which reports count by and a candidate's stage shows. Owners, and roles given the right, rename, add and order the categories there.",
+        ],
       },
       {
         heading: "Advertise it",

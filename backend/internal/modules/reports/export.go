@@ -28,9 +28,9 @@ func Tables(r Report) []sheet.Table {
 		if f.PercentOfPrevious != nil {
 			pct = strconv.Itoa(*f.PercentOfPrevious)
 		}
-		name := stageLabel[f.Stage]
+		name := f.Label
 		if name == "" {
-			name = f.Stage
+			name = stageLabel[f.Stage]
 		}
 		funnel.Rows = append(funnel.Rows, []string{name, strconv.Itoa(f.Reached), pct})
 	}

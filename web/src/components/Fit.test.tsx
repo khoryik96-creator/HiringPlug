@@ -107,7 +107,7 @@ describe("fit scores", () => {
 
 const app = (id: string, name: string): Application => ({
   id, candidateId: `cand_${id}`, candidateName: name, stage: "screening", version: 1, jobId: "jo_1", jobTitle: "Auditor", companyId: "comp_1",
-  companyName: "Maybank", candidateTitle: null, candidateAvailability: null, reason: null, reasonNote: null, channel: null,
+  companyName: "Maybank", candidateTitle: null, candidateAvailability: null, reason: null, reasonNote: null, category: null, channel: null,
   stageChangedAt: new Date().toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 });
 

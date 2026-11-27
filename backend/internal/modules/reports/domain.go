@@ -44,8 +44,53 @@ func Period(from, to *time.Time, today time.Time) (time.Time, time.Time, apperr.
 
 // App is an application as reports count it.
 type App struct {
-	Source string   // where it came from; "unknown" when not recorded
-	Stages []string // every stage it has been at, in order
+	Source     string   // where it came from; "unknown" when not recorded
+	Stages     []string // every stage it has been at, in order
+	Categories []string // the category of each of Stages ("": its kind's first)
+}
+
+// Category is one of the company's stage categories, in its order.
+type Category struct{ Key, Label, Kind string }
+
+// kindCategories are one category per stage kind, for a company without categories.
+func kindCategories() []Category {
+	out := make([]Category, len(Stages))
+	for i, s := range Stages {
+		out[i] = Category{Key: s, Label: stageLabel[s], Kind: s}
+	}
+	return out
+}
+
+// categoryIndex is the index in cats of the category key of kind (its
+// kind's first when key is not one of them), or -1 for a closed stage.
+func categoryIndex(cats []Category, kind, key string) int {
+	first := -1
+	for i, c := range cats {
+		if c.Kind != kind {
+			continue
+		}
+		if c.Key == key {
+			return i
+		}
+		if first < 0 {
+			first = i
+		}
+	}
+	return first
+}
+
+// FurthestCategory is the index in cats of the furthest category an
+// application reached, or -1.
+func FurthestCategory(a App, cats []Category) int {
+	furthest := -1
+	for i, st := range a.Stages {
+		key := ""
+		if i < len(a.Categories) {
+			key = a.Categories[i]
+		}
+		furthest = max(furthest, categoryIndex(cats, st, key))
+	}
+	return furthest
 }
 
 // Furthest is the index in Stages of the furthest open stage an application
@@ -61,25 +106,29 @@ func Furthest(stages []string) int {
 	return furthest
 }
 
-// FunnelStage is how many applications reached a stage.
+// FunnelStage is how many applications reached a stage category.
 type FunnelStage struct {
-	Stage             string
-	Reached           int
-	PercentOfPrevious *int
+	Stage, Category, Label string
+	Reached                int
+	PercentOfPrevious      *int
 }
 
-// Funnel counts the applications reaching each stage, and what share of
-// those at the stage before got there.
-func Funnel(apps []App) []FunnelStage {
-	reached := make([]int, len(Stages))
+// Funnel counts the applications reaching each category (in the company's
+// order: 1st, 2nd and Final Interview are three rows), and what share of
+// those at the one before got there. No categories: one per stage kind.
+func Funnel(apps []App, cats []Category) []FunnelStage {
+	if len(cats) == 0 {
+		cats = kindCategories()
+	}
+	reached := make([]int, len(cats))
 	for _, a := range apps {
-		for i := 0; i <= Furthest(a.Stages); i++ {
+		for i := 0; i <= FurthestCategory(a, cats); i++ {
 			reached[i]++
 		}
 	}
-	out := make([]FunnelStage, len(Stages))
-	for i, s := range Stages {
-		out[i] = FunnelStage{Stage: s, Reached: reached[i]}
+	out := make([]FunnelStage, len(cats))
+	for i, c := range cats {
+		out[i] = FunnelStage{Stage: c.Kind, Category: c.Key, Label: c.Label, Reached: reached[i]}
 		if i > 0 && reached[i-1] > 0 {
 			pct := (reached[i]*100 + reached[i-1]/2) / reached[i-1]
 			out[i].PercentOfPrevious = &pct

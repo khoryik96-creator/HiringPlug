@@ -10,15 +10,15 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 beforeEach(() => { localStorage.setItem("hp.pipelineView", "board"); });
 
 const tech: Schemas["StageStep"][] = [
-  { key: "applied", label: "Applied", stage: "applied" }, { key: "call", label: "Phone screen", stage: "screening" },
-  { key: "tech", label: "Tech test", stage: "interview" }, { key: "panel", label: "Panel", stage: "interview" },
-  { key: "offer", label: "Offer", stage: "offer" }, { key: "placed", label: "Placed", stage: "placed" },
+  { key: "applied", label: "Applied", stage: "applied", category: "applied" }, { key: "call", label: "Phone screen", stage: "screening", category: "screening" },
+  { key: "tech", label: "Tech test", stage: "interview", category: "interview" }, { key: "panel", label: "Panel", stage: "interview", category: "interview" },
+  { key: "offer", label: "Offer", stage: "offer", category: "offer" }, { key: "placed", label: "Placed", stage: "placed", category: "placed" },
 ];
 const jobId = "jo_01jbz6w0m0k8q9x2r3s4t5v6w7";
 const person = (n: number, name: string, stage: Application["stage"], step: string | null = null): Application => ({
   id: `appl_01jbz6w0m0k8q9x2r3s4t5v6w${String(n)}`, version: 3, jobId, jobTitle: "Developer", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maju",
   candidateId: `cand_01jbz6w0m0k8q9x2r3s4t5v6w${String(n)}`, candidateName: name, candidateTitle: null, candidateAvailability: null, stage, step,
-  reason: null, reasonNote: null, channel: null, stageChangedAt: new Date().toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
+  reason: null, reasonNote: null, category: null, channel: null, stageChangedAt: new Date().toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 });
 const jobStages = (over: Partial<Schemas["JobStages"]> = {}): Schemas["JobStages"] => ({
   jobId, version: 1, source: "template", templateId: "stpl_01jbz6w0m0k8q9x2r3s4t5v6w7", templateName: "Tech hiring", steps: tech, ...over,

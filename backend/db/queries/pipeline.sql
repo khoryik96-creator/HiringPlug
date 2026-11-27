@@ -2,8 +2,8 @@
 -- transaction: row-level security limits every query to the current tenant.
 
 -- name: InsertApplication :one
-INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, channel, created_by)
-VALUES (app_current_tenant(), @job_order_id, @candidate_id, @stage, sqlc.narg(channel), app_current_user())
+INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, category, channel, created_by)
+VALUES (app_current_tenant(), @job_order_id, @candidate_id, @stage, sqlc.narg(category), sqlc.narg(channel), app_current_user())
 ON CONFLICT (tenant_id, job_order_id, candidate_id) DO NOTHING
 RETURNING *;
 
@@ -18,6 +18,7 @@ SELECT * FROM application WHERE id = @id;
 UPDATE application SET
   stage = @stage,
   step = sqlc.narg(step),
+  category = sqlc.narg(category),
   reason = sqlc.narg(reason),
   reason_note = sqlc.narg(reason_note),
   stage_changed_at = now(),
@@ -84,7 +85,8 @@ UPDATE application SET candidate_id = @to_id, updated_at = now() WHERE candidate
 -- order) and when they were first placed (reports).
 -- name: ApplicationFacts :many
 SELECT a.id, a.job_order_id, a.candidate_id, a.channel, a.created_at,
-  array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages
+  array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages,
+  array_agg(coalesce(c.to_category, '') ORDER BY c.changed_at, c.id)::text[] AS categories
 FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id
 WHERE a.created_at >= @from_time AND a.created_at < @to_time
 GROUP BY a.id
@@ -210,9 +212,32 @@ LIMIT 50;
 -- name: MovesToStageBetween :many
 SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
-WHERE c.to_stage = @stage AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
+WHERE c.to_stage = @stage AND c.from_stage IS DISTINCT FROM c.to_stage AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
 LIMIT 50000;
 
 -- Applications now at some stages (reports: the revenue forecast).
 -- name: ApplicationsAtStages :many
 SELECT * FROM application WHERE stage = ANY(@stages::text[]) ORDER BY id LIMIT 5000;
+
+-- Stage categories (empty: the standard ones), in order.
+-- name: ListStageCategories :many
+SELECT * FROM stage_category ORDER BY position, key;
+
+-- Saving the categories replaces the list; the lock keeps two saves apart.
+-- name: LockStageCategories :exec
+SELECT pg_advisory_xact_lock(hashtext('stage_category:' || app_current_tenant()));
+
+-- name: DeleteStageCategories :exec
+DELETE FROM stage_category WHERE true;
+
+-- name: InsertStageCategory :exec
+INSERT INTO stage_category (tenant_id, key, label, kind, position, updated_by)
+VALUES (app_current_tenant(), @key, @label, @kind, @position, app_current_user());
+
+-- How much still uses some categories: stages of templates and jobs, and
+-- open applications.
+-- name: StageCategoryUse :one
+SELECT
+  ((SELECT count(*) FROM stage_template t, jsonb_array_elements(t.steps) s WHERE s->>'category' = ANY(@keys::text[]))
+   + (SELECT count(*) FROM job_stage_plan p, jsonb_array_elements(p.steps) s WHERE s->>'category' = ANY(@keys::text[])))::integer AS stages,
+  (SELECT count(*) FROM application WHERE category = ANY(@keys::text[]) AND stage NOT IN ('rejected', 'withdrawn'))::integer AS applications;

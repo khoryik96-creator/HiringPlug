@@ -10,9 +10,21 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const tech: Schemas["StageTemplate"] = {
   id: "stpl_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 2, name: "Tech hiring", isDefault: true, jobCount: 3, createdAt: "", updatedAt: "",
-  steps: [{ key: "applied", label: "Applied", stage: "applied" }, { key: "tech", label: "Tech test", stage: "interview" }, { key: "placed", label: "Placed", stage: "placed" }],
+  steps: [{ key: "applied", label: "Applied", stage: "applied", category: "applied" }, { key: "tech", label: "Tech test", stage: "interview", category: "interview" }, { key: "placed", label: "Placed", stage: "placed", category: "placed" }],
 };
-const serve = (items: Schemas["StageTemplate"][]) => vi.spyOn(api, "GET").mockResolvedValue(ok({ items, standard: STANDARD }));
+const CATEGORIES: Schemas["StageCategories"] = {
+  version: "0",
+  items: [
+    { key: "applied", label: "Applied", kind: "applied" }, { key: "screening", label: "Screening", kind: "screening" },
+    { key: "submitted", label: "Submitted", kind: "submitted" }, { key: "interview", label: "1st Interview", kind: "interview" },
+    { key: "interview_2", label: "2nd Interview", kind: "interview" }, { key: "interview_final", label: "Final Interview", kind: "interview" },
+    { key: "offer", label: "Offer", kind: "offer" }, { key: "placed", label: "Placed", kind: "placed" },
+  ],
+};
+const serve = (items: Schemas["StageTemplate"][], categories: Schemas["StageCategories"] | null = CATEGORIES) =>
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/stage-categories"
+    ? (categories ? ok(categories) : ok({ items: [], version: "0" }))
+    : path === "/v1/me" ? ok({ permissions: [] }) : ok({ items, standard: STANDARD }))) as never);
 
 it("lists the templates, the default first, with the standard stages", async () => {
   serve([tech]);
@@ -34,14 +46,17 @@ it("saves a new template from the standard stages, with a stage added", async ()
   fireEvent.click(within(form).getByRole("checkbox", { name: "Default for new jobs" }));
   fireEvent.click(within(form).getByRole("button", { name: "+ Add a stage" }));
   fireEvent.change(within(form).getByRole("textbox", { name: "Stage 6 name" }), { target: { value: "Reference check" } });
-  fireEvent.change(within(form).getByRole("combobox", { name: "Stage 6 counts as" }), { target: { value: "offer" } });
+  fireEvent.change(await within(form).findByRole("combobox", { name: "Stage 6 falls under" }), { target: { value: "offer" } });
+  // A stage falls under a category: the third one, the 2nd interview round.
+  fireEvent.change(within(form).getByRole("combobox", { name: "Stage 4 falls under" }), { target: { value: "interview_2" } });
   fireEvent.click(within(form).getByRole("button", { name: "Save template" }));
   await waitFor(() => { expect(post).toHaveBeenCalled(); });
   const body = sentBody(post) as Schemas["StageTemplateInput"];
   expect(body.name).toBe("Tech hiring");
   expect(body.isDefault).toBe(true);
-  expect(body.steps.map((s) => `${s.label}/${s.stage}`)).toEqual([
-    "Applied/applied", "Screening/screening", "Submitted/submitted", "Interview/interview", "Offer/offer", "Reference check/offer", "Placed/placed",
+  expect(body.steps.map((s) => `${s.label}/${s.stage}/${s.category ?? ""}`)).toEqual([
+    "Applied/applied/applied", "Screening/screening/screening", "Submitted/submitted/submitted", "Interview/interview/interview_2",
+    "Offer/offer/offer", "Reference check/offer/offer", "Placed/placed/placed",
   ]); // added before Placed
 });
 
