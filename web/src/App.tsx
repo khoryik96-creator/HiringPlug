@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 
-import { api, ApiError, unwrap } from "./api/client";
+import { api, ApiError, type Permission, unwrap } from "./api/client";
 import { askSignIn, authLinkRoute, clearToken, getToken, setToken, shareSignIn } from "./auth";
 import { AiLimitNotice } from "./components/AiLimitNotice";
 import { AiNotice } from "./components/AiNotice";
-import { CloseIcon, DockRightIcon, IconButton, OutlookIcon } from "./components/ActionIcons";
+import { CloseIcon, DockRightIcon, IconActions, IconButton, IconLink, OutlookIcon } from "./components/ActionIcons";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { CvImportIndicator } from "./components/outlook/CvImportIndicator";
 import { NotificationBell } from "./components/Notifications";
@@ -23,7 +23,7 @@ import { MicrosoftSignIn } from "./pages/MicrosoftSignIn";
 import { microsoftRoute } from "./microsoft";
 import { SignIn } from "./pages/SignIn";
 import { Menu } from "./components/Menu";
-import { Calendar, menu, resolve, type Route } from "./routes";
+import { Calendar, menu, OutlookMail, resolve, type Route } from "./routes";
 
 const newSessionQueries = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -57,11 +57,14 @@ const calendarOverlaysPage = () => typeof window.matchMedia === "function" && wi
 
 function Shell({ onSignOut }: { onSignOut: () => void }) {
   const hash = useHash();
-  const [calendarDocked, setCalendarDocked] = useState(false);
+  // One side dock at a time: the calendar or the mail, beside whatever page is open.
+  const [dock, setDock] = useState<"calendar" | "mail" | null>(null);
+  const setCalendarDocked = (on: boolean) => { setDock(on ? "calendar" : null); };
   // On a phone the pages are under a Menu button; opened at a page, it closes on going to another.
   const [menuOpenAt, setMenuOpenAt] = useState<string | null>(null);
   const calendarOverlay = useSyncExternalStore(watchCalendarWidth, calendarOverlaysPage);
   const calendarDockButton = useRef<HTMLButtonElement>(null);
+  const mailDockButton = useRef<HTMLButtonElement>(null);
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   if (me.error instanceof ApiError && me.error.code === "UNAUTHENTICATED") {
     onSignOut();
@@ -81,8 +84,15 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   const pageKey = inSettings ? hash.split("#", 2).join("#") : hash;
   const canUseCalendar = permissions.includes("calendars:use");
   const onCalendar = route.section === "calendar";
-  const showCalendarDock = canUseCalendar && calendarDocked && !onCalendar;
-  const calendarModal = showCalendarDock && calendarOverlay;
+  const canUseMail = permissions.includes("emails:send");
+  const showCalendarDock = canUseCalendar && dock === "calendar" && !onCalendar;
+  // The mail beside other pages; on the mail page itself, the page is the mail.
+  const showMailDock = canUseMail && dock === "mail" && route.section !== "outlook";
+  const calendarModal = (showCalendarDock || showMailDock) && calendarOverlay;
+  const closeMailDock = () => {
+    setDock(null);
+    requestAnimationFrame(() => { mailDockButton.current?.focus(); });
+  };
   const closeCalendarDock = () => {
     setCalendarDocked(false);
     if (calendarModal) {
@@ -91,15 +101,18 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   };
   const menuOpen = menuOpenAt === hash;
   return (
-    <div className={showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
+    <div className={showMailDock ? "app-shell calendar-docked mail-docked" : showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
       <SessionKeeper onSignOut={() => { forgetTabs(); void endSession().finally(onSignOut); }} />
       <header className={menuOpen ? "topbar menu-open" : "topbar"} inert={calendarModal}>
         <span className="brand">Hiring<span>Plug</span></span>
         <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>
         <MainMenu routes={menu("main", permissions)} current={route.section} />
         <div className="topbar-tools">
-          {permissions.includes("emails:send") && <a className="settings-link topbar-shortcut" href="#/outlook" aria-label="Outlook" title="Outlook"
-            aria-current={route.section === "outlook" ? "page" : undefined}><OutlookIcon /></a>}
+          {canUseMail && <a className="settings-link topbar-shortcut" href="#/outlook" aria-label="Outlook" title="Outlook"
+            aria-current={route.section === "outlook" ? "page" : undefined} onClick={() => { if (dock === "mail") setDock(null); }}><OutlookIcon /></a>}
+          {canUseMail && route.section !== "outlook" && <button type="button" ref={mailDockButton} className="settings-link topbar-shortcut calendar-dock-toggle"
+            aria-label="Dock mail" title={showMailDock ? "Close mail dock" : "Dock mail: your inbox beside any page"} aria-pressed={showMailDock}
+            aria-controls={showMailDock ? "mail-dock" : undefined} onClick={() => { setDock(showMailDock ? null : "mail"); }}><DockRightIcon /></button>}
           {canUseCalendar && <a className="settings-link topbar-shortcut" href="#/calendar" aria-label="Calendar" title="Calendar"
             aria-current={onCalendar ? "page" : undefined} onClick={() => { setCalendarDocked(false); }}>
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -159,6 +172,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         </div>
         {calendarModal && <div className="calendar-dock-backdrop" aria-hidden="true" />}
         {showCalendarDock && <CalendarDock userId={me.data.user.id} modal={calendarModal} onClose={closeCalendarDock} />}
+        {showMailDock && <MailDock userId={me.data.user.id} permissions={permissions} modal={calendarModal} onClose={closeMailDock} />}
       </div>
     </div>
   );
@@ -188,6 +202,30 @@ function CalendarDock({ userId, modal, onClose }: { userId: string; modal: boole
       </header>
       <PageErrorBoundary>
         <Suspense fallback={<p className="muted" role="status">Loading calendar…</p>}><Calendar docked userId={userId} /></Suspense>
+      </PageErrorBoundary>
+    </aside>
+  );
+}
+
+/** The mailbox beside whatever page is open (inbox, reading, replying), kept as one moves around. */
+function MailDock({ userId, permissions, modal, onClose }: { userId: string; permissions: Permission[]; modal: boolean; onClose: () => void }) {
+  const dock = useRef<HTMLElement>(null);
+  useEffect(() => { dock.current?.focus(); }, []);
+  return (
+    <aside ref={dock} id="mail-dock" className="calendar-dock mail-dock" aria-label="Mail dock" tabIndex={-1}
+      role={modal ? "dialog" : undefined} aria-modal={modal || undefined}
+      onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented && event.target === event.currentTarget) onClose(); }}>
+      <header className="calendar-dock-head">
+        <h2>Mail</h2>
+        <IconActions label="Mail dock">
+          <IconLink label="Open full mail" icon={<OutlookIcon />} href="#/outlook" />
+          <IconButton label="Close mail dock" icon={<CloseIcon />} onClick={onClose} />
+        </IconActions>
+      </header>
+      <PageErrorBoundary>
+        <Suspense fallback={<p className="muted" role="status">Loading mail…</p>}>
+          <OutlookMail docked userId={userId} permissions={permissions} canImportCv={permissions.includes("intake:create")} />
+        </Suspense>
       </PageErrorBoundary>
     </aside>
   );

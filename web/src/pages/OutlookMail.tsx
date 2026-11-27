@@ -43,11 +43,14 @@ export function listLimit(screen: number, folders: number): number {
   return Math.max(260, Math.min(760, Math.round((screen - folders - 80) * 0.55)));
 }
 
-export function OutlookMail({ canImportCv = false, permissions = [], userId }: {
+export function OutlookMail({ canImportCv = false, permissions = [], userId, docked = false }: {
   canImportCv?: boolean; permissions?: Permission[];
   /** The signed-in person: the CVs they imported from their mail show on it. */
   userId?: string;
+  /** In the side dock, beside another page: compact, and the address is that page's, not the mail's. */
+  docked?: boolean;
 }) {
+  if (docked) return <OutlookWorkspace docked canImportCv={canImportCv} permissions={permissions} userId={userId} initialSearch="" initialThread="" />;
   const params = new URLSearchParams(window.location.hash.split("?")[1]);
   if (params.has("rules")) return <OutlookRules />;
   const candidateId = params.get("candidateId");
@@ -57,7 +60,8 @@ export function OutlookMail({ canImportCv = false, permissions = [], userId }: {
     initialSearch={params.get("search") ?? ""} initialThread={params.get("conversation") ?? ""}/>;
 }
 
-function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, permissions, userId }: {
+function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, permissions, userId, docked = false }: {
+  docked?: boolean;
   profile?: OutlookProfile;
   canImportCv: boolean;
   initialSearch: string;
@@ -160,19 +164,25 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
     if (id === selected) setSelected(next && !next.isDraft ? next.id : undefined);
   }
 
-  return <main className="outlook-page">
+  const Root = docked ? "div" : "main";
+  return <Root className={docked ? "outlook-page outlook-docked" : "outlook-page"}>
     <div className="row spread">
-      <h2>Outlook Mail</h2>
+      {!docked && <h2>Outlook Mail</h2>}
+      {docked && folders.length > 0 && <select className="outlook-folder-select" aria-label="Folder" value={activeFolder ?? ""}
+        onChange={(e) => { const f = folders.find((x) => x.id === e.target.value); if (f) chooseFolder(f); }}>
+        {!activeFolder && <option value="">{search ? "Search results" : "Messages"}</option>}
+        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}{f.unread > 0 ? ` (${String(f.unread)})` : ""}</option>)}
+      </select>}
       <IconActions label="Outlook actions">
         {data?.enabled && <IconButton label="Write with HiringPlug" icon={<FileIcon />} onClick={() => { setATSComposer(true); }} />}
         <IconButton label={scheduled ? "Back to mail" : "Scheduled"} icon={<ClockIcon />} pressed={scheduled}
           onClick={() => { setScheduled(!scheduled); }} />
         {data?.enabled && <>
-          <IconLink label="Inbox rules" icon={<StepsIcon />} href="#/outlook?rules=1" />
+          {!docked && <IconLink label="Inbox rules" icon={<StepsIcon />} href="#/outlook?rules=1" />}
           <IconButton label="Refresh" icon={<RefreshIcon />} disabled={sync.isPending} onClick={() => { sync.mutate(false); }} />
-          <IconButton label="Turn off sync" icon={<PowerIcon />} danger disabled={sync.isPending} onClick={() => {
+          {!docked && <IconButton label="Turn off sync" icon={<PowerIcon />} danger disabled={sync.isPending} onClick={() => {
             if (window.confirm("Turn off Outlook sync? Pending sends will be cancelled and HiringPlug’s profile links removed. Mail and drafts stay in Outlook.")) sync.mutate(true);
-          }} />
+          }} />}
         </>}
       </IconActions>
     </div>
@@ -190,8 +200,10 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
       {data.error && <p className="warning" role="alert">{data.error}</p>}
       {data.syncing && <p className="muted" role="status">Syncing Outlook folders…</p>}
       <section className="panel outlook-workspace" style={{ "--outlook-folders": `${String(foldersWidth)}px`, "--outlook-list": `${String(listWidth)}px` } as CSSProperties}>
-        <OutlookFolderPane folders={folders} active={activeFolder} onChoose={chooseFolder} />
-        <Splitter label="Folder pane width" value={foldersWidth} min={140} max={360} onChange={setFoldersWidth} />
+        {!docked && <>
+          <OutlookFolderPane folders={folders} active={activeFolder} onChoose={chooseFolder} />
+          <Splitter label="Folder pane width" value={foldersWidth} min={140} max={360} onChange={setFoldersWidth} />
+        </>}
         <div className="outlook-content">
           <div className="outlook-topbar">
           <OutlookCommandBar message={active} folders={folders} busy={change.isPending}
@@ -221,7 +233,7 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
                 <button type="button" disabled={data.nextOffset == null} onClick={() => { setOffset(data.nextOffset ?? offset); }}>Next</button>
               </div>}
             </div>
-            <Splitter label="Message list width" value={listWidth} min={260} max={listMax} onChange={(w) => { setListWidth(Math.min(w, listMax)); }} />
+            {!docked && <Splitter label="Message list width" value={listWidth} min={260} max={listMax} onChange={(w) => { setListWidth(Math.min(w, listMax)); }} />}
             {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
               canImportCv={canImportCv} userId={userId} onOpenDraft={openDraft}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />
@@ -237,5 +249,5 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
       setDraft(undefined);
       if (operation === "send" || operation === "schedule") setScheduled(true);
     }}/>}
-  </main>;
+  </Root>;
 }

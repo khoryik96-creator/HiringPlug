@@ -2245,7 +2245,12 @@ their actions under the name; tables in reports scroll inside their panel.
 ## Calendar and Outlook
 
 The Calendar icon opens the full calendar. The dock icon beside it opens the calendar
-on the right while you stay on your current page. Day, Week, Month, and Agenda
+on the right while you stay on your current page. The dock icon beside the
+Outlook icon does the same for the mail (1.53.0): the inbox, a dropdown of
+folders, search, the message being read above, its replies and forwards, kept
+open while you move between jobs, companies, candidates and the rest. One
+dock at a time (docking one closes the other); on the Outlook page the page is
+the mail; "Open full mail" goes there. Day, Week, Month, and Agenda
 selections are remembered in this browser. As in Outlook, a meeting's block
 shows its title first (wrapping to fill the time it takes) and then its time;
 a short one shows both on one line, and a month day shows three meetings with

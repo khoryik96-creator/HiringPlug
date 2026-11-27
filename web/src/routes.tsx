@@ -45,7 +45,7 @@ const Automations = page(() => import("./pages/Automations"), "Automations");
 const StageTemplates = page(() => import("./pages/StageTemplates"), "StageTemplates");
 const EmailSignature = page(() => import("./components/EmailSignature"), "EmailSignature");
 const ClaimsStorage = page(() => import("./pages/ClaimsStorage"), "ClaimsStorage");
-const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
+export const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
 export const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Claims = page(() => import("./pages/Claims"), "Claims");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");

@@ -221,7 +221,8 @@ describe("top bar", () => {
     const outlook = await screen.findByRole("link", { name: "Outlook" });
     expect(icon.getAttribute("href")).toBe("#/calendar");
     expect(outlook.getAttribute("href")).toBe("#/outlook");
-    expect(outlook.nextElementSibling).toBe(icon);
+    expect(outlook.nextElementSibling).toBe(screen.getByRole("button", { name: "Dock mail" }));
+    expect(outlook.nextElementSibling?.nextElementSibling).toBe(icon);
     expect(icon.nextElementSibling).toBe(screen.getByRole("button", { name: "Dock calendar" }));
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
     expect(nav.queryByRole("link", { name: /^(Calendar|Outlook)$/ })).toBeNull();
@@ -257,6 +258,43 @@ describe("top bar", () => {
     expect(screen.getByLabelText<HTMLInputElement>("First name").value).toBe("Unsaved name");
     window.location.hash = "#/calendar";
     expect((await screen.findByRole("button", { name: "Week" })).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("docks the mail beside a record, one dock at a time, and keeps the page as it was", async () => {
+    const permissions = [...RECRUITER, "calendars:use", "emails:send"] as const;
+    vi.spyOn(api, "GET").mockImplementation((path: string) => {
+      if (path === "/v1/me") return Promise.resolve(ok(testMe([...permissions])));
+      if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(alice));
+      if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+      if (path === "/v1/calendar/events") return Promise.resolve(ok({ items: [] }));
+      if (path === "/v1/outlook/mail") {
+        return Promise.resolve(ok({
+          connected: true, enabled: true, syncing: false, error: null, nextOffset: null,
+          folders: [{ id: "in", name: "Inbox", kind: "inbox", parentId: null, unread: 2, total: 9 }],
+          items: [],
+        }));
+      }
+      return Promise.reject(new Error(`unexpected GET ${path}`));
+    });
+    setToken("test-token");
+    const candidateHash = `#/candidates/${alice.id}`;
+    window.location.hash = candidateHash;
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit profile" }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Unsaved name" } });
+    fireEvent.click(screen.getByRole("button", { name: "Dock calendar" }));
+    await screen.findByRole("complementary", { name: "Calendar dock" });
+    const toggle = screen.getByRole("button", { name: "Dock mail" });
+    fireEvent.click(toggle);
+    const dock = await screen.findByRole("complementary", { name: "Mail dock" });
+    expect(screen.queryByRole("complementary", { name: "Calendar dock" })).toBeNull();
+    const folder = await within(dock).findByRole("combobox", { name: "Folder" });
+    expect(within(folder).getByRole("option", { name: "Inbox (2)" })).toBeTruthy();
+    expect(within(dock).getByRole("link", { name: "Open full mail" }).getAttribute("href")).toBe("#/outlook");
+    expect(window.location.hash).toBe(candidateHash);
+    expect(screen.getByLabelText<HTMLInputElement>("First name").value).toBe("Unsaved name");
+    fireEvent.click(within(dock).getByRole("button", { name: "Close mail dock" }));
+    expect(screen.queryByRole("complementary", { name: "Mail dock" })).toBeNull();
   });
 
   it("ends the session on the server when signing out", async () => {

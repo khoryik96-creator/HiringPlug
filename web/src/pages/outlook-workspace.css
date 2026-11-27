@@ -298,3 +298,14 @@ main.outlook-page { padding-right: calc(1.25rem + var(--outlook-docked, 0px)); }
 .address-suggestions li { padding: .45rem .6rem; border-radius: 7px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .address-suggestions li[aria-selected="true"], .address-suggestions li:hover { background: color-mix(in srgb, var(--accent, #6d4ae0) 12%, #fff); }
 .address-suggestions .muted { font-size: .88em; }
+
+/* Docked beside another page (the mail dock): one column, the folders in a
+   dropdown, the message list above the message being read. */
+.outlook-docked { padding: .6rem .75rem; }
+.outlook-docked > .row.spread { gap: .5rem; flex-wrap: nowrap; }
+.outlook-folder-select { min-width: 0; flex: 1 1 auto; max-width: 14rem; }
+.outlook-docked .outlook-workspace { display: block; padding: 0; }
+.outlook-docked .outlook-columns { display: flex; flex-direction: column; }
+.outlook-docked .outlook-messages { max-height: 38vh; border-bottom: 1px solid var(--line); }
+.outlook-docked .outlook-reading { max-height: none; }
+.outlook-docked .outlook-search input { min-width: 0; flex: 1 1 8rem; }
