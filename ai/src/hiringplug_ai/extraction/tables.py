@@ -16,6 +16,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from .spacing import word_options
+
 _ROLE = re.compile(r"^(?:role|position|designation|job\s*title|title|jawatan)$", re.I)
 _ORG = re.compile(r"^(?:organi[sz]ation|company(?:\s+name)?|employer|syarikat)$", re.I)
 _DATES = re.compile(r"^(?:duration|period|dates?|tenure|from\s*[-\u2013/]\s*to|year\(?s\)?)$", re.I)
@@ -117,7 +119,7 @@ def _is_work_header(cells: list[str]) -> bool:
 
 def work_tables(page: Any) -> list[WorkTable]:
     """The page's work-history tables, top to bottom, as labelled text."""
-    if not any(_HINT.match(str(w.get("text", ""))) for w in page.extract_words()):
+    if not any(_HINT.match(str(w.get("text", ""))) for w in page.extract_words(**word_options(page))):
         return []
     found: list[WorkTable] = []
     for table in page.find_tables():

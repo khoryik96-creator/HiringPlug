@@ -30,7 +30,8 @@ rebuilt here as small, separately tested modules.
    strip markup with a pattern, which leaves font names and joins
    paragraphs).
 2. **PDF, page by page** (`pdf.py`):
-   - read each page's text layer (pdfplumber);
+   - read each page's text layer (pdfplumber; on a page that stores no spaces,
+     a gap wider than 0.15 of the letters' size starts a word: extraction/spacing.py);
    - decide per page whether to OCR it. *Unextractable*: the text is glyph
      noise such as `(cid:415)`, control codes or replacement characters, from
      fonts without a Unicode map. *Sparse-visual*: little text, but the page is

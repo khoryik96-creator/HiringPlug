@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any
 
+from .spacing import word_options
 from .tables import work_tables
 
 BIN = 2.0  # points
@@ -163,7 +164,7 @@ def page_text(page: Any) -> str:
 
     # The columns are found on the whole page (without the tables): the strips
     # between tables are often too short to tell on their own.
-    outside = [w for w in page.extract_words() if not in_table(w)]
+    outside = [w for w in page.extract_words(**word_options(page)) if not in_table(w)]
     gutter = find_gutter(outside, x1, _rows(outside))
     if gutter is not None and all(t.left >= gutter - 1 or t.right <= gutter + 1 for t in tables):
         return _columns_with_tables(page, tables, gutter, outside)
@@ -226,14 +227,15 @@ def _column_text(page: Any) -> str:
     """One column's text, as it stands (it is not split again)."""
     if page is None:
         return ""
-    words = page.extract_words()
-    return _respaced(str(page.extract_text() or ""), _rows(words))
+    opts = word_options(page)
+    words = page.extract_words(**opts)
+    return _respaced(str(page.extract_text(**opts) or ""), _rows(words))
 
 
 def _region_text(page: Any, gutter: float | None = None) -> str:
     if page is None:
         return ""
-    words = page.extract_words()
+    words = page.extract_words(**word_options(page))
     rows = _rows(words)
     return _respaced(_page_text(page, words, rows, gutter), rows)
 
@@ -243,7 +245,7 @@ def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row], gutter:
     if gutter is None or not (float(page.bbox[0]) < gutter < float(page.bbox[2])) or not words:
         gutter = find_gutter(words, float(page.bbox[2]), rows)
     if gutter is None:
-        return str(page.extract_text() or "")
+        return str(page.extract_text(**word_options(page)) or "")
     parts: list[str] = []
     block_top: float | None = None
     block_bottom = 0.0
@@ -266,7 +268,7 @@ def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row], gutter:
         # The column that starts higher first (it usually holds the name), else the wider one.
         bounds.sort(key=lambda side: (round(first_top(side) / 6), -(side[1] - side[0])))
         for x0, x1 in bounds:
-            text = page.within_bbox((x0, top, x1, bottom)).extract_text()
+            text = page.within_bbox((x0, top, x1, bottom)).extract_text(**word_options(page))
             if text and text.strip():
                 parts.append(text)
 
