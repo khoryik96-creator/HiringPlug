@@ -255,9 +255,9 @@ const (
 // transaction. It goes from the server's mail when that is set up, else from
 // userID's own connected mailbox when they have one that sends. It returns
 // how it goes (Via...).
-func (m *Module) NotifyAccountFor(ctx context.Context, tx pgx.Tx, tenantID, userID string, n Notice) (string, error) {
+func (m *Module) NotifyAccountFor(ctx context.Context, tx pgx.Tx, tenantID, userID string, n Notice) (via, emailID string, err error) {
 	n.AccountNotice = true
-	via := ViaServer
+	via = ViaServer
 	switch mode := m.service.serverMode(); {
 	case mode == "live":
 	case m.service.mailboxSends(ctx, tx, userID):
@@ -267,8 +267,29 @@ func (m *Module) NotifyAccountFor(ctx context.Context, tx pgx.Tx, tenantID, user
 	default:
 		via = ViaNone // queued all the same: it fails, and shows so, if no mail server is set up
 	}
-	_, err := m.QueueNotice(ctx, tx, tenantID, n)
-	return via, err
+	emailID, err = m.QueueNotice(ctx, tx, tenantID, n)
+	return via, emailID, err
+}
+
+// EmailState is how an email went: queued, sent or failed (with why), and when.
+type EmailState struct {
+	Status string
+	Error  *string
+	At     time.Time
+}
+
+// EmailStates returns how some emails went, by id, in the caller's
+// transaction (the Team page: invitations).
+func (m *Module) EmailStates(ctx context.Context, tx pgx.Tx, ids []string) (map[string]EmailState, error) {
+	out := map[string]EmailState{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := store.New(tx).EmailStates(ctx, ids)
+	for _, r := range rows {
+		out[r.ID] = EmailState{Status: r.Status, Error: r.Error, At: r.At}
+	}
+	return out, err
 }
 
 // Notify records a notice and queues it for sending, in the caller's

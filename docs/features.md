@@ -2201,7 +2201,8 @@ email (`HP_SMTP_*`), or, when that is not set up (or is only the Mailpit test
 inbox), from the inviter's connected mailbox (they are shown its link
 anyway). The Team page says which, or that it was **not emailed** (no server
 email, no mailbox), with the link to copy and how to fix it, and Settings ›
-System's server checks say when the server's email cannot reach anyone.
+System's server checks say when the server's email cannot reach anyone. Under each invited person the Team page says how their latest invitation
+email went: waiting, sent (when), or failed with the mail server's answer.
 Password resets and Microsoft links only ever go from the server's email; everyone changes their password under their
 name. ✅ A sign-in lasts 12 hours and is renewed quietly (the same session)
 while someone is using HyPlug; after they have been away, the last five

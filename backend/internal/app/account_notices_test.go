@@ -140,3 +140,38 @@ func TestInvitationsGoFromTheInvitersMailboxWithoutServerMail(t *testing.T) {
 	runCoreJobsUntilIdle(t, f.a, tenant.ID)
 	assert.EqualValues(t, 1, sent.Load(), "the reconnect link did not go through the owner's Outlook")
 }
+
+// The Team page says how each invitation email went: sent, or failed with the
+// mail server's answer (it used to say "emailed" for one the server refused).
+func TestTheTeamPageSaysHowEachInvitationWent(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, liveServerMail())
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	for _, email := range []string{"pat." + tenant.ID + "@test.local", "refused." + tenant.ID + "@test.local"} {
+		res := a.request(http.MethodPost, "/v1/team/invites", owner, map[string]any{"email": email, "name": "Pat", "role": "recruiter"})
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	}
+	var queued api.TeamList
+	a.request(http.MethodGet, "/v1/team", owner, nil).JSON(&queued)
+	for _, m := range queued.Items {
+		if m.Status == api.TeamStatusInvited {
+			require.NotNil(t, m.InvitationEmail, m.Email)
+			assert.Equal(t, api.EmailStatusQueued, m.InvitationEmail.Status, "waiting to be sent: %s", m.Email)
+		}
+	}
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	var team api.TeamList
+	a.request(http.MethodGet, "/v1/team", owner, nil).JSON(&team)
+	states := map[string]api.InvitationEmail{}
+	for _, m := range team.Items {
+		if m.InvitationEmail != nil {
+			states[strings.SplitN(m.Email, ".", 2)[0]] = *m.InvitationEmail
+		}
+	}
+	require.Len(t, states, 2, "the owner, active, has none")
+	assert.Equal(t, api.EmailStatusSent, states["pat"].Status)
+	assert.True(t, states["pat"].Error.IsNull())
+	assert.Equal(t, api.EmailStatusFailed, states["refused"].Status)
+	assert.Contains(t, states["refused"].Error.MustGet(), "550", "with the mail server's answer")
+}

@@ -19,6 +19,7 @@ import { type ComposeContext, OutlookComposeTools, useComposeData } from "./Outl
 import { OutlookDialog, useOutlookDock } from "./OutlookDialog";
 import { maxDraftFileSize, OutlookDraftFiles } from "./OutlookDraftFiles";
 import { hasSignature, withSignature } from "./outlookSignature";
+import { useFileDrop } from "./useFileDrop";
 import { outlookAddresses } from "./outlookAddresses";
 
 type Draft = Schemas["OutlookDraft"];
@@ -89,7 +90,11 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
   focusMessage: boolean; fresh: boolean; permissions: Permission[]; about: ComposeContext;
 }) {
   const client = useQueryClient();
-  const [draft, setDraft] = useState(opened);
+  const [draft, setDraftState] = useState(opened);
+  // The draft as last saved, read by files attached one after another (a drop
+  // of several): each upload needs the version the one before it left.
+  const latest = useRef(opened);
+  const setDraft = (next: Schemas["OutlookDraft"] | undefined) => { latest.current = next; setDraftState(next); };
   const [form, setForm] = useState(() => formOf(opened));
   const [originalReplyText, setOriginalReplyText] = useState(() => focusMessage ? editorText(form.html).replace(/\s+/g, " ") : undefined);
   const [editorReset, setEditorReset] = useState(0);
@@ -137,7 +142,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
         return "files";
       }
       if (typeof operation !== "string") {
-        let opened = draft;
+        let opened = latest.current ?? draft;
         if ("file" in operation) {
           const file = typeof operation.file === "function" ? await operation.file() : operation.file;
           if (file.size === 0 || file.size > maxDraftFileSize) {
@@ -207,6 +212,21 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       if (typeof operation !== "string") void client.invalidateQueries({ queryKey: outlookScheduledKey });
     },
   });
+  /** Files dropped on the message: attached one after another. */
+  async function attachDropped(files: File[]) {
+    if (operationInFlight.current || files.length === 0) return;
+    for (const file of files) {
+      operationInFlight.current = true;
+      setBusy(true);
+      setNotice("");
+      try {
+        await action.mutateAsync({ file });
+      } catch {
+        return; // the error is shown; the rest wait for another drop
+      }
+    }
+  }
+  const drop = useFileDrop(!locked, (files) => { void attachDropped(files); });
   function run(operation: DraftAction) {
     // Cover the gap before the disabled fieldset is painted, including a slow CV download.
     if (operationInFlight.current) return;
@@ -227,7 +247,7 @@ function DraftFields({ opened, onClose, setBusy, focusMessage, fresh, permission
       <h3 id="outlook-draft-heading">{draft ? "Outlook draft" : "New Outlook message"}</h3>
       <span className="row">{dock}<IconButton label="Close" icon={<CloseIcon />} disabled={action.isPending} onClick={() => { onClose(); }} /></span>
     </div>
-    <form className="form-grid" onSubmit={(event) => { event.preventDefault(); run("save"); }}>
+    <form className={`form-grid outlook-draft-form${drop.dropping ? " dropping" : ""}`} onSubmit={(event) => { event.preventDefault(); run("save"); }} {...drop.handlers}>
       <fieldset disabled={locked || action.isPending} className="full outlook-draft-fields">
         <Field label="To" error={errorFor("to")}><OutlookAddressInput value={form.to} onChange={(v) => { update("to", v); }}/></Field>
         {!copies && <button type="button" className="link" onClick={() => { setCopies(true); }}>Cc / Bcc</button>}

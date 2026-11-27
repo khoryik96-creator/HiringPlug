@@ -9,6 +9,7 @@ import { Menu } from "../components/Menu";
 import { SignInMethods } from "../components/SignInMethods";
 import { SaveError } from "../components/SaveError";
 import { formatWhen, keysOf, ROLE, TEAM_STATUS } from "../labels";
+import { InvitationEmailState, InvitationSent } from "./TeamInvitations";
 
 type Member = Schemas["TeamMember"];
 type Group = Schemas["TeamGroup"];
@@ -44,32 +45,6 @@ const roles = (myRole: Schemas["Role"]) => keysOf(ROLE).filter((r) => rank(r) <=
 /** A link just emailed to someone: an invitation (shown, to pass on another way if email is not set up), or to connect Microsoft (never shown: it signs in as them). */
 type Sent = { what: string; link?: string; delivery?: Schemas["Invitation"]["delivery"] };
 
-/** How an invitation went, in words, and what to do when it cannot arrive. */
-function InvitationSent({ email, link, delivery, onDone }: { email: string; link: string; delivery: Schemas["Invitation"]["delivery"]; onDone: () => void }) {
-  const lead = {
-    server: <>Invitation emailed to {email}. If it does not arrive, send them this link (it works for 7 days):</>,
-    mailbox: <>Invitation emailed to {email} from your own mailbox: the server&apos;s email is not set up. If it does not arrive, send them this link (it works for 7 days):</>,
-    test_inbox: <><strong>Not emailed:</strong> the server&apos;s email is only a test inbox, so nothing reaches {email}. Send them this link yourself (it works for 7 days):</>,
-    none: <><strong>Not emailed:</strong> the server&apos;s email is not set up and you have no mailbox connected. Send them this link yourself (it works for 7 days):</>,
-  }[delivery];
-  const fix = delivery === "test_inbox" || delivery === "none";
-  return (
-    <div className={fix ? "warning" : "team-sent"} role="status">
-      <p>{lead}</p>
-      <code className="secret">{link}</code>{" "}
-      <button type="button" className="link" onClick={() => {
-        try { void navigator.clipboard.writeText(link); } catch { /* no clipboard here: the link is shown to copy by hand */ }
-      }}>Copy link</button>{" "}
-      <button type="button" className="link" onClick={onDone}>Done</button>
-      {fix && (
-        <p className="muted small">
-          To have invitations emailed, connect your mailbox in <a href="#/email-connection">Settings › Email connection</a> and send a new
-          invitation, or have whoever runs the server set up its email (HP_SMTP_* settings).
-        </p>
-      )}
-    </div>
-  );
-}
 
 function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[]; microsoft: boolean }) {
   const queryClient = useQueryClient();
@@ -162,6 +137,7 @@ function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Membe
           <span className={`badge ${m.status === "active" ? "accepted" : m.status === "invited" ? "draft" : "withdrawn"}`}>{TEAM_STATUS[m.status]}</span>
           {m.twoStep && <span className="badge two-step-badge" title="Signs in with a code from an authenticator app too">2-step</span>}
           <div className="team-last muted small">{m.lastSignInAt ? <>Last signed in {formatWhen(m.lastSignInAt)}</> : "Never signed in"}</div>
+          {m.status === "invited" && m.invitationEmail && <InvitationEmailState email={m.invitationEmail} />}
         </td>
         <td className="team-actions">
           {actions.length > 0 && (

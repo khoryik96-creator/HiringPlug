@@ -272,6 +272,43 @@ func (q *Queries) EmailCandidateIDs(ctx context.Context, emailIds []string) ([]E
 	return items, nil
 }
 
+const emailStates = `-- name: EmailStates :many
+SELECT id, status, error, coalesce(sent_at, created_at)::timestamptz AS at FROM email WHERE id = ANY($1::text[])
+`
+
+type EmailStatesRow struct {
+	ID     string
+	Status string
+	Error  *string
+	At     time.Time
+}
+
+// How some emails went (the Team page: invitations).
+func (q *Queries) EmailStates(ctx context.Context, ids []string) ([]EmailStatesRow, error) {
+	rows, err := q.db.Query(ctx, emailStates, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailStatesRow
+	for rows.Next() {
+		var i EmailStatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.Error,
+			&i.At,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const failUnsentEmail = `-- name: FailUnsentEmail :one
 UPDATE email SET status = 'failed', error = $1
 WHERE id = $2 AND status = 'queued' AND delivery_attempted_at IS NULL

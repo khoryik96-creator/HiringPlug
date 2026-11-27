@@ -603,6 +603,39 @@ func (q *Queries) InsertTeamGroup(ctx context.Context, name string) (InsertTeamG
 	return i, err
 }
 
+const inviteEmails = `-- name: InviteEmails :many
+SELECT DISTINCT ON (l.user_id) l.user_id, l.email_id::text AS email_id
+FROM user_link l JOIN app_user u ON u.tenant_id = l.tenant_id AND u.id = l.user_id
+WHERE l.kind = 'invite' AND l.email_id IS NOT NULL AND u.invited
+ORDER BY l.user_id, l.created_at DESC
+`
+
+type InviteEmailsRow struct {
+	UserID  string
+	EmailID string
+}
+
+// Each invited person's latest invitation email.
+func (q *Queries) InviteEmails(ctx context.Context) ([]InviteEmailsRow, error) {
+	rows, err := q.db.Query(ctx, inviteEmails)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []InviteEmailsRow
+	for rows.Next() {
+		var i InviteEmailsRow
+		if err := rows.Scan(&i.UserID, &i.EmailID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const inviteUser = `-- name: InviteUser :one
 INSERT INTO app_user (tenant_id, email, name, role, active, invited)
 VALUES (app_current_tenant(), $1, $2, $3, false, true)
@@ -1238,6 +1271,21 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET guide_dismissed = EXCLUDED.guide_
 // The dashboard's getting-started checklist hidden (or shown again).
 func (q *Queries) SetGuideDismissed(ctx context.Context, guideDismissed bool) error {
 	_, err := q.db.Exec(ctx, setGuideDismissed, guideDismissed)
+	return err
+}
+
+const setInviteEmail = `-- name: SetInviteEmail :exec
+UPDATE user_link SET email_id = $1 WHERE user_id = $2 AND kind = 'invite' AND used_at IS NULL
+`
+
+type SetInviteEmailParams struct {
+	EmailID *string
+	UserID  string
+}
+
+// The email an invitation link was sent in (the link just made: the newest unused one).
+func (q *Queries) SetInviteEmail(ctx context.Context, arg SetInviteEmailParams) error {
+	_, err := q.db.Exec(ctx, setInviteEmail, arg.EmailID, arg.UserID)
 	return err
 }
 

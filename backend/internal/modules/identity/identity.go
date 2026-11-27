@@ -40,18 +40,35 @@ type Mailer interface {
 	// Invite sends an invitation for inviterID, who is shown its link too:
 	// from the server's mail, or their own mailbox when the server's is not
 	// set up. It returns how it goes (server, mailbox, test_inbox or none).
-	Invite(ctx context.Context, tx pgx.Tx, tenantID, inviterID string, to []string, subject, body string) (string, error)
+	// The email's id comes back too: the Team page says how it went.
+	Invite(ctx context.Context, tx pgx.Tx, tenantID, inviterID string, to []string, subject, body string) (delivery, emailID string, err error)
 }
+
+// MailState is how an email went (emails module): queued, sent or failed, and why.
+type MailState struct {
+	Status string
+	Error  *string
+	At     time.Time
+}
+
+// InviteMail reads how invitation emails went (emails module).
+type InviteMail interface {
+	EmailStates(ctx context.Context, tx pgx.Tx, ids []string) (map[string]MailState, error)
+}
+
+// ReadInviteMailWith sets how invitation emails are read (called by internal/app).
+func (m *Module) ReadInviteMailWith(r InviteMail) { m.inviteMail = r }
 
 // Module is the identity module.
 type Module struct {
-	pool      *pgxpool.Pool
-	verifier  *authn.Verifier
-	mailer    Mailer
-	publicURL string
-	limits    limits
-	twoStep   twoStepKeys
-	ms        *microsoftSignIn // nil until UseMicrosoft
+	pool       *pgxpool.Pool
+	verifier   *authn.Verifier
+	mailer     Mailer
+	inviteMail InviteMail // nil: the Team page does not say how invitations went
+	publicURL  string
+	limits     limits
+	twoStep    twoStepKeys
+	ms         *microsoftSignIn // nil until UseMicrosoft
 	// now is the app server's clock (links, two-step codes). Sessions are
 	// issued and ended by the database's clock instead (databaseSecond).
 	now  func() time.Time

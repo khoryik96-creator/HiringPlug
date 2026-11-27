@@ -15586,6 +15586,9 @@ components:
       type: object
       required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep, signInMethods]
       properties:
+        invitationEmail:
+          description: While invited, how the latest invitation email went; absent when none is recorded.
+          allOf: [{$ref: '#/components/schemas/InvitationEmail'}]
         signInMethods:
           type: array
           description: "How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited)."
@@ -15616,6 +15619,13 @@ components:
         email: {type: string, format: email, maxLength: 254}
         name: {type: string, minLength: 1, maxLength: 200}
         role: {$ref: '#/components/schemas/Role'}
+    InvitationEmail:
+      type: object
+      required: [status, error, at]
+      properties:
+        status: {$ref: '#/components/schemas/EmailStatus'}
+        error: {type: string, nullable: true, description: "Why it could not be sent (the mail server's or Microsoft's answer)."}
+        at: {type: string, format: date-time, description: When it was last tried or sent.}
     Invitation:
       type: object
       required: [member, link, expiresAt, emailed, delivery]

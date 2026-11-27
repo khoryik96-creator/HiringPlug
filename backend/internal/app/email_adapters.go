@@ -234,8 +234,20 @@ func (a identityMailer) Notify(ctx context.Context, tx pgx.Tx, tenantID string, 
 	return a.modules.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: subject, Body: body, AccountNotice: true})
 }
 
-func (a identityMailer) Invite(ctx context.Context, tx pgx.Tx, tenantID, inviterID string, to []string, subject, body string) (string, error) {
+func (a identityMailer) Invite(ctx context.Context, tx pgx.Tx, tenantID, inviterID string, to []string, subject, body string) (string, string, error) {
 	return a.modules.Emails.NotifyAccountFor(ctx, tx, tenantID, inviterID, emails.Notice{To: to, Subject: subject, Body: body})
+}
+
+// inviteMail tells identity how invitation emails went (emails module).
+type inviteMail struct{ emails *emails.Module }
+
+func (a inviteMail) EmailStates(ctx context.Context, tx pgx.Tx, ids []string) (map[string]identity.MailState, error) {
+	states, err := a.emails.EmailStates(ctx, tx, ids)
+	out := make(map[string]identity.MailState, len(states))
+	for id, st := range states {
+		out[id] = identity.MailState{Status: st.Status, Error: st.Error, At: st.At}
+	}
+	return out, err
 }
 
 // emailContacts gives the emails module a client's contact to write to.

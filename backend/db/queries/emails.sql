@@ -240,3 +240,7 @@ LIMIT 20000;
 UPDATE email SET status = 'failed', error = @error
 WHERE id = @id AND status = 'queued' AND delivery_attempted_at IS NULL
 RETURNING id, fees_restricted;
+
+-- How some emails went (the Team page: invitations).
+-- name: EmailStates :many
+SELECT id, status, error, coalesce(sent_at, created_at)::timestamptz AS at FROM email WHERE id = ANY(@ids::text[]);

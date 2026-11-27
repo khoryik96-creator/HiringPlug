@@ -1954,6 +1954,7 @@ type UserLink struct {
 	UsedAt    *time.Time
 	CreatedBy string
 	CreatedAt time.Time
+	EmailID   *string
 }
 
 type UserMicrosoft struct {

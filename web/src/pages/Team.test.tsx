@@ -129,6 +129,18 @@ describe("team", () => {
     expect(sentBody(post)).toEqual({ email: "wei@contoh.my", name: "Wei", role: "recruiter" });
   });
 
+  it("shows how each invitation email went: sent, or failed with the mail server's answer", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [
+      member("usr_me", "Aina", "owner"),
+      { ...member("usr_j", "Jerome", "owner", "invited"), invitationEmail: { status: "failed", error: "550 5.7.1 Client does not have permissions to send as this sender", at: "2026-11-27T01:00:00Z" } },
+      { ...member("usr_t", "Tan", "recruiter", "invited"), invitationEmail: { status: "sent", error: null, at: "2026-11-27T01:00:00Z" } },
+    ] }));
+    renderWithClient(<Team myRole="owner" myId="usr_me" />);
+    expect((await screen.findByText(/Invitation email failed/)).closest("[role=note]")?.textContent)
+      .toContain("550 5.7.1 Client does not have permissions to send as this sender");
+    expect(screen.getByText(/Invitation email sent/)).toBeTruthy();
+  });
+
   it("says plainly when an invitation could not be emailed, and how to fix it", async () => {
     reads();
     vi.spyOn(api, "POST").mockResolvedValue(ok({

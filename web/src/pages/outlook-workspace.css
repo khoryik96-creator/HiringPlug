@@ -30,6 +30,9 @@ main.outlook-page { max-width: none; padding: 0 1.25rem; }
   overflow-wrap: anywhere;
 }
 .outlook-folders button:hover { background: #ece7f8; }
+.outlook-folder-label { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; }
+.outlook-folder-icon { flex-shrink: 0; color: var(--muted, #6b6585); }
+.outlook-folders button[aria-current] .outlook-folder-icon { color: var(--accent-dark, #5d3dc2); }
 .outlook-folders button.has-unread { font-weight: 700; }
 .outlook-folders button[aria-current] { background: var(--accent-soft, #eee8ff); color: var(--accent-dark, #5d3dc2); }
 .outlook-count { color: var(--accent, #6946c8); font-weight: 700; font-size: .82rem; }
@@ -313,3 +316,12 @@ main.outlook-page { padding-right: calc(1.25rem + var(--outlook-docked, 0px)); }
 .outlook-docked .outlook-messages { max-height: 38vh; border-bottom: 1px solid var(--line); }
 .outlook-docked .outlook-reading { max-height: none; }
 .outlook-docked .outlook-search input { min-width: 0; flex: 1 1 8rem; }
+
+/* Attach file in an Outlook draft: a labelled button beside "Attachments", easy to find. */
+.outlook-attach { display: inline-flex; align-items: center; gap: .35rem; }
+.outlook-attach svg { width: 16px; height: 16px; }
+/* Files dragged over a draft: dropped anywhere on it, they are attached. */
+.outlook-draft-form { position: relative; }
+.outlook-draft-form.dropping { outline: 2px dashed var(--accent, #6d4fd8); outline-offset: 6px; border-radius: 10px; }
+.outlook-draft-form.dropping::after { content: "Drop files to attach them"; position: absolute; inset: 0; display: grid; place-items: center; z-index: 40;
+  background: rgba(239, 234, 253, .82); color: var(--accent-dark, #4c35a8); font-weight: 700; font-size: 1.1rem; border-radius: 10px; pointer-events: none; }

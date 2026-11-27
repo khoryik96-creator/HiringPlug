@@ -399,3 +399,14 @@ FROM app_user u;
 
 -- name: HasPassword :one
 SELECT (password_hash IS NOT NULL)::boolean AS has_password FROM app_user WHERE id = @id;
+
+-- The email an invitation link was sent in (the link just made: the newest unused one).
+-- name: SetInviteEmail :exec
+UPDATE user_link SET email_id = @email_id WHERE user_id = @user_id AND kind = 'invite' AND used_at IS NULL;
+
+-- Each invited person's latest invitation email.
+-- name: InviteEmails :many
+SELECT DISTINCT ON (l.user_id) l.user_id, l.email_id::text AS email_id
+FROM user_link l JOIN app_user u ON u.tenant_id = l.tenant_id AND u.id = l.user_id
+WHERE l.kind = 'invite' AND l.email_id IS NOT NULL AND u.invited
+ORDER BY l.user_id, l.created_at DESC;

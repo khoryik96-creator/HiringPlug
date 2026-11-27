@@ -74,9 +74,16 @@ func (h *HTTP) ListTeam(ctx context.Context, _ api.ListTeamRequestObject) (api.L
 	if err != nil {
 		return nil, err
 	}
+	invites, err := h.m.InvitationEmails(ctx, p)
+	if err != nil {
+		return nil, err
+	}
 	out := api.ListTeam200JSONResponse{Items: make([]api.TeamMember, len(rows))}
 	for i, r := range rows {
 		out.Items[i] = memberToAPI(r)
+		if st, ok := invites[r.ID]; ok && r.Invited {
+			out.Items[i].InvitationEmail = &api.InvitationEmail{Status: api.EmailStatus(st.Status), Error: c.OrNull(st.Error), At: st.At}
+		}
 		out.Items[i].TwoStep = twoStep[r.ID]
 		out.Items[i].SignInMethods = methodsToAPI(methods[r.ID])
 	}

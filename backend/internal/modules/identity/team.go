@@ -40,6 +40,33 @@ func (m *Module) Team(ctx context.Context, p authz.Principal) ([]TeamMember, err
 	return out, err
 }
 
+// InvitationEmails says, for each invited person, how their latest
+// invitation email went (none recorded: left out).
+func (m *Module) InvitationEmails(ctx context.Context, p authz.Principal) (map[string]MailState, error) {
+	out := map[string]MailState{}
+	if m.inviteMail == nil {
+		return out, nil
+	}
+	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
+		rows, err := store.New(tx).InviteEmails(ctx)
+		if err != nil || len(rows) == 0 {
+			return err
+		}
+		ids := make([]string, len(rows))
+		for i, r := range rows {
+			ids[i] = r.EmailID
+		}
+		states, err := m.inviteMail.EmailStates(ctx, tx, ids)
+		for _, r := range rows {
+			if st, ok := states[r.EmailID]; ok {
+				out[r.UserID] = st
+			}
+		}
+		return err
+	})
+	return out, err
+}
+
 // Invite adds someone to the team as role and emails them an invitation to
 // choose a password.
 func (m *Module) Invite(ctx context.Context, p authz.Principal, email, name, role string) (Invitation, error) {
@@ -140,8 +167,11 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 	role := strings.ReplaceAll(member.Role, "_", " ")
 	body := "Hello " + member.Name + ",\n\n" + p.Name + " invited you to join " + company.Name + " on HyPlug as " + role +
 		".\n\nChoose your password here (the link works for 7 days):\n" + link + "\n\nHyPlug"
-	delivery, err := m.mailer.Invite(ctx, tx, p.TenantID, p.UserID, []string{member.Email}, p.Name+" invited you to "+company.Name+" on HyPlug", body)
+	delivery, emailID, err := m.mailer.Invite(ctx, tx, p.TenantID, p.UserID, []string{member.Email}, p.Name+" invited you to "+company.Name+" on HyPlug", body)
 	if err != nil {
+		return Invitation{}, err
+	}
+	if err := q.SetInviteEmail(ctx, store.SetInviteEmailParams{UserID: member.ID, EmailID: &emailID}); err != nil {
 		return Invitation{}, err
 	}
 	return Invitation{Member: member, Link: link, ExpiresAt: expires, Emailed: delivery == "server" || delivery == "mailbox", Delivery: delivery}, nil

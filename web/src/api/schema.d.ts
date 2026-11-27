@@ -9982,6 +9982,8 @@ export interface components {
          */
         TeamStatus: "invited" | "active" | "deactivated";
         TeamMember: {
+            /** @description While invited, how the latest invitation email went; absent when none is recorded. */
+            invitationEmail?: components["schemas"]["InvitationEmail"];
             /** @description How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited). */
             signInMethods: components["schemas"]["SignInMethod"][];
             /** @description Signs in with a code from an authenticator app too. */
@@ -10005,6 +10007,16 @@ export interface components {
             email: string;
             name: string;
             role: components["schemas"]["Role"];
+        };
+        InvitationEmail: {
+            status: components["schemas"]["EmailStatus"];
+            /** @description Why it could not be sent (the mail server's or Microsoft's answer). */
+            error: string | null;
+            /**
+             * Format: date-time
+             * @description When it was last tried or sent.
+             */
+            at: string;
         };
         Invitation: {
             member: components["schemas"]["TeamMember"];

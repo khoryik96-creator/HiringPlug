@@ -66,7 +66,7 @@ export function OutlookAttachments({ messageId, canImportCv = false, userId, rem
   const downloadAll = several && <button type="button" className="secondary small" disabled={all.isPending}
     onClick={() => { all.mutate(); }}><DownloadIcon /> {all.isPending ? "Downloading…" : "Download all"}</button>;
   return <section className="outlook-attachments" aria-label="Attachments">
-    {tools ? <div className="row outlook-draft-file-head"><h4>Attachments</h4>{tools}</div>
+    {tools ? <div className="row outlook-draft-file-head">{tools}</div>
       : <div className="row outlook-draft-file-head"><h4>Attachments</h4>{downloadAll}</div>}
     <ErrorMessage error={all.error} />
     {attachments.isPending && <p className="muted" role="status">Loading attachments…</p>}

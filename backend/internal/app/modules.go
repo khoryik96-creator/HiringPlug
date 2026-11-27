@@ -146,6 +146,7 @@ func NewModules(d Deps) *Modules {
 		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts, InterviewReminders: calendarReminderMail{m}, Invoices: invoiceDelivery{m},
 		SignIn: m.Identity, // the Microsoft app signs people in too: owners only, then
 	}, d.Mail, d.Files)
+	m.Identity.ReadInviteMailWith(inviteMail{m.Emails}) // the Team page says how each invitation went
 	mode := mail.DeliveryMode(d.Config.SMTP.Addr)
 	m.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
 		KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL, ServerMode: mode, AllowPrivate: d.Config.AllowPrivateNetworks,

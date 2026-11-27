@@ -119,6 +119,8 @@ it("creates a draft on the first attachment and keeps unsaved text when removing
   fireEvent.change(screen.getByLabelText("Subject"), { target: { value: draft.subject } });
   const message = screen.getByRole("textbox", { name: "Message" });
   fireEvent.input(message, { target: { innerHTML: "<p><strong>Tuesday</strong> is available.</p>" } });
+  const attach = screen.getByRole("button", { name: "Attach file" });
+  expect(attach.textContent, "a labelled button, not a lone paperclip").toContain("Attach file");
   fireEvent.change(screen.getByLabelText("Attachment file"), { target: { files: [file] } });
   expect(await screen.findByText(file.name)).toBeTruthy();
   const creates = (post.mock.calls as unknown[][]).filter((call) => call[0] === "/v1/outlook/drafts");
@@ -192,4 +194,39 @@ it("docks on the right, beside the mail, and opens docked the next time", async 
   expect((await screen.findByRole("button", { name: "Dock right" })).getAttribute("aria-pressed")).toBe("true");
   expect(screen.getByRole("dialog").className).toContain("docked");
   try { localStorage.removeItem("hiringplug.outlook.docked"); } catch { /* none */ }
+});
+
+it("attaches files dropped anywhere on the message, one after another, to one draft", async () => {
+  const draft: Schemas["OutlookDraft"] = {
+    messageId: "omg_test", version: "created", subject: "Interview", body: "Tuesday is available.",
+    to: [], cc: [], bcc: [], hasAttachments: false, bodyTruncated: false,
+    schedule: null, scheduleNeedsReview: false, webUrl: null,
+  };
+  const created = { ...draft, version: "created" };
+  const post = vi.spyOn(api, "POST").mockImplementation((path) => Promise.resolve(
+    path === "/v1/email-previews" ? ok({ subject: "", bodyHtml: "", missing: [], fieldValues: {} }) : ok(created)));
+  let n = 0;
+  const upload = vi.fn<(url: string, options: RequestInit) => Promise<Response>>().mockImplementation(() => {
+    n += 1;
+    return Promise.resolve(new Response(JSON.stringify({ ...draft, hasAttachments: true, version: `after-${String(n)}` })));
+  });
+  vi.stubGlobal("fetch", upload);
+  vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
+    path === "/v1/outlook/messages/{messageId}/attachments" ? ok({ items: [], more: false })
+      : path === "/v1/email-signature" ? ok({ bodyHtml: "", version: 0, updatedAt: null }) : ok({ items: [], fields: [] })));
+  renderWithClient(<OutlookDraftEditor id={null} onClose={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Subject"), { target: { value: draft.subject } });
+  const form = screen.getByLabelText("Subject").closest("form") as HTMLFormElement;
+  const files = [new File(["a"], "CV.pdf", { type: "application/pdf" }), new File(["b"], "JD.docx")];
+  const dataTransfer = { types: ["Files"], files };
+  fireEvent.dragOver(form, { dataTransfer });
+  expect(form.className, "it shows the files can be dropped").toContain("dropping");
+  fireEvent.drop(form, { dataTransfer });
+  await waitFor(() => { expect(upload).toHaveBeenCalledTimes(2); });
+  expect((post.mock.calls as unknown[][]).filter((c) => c[0] === "/v1/outlook/drafts"), "one draft for both").toHaveLength(1);
+  expect(upload.mock.calls.map(([url]) => url)).toEqual([
+    "/v1/outlook/drafts/omg_test/attachments?version=created",
+    "/v1/outlook/drafts/omg_test/attachments?version=after-1", // the second takes the version the first left
+  ]);
+  expect(form.className).not.toContain("dropping");
 });

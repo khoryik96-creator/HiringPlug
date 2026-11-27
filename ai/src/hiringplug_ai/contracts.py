@@ -4415,28 +4415,6 @@ class TeamStatus(StrEnum):
     deactivated = "deactivated"
 
 
-class TeamMember(BaseModel):
-    signInMethods: Annotated[
-        list[SignInMethod],
-        Field(
-            description="How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited)."
-        ),
-    ]
-    twoStep: Annotated[bool, Field(description="Signs in with a code from an authenticator app too.")]
-    id: UserId
-    name: str
-    email: str
-    role: Role
-    teamId: Annotated[TeamGroupId | None, Field(...)]
-    status: TeamStatus
-    lastSignInAt: Annotated[AwareDatetime | None, Field(...)]
-    createdAt: AwareDatetime
-
-
-class TeamList(BaseModel):
-    items: list[TeamMember]
-
-
 class InviteInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -4446,28 +4424,19 @@ class InviteInput(BaseModel):
     role: Role
 
 
+class InvitationEmail(BaseModel):
+    status: EmailStatus1
+    error: Annotated[
+        str | None, Field(description="Why it could not be sent (the mail server's or Microsoft's answer).")
+    ]
+    at: Annotated[AwareDatetime, Field(description="When it was last tried or sent.")]
+
+
 class Delivery(StrEnum):
     server = "server"
     mailbox = "mailbox"
     test_inbox = "test_inbox"
     none = "none"
-
-
-class Invitation(BaseModel):
-    member: TeamMember
-    link: Annotated[
-        str, Field(description="The invitation link (also emailed), to pass on another way if needed.")
-    ]
-    expiresAt: AwareDatetime
-    emailed: Annotated[
-        bool, Field(description="Whether it is on its way to them (delivery server or mailbox).")
-    ]
-    delivery: Annotated[
-        Delivery,
-        Field(
-            description="How the invitation goes: server, from the server's mail (HP_SMTP_*); mailbox, from the inviter's own connected mailbox (the server's mail is not set up); test_inbox, held in the server's test inbox (Mailpit), never reaching them; none, nothing can send it (no server mail, no connected mailbox). With test_inbox or none, pass the link on another way.\n"
-        ),
-    ]
 
 
 class TeamMemberUpdate(BaseModel):
@@ -9266,6 +9235,51 @@ class Me(BaseModel):
     tenant: Tenant
     role: Role
     permissions: list[Permission]
+
+
+class TeamMember(BaseModel):
+    invitationEmail: Annotated[
+        InvitationEmail | None,
+        Field(
+            description="While invited, how the latest invitation email went; absent when none is recorded."
+        ),
+    ] = None
+    signInMethods: Annotated[
+        list[SignInMethod],
+        Field(
+            description="How they can sign in: with a password they chose, with the Microsoft account linked to them, or both (none while invited)."
+        ),
+    ]
+    twoStep: Annotated[bool, Field(description="Signs in with a code from an authenticator app too.")]
+    id: UserId
+    name: str
+    email: str
+    role: Role
+    teamId: Annotated[TeamGroupId | None, Field(...)]
+    status: TeamStatus
+    lastSignInAt: Annotated[AwareDatetime | None, Field(...)]
+    createdAt: AwareDatetime
+
+
+class TeamList(BaseModel):
+    items: list[TeamMember]
+
+
+class Invitation(BaseModel):
+    member: TeamMember
+    link: Annotated[
+        str, Field(description="The invitation link (also emailed), to pass on another way if needed.")
+    ]
+    expiresAt: AwareDatetime
+    emailed: Annotated[
+        bool, Field(description="Whether it is on its way to them (delivery server or mailbox).")
+    ]
+    delivery: Annotated[
+        Delivery,
+        Field(
+            description="How the invitation goes: server, from the server's mail (HP_SMTP_*); mailbox, from the inviter's own connected mailbox (the server's mail is not set up); test_inbox, held in the server's test inbox (Mailpit), never reaching them; none, nothing can send it (no server mail, no connected mailbox). With test_inbox or none, pass the link on another way.\n"
+        ),
+    ]
 
 
 class InterviewQuestion(BaseModel):

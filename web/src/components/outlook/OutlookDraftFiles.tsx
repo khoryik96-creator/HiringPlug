@@ -1,7 +1,7 @@
 import { useRef } from "react";
 
 import type { Schemas } from "../../api/client";
-import { IconButton, PaperclipIcon } from "../ActionIcons";
+import { PaperclipIcon } from "../ActionIcons";
 import { OutlookAttachments } from "./OutlookAttachments";
 
 export const maxDraftFileSize = 10 << 20;
@@ -12,7 +12,9 @@ export function OutlookDraftFiles({ draft, disabled, onAdd, onRemove }: {
 }) {
   const input = useRef<HTMLInputElement>(null);
   const picker = <>
-    <IconButton label="Attach file" icon={<PaperclipIcon />} disabled={disabled} onClick={() => { input.current?.click(); }} />
+    <button type="button" className="secondary small outlook-attach" disabled={disabled} onClick={() => { input.current?.click(); }}>
+      <PaperclipIcon /> Attach file
+    </button>
     <input ref={input} type="file" hidden aria-label="Attachment file" disabled={disabled} onChange={(event) => {
       const file = event.currentTarget.files?.[0];
       event.currentTarget.value = "";

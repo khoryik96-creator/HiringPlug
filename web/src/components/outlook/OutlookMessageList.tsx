@@ -6,6 +6,7 @@ import { useRef } from "react";
 
 import type { Schemas } from "../../api/client";
 import { FlagIcon, MoveFolderIcon, PaperclipIcon } from "../ActionIcons";
+import { FolderIcon } from "./folderIcons";
 import type { CvImportState } from "./outlookCvImports";
 
 type Message = Schemas["OutlookMessage"];
@@ -46,7 +47,7 @@ export function OutlookFolderPane({ folders, active, onChoose }: { folders: Fold
         <button type="button" key={folder.id} aria-current={active === folder.id ? "page" : undefined}
           style={depth ? { paddingLeft: `${String(0.75 + depth * 0.9)}rem` } : undefined}
           className={folder.unread > 0 ? "has-unread" : undefined} onClick={() => { onChoose(folder); }}>
-          <span className="outlook-folder-name">{folder.name}</span>
+          <span className="outlook-folder-label"><FolderIcon folder={folder} /><span className="outlook-folder-name">{folder.name}</span></span>
           {folder.unread > 0 && <span className="outlook-count" aria-label={`${String(folder.unread)} unread`}>{folder.unread}</span>}
         </button>
       ))}
