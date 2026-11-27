@@ -22,7 +22,9 @@ func (f *msTest) lastMailTo(tenantID, address string) string {
 	runCoreJobsUntilIdle(f.t, f.a, tenantID)
 	msgs := mailServer.To(address)
 	require.NotEmpty(f.t, msgs, "an email to %s", address)
-	return msgs[len(msgs)-1].Data
+	// Joined where quoted-printable wrapped its lines, so a phrase is found
+	// wherever the wrap falls (it moves with the product's name).
+	return strings.ReplaceAll(msgs[len(msgs)-1].Data, "=\r\n", "")
 }
 
 // An administrator can type anyone's address as an account's email (mail);
