@@ -163,7 +163,12 @@ async function callback(request, env, now, fetcher) {
     id,
     now,
   ).first();
-  if (!flow) return page({ step: "expired" }); // Never replay a code exchange, including after a timeout.
+  if (!flow) {
+    // Never replay a code exchange, including after a timeout. A second visit
+    // (a reload, or a browser loading the page twice) says how the first went.
+    const seen = await statement(env, "SELECT status FROM flows WHERE id=? AND expires>?", id, now).first();
+    return page({ step: { connected: "connected", exchanging: "finishing" }[seen?.status] ?? "expired" });
+  }
   try {
     if (
       query.has("error") ||
@@ -219,8 +224,7 @@ async function callback(request, env, now, fetcher) {
     return page(error instanceof SignInFailure ? error : null);
   }
 }
-// Apollo's refusals of a match, by status: out of credits, not allowed for
-// this account or plan, or too many requests for now.
+// Apollo's refusals of a match: no credits, not allowed for the plan, too many requests.
 const LIMITS = { 402: "no_credits", 403: "plan_not_allowed", 429: "rate_limited" };
 const BUSY_LEASE = 120; // seconds: more than a token refresh plus People Match
 const finishOperation = async (env, connection, id, result) =>
@@ -479,8 +483,11 @@ export async function handle(request, env, fetcher = fetch, now = Math.floor(Dat
   }
 }
 export default {
-  fetch(request, env) {
-    return handle(request, env);
+  fetch(request, env, ctx) {
+    // Finish even if the browser drops the request (a sign-in stuck mid-exchange).
+    const response = handle(request, env);
+    ctx?.waitUntil?.(response.catch(() => {}));
+    return response;
   },
   async scheduled(event, env) {
     const now = Math.floor(Date.now() / 1000);

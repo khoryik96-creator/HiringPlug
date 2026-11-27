@@ -35,6 +35,8 @@ export function signInMessage(failure) {
       return "Apollo connected. Return to the app where you started. You can close this tab.";
     case "declined":
       return `Apollo sign-in was declined${detail ? ` (Apollo said: ${detail})` : ""}. ${AGAIN}`;
+    case "finishing":
+      return "Apollo sign-in is still finishing. Return to the app where you started and click Check connection in a few seconds.";
     case "expired":
       return `This sign-in link has expired or was already used. ${AGAIN}`;
     case "credentials":

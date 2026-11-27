@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 import { emailResult } from "./identity.mjs";
 import { digest, seal } from "./secrets.mjs";
-import { handle } from "./worker.mjs";
+import worker, { handle } from "./worker.mjs";
 
 const person = {
   url: "https://www.linkedin.com/in/sample-person",
@@ -254,5 +254,22 @@ test("a failed Apollo sign-in says which step failed, never the code or token", 
   );
   assert.match(await signIn("code=c&state=STATE", answers({ status: 200, body: token() })), /^Apollo connected/);
   assert.match(await signIn("code=c&state=" + "ff".repeat(32), answers({ status: 200 })), /expired or was already used/);
+
+  // The page loaded twice: the second visit says how the first went.
+  const twice = async (status) => {
+    const id = (++n).toString(16).padStart(2, "0").repeat(32);
+    sql.prepare("INSERT INTO flows VALUES (?, 'proof', ?, 1000, 0, 'test')").run(id, status);
+    return (await handle(new Request(env.PUBLIC_ORIGIN + "/callback?code=c&state=" + id), env, answers({ status: 200 }), 100)).text();
+  };
+  assert.match(await twice("exchanging"), /still finishing\. Return to the app where you started and click Check connection/);
+  assert.match(await twice("connected"), /^Apollo connected/);
+  assert.match(await twice("cancelled"), /expired or was already used/);
   assert.doesNotMatch(scope, /fictional|test-secret|code=/);
+});
+
+test("a request the browser drops is still finished", async () => {
+  const kept = [];
+  const response = worker.fetch(new Request("https://elsewhere.test/"), {}, { waitUntil: (p) => kept.push(p) });
+  assert.equal(kept.length, 1, "the work is handed to waitUntil");
+  assert.equal((await response).status, 503, "an unconfigured broker still answers");
 });

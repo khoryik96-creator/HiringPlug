@@ -60,6 +60,11 @@ search so HyPlug can bind the company page used in that scan.
   grant), the answer was incomplete, or the profile could not be read.
   Fix that setting, then connect again. Redeploy the Worker after updating
   HyPlug to get these messages.
+- **"This sign-in link has expired or was already used."** The return page
+  was opened again after the sign-in had already used it (a reload, or a
+  browser loading it twice). The broker finishes a sign-in even when the
+  browser drops the page, and a second visit says whether it connected or
+  is still finishing: go back to HyPlug and click **Check connection**.
 - **Apollo limited the lookup.** HyPlug says which refusal Apollo gave: no
   credits left (402), not allowed for the account's plan (403), or too many
   lookups in a short time (429). Lookups through other apps can be refused
