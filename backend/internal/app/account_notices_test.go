@@ -16,10 +16,12 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
-// Emails about someone's account (an invitation, a link to connect
-// Microsoft, a Microsoft account linked) go from the server's mail, sent by
-// nobody: never from the connected mailbox of whoever caused them, where a
-// copy in their Sent Items would hand them the link (and the account).
+// Emails about someone's account that hand over a sign-in (a link to connect
+// Microsoft) go from the server's mail, sent by nobody: never from the
+// connected mailbox of whoever caused them, where a copy in their Sent Items
+// would hand them the link (and the account). An invitation is the exception:
+// its link is shown to whoever invites anyway, so it goes from their own
+// mailbox, the mail people's mail servers already accept from them.
 func TestAccountNoticesNeverGoThroughAPersonsMailbox(t *testing.T) {
 	t.Parallel()
 	f := newMicrosoftTest(t, liveServerMail())
@@ -50,16 +52,17 @@ func TestAccountNoticesNeverGoThroughAPersonsMailbox(t *testing.T) {
 	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
 	var inv api.Invitation
 	res.JSON(&inv)
-	assert.Equal(t, api.InvitationDeliveryServer, inv.Delivery, "the server's mail is set up: it goes from there")
+	assert.Equal(t, api.InvitationDeliveryMailbox, inv.Delivery, "an invitation goes from the inviter's own mailbox, even with the server's mail set up")
 	assert.True(t, inv.Emailed)
 	link := f.reconnectLink(owner.Token, recruiter.ID) // from the server's mail (the helper reads it there)
 	assert.NotEmpty(t, link)
-	assert.Contains(t, f.lastMailTo(tenant.ID, invitee), "invited you")
-	assert.EqualValues(t, 1, sentThroughOutlook.Load(), "neither went through the owner's mailbox")
+	runCoreJobsUntilIdle(t, f.a, tenant.ID)
+	assert.EqualValues(t, 2, sentThroughOutlook.Load(), "the invitation went through the owner's mailbox; the reconnect link did not")
+	assert.Empty(t, mailServer.To(invitee), "not from the server's mail")
 
 	rows, err := testutil.Current.Admin.Query(context.Background(),
-		`SELECT sent_by, mailbox_ref IS NULL, status FROM email WHERE tenant_id = $1 AND $2 <> ALL (to_addresses) ORDER BY created_at`,
-		tenant.ID, "someone."+tenant.ID+"@different-domain.test")
+		`SELECT sent_by, mailbox_ref IS NULL, status FROM email WHERE tenant_id = $1 AND $2 <> ALL (to_addresses) AND $3 <> ALL (to_addresses) ORDER BY created_at`,
+		tenant.ID, "someone."+tenant.ID+"@different-domain.test", invitee)
 	require.NoError(t, err)
 	defer rows.Close()
 	n := 0
@@ -73,7 +76,7 @@ func TestAccountNoticesNeverGoThroughAPersonsMailbox(t *testing.T) {
 		n++
 	}
 	require.NoError(t, rows.Err())
-	assert.Equal(t, 2, n, "the invitation and the reconnect link")
+	assert.Equal(t, 1, n, "the reconnect link")
 }
 
 // liveServerMail sets up the server's own mail (HP_SMTP_*), as on a real

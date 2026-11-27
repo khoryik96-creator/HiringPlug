@@ -252,16 +252,16 @@ const (
 
 // NotifyAccountFor queues an account notice that userID sends and may see
 // in full (an invitation: its link is shown to them too), in the caller's
-// transaction. It goes from the server's mail when that is set up, else from
-// userID's own connected mailbox when they have one that sends. It returns
-// how it goes (Via...).
+// transaction. It goes from userID's own connected mailbox when they have one
+// that sends (the mail their other emails go by, which people's mail servers
+// know), else from the server's mail. It returns how it goes (Via...).
 func (m *Module) NotifyAccountFor(ctx context.Context, tx pgx.Tx, tenantID, userID string, n Notice) (via, emailID string, err error) {
 	n.AccountNotice = true
 	via = ViaServer
 	switch mode := m.service.serverMode(); {
-	case mode == "live":
 	case m.service.mailboxSends(ctx, tx, userID):
 		n.SentBy, via = &userID, ViaMailbox
+	case mode == "live":
 	case mode == "test":
 		via = ViaTestInbox
 	default:

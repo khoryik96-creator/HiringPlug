@@ -2196,10 +2196,10 @@ Roles have permissions per area: **view** (`:read`), **write** (`:create`),
 (`candidates.compensation:read` / `:update`). Defaults per role are in the
 contract. ✅ People sign in with email and password; owners and admins invite
 them, change roles and deactivate them on the **Team** page; "Forgot your
-password?" emails a reset link; ✅ an invitation goes from the server's own
-email (`HP_SMTP_*`), or, when that is not set up (or is only the Mailpit test
-inbox), from the inviter's connected mailbox (they are shown its link
-anyway). The Team page says which, or that it was **not emailed** (no server
+password?" emails a reset link; ✅ an invitation goes from the inviter's
+connected mailbox when they have one (the mail their other emails go by;
+they are shown its link anyway), else from the server's own email
+(`HP_SMTP_*`). The Team page says which, or that it was **not emailed** (no server
 email, no mailbox), with the link to copy and how to fix it, and Settings ›
 System's server checks say when the server's email cannot reach anyone. Under each invited person the Team page says how their latest invitation
 email went: waiting, sent (when), or failed with the mail server's answer.

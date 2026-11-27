@@ -20,7 +20,7 @@ export function InvitationEmailState({ email }: { email: Schemas["InvitationEmai
 export function InvitationSent({ email, link, delivery, onDone }: { email: string; link: string; delivery: Schemas["Invitation"]["delivery"]; onDone: () => void }) {
   const lead = {
     server: <>Invitation emailed to {email}. If it does not arrive, send them this link (it works for 7 days):</>,
-    mailbox: <>Invitation emailed to {email} from your own mailbox: the server&apos;s email is not set up. If it does not arrive, send them this link (it works for 7 days):</>,
+    mailbox: <>Invitation emailed to {email} from your mailbox. If it does not arrive, send them this link (it works for 7 days):</>,
     test_inbox: <><strong>Not emailed:</strong> the server&apos;s email is only a test inbox, so nothing reaches {email}. Send them this link yourself (it works for 7 days):</>,
     none: <><strong>Not emailed:</strong> the server&apos;s email is not set up and you have no mailbox connected. Send them this link yourself (it works for 7 days):</>,
   }[delivery];
