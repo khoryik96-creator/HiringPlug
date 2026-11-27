@@ -30,11 +30,11 @@ type msTest struct {
 	ms *entratest.Server
 }
 
-func newMicrosoftTest(t *testing.T) *msTest {
+func newMicrosoftTest(t *testing.T, overrides ...map[string]string) *msTest {
 	t.Helper()
-	a := newTestApp(t, map[string]string{
+	a := newTestApp(t, append([]map[string]string{{
 		"HP_PUBLIC_URL": "http://app.test", "HP_MAIL_MICROSOFT_CLIENT_ID": "server-client", "HP_MAIL_MICROSOFT_CLIENT_SECRET": "server-secret",
-	})
+	}}, overrides...)...)
 	ms := entratest.New(t)
 	a.modules.Identity.UseMicrosoftService(ms.URL, ms.Client())
 	return &msTest{t: t, a: a, ms: ms}

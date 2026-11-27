@@ -37,6 +37,10 @@ import (
 // caller's transaction (emails module).
 type Mailer interface {
 	Notify(ctx context.Context, tx pgx.Tx, tenantID string, to []string, subject, body string) error
+	// Invite sends an invitation for inviterID, who is shown its link too:
+	// from the server's mail, or their own mailbox when the server's is not
+	// set up. It returns how it goes (server, mailbox, test_inbox or none).
+	Invite(ctx context.Context, tx pgx.Tx, tenantID, inviterID string, to []string, subject, body string) (string, error)
 }
 
 // Module is the identity module.

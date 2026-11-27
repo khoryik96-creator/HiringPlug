@@ -368,7 +368,7 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		sender = "HyPlug"
 	}
 	sentBy := n.SentBy
-	if n.AccountNotice { // by the system, from the server's mail (Notice.AccountNotice)
+	if n.AccountNotice && sentBy == nil { // by the system, from the server's mail (Notice.AccountNotice)
 		system := authz.SystemUserID
 		sentBy = &system
 	}

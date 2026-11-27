@@ -148,5 +148,6 @@ func memberToAPI(r TeamMember) api.TeamMember {
 }
 
 func invitationToAPI(inv Invitation) api.Invitation {
-	return api.Invitation{Member: memberToAPI(inv.Member), Link: inv.Link, ExpiresAt: inv.ExpiresAt, Emailed: inv.Emailed}
+	return api.Invitation{Member: memberToAPI(inv.Member), Link: inv.Link, ExpiresAt: inv.ExpiresAt, Emailed: inv.Emailed,
+		Delivery: api.InvitationDelivery(inv.Delivery)}
 }

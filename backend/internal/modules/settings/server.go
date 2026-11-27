@@ -19,6 +19,21 @@ import (
 type ServerSetup struct {
 	FilesDir string                     // HP_FILES_DIR: its disk's space
 	Files    interface{ Check() error } // the uploaded files: written, read back and removed
+	MailMode string                     // the server's own mail (HP_SMTP_*): live, test (a test inbox) or unconfigured
+}
+
+// mailProblem is what the server's own mail cannot do, in words ("" when it is set up).
+func mailProblem(mode string) string {
+	switch mode {
+	case "live", "":
+		return ""
+	case "test":
+		return "The server's own email (HP_SMTP_*) is a test inbox (Mailpit): password resets and alert emails never reach anyone, " +
+			"and invitations only arrive when the person inviting has connected their mailbox (Settings › Email connection)."
+	default:
+		return "The server's own email (HP_SMTP_*) is not set up: password resets and alert emails cannot be sent, " +
+			"and invitations only arrive when the person inviting has connected their mailbox (Settings › Email connection)."
+	}
 }
 
 // UseServer gives Settings the server's files for its checks.
@@ -43,6 +58,9 @@ func (s *Service) serverChecks(ctx context.Context, tx pgx.Tx) (*ServerChecks, e
 	}
 	if out.Problems, err = checks.Problems(ctx); err != nil {
 		return nil, err
+	}
+	if text := mailProblem(s.server.MailMode); text != "" {
+		out.Problems = append(out.Problems, alerts.Problem{Key: "server_mail", Text: text})
 	}
 	if s.server.Files != nil {
 		out.Files = s.server.Files.Check()

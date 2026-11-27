@@ -23,7 +23,8 @@ type Invitation struct {
 	Member    TeamMember
 	Link      string
 	ExpiresAt time.Time
-	Emailed   bool
+	Emailed   bool   // on its way to them
+	Delivery  string // how: server, mailbox, test_inbox or none (Mailer.Invite)
 }
 
 func teamProblem(message string) error { return apperr.New(api.ErrorCodeTEAMCHANGENOTALLOWED, message) }
@@ -139,10 +140,11 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 	role := strings.ReplaceAll(member.Role, "_", " ")
 	body := "Hello " + member.Name + ",\n\n" + p.Name + " invited you to join " + company.Name + " on HyPlug as " + role +
 		".\n\nChoose your password here (the link works for 7 days):\n" + link + "\n\nHyPlug"
-	if err := m.mailer.Notify(ctx, tx, p.TenantID, []string{member.Email}, p.Name+" invited you to "+company.Name+" on HyPlug", body); err != nil {
+	delivery, err := m.mailer.Invite(ctx, tx, p.TenantID, p.UserID, []string{member.Email}, p.Name+" invited you to "+company.Name+" on HyPlug", body)
+	if err != nil {
 		return Invitation{}, err
 	}
-	return Invitation{Member: member, Link: link, ExpiresAt: expires, Emailed: true}, nil
+	return Invitation{Member: member, Link: link, ExpiresAt: expires, Emailed: delivery == "server" || delivery == "mailbox", Delivery: delivery}, nil
 }
 
 // UpdateMember changes someone's role or team, or deactivates or reactivates

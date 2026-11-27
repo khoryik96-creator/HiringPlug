@@ -42,7 +42,34 @@ const rank = (r: Schemas["Role"]) => (r === "owner" ? 3 : r === "admin" ? 2 : 1)
 const roles = (myRole: Schemas["Role"]) => keysOf(ROLE).filter((r) => rank(r) <= rank(myRole));
 
 /** A link just emailed to someone: an invitation (shown, to pass on another way if email is not set up), or to connect Microsoft (never shown: it signs in as them). */
-type Sent = { what: string; link?: string };
+type Sent = { what: string; link?: string; delivery?: Schemas["Invitation"]["delivery"] };
+
+/** How an invitation went, in words, and what to do when it cannot arrive. */
+function InvitationSent({ email, link, delivery, onDone }: { email: string; link: string; delivery: Schemas["Invitation"]["delivery"]; onDone: () => void }) {
+  const lead = {
+    server: <>Invitation emailed to {email}. If it does not arrive, send them this link (it works for 7 days):</>,
+    mailbox: <>Invitation emailed to {email} from your own mailbox: the server&apos;s email is not set up. If it does not arrive, send them this link (it works for 7 days):</>,
+    test_inbox: <><strong>Not emailed:</strong> the server&apos;s email is only a test inbox, so nothing reaches {email}. Send them this link yourself (it works for 7 days):</>,
+    none: <><strong>Not emailed:</strong> the server&apos;s email is not set up and you have no mailbox connected. Send them this link yourself (it works for 7 days):</>,
+  }[delivery];
+  const fix = delivery === "test_inbox" || delivery === "none";
+  return (
+    <div className={fix ? "warning" : "team-sent"} role="status">
+      <p>{lead}</p>
+      <code className="secret">{link}</code>{" "}
+      <button type="button" className="link" onClick={() => {
+        try { void navigator.clipboard.writeText(link); } catch { /* no clipboard here: the link is shown to copy by hand */ }
+      }}>Copy link</button>{" "}
+      <button type="button" className="link" onClick={onDone}>Done</button>
+      {fix && (
+        <p className="muted small">
+          To have invitations emailed, connect your mailbox in <a href="#/email-connection">Settings › Email connection</a> and send a new
+          invitation, or have whoever runs the server set up its email (HP_SMTP_* settings).
+        </p>
+      )}
+    </div>
+  );
+}
 
 function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[]; microsoft: boolean }) {
   const queryClient = useQueryClient();
@@ -58,7 +85,7 @@ function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Membe
   });
   const resend = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })),
-    onSuccess: (inv) => { setSent({ what: "New invitation emailed", link: inv.link }); },
+    onSuccess: (inv) => { setSent({ what: "New invitation emailed", link: inv.link, delivery: inv.delivery }); },
   });
   const reconnect = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/microsoft/reconnect", { params: { path: { userId: m.id } } })),
@@ -150,12 +177,10 @@ function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Membe
       {(sent || error) && (
         <tr className="team-note">
           <td colSpan={5}>
-            {sent && (
-              <div className={sent.link ? "warning" : "team-sent"} role="status">
-                {sent.link ? <>
-                  {sent.what} to {m.email}. If email is not set up, send them this link (it works for 7 days):{" "}
-                  <code className="secret">{sent.link}</code>
-                </> : <>{sent.what} to {m.email}. It works once, for 7 days.</>}{" "}
+            {sent?.link && sent.delivery && <InvitationSent email={m.email} link={sent.link} delivery={sent.delivery} onDone={() => { setSent(null); }} />}
+            {sent && !sent.link && (
+              <div className="team-sent" role="status">
+                {sent.what} to {m.email}. It works once, for 7 days.{" "}
                 <button type="button" className="link" onClick={() => { setSent(null); }}>Done</button>
               </div>
             )}
@@ -236,13 +261,7 @@ function Invite({ myRole }: { myRole: Schemas["Role"] }) {
   return (
     <section className="panel" aria-label="Invite someone">
       <h3>Invite someone</h3>
-      {sent && (
-        <div className="warning" role="status">
-          <p>Invitation emailed to {sent.member.email}. If email is not set up, send them this link (it works for 7 days):</p>
-          <code className="secret">{sent.link}</code>{" "}
-          <button type="button" className="link" onClick={() => { setSent(null); }}>Done</button>
-        </div>
-      )}
+      {sent && <InvitationSent email={sent.member.email} link={sent.link} delivery={sent.delivery} onDone={() => { setSent(null); }} />}
       <form className="form-grid" onSubmit={(e) => { e.preventDefault(); invite.mutate(); }}>
         <label className="field">Email<input type="email" required value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); }} /></label>
         <label className="field">Name<input required value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>

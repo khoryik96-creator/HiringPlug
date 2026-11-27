@@ -4446,6 +4446,13 @@ class InviteInput(BaseModel):
     role: Role
 
 
+class Delivery(StrEnum):
+    server = "server"
+    mailbox = "mailbox"
+    test_inbox = "test_inbox"
+    none = "none"
+
+
 class Invitation(BaseModel):
     member: TeamMember
     link: Annotated[
@@ -4453,7 +4460,13 @@ class Invitation(BaseModel):
     ]
     expiresAt: AwareDatetime
     emailed: Annotated[
-        bool, Field(description="Whether an email was queued (it fails later if no mail server is set up).")
+        bool, Field(description="Whether it is on its way to them (delivery server or mailbox).")
+    ]
+    delivery: Annotated[
+        Delivery,
+        Field(
+            description="How the invitation goes: server, from the server's mail (HP_SMTP_*); mailbox, from the inviter's own connected mailbox (the server's mail is not set up); test_inbox, held in the server's test inbox (Mailpit), never reaching them; none, nothing can send it (no server mail, no connected mailbox). With test_inbox or none, pass the link on another way.\n"
+        ),
     ]
 
 

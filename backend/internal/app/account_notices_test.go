@@ -2,6 +2,8 @@ package app_test
 
 import (
 	"context"
+	"encoding/base64"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -20,7 +22,7 @@ import (
 // copy in their Sent Items would hand them the link (and the account).
 func TestAccountNoticesNeverGoThroughAPersonsMailbox(t *testing.T) {
 	t.Parallel()
-	f := newMicrosoftTest(t)
+	f := newMicrosoftTest(t, liveServerMail())
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
 	owner, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleRecruiter]
 	f.enable(owner.Token, newGUID(), false)
@@ -46,6 +48,10 @@ func TestAccountNoticesNeverGoThroughAPersonsMailbox(t *testing.T) {
 	invitee := "pat." + tenant.ID + "@test.local"
 	res = f.a.request(http.MethodPost, "/v1/team/invites", owner.Token, map[string]any{"email": invitee, "name": "Pat", "role": "recruiter"})
 	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var inv api.Invitation
+	res.JSON(&inv)
+	assert.Equal(t, api.InvitationDeliveryServer, inv.Delivery, "the server's mail is set up: it goes from there")
+	assert.True(t, inv.Emailed)
 	link := f.reconnectLink(owner.Token, recruiter.ID) // from the server's mail (the helper reads it there)
 	assert.NotEmpty(t, link)
 	assert.Contains(t, f.lastMailTo(tenant.ID, invitee), "invited you")
@@ -68,4 +74,69 @@ func TestAccountNoticesNeverGoThroughAPersonsMailbox(t *testing.T) {
 	}
 	require.NoError(t, rows.Err())
 	assert.Equal(t, 2, n, "the invitation and the reconnect link")
+}
+
+// liveServerMail sets up the server's own mail (HP_SMTP_*), as on a real
+// server: the test mail server, which is not a test inbox's address.
+func liveServerMail() map[string]string {
+	return map[string]string{"HP_SMTP_HOST": mailServer.Addr, "HP_SMTP_FROM": "no-reply@agency.test", "HP_SMTP_TLS": "none"}
+}
+
+// Without the server's own mail (HP_SMTP_* not set up), an invitation goes
+// from the inviter's connected mailbox (they are shown its link anyway), and
+// says so; with no mailbox either, it says it was not emailed. Other account
+// emails (a link to connect Microsoft) still never go through a person's
+// mailbox.
+func TestInvitationsGoFromTheInvitersMailboxWithoutServerMail(t *testing.T) {
+	t.Parallel()
+	f := newMicrosoftTest(t) // no HP_SMTP_HOST: the server's mail is not set up
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
+	owner, admin, recruiter := tenant.Users[api.RoleOwner], tenant.Users[api.RoleAdmin], tenant.Users[api.RoleRecruiter]
+	f.enable(owner.Token, newGUID(), false)
+
+	invite := func(token, email string) api.Invitation {
+		t.Helper()
+		res := f.a.request(http.MethodPost, "/v1/team/invites", token, map[string]any{"email": email, "name": "Pat", "role": "recruiter"})
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var inv api.Invitation
+		res.JSON(&inv)
+		return inv
+	}
+
+	// The admin has no mailbox: nothing can send it, and the answer says so.
+	none := invite(admin.Token, "sam."+tenant.ID+"@test.local")
+	assert.Equal(t, api.InvitationDeliveryNone, none.Delivery)
+	assert.False(t, none.Emailed, "not on its way: pass the link on another way")
+	assert.NotEmpty(t, none.Link)
+
+	// The owner's Outlook is connected: the invitation goes through it.
+	outlook := &outlookMailFixture{folder: "inbox"}
+	var sent atomic.Int32
+	var sentBody atomic.Value
+	connectTestOutlook(t, f.a, owner.Token, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/sendMail") {
+			sent.Add(1)
+			b, _ := io.ReadAll(r.Body)
+			sentBody.Store(string(b))
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		outlook.serve(w, r)
+	}))
+	inv := invite(owner.Token, "pat."+tenant.ID+"@test.local")
+	assert.Equal(t, api.InvitationDeliveryMailbox, inv.Delivery)
+	assert.True(t, inv.Emailed)
+	runCoreJobsUntilIdle(t, f.a, tenant.ID)
+	require.EqualValues(t, 1, sent.Load(), "the invitation went through the owner's Outlook")
+	raw, _ := sentBody.Load().(string)
+	mime, err := base64.StdEncoding.DecodeString(raw) // Outlook is sent the message as MIME, in base64
+	require.NoError(t, err)
+	body := strings.ReplaceAll(string(mime), "=\r\n", "") // its quoted-printable lines joined
+	assert.Contains(t, body, "invited you")
+	assert.Contains(t, body, inv.Link, "with its link")
+
+	// A link to connect Microsoft is never handed to whoever sends it.
+	f.reconnectLink(owner.Token, recruiter.ID)
+	runCoreJobsUntilIdle(t, f.a, tenant.ID)
+	assert.EqualValues(t, 1, sent.Load(), "the reconnect link did not go through the owner's Outlook")
 }

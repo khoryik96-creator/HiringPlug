@@ -15,6 +15,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -133,9 +134,13 @@ func configureOutlookFixture(t *testing.T, a *testApp, handler http.Handler) {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
+	mode := "test" // the server's mail: a test inbox, unless the test set up a real one
+	if a.deps.Config.SMTP.Addr != "" {
+		mode = mail.DeliveryMode(a.deps.Config.SMTP.Addr)
+	}
 	a.modules.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
 		KeysSecret: []byte("synthetic-mailbox-encryption-key-32-chars"),
-		PublicURL:  "http://app.test", ServerMode: "test", HTTPClient: server.Client(),
+		PublicURL:  "http://app.test", ServerMode: mode, HTTPClient: server.Client(),
 		Microsoft: emails.OAuthApplication{ClientID: "test-client", ClientSecret: "test-client-secret"},
 		Providers: map[string]emails.OAuthProvider{"microsoft": {
 			AuthorizeURL: server.URL + "/authorize", TokenURL: server.URL + "/token", ProfileURL: server.URL + "/profile",

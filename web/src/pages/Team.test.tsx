@@ -118,6 +118,7 @@ describe("team", () => {
     reads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({
       member: member("usr_x", "Wei", "recruiter", "invited"), link: "http://localhost:5173/#/invite/abc", expiresAt: "2026-11-10T00:00:00Z", emailed: true,
+      delivery: "server",
     }));
     renderWithClient(<Team myRole="admin" myId="usr_me" />);
     const form = await screen.findByRole("region", { name: "Invite someone" });
@@ -126,6 +127,24 @@ describe("team", () => {
     fireEvent.click(within(form).getByRole("button", { name: "Invite" }));
     expect(await screen.findByText("http://localhost:5173/#/invite/abc")).toBeTruthy();
     expect(sentBody(post)).toEqual({ email: "wei@contoh.my", name: "Wei", role: "recruiter" });
+  });
+
+  it("says plainly when an invitation could not be emailed, and how to fix it", async () => {
+    reads();
+    vi.spyOn(api, "POST").mockResolvedValue(ok({
+      member: member("usr_x", "Wei", "recruiter", "invited"), link: "http://localhost:5173/#/invite/abc", expiresAt: "2026-11-10T00:00:00Z", emailed: false,
+      delivery: "none",
+    }));
+    renderWithClient(<Team myRole="admin" myId="usr_me" />);
+    const form = await screen.findByRole("region", { name: "Invite someone" });
+    fireEvent.change(within(form).getByLabelText("Email"), { target: { value: "wei@contoh.my" } });
+    fireEvent.change(within(form).getByLabelText("Name"), { target: { value: "Wei" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Invite" }));
+    const note = await screen.findByRole("status");
+    expect(note.textContent).toMatch(/Not emailed: the server's email is not set up and you have no mailbox connected/);
+    expect(note.textContent).not.toContain("Invitation emailed");
+    expect(within(note).getByRole("link", { name: "Settings › Email connection" }).getAttribute("href")).toBe("#/email-connection");
+    expect(within(note).getByText("http://localhost:5173/#/invite/abc")).toBeTruthy();
   });
 
   it("puts people in teams, and adds teams", async () => {

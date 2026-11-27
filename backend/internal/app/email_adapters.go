@@ -234,6 +234,10 @@ func (a identityMailer) Notify(ctx context.Context, tx pgx.Tx, tenantID string, 
 	return a.modules.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: subject, Body: body, AccountNotice: true})
 }
 
+func (a identityMailer) Invite(ctx context.Context, tx pgx.Tx, tenantID, inviterID string, to []string, subject, body string) (string, error) {
+	return a.modules.Emails.NotifyAccountFor(ctx, tx, tenantID, inviterID, emails.Notice{To: to, Subject: subject, Body: body})
+}
+
 // emailContacts gives the emails module a client's contact to write to.
 type emailContacts struct {
 	contacts  *contacts.Module

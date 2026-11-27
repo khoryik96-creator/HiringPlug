@@ -205,6 +205,16 @@ func (s *Service) bindDelivery(ctx context.Context, tx pgx.Tx, emailID, userID s
 	return mode, store.New(tx).BindEmailDelivery(ctx, store.BindEmailDeliveryParams{ID: emailID, DeliveryMode: mode, MailboxRef: ref})
 }
 
+// mailboxSends reports whether userID has a connected mailbox that sends to
+// real inboxes (not an SMTP test inbox), in tx.
+func (s *Service) mailboxSends(ctx context.Context, tx pgx.Tx, userID string) bool {
+	row, err := store.New(tx).MailboxForDelivery(ctx, userID)
+	if err != nil {
+		return false
+	}
+	return row.Provider != "smtp" || mail.DeliveryMode(smtpAddress(row.Host, row.Port)) != "test"
+}
+
 // smtpAddress keeps user-supplied hosts out of URI parsing and credentials.
 func smtpAddress(host string, port int32) string {
 	return net.JoinHostPort(host, strconv.Itoa(int(port)))

@@ -15618,12 +15618,18 @@ components:
         role: {$ref: '#/components/schemas/Role'}
     Invitation:
       type: object
-      required: [member, link, expiresAt, emailed]
+      required: [member, link, expiresAt, emailed, delivery]
       properties:
         member: {$ref: '#/components/schemas/TeamMember'}
         link: {type: string, description: "The invitation link (also emailed), to pass on another way if needed."}
         expiresAt: {type: string, format: date-time}
-        emailed: {type: boolean, description: "Whether an email was queued (it fails later if no mail server is set up)."}
+        emailed: {type: boolean, description: "Whether it is on its way to them (delivery server or mailbox)."}
+        delivery:
+          type: string
+          enum: [server, mailbox, test_inbox, none]
+          description: >
+            How the invitation goes: server, from the server's mail (HP_SMTP_*); mailbox, from the inviter's own connected mailbox (the server's mail is not set up); test_inbox, held in the server's test inbox (Mailpit), never reaching them; none, nothing can send it (no server mail, no connected mailbox). With test_inbox or none, pass the link on another way.
+
     TeamMemberUpdate:
       type: object
       additionalProperties: false

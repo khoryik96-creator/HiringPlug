@@ -220,9 +220,10 @@ type Notice struct {
 	ShowsFees bool
 	// AccountNotice: about someone's account (an invitation, a password
 	// reset, a link to connect Microsoft, a Microsoft account linked). Sent
-	// only from the server's mail, by nobody: never from the mailbox of whoever
+	// from the server's mail, by nobody: never from the mailbox of whoever
 	// caused it (a copy in their Sent Items would hand them the link), and in
-	// no one's sent mail here either.
+	// no one's sent mail here either. The one exception is NotifyAccountFor
+	// (an invitation, whose link its sender is shown anyway).
 	AccountNotice bool
 	// SenderName is who it is from ("HyPlug" when empty).
 	SenderName string
@@ -239,6 +240,35 @@ type Notice struct {
 type NoticeFile struct {
 	Name, ContentType, Key string
 	Data                   []byte
+}
+
+// How an account notice from NotifyAccountFor goes.
+const (
+	ViaServer    = "server"     // the server's mail (HP_SMTP_*)
+	ViaMailbox   = "mailbox"    // the user's own connected mailbox: the server's mail is not set up
+	ViaTestInbox = "test_inbox" // the server's test inbox (Mailpit) holds it: it never arrives
+	ViaNone      = "none"       // nothing can send it: no server mail, no connected mailbox
+)
+
+// NotifyAccountFor queues an account notice that userID sends and may see
+// in full (an invitation: its link is shown to them too), in the caller's
+// transaction. It goes from the server's mail when that is set up, else from
+// userID's own connected mailbox when they have one that sends. It returns
+// how it goes (Via...).
+func (m *Module) NotifyAccountFor(ctx context.Context, tx pgx.Tx, tenantID, userID string, n Notice) (string, error) {
+	n.AccountNotice = true
+	via := ViaServer
+	switch mode := m.service.serverMode(); {
+	case mode == "live":
+	case m.service.mailboxSends(ctx, tx, userID):
+		n.SentBy, via = &userID, ViaMailbox
+	case mode == "test":
+		via = ViaTestInbox
+	default:
+		via = ViaNone // queued all the same: it fails, and shows so, if no mail server is set up
+	}
+	_, err := m.QueueNotice(ctx, tx, tenantID, n)
+	return via, err
 }
 
 // Notify records a notice and queues it for sending, in the caller's

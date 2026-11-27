@@ -94,3 +94,33 @@ func problemsAbout(problems []string, word string) []string {
 	}
 	return out
 }
+
+// The server checks say when the server's own email cannot reach anyone (not
+// set up, or a test inbox), and what that stops; set up, they say nothing.
+func TestServerChecksSayWhenTheServersEmailCannotSend(t *testing.T) {
+	op := testutil.Current.NewTenant(t, api.RoleOwner)
+	problems := func(overrides map[string]string) []string {
+		t.Helper()
+		overrides["HP_BACKUP_TENANT"] = op.ID
+		a := newTestApp(t, overrides)
+		var st api.SystemStatus
+		res := a.request(http.MethodGet, "/v1/settings/system", op.Users[api.RoleOwner].Token, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&st)
+		var out []string
+		for _, p := range st.Server.MustGet().Problems {
+			if strings.Contains(p, "HP_SMTP_*") {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	none := problems(map[string]string{})
+	require.Len(t, none, 1)
+	assert.Contains(t, none[0], "is not set up")
+	assert.Contains(t, none[0], "invitations only arrive when the person inviting has connected their mailbox")
+	test := problems(map[string]string{"HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@agency.test", "HP_SMTP_TLS": "none"})
+	require.Len(t, test, 1)
+	assert.Contains(t, test[0], "is a test inbox")
+	assert.Empty(t, problems(liveServerMail()), "set up: nothing to say")
+}

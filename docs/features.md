@@ -2196,7 +2196,13 @@ Roles have permissions per area: **view** (`:read`), **write** (`:create`),
 (`candidates.compensation:read` / `:update`). Defaults per role are in the
 contract. ✅ People sign in with email and password; owners and admins invite
 them, change roles and deactivate them on the **Team** page; "Forgot your
-password?" emails a reset link; everyone changes their password under their
+password?" emails a reset link; ✅ an invitation goes from the server's own
+email (`HP_SMTP_*`), or, when that is not set up (or is only the Mailpit test
+inbox), from the inviter's connected mailbox (they are shown its link
+anyway). The Team page says which, or that it was **not emailed** (no server
+email, no mailbox), with the link to copy and how to fix it, and Settings ›
+System's server checks say when the server's email cannot reach anyone.
+Password resets and Microsoft links only ever go from the server's email; everyone changes their password under their
 name. ✅ A sign-in lasts 12 hours and is renewed quietly (the same session)
 while someone is using HyPlug; after they have been away, the last five
 minutes count down with **Stay signed in** before they are signed out. ✅ **Two-step sign-in**: a code from an authenticator app after the
