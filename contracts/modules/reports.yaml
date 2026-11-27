@@ -18,7 +18,7 @@ x-module:
       description: See every user's activity against their targets, not only your own.
       roles: [owner, admin]
     reports.settings:manage:
-      description: Set activity targets (per user, or one for everyone) and the forecast's weight for each stage.
+      description: Set activity targets (per user, or one for everyone; for calls, CVs sent, interviews, placements and each stage category) and the forecast's weight for each stage.
       roles: [owner, admin]
     reports.forecast:read:
       description: See the revenue forecast (fees expected from the pipeline); it also needs placements.fees:read.
@@ -239,12 +239,16 @@ components:
       enum: [week, month]
     ActivityCounts:
       type: object
-      required: [calls, cvsSent, interviews, placements]
+      required: [calls, cvsSent, interviews, placements, categories]
       properties:
         calls: { type: integer, description: "Calls logged: screening calls, reference checks and notes of a call." }
         cvsSent: { type: integer, description: "CVs sent to clients: applications moved to submitted, and CVs attached to an email to anyone but the candidate (the same candidate on the same day counts once)." }
         interviews: { type: integer, description: Interviews arranged (scheduled by the user). }
         placements: { type: integer, description: Placements recorded and credited to the user (not cancelled). }
+        categories:
+          type: object
+          description: "Candidates the user moved into a stage of each category (StageCategory.key), e.g. 1st Interview: each candidate once per category in the period."
+          additionalProperties: { type: integer }
     ActivityGoal:
       type: object
       additionalProperties: false
@@ -255,6 +259,11 @@ components:
         cvsSent: { type: integer, nullable: true, minimum: 0, maximum: 100000 }
         interviews: { type: integer, nullable: true, minimum: 0, maximum: 100000 }
         placements: { type: integer, nullable: true, minimum: 0, maximum: 100000 }
+        categories:
+          type: object
+          maxProperties: 50
+          description: "A target per stage category (StageCategory.key); a category left out has none."
+          additionalProperties: { type: integer, minimum: 0, maximum: 100000 }
     ActivityRow:
       type: object
       required: [userId, userName, done, target]

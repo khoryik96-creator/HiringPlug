@@ -12433,6 +12433,10 @@ export interface components {
             interviews: number;
             /** @description Placements recorded and credited to the user (not cancelled). */
             placements: number;
+            /** @description Candidates the user moved into a stage of each category (StageCategory.key), e.g. 1st Interview: each candidate once per category in the period. */
+            categories: {
+                [key: string]: number;
+            };
         };
         /** @description A target for each activity; null when none is set for it. */
         ActivityGoal: {
@@ -12440,6 +12444,10 @@ export interface components {
             cvsSent: number | null;
             interviews: number | null;
             placements: number | null;
+            /** @description A target per stage category (StageCategory.key); a category left out has none. */
+            categories?: {
+                [key: string]: number;
+            };
         };
         ActivityRow: {
             userId: components["schemas"]["UserId"];

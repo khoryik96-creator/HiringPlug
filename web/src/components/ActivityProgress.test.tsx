@@ -15,8 +15,8 @@ const goal = (calls: number | null, cvsSent: number | null): Schemas["ActivityGo
 const activity = (over: Partial<Schemas["ActivityReport"]> = {}): Schemas["ActivityReport"] => ({
   period: "week", from: "2026-11-16", to: "2026-11-22", team: true,
   rows: [
-    { userId: "usr_a", userName: "Aina", done: { calls: 12, cvsSent: 5, interviews: 2, placements: 0 }, target: goal(20, 5) },
-    { userId: "usr_w", userName: "Wei", done: { calls: 3, cvsSent: 0, interviews: 0, placements: 1 }, target: null },
+    { userId: "usr_a", userName: "Aina", done: { calls: 12, cvsSent: 5, interviews: 2, placements: 0, categories: {} }, target: goal(20, 5) },
+    { userId: "usr_w", userName: "Wei", done: { calls: 3, cvsSent: 0, interviews: 0, placements: 1, categories: {} }, target: null },
   ],
   ...over,
 });
@@ -42,6 +42,23 @@ describe("activity against targets", () => {
     await waitFor(() => { expect(get).toHaveBeenLastCalledWith("/v1/reports/activity", { params: { query: { period: "month" } } }); });
   });
 
+  it("shows a stage category someone has a target for", async () => {
+    const withRounds = activity({ rows: [
+      { userId: "usr_a", userName: "Aina", done: { calls: 0, cvsSent: 0, interviews: 0, placements: 0, categories: { interview: 3, applied: 9 } },
+        target: { ...goal(null, null), categories: { interview: 4 } } },
+    ] });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/stage-categories"
+      ? { version: "0", items: [{ key: "applied", label: "Applied", kind: "applied" }, { key: "interview", label: "1st Interview", kind: "interview" },
+        { key: "interview_2", label: "2nd Interview", kind: "interview" }] }
+      : withRounds))) as never);
+    renderWithClient(<ActivityProgress onlyUser="usr_a" title="Your activity" />);
+    const panel = await screen.findByRole("region", { name: "Your activity" });
+    expect(await within(panel).findByRole("meter", { name: "1st Interview: progress" })).toBeTruthy();
+    expect(within(panel).getByText("of 4")).toBeTruthy();
+    expect(within(panel).queryByText("2nd Interview"), "no target for it: left out").toBeNull();
+    expect(within(panel).queryByText("Applied")).toBeNull();
+  });
+
   it("shows one person their own as cards (the dashboard)", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(activity()));
     renderWithClient(<ActivityProgress onlyUser="usr_a" title="Your activity" />);
@@ -52,7 +69,7 @@ describe("activity against targets", () => {
   });
 
   it("says where targets are set when there are none", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(activity({ team: false, rows: [{ userId: "usr_w", userName: "Wei", done: { calls: 0, cvsSent: 0, interviews: 0, placements: 0 }, target: null }] })));
+    vi.spyOn(api, "GET").mockResolvedValue(ok(activity({ team: false, rows: [{ userId: "usr_w", userName: "Wei", done: { calls: 0, cvsSent: 0, interviews: 0, placements: 0, categories: {} }, target: null }] })));
     renderWithClient(<ActivityProgress />);
     expect(await screen.findByText(/owners and admins set them in Settings/)).toBeTruthy();
   });

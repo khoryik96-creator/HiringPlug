@@ -8,12 +8,15 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { formatDay } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { targetCategories, useStageCategories } from "./stages/categories";
 
 type Period = Schemas["ActivityPeriod"];
 type Counts = Schemas["ActivityCounts"];
 type Goal = Schemas["ActivityGoal"];
 
-export const ACTIVITIES: [keyof Counts, string][] = [
+type Activity = Exclude<keyof Counts, "categories">;
+
+export const ACTIVITIES: [Activity, string][] = [
   ["calls", "Calls"], ["cvsSent", "CVs sent"], ["interviews", "Interviews arranged"], ["placements", "Placements"],
 ];
 
@@ -43,6 +46,19 @@ function Meter({ label, done, target, bare = false }: { label: string; done: num
 
 const goalOf = (row: Schemas["ActivityRow"]): Goal | null => row.target;
 
+/** One thing counted against a target: an activity, or moves into a stage category. */
+interface Measure { key: string; label: string; done: (r: Schemas["ActivityRow"]) => number; target: (r: Schemas["ActivityRow"]) => number | null | undefined }
+
+/** The activities, then each stage category someone shown has a target for. */
+export function measuresOf(rows: Schemas["ActivityRow"][], cats: Schemas["StageCategory"][]): Measure[] {
+  const out: Measure[] = ACTIVITIES.map(([k, label]) => ({ key: k, label, done: (r) => r.done[k], target: (r) => goalOf(r)?.[k] }));
+  for (const c of targetCategories(cats)) {
+    if (!rows.some((r) => goalOf(r)?.categories?.[c.key] !== undefined)) continue;
+    out.push({ key: "category:" + c.key, label: c.label, done: (r) => r.done.categories[c.key] ?? 0, target: (r) => goalOf(r)?.categories?.[c.key] });
+  }
+  return out;
+}
+
 /** A panel of activity against targets; onlyUser shows just that person (the dashboard). */
 export function ActivityProgress({ onlyUser, title = "Activity against targets" }: { onlyUser?: string; title?: string }) {
   const [period, setPeriod] = useState<Period>("week");
@@ -54,6 +70,7 @@ export function ActivityProgress({ onlyUser, title = "Activity against targets" 
   const rows = (a?.rows ?? []).filter((r) => !onlyUser || r.userId === onlyUser);
   const single = rows.length === 1 && (onlyUser !== undefined || !a?.team);
   const me = single ? rows[0] : undefined;
+  const measures = measuresOf(rows, useStageCategories().data?.items ?? []);
   return (
     <section className="panel" aria-label={title}>
       <div className="row spread">
@@ -70,13 +87,13 @@ export function ActivityProgress({ onlyUser, title = "Activity against targets" 
       {a && <p className="muted small">{formatDay(a.from)} to {formatDay(a.to)}</p>}
       {me && (
         <div className="activity-cards">
-          {ACTIVITIES.map(([key, label]) => {
-            const target = goalOf(me)?.[key];
+          {measures.map(({ key, label, done, target: targetOf }) => {
+            const target = targetOf(me);
             return (
               <div className="activity-card" key={key}>
                 <span className="kpi-label">{label}</span>
-                <strong>{me.done[key]}</strong>
-                <Meter label={`${label}: progress`} done={me.done[key]} target={target} bare />
+                <strong>{done(me)}</strong>
+                <Meter label={`${label}: progress`} done={done(me)} target={target} bare />
                 <small className="muted">{target === null || target === undefined ? "No target set" : `of ${String(target)}`}</small>
               </div>
             );
@@ -85,13 +102,13 @@ export function ActivityProgress({ onlyUser, title = "Activity against targets" 
       )}
       {!me && rows.length > 0 && (
         <div className="table-scroll"><table>
-          <thead><tr><th>Who</th>{ACTIVITIES.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead>
+          <thead><tr><th>Who</th>{measures.map(({ key, label }) => <th key={key}>{label}</th>)}</tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.userId}>
                 <td>{r.userName}</td>
-                {ACTIVITIES.map(([key, label]) => (
-                  <td key={key}><Meter label={`${r.userName}, ${label}: progress`} done={r.done[key]} target={goalOf(r)?.[key]} /></td>
+                {measures.map(({ key, label, done, target }) => (
+                  <td key={key}><Meter label={`${r.userName}, ${label}: progress`} done={done(r)} target={target(r)} /></td>
                 ))}
               </tr>
             ))}

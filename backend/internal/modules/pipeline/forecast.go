@@ -29,6 +29,23 @@ func (m *Module) MovesTo(ctx context.Context, tx pgx.Tx, stage string, from, to 
 	return out, err
 }
 
+// CategoryMove is a user moving an application into a stage of a category.
+type CategoryMove struct {
+	By, ApplicationID, Category string
+	At                          time.Time
+}
+
+// MovesToCategory returns the moves into a stage category (from another
+// category or none) from one instant to another, in the caller's transaction.
+func (m *Module) MovesToCategory(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CategoryMove, error) {
+	rows, err := store.New(tx).MovesToCategoryBetween(ctx, store.MovesToCategoryBetweenParams{FromTime: from, ToTime: to})
+	out := make([]CategoryMove, len(rows))
+	for i, r := range rows {
+		out[i] = CategoryMove{By: r.ChangedBy, ApplicationID: r.ApplicationID, Category: r.Category, At: r.ChangedAt}
+	}
+	return out, err
+}
+
 // AtStages returns the applications now at any of stages (at most 5,000),
 // with their job and candidate, in the caller's transaction.
 func (m *Module) AtStages(ctx context.Context, tx pgx.Tx, stages []string) ([]Brief, error) {

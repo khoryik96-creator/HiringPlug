@@ -5,6 +5,7 @@ package reports
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"time"
 
@@ -109,6 +110,9 @@ func (s *Service) activityIn(ctx context.Context, tx pgx.Tx, p authz.Principal, 
 	if f.Placements, err = src.Placements(ctx, tx, start, end); err != nil {
 		return out, err
 	}
+	if f.CategoryMoves, err = src.CategoryMoves(ctx, tx, start, end); err != nil {
+		return out, err
+	}
 	counts := CountActivity(f, func(t time.Time) time.Time {
 		t = t.In(s.loc)
 		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
@@ -172,11 +176,20 @@ func to32(v *int) *int32 {
 
 func listTargets(ctx context.Context, tx pgx.Tx) ([]Target, error) {
 	rows, err := store.New(tx).ListTargets(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]Target, len(rows))
 	for i, r := range rows {
 		out[i] = Target{UserID: r.UserID, Period: r.Period, Goal: Goal{Calls: i32(r.Calls), CVsSent: i32(r.CvsSent), Interviews: i32(r.Interviews), Placements: i32(r.Placements)}}
+		if err := json.Unmarshal(r.Categories, &out[i].Goal.Categories); err != nil {
+			return nil, err
+		}
+		if len(out[i].Goal.Categories) == 0 {
+			out[i].Goal.Categories = nil
+		}
 	}
-	return out, err
+	return out, nil
 }
 
 func listWeights(ctx context.Context, tx pgx.Tx) ([]StageWeight, error) {
@@ -220,7 +233,15 @@ func (s *Service) SaveSettings(ctx context.Context, p authz.Principal, in Settin
 		for _, m := range members {
 			active[m.ID] = true
 		}
-		if err := CheckSettings(in.Targets, in.Weights, active).Err(); err != nil {
+		keys, err := s.deps.Activity.Categories(ctx, tx)
+		if err != nil {
+			return err
+		}
+		categories := map[string]bool{}
+		for _, k := range keys {
+			categories[k] = true
+		}
+		if err := CheckSettings(in.Targets, in.Weights, active, categories).Err(); err != nil {
 			return err
 		}
 		q := store.New(tx)
@@ -228,9 +249,17 @@ func (s *Service) SaveSettings(ctx context.Context, p authz.Principal, in Settin
 			return err
 		}
 		for _, t := range in.Targets {
+			byCategory := t.Goal.Categories
+			if byCategory == nil {
+				byCategory = map[string]int{}
+			}
+			categoriesJSON, err := json.Marshal(byCategory)
+			if err != nil {
+				return err
+			}
 			if err := q.InsertTarget(ctx, store.InsertTargetParams{
 				UserID: t.UserID, Period: t.Period, Calls: to32(t.Goal.Calls), CvsSent: to32(t.Goal.CVsSent),
-				Interviews: to32(t.Goal.Interviews), Placements: to32(t.Goal.Placements),
+				Interviews: to32(t.Goal.Interviews), Placements: to32(t.Goal.Placements), Categories: categoriesJSON,
 			}); err != nil {
 				return err
 			}

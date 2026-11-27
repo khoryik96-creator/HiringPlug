@@ -8,9 +8,9 @@ SELECT * FROM activity_target ORDER BY user_id NULLS FIRST, period;
 DELETE FROM activity_target;
 
 -- name: InsertTarget :exec
-INSERT INTO activity_target (tenant_id, user_id, period, calls, cvs_sent, interviews, placements, updated_by)
+INSERT INTO activity_target (tenant_id, user_id, period, calls, cvs_sent, interviews, placements, categories, updated_by)
 VALUES (app_current_tenant(), sqlc.narg(user_id), @period, sqlc.narg(calls), sqlc.narg(cvs_sent),
-        sqlc.narg(interviews), sqlc.narg(placements), app_current_user());
+        sqlc.narg(interviews), sqlc.narg(placements), @categories::jsonb, app_current_user());
 
 -- name: ListStageWeights :many
 SELECT * FROM forecast_stage_weight;

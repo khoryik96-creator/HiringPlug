@@ -32,11 +32,19 @@ func PeriodOf(period string, day time.Time) (time.Time, time.Time) {
 }
 
 // Counts are what a user did: calls logged, CVs sent to clients, interviews
-// arranged and placements recorded.
-type Counts struct{ Calls, CVsSent, Interviews, Placements int }
+// arranged, placements recorded, and candidates moved into a stage of each
+// category (by category key).
+type Counts struct {
+	Calls, CVsSent, Interviews, Placements int
+	Categories                             map[string]int
+}
 
-// Goal is a target for each activity; nil when none is set for it.
-type Goal struct{ Calls, CVsSent, Interviews, Placements *int }
+// Goal is a target for each activity; nil when none is set for it. A
+// category without a target is left out of Categories.
+type Goal struct {
+	Calls, CVsSent, Interviews, Placements *int
+	Categories                             map[string]int
+}
 
 // Facts are what users did in a period, as read from other modules.
 type Facts struct {
@@ -47,7 +55,11 @@ type Facts struct {
 	Emailed        []CVSent
 	Interviews     []Done
 	Placements     []Done
+	CategoryMoves  []CategoryMove
 }
+
+// CategoryMove is a user moving an application into a stage of a category.
+type CategoryMove struct{ By, ApplicationID, Category string }
 
 // CountActivity adds up each user's activity. A screening call counts once
 // (its note is the call); a CV sent counts once per candidate per day for the
@@ -84,6 +96,21 @@ func CountActivity(f Facts, day func(time.Time) time.Time) map[string]*Counts {
 	}
 	for _, d := range f.Placements {
 		of(d.By).Placements++
+	}
+	// A candidate counts once per category however often they are moved back
+	// into it.
+	moved := map[string]bool{}
+	for _, m := range f.CategoryMoves {
+		key := m.By + "|" + m.ApplicationID + "|" + m.Category
+		if moved[key] {
+			continue
+		}
+		moved[key] = true
+		c := of(m.By)
+		if c.Categories == nil {
+			c.Categories = map[string]int{}
+		}
+		c.Categories[m.Category]++
 	}
 	// The app's own work (a worker, an accepted offer) is no one's activity.
 	for user := range out {
@@ -158,8 +185,9 @@ func Weights(saved []StageWeight) []StageWeight {
 
 // CheckSettings checks targets and weights a person saves: one target per
 // user (or everyone) and period, each number in range, and known stages.
-// activeUsers are the company's users a target may be for.
-func CheckSettings(targets []Target, weights []StageWeight, activeUsers map[string]bool) apperr.FieldErrors {
+// activeUsers are the company's users a target may be for; categories are the
+// company's stage categories a target may be set for.
+func CheckSettings(targets []Target, weights []StageWeight, activeUsers, categories map[string]bool) apperr.FieldErrors {
 	var errs apperr.FieldErrors
 	seen := map[string]bool{}
 	for i, t := range targets {
@@ -182,6 +210,14 @@ func CheckSettings(targets []Target, weights []StageWeight, activeUsers map[stri
 		for j, v := range []*int{t.Goal.Calls, t.Goal.CVsSent, t.Goal.Interviews, t.Goal.Placements} {
 			if v != nil && (*v < 0 || *v > 100000) {
 				errs.Add(at+"goal."+names[j], "between 0 and 100000")
+			}
+		}
+		for key, v := range t.Goal.Categories {
+			switch {
+			case !categories[key]:
+				errs.Add(at+"goal.categories."+key, "is not one of the company's stage categories")
+			case v < 0 || v > 100000:
+				errs.Add(at+"goal.categories."+key, "between 0 and 100000")
 			}
 		}
 	}

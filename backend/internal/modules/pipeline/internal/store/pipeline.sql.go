@@ -797,6 +797,53 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 	return result.RowsAffected(), nil
 }
 
+const movesToCategoryBetween = `-- name: MovesToCategoryBetween :many
+SELECT c.changed_by::text AS changed_by, c.changed_at, c.application_id, c.to_category::text AS category
+FROM application_stage_change c
+WHERE c.to_category IS NOT NULL AND c.from_category IS DISTINCT FROM c.to_category
+  AND c.changed_at >= $1 AND c.changed_at < $2 AND c.changed_by IS NOT NULL
+LIMIT 50000
+`
+
+type MovesToCategoryBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type MovesToCategoryBetweenRow struct {
+	ChangedBy     string
+	ChangedAt     time.Time
+	ApplicationID string
+	Category      string
+}
+
+// Moves into a stage category (reports: targets per category): from another
+// category, or from none.
+func (q *Queries) MovesToCategoryBetween(ctx context.Context, arg MovesToCategoryBetweenParams) ([]MovesToCategoryBetweenRow, error) {
+	rows, err := q.db.Query(ctx, movesToCategoryBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MovesToCategoryBetweenRow
+	for rows.Next() {
+		var i MovesToCategoryBetweenRow
+		if err := rows.Scan(
+			&i.ChangedBy,
+			&i.ChangedAt,
+			&i.ApplicationID,
+			&i.Category,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const movesToStageBetween = `-- name: MovesToStageBetween :many
 SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id

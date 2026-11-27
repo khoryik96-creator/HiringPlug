@@ -115,7 +115,8 @@ func TestActivityAgainstTargets(t *testing.T) {
 	require.Len(t, week.Rows, 1)
 	mine := week.Rows[0]
 	assert.Equal(t, recruiter.ID, mine.UserId)
-	assert.Equal(t, api.ActivityCounts{Calls: 3, CvsSent: 2, Interviews: 1, Placements: 1}, mine.Done)
+	assert.Equal(t, api.ActivityCounts{Calls: 3, CvsSent: 2, Interviews: 1, Placements: 1,
+		Categories: map[string]int{"applied": 2, "submitted": 1, "interview": 1, "placed": 1}}, mine.Done)
 	target := mine.Target.MustGet()
 	assert.Equal(t, 20, target.Calls.MustGet(), "everyone's weekly target")
 	assert.True(t, target.Interviews.IsNull())
@@ -128,14 +129,14 @@ func TestActivityAgainstTargets(t *testing.T) {
 	team := a.activity(owner.Token, today)
 	assert.True(t, team.Team)
 	assert.Equal(t, mine.Done, rowOf(t, team, recruiter.ID).Done)
-	assert.Equal(t, api.ActivityCounts{}, rowOf(t, team, owner.ID).Done, "everyone is listed, with nothing done too")
+	assert.Equal(t, api.ActivityCounts{Categories: map[string]int{}}, rowOf(t, team, owner.ID).Done, "everyone is listed, with nothing done too")
 	assert.True(t, rowOf(t, team, owner.ID).Target.IsSpecified())
 	for _, row := range team.Rows {
 		assert.NotEqual(t, tenant.Users[api.RoleViewer].ID, row.UserId, "a viewer does not recruit: no row, no target")
 	}
 
 	lastYear := a.activity(token, "?day=2020-03-04")
-	assert.Equal(t, api.ActivityCounts{}, lastYear.Rows[0].Done, "another week")
+	assert.Equal(t, api.ActivityCounts{Categories: map[string]int{}}, lastYear.Rows[0].Done, "another week")
 
 	t.Run("targets are checked", func(t *testing.T) {
 		res := a.request(http.MethodPut, "/v1/reports/settings", owner.Token, map[string]any{
@@ -152,6 +153,6 @@ func TestActivityAgainstTargets(t *testing.T) {
 	other := testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token
 	elsewhere := a.activity(other, today)
 	require.Len(t, elsewhere.Rows, 1)
-	assert.Equal(t, api.ActivityCounts{}, elsewhere.Rows[0].Done, "another company sees nothing of this one")
+	assert.Equal(t, api.ActivityCounts{Categories: map[string]int{}}, elsewhere.Rows[0].Done, "another company sees nothing of this one")
 	assert.True(t, elsewhere.Rows[0].Target.IsNull(), "nor its targets")
 }

@@ -28,3 +28,11 @@ export function stageName(stage: Stage, category: string | null | undefined, cat
   const own = cats.find((c) => c.key === category && c.kind === stage) ?? cats.find((c) => c.kind === stage);
   return own?.label ?? STAGE[stage];
 }
+
+/**
+ * The categories a person can have a target for: every one but those of the
+ * submitted and placed kinds, which CVs sent and Placements already count.
+ */
+export function targetCategories(cats: Category[]): Category[] {
+  return cats.filter((c) => c.kind !== "submitted" && c.kind !== "placed");
+}

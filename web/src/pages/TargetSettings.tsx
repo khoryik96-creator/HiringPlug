@@ -8,16 +8,19 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { ACTIVITIES } from "../components/ActivityProgress";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { fieldErrors } from "../components/forms";
+import { targetCategories, useStageCategories } from "../components/stages/categories";
 import { STAGE } from "../labels";
 
 type Period = Schemas["ActivityPeriod"];
 type Goal = Schemas["ActivityGoal"];
-type Draft = Record<keyof Goal, string>;
+/** A person's target boxes: the activities by name, each category as "category:<key>". */
+type Draft = Record<string, string>;
 type Weight = Schemas["StageWeight"];
 
 export const reportSettingsKey = ["reports", "settings"];
 const EVERYONE = "";
 const EMPTY: Draft = { calls: "", cvsSent: "", interviews: "", placements: "" };
+const CAT = "category:";
 
 const keyOf = (userId: string | null, period: Period) => `${userId ?? EVERYONE}|${period}`;
 
@@ -27,6 +30,7 @@ export function draftsOf(targets: Schemas["ActivityTarget"][]): Record<string, D
   for (const t of targets) {
     const d = { ...EMPTY };
     for (const [k] of ACTIVITIES) d[k] = t.goal[k] === null ? "" : String(t.goal[k]);
+    for (const [key, n] of Object.entries(t.goal.categories ?? {})) d[CAT + key] = String(n);
     out[keyOf(t.userId, t.period)] = d;
   }
   return out;
@@ -36,10 +40,13 @@ export function draftsOf(targets: Schemas["ActivityTarget"][]): Record<string, D
 export function targetsOf(drafts: Record<string, Draft>): Schemas["ActivityTarget"][] {
   const out: Schemas["ActivityTarget"][] = [];
   for (const [key, d] of Object.entries(drafts)) {
-    if (ACTIVITIES.every(([k]) => d[k].trim() === "")) continue;
+    if (Object.values(d).every((v) => v.trim() === "")) continue;
     const [user = "", period = "week"] = key.split("|");
     const goal = { calls: null, cvsSent: null, interviews: null, placements: null } as Goal;
-    for (const [k] of ACTIVITIES) goal[k] = d[k].trim() === "" ? null : Number(d[k]);
+    for (const [k] of ACTIVITIES) goal[k] = (d[k] ?? "").trim() === "" ? null : Number(d[k]);
+    const categories: Record<string, number> = {};
+    for (const [k, v] of Object.entries(d)) if (k.startsWith(CAT) && v.trim() !== "") categories[k.slice(CAT.length)] = Number(v);
+    if (Object.keys(categories).length > 0) goal.categories = categories;
     out.push({ userId: user === EVERYONE ? null : user, period: period as Period, goal });
   }
   return out;
@@ -54,6 +61,8 @@ export function TargetSettings() {
     queryFn: async () => unwrap(await api.GET("/v1/reports/activity", { params: { query: { period: "week" } } })),
   });
   const [period, setPeriod] = useState<Period>("week");
+  const categories = targetCategories(useStageCategories().data?.items ?? []);
+  const columns: [string, string][] = [...ACTIVITIES, ...categories.map((c): [string, string] => [CAT + c.key, c.label])];
   const [drafts, setDrafts] = useState<Record<string, Draft> | null>(null);
   const [weights, setWeights] = useState<Weight[] | null>(null);
   const current = drafts ?? draftsOf(settings.data?.targets ?? []);
@@ -72,7 +81,7 @@ export function TargetSettings() {
     },
   });
   const errors = fieldErrors(save.error);
-  const set = (user: string, k: keyof Goal, v: string) => {
+  const set = (user: string, k: string, v: string) => {
     const key = keyOf(user === EVERYONE ? null : user, period);
     setDrafts({ ...current, [key]: { ...(current[key] ?? EMPTY), [k]: v } });
   };
@@ -107,20 +116,22 @@ export function TargetSettings() {
             </div>
             <p className="muted small">
               What each person should do {period === "week" ? "each week (Monday to Sunday)" : "each month"}. Leave a box empty for no target.
+              A stage category ({categories.map((c) => c.label).join(", ") || "1st Interview, 2nd Interview..."}) counts the candidates the person
+              moves into it, each candidate once.
               A person without their own target has everyone's. Each recruiter sees their progress on the dashboard and the Reports page.
             </p>
             <div className="table-scroll"><table className="targets-table">
-              <thead><tr><th>Who</th>{ACTIVITIES.map(([k, label]) => <th key={k}>{label}</th>)}</tr></thead>
+              <thead><tr><th>Who</th>{columns.map(([k, label]) => <th key={k}>{label}</th>)}</tr></thead>
               <tbody>
                 {people.map(([id, name]) => {
                   const d = current[keyOf(id === EVERYONE ? null : id, period)] ?? EMPTY;
                   return (
                     <tr key={id || "everyone"}>
                       <td>{id === EVERYONE ? <strong>{name}</strong> : name}</td>
-                      {ACTIVITIES.map(([k, label]) => (
+                      {columns.map(([k, label]) => (
                         <td key={k}>
                           <input type="number" min={0} max={100000} inputMode="numeric" className="target-input" aria-label={`${name}: ${label} per ${period}`}
-                            value={d[k]} onChange={(e) => { set(id, k, e.target.value); }} />
+                            value={d[k] ?? ""} onChange={(e) => { set(id, k, e.target.value); }} />
                         </td>
                       ))}
                     </tr>

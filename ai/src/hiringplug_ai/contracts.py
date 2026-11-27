@@ -7137,6 +7137,17 @@ class ActivityCounts(BaseModel):
     placements: Annotated[
         int, Field(description="Placements recorded and credited to the user (not cancelled).")
     ]
+    categories: Annotated[
+        dict[str, int],
+        Field(
+            description="Candidates the user moved into a stage of each category (StageCategory.key), e.g. 1st Interview: each candidate once per category in the period."
+        ),
+    ]
+
+
+CategoriesAdditionalProperty = TypeAliasType(
+    "CategoriesAdditionalProperty", Annotated[int, Field(ge=0, le=100000)]
+)
 
 
 class ActivityGoal(BaseModel):
@@ -7147,6 +7158,13 @@ class ActivityGoal(BaseModel):
     cvsSent: Annotated[int | None, Field(ge=0, le=100000)]
     interviews: Annotated[int | None, Field(ge=0, le=100000)]
     placements: Annotated[int | None, Field(ge=0, le=100000)]
+    categories: Annotated[
+        dict[str, CategoriesAdditionalProperty] | None,
+        Field(
+            description="A target per stage category (StageCategory.key); a category left out has none.",
+            max_length=50,
+        ),
+    ] = None
 
 
 class ActivityRow(BaseModel):

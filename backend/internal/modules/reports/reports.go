@@ -97,6 +97,10 @@ type ActivitySources interface {
 	CVsEmailed(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CVSent, error)
 	Interviews(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Done, error)
 	Placements(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Done, error)
+	// CategoryMoves are users moving applications into a stage of a category.
+	CategoryMoves(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CategoryMove, error)
+	// Categories are the keys of the company's stage categories, in order.
+	Categories(ctx context.Context, tx pgx.Tx) ([]string, error)
 	// Members are the company's active users.
 	Members(ctx context.Context, tx pgx.Tx) ([]Member, error)
 }

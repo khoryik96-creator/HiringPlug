@@ -21,6 +21,7 @@ type ActivityTarget struct {
 	Placements *int32
 	UpdatedBy  string
 	UpdatedAt  time.Time
+	Categories []byte
 }
 
 type AiPaidControl struct {

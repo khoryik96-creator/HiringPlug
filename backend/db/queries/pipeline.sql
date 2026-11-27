@@ -215,6 +215,15 @@ FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id 
 WHERE c.to_stage = @stage AND c.from_stage IS DISTINCT FROM c.to_stage AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
 LIMIT 50000;
 
+-- Moves into a stage category (reports: targets per category): from another
+-- category, or from none.
+-- name: MovesToCategoryBetween :many
+SELECT c.changed_by::text AS changed_by, c.changed_at, c.application_id, c.to_category::text AS category
+FROM application_stage_change c
+WHERE c.to_category IS NOT NULL AND c.from_category IS DISTINCT FROM c.to_category
+  AND c.changed_at >= @from_time AND c.changed_at < @to_time AND c.changed_by IS NOT NULL
+LIMIT 50000;
+
 -- Applications now at some stages (reports: the revenue forecast).
 -- name: ApplicationsAtStages :many
 SELECT * FROM application WHERE stage = ANY(@stages::text[]) ORDER BY id LIMIT 5000;

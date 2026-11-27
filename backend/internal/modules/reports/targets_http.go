@@ -14,11 +14,27 @@ import (
 )
 
 func goalToAPI(g Goal) api.ActivityGoal {
-	return api.ActivityGoal{Calls: c.OrNull(g.Calls), CvsSent: c.OrNull(g.CVsSent), Interviews: c.OrNull(g.Interviews), Placements: c.OrNull(g.Placements)}
+	out := api.ActivityGoal{Calls: c.OrNull(g.Calls), CvsSent: c.OrNull(g.CVsSent), Interviews: c.OrNull(g.Interviews), Placements: c.OrNull(g.Placements)}
+	if len(g.Categories) > 0 {
+		out.Categories = &g.Categories
+	}
+	return out
 }
 
 func goalFromAPI(g api.ActivityGoal) Goal {
-	return Goal{Calls: c.ValueOrNil(g.Calls), CVsSent: c.ValueOrNil(g.CvsSent), Interviews: c.ValueOrNil(g.Interviews), Placements: c.ValueOrNil(g.Placements)}
+	out := Goal{Calls: c.ValueOrNil(g.Calls), CVsSent: c.ValueOrNil(g.CvsSent), Interviews: c.ValueOrNil(g.Interviews), Placements: c.ValueOrNil(g.Placements)}
+	if g.Categories != nil && len(*g.Categories) > 0 {
+		out.Categories = *g.Categories
+	}
+	return out
+}
+
+func countsToAPI(n Counts) api.ActivityCounts {
+	categories := n.Categories
+	if categories == nil {
+		categories = map[string]int{}
+	}
+	return api.ActivityCounts{Calls: n.Calls, CvsSent: n.CVsSent, Interviews: n.Interviews, Placements: n.Placements, Categories: categories}
 }
 
 // ActivityToAPI is an activity report as the contract has it.
@@ -26,9 +42,7 @@ func ActivityToAPI(r ActivityReport) api.ActivityReport {
 	out := api.ActivityReport{Period: api.ActivityPeriod(r.Period), From: openapi_types.Date{Time: r.From}, To: openapi_types.Date{Time: r.To},
 		Team: r.Team, Rows: make([]api.ActivityRow, len(r.Rows))}
 	for i, row := range r.Rows {
-		a := api.ActivityRow{UserId: row.UserID, UserName: row.Name, Done: api.ActivityCounts{
-			Calls: row.Done.Calls, CvsSent: row.Done.CVsSent, Interviews: row.Done.Interviews, Placements: row.Done.Placements,
-		}}
+		a := api.ActivityRow{UserId: row.UserID, UserName: row.Name, Done: countsToAPI(row.Done)}
 		if row.Target != nil {
 			a.Target.Set(goalToAPI(*row.Target))
 		} else {

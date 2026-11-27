@@ -19,9 +19,9 @@ func (q *Queries) DeleteTargets(ctx context.Context) error {
 }
 
 const insertTarget = `-- name: InsertTarget :exec
-INSERT INTO activity_target (tenant_id, user_id, period, calls, cvs_sent, interviews, placements, updated_by)
+INSERT INTO activity_target (tenant_id, user_id, period, calls, cvs_sent, interviews, placements, categories, updated_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4,
-        $5, $6, app_current_user())
+        $5, $6, $7::jsonb, app_current_user())
 `
 
 type InsertTargetParams struct {
@@ -31,6 +31,7 @@ type InsertTargetParams struct {
 	CvsSent    *int32
 	Interviews *int32
 	Placements *int32
+	Categories []byte
 }
 
 func (q *Queries) InsertTarget(ctx context.Context, arg InsertTargetParams) error {
@@ -41,6 +42,7 @@ func (q *Queries) InsertTarget(ctx context.Context, arg InsertTargetParams) erro
 		arg.CvsSent,
 		arg.Interviews,
 		arg.Placements,
+		arg.Categories,
 	)
 	return err
 }
@@ -78,7 +80,7 @@ func (q *Queries) ListStageWeights(ctx context.Context) ([]ForecastStageWeight, 
 
 const listTargets = `-- name: ListTargets :many
 
-SELECT id, tenant_id, user_id, period, calls, cvs_sent, interviews, placements, updated_by, updated_at FROM activity_target ORDER BY user_id NULLS FIRST, period
+SELECT id, tenant_id, user_id, period, calls, cvs_sent, interviews, placements, updated_by, updated_at, categories FROM activity_target ORDER BY user_id NULLS FIRST, period
 `
 
 // Queries owned by the reports module: activity targets and the forecast's
@@ -103,6 +105,7 @@ func (q *Queries) ListTargets(ctx context.Context) ([]ActivityTarget, error) {
 			&i.Placements,
 			&i.UpdatedBy,
 			&i.UpdatedAt,
+			&i.Categories,
 		); err != nil {
 			return nil, err
 		}

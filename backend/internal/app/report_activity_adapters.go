@@ -92,6 +92,24 @@ func (a reportActivity) Placements(ctx context.Context, tx pgx.Tx, from, to time
 	return out, err
 }
 
+func (a reportActivity) CategoryMoves(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.CategoryMove, error) {
+	moves, err := a.pipeline.MovesToCategory(ctx, tx, from, to)
+	out := make([]reports.CategoryMove, len(moves))
+	for i, m := range moves {
+		out[i] = reports.CategoryMove{By: m.By, ApplicationID: m.ApplicationID, Category: m.Category}
+	}
+	return out, err
+}
+
+func (a reportActivity) Categories(ctx context.Context, tx pgx.Tx) ([]string, error) {
+	cats, err := a.pipeline.CategoriesIn(ctx, tx)
+	out := make([]string, len(cats))
+	for i, c := range cats {
+		out[i] = c.Key
+	}
+	return out, err
+}
+
 // Members are the active users who recruit: those whose role may move
 // candidates through the pipeline (not hiring managers or viewers).
 func (a reportActivity) Members(ctx context.Context, tx pgx.Tx) ([]reports.Member, error) {
