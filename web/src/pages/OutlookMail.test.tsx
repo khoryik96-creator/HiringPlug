@@ -191,3 +191,23 @@ it("opens again where the person left it: their folder, message and open draft",
   await screen.findByRole("button", { name: /Interview on Tuesday/ });
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+it("stays where the person was after sending, with a line that it went (not the Scheduled list)", async () => {
+  window.location.hash = "#/outlook";
+  const folders = [{ id: "omf_inbox", name: "Inbox", kind: "inbox" }, { id: "omf_drafts", name: "Drafts", kind: "drafts" }];
+  const inbox = { id: "omg_in", folderId: "omf_inbox", conversation: "t1", subject: "Interview on Tuesday", sender: "nadia@example.test", receivedAt: "2026-11-18T01:00:00Z", isRead: true, isDraft: false };
+  const drafted = { id: "omg_d", folderId: "omf_drafts", conversation: "t2", subject: "Shortlist for Grab", sender: "me@example.test", receivedAt: "2026-11-18T02:00:00Z", isRead: true, isDraft: true };
+  const draft: Schemas["OutlookDraft"] = { messageId: "omg_d", version: "v", subject: "Shortlist for Grab", body: "Three profiles.", to: ["hr@grab.example"], cc: [], bcc: [],
+    hasAttachments: false, bodyTruncated: false, schedule: null, scheduleNeedsReview: false, webUrl: null };
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
+    path === "/v1/outlook/mail" ? ok({ connected: true, enabled: true, folders, items: [inbox, drafted] })
+      : path === "/v1/outlook/drafts/{messageId}" ? ok(draft) : ok({ items: [], more: false, fields: [] }))) as never);
+  const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ id: "oms_1", messageId: "omg_d", status: "queued" }));
+  renderWithClient(<OutlookMail userId="usr_3" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Shortlist for Grab/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send now" }));
+  await waitFor(() => { expect(put).toHaveBeenCalledTimes(1); });
+  expect(await screen.findByText("Sent.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Interview on Tuesday/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Scheduled" }).getAttribute("aria-pressed")).not.toBe("true");
+});

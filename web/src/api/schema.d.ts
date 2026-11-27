@@ -2478,6 +2478,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/outlook/messages/{messageId}/attachments/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download all of a message's file attachments in one .zip (as Outlook's Download all)
+         * @description The message's file attachments (not pictures in its text), each up to 20 MiB and 60 MiB in all; two with the same name are kept apart ("CV (2).pdf"). Files too large are left out and listed in "Left out.txt" inside the zip.
+         */
+        get: operations["downloadAllOutlookAttachments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/outlook/messages/{messageId}/attachments/{attachmentId}/file": {
         parameters: {
             query?: never;
@@ -18245,6 +18267,53 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            /** @description Outlook is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadAllOutlookAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A .zip of the attachments */
+            200: {
+                headers: {
+                    "Content-Disposition": string;
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The attachments exceed 60 MiB together */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Outlook is unavailable */
             503: {
                 headers: {

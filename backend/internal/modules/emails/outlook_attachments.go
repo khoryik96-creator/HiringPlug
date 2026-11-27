@@ -150,25 +150,32 @@ func (s *Service) downloadOutlookAttachment(ctx context.Context, p authz.Princip
 	if attachment.Size > outlookAttachmentLimit {
 		return nil, "", attachmentTooLarge()
 	}
+	data, err := s.attachmentBytes(ctx, token, target)
+	return data, outlookAttachmentName(attachment.Name), err
+}
+
+// attachmentBytes reads one file attachment's bytes (target is its Graph
+// path), refusing more than outlookAttachmentLimit.
+func (s *Service) attachmentBytes(ctx context.Context, token, target string) ([]byte, error) {
 	response, err := s.openOutlookResponse(ctx, token, http.MethodGet, target+"/$value", nil, "")
 	if err != nil {
-		return nil, "", attachmentFailure(err)
+		return nil, attachmentFailure(err)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
-		return nil, "", outlookFailure(&outlookGraphError{status: http.StatusBadGateway}, false)
+		return nil, outlookFailure(&outlookGraphError{status: http.StatusBadGateway}, false)
 	}
 	if response.ContentLength > outlookAttachmentLimit {
-		return nil, "", attachmentTooLarge()
+		return nil, attachmentTooLarge()
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, outlookAttachmentLimit+1))
 	if err != nil {
-		return nil, "", outlookFailure(err, false)
+		return nil, outlookFailure(err, false)
 	}
 	if len(data) > outlookAttachmentLimit {
-		return nil, "", attachmentTooLarge()
+		return nil, attachmentTooLarge()
 	}
-	return data, outlookAttachmentName(attachment.Name), nil
+	return data, nil
 }
 
 func (h *HTTP) ListOutlookAttachments(ctx context.Context, r api.ListOutlookAttachmentsRequestObject) (api.ListOutlookAttachmentsResponseObject, error) {

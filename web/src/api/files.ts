@@ -50,6 +50,11 @@ export function outlookAttachmentFilePath(messageId: string, attachmentId: strin
   return `/v1/outlook/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/file`;
 }
 
+/** Every file attachment of a message in one .zip (Download all). */
+export function outlookAttachmentsZipPath(messageId: string): string {
+  return `/v1/outlook/messages/${encodeURIComponent(messageId)}/attachments/zip`;
+}
+
 export async function uploadOutlookDraftFile(messageId: string, version: string, file: File): Promise<Schemas["OutlookDraft"]> {
   const body = new FormData();
   body.append("file", file);

@@ -4388,6 +4388,43 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
+  /v1/outlook/messages/{messageId}/attachments/zip:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^omg_[0-9a-z]{26}$'}
+    get:
+      operationId: downloadAllOutlookAttachments
+      tags: [emails]
+      summary: Download all of a message's file attachments in one .zip (as Outlook's Download all)
+      description: >-
+        The message's file attachments (not pictures in its text), each up to 20 MiB and 60 MiB in all; two with the same name are kept apart ("CV (2).pdf"). Files too large are left out and listed in "Left out.txt" inside the zip.
+      x-permission: emails:send
+      responses:
+        '200':
+          description: A .zip of the attachments
+          headers:
+            Content-Disposition: {required: true, schema: {type: string}}
+            Cache-Control: {required: true, schema: {type: string}}
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413':
+          description: The attachments exceed 60 MiB together
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/outlook/messages/{messageId}/attachments/{attachmentId}/file:
     parameters:
       - name: messageId

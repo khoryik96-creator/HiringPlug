@@ -82,6 +82,7 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
   // The draft that was open: opened again once the mail shows it is still there.
   const [draftToReopen, setDraftToReopen] = useState(last?.draft ?? "");
   const [scheduled, setScheduled] = useState(false);
+  const [sentNote, setSentNote] = useState<"send" | "schedule" | null>(null);
   const [atsComposer, setATSComposer] = useState(false);
   // A null message starts a new draft.
   // fresh: just created here (new, reply, forward), so the signature goes in.
@@ -187,6 +188,10 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
       </IconActions>
     </div>
     <ErrorMessage error={result.error ?? sync.error}/>
+    {sentNote && <p className="muted outlook-sent-note" role="status">
+      {sentNote === "send" ? "Sent." : "Scheduled: it is under Scheduled (the clock), where it can be changed until it goes."}
+      {" "}<button type="button" className="link" onClick={() => { setSentNote(null); }}>OK</button>
+    </p>}
     {result.isPending && <p className="muted">Loading Outlook Mail…</p>}
     {!scheduled && data && !data.connected && <section className="panel">
       <p>Connect your Microsoft mailbox to use Outlook Mail.</p>
@@ -247,7 +252,8 @@ function OutlookWorkspace({ profile, canImportCv, initialSearch, initialThread, 
     {draft && <OutlookDraftEditor key={draft.id ?? "new"} id={draft.id} focusMessage={draft.focusMessage} fresh={draft.fresh}
       permissions={permissions} about={profile ?? {}} onClose={(operation) => {
       setDraft(undefined);
-      if (operation === "send" || operation === "schedule") setScheduled(true);
+      // Stay where you were (as Outlook does); a line says it went.
+      if (operation === "send" || operation === "schedule") setSentNote(operation);
     }}/>}
   </Root>;
 }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../../api/client";
@@ -172,4 +172,38 @@ it("takes the counts out of the tab's title when the badge goes (signed out)", a
   await waitFor(() => { expect(document.title).toBe("(1✗) HiringPlug"); });
   view.unmount();
   expect(document.title).toBe("HiringPlug");
+});
+
+it("downloads every file at once with two or more, and opens a PDF to view instead of downloading it", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({
+    items: [
+      { id: "cv", fileName: "Nadia – CV.pdf", sizeBytes: 4400, downloadable: true, savable: true },
+      { id: "jd", fileName: "Role.docx", sizeBytes: 9000, downloadable: true, savable: true },
+    ],
+    more: false,
+  }));
+  const download = vi.spyOn(files, "downloadFrom").mockResolvedValue(undefined);
+  const fetched = vi.spyOn(files, "fetchFile").mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" }));
+  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:cv", revokeObjectURL: () => undefined }));
+  if (typeof HTMLDialogElement.prototype.showModal !== "function") {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
+  }
+  renderWithClient(<OutlookAttachments messageId="omg_test" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Download all" }));
+  await waitFor(() => { expect(download).toHaveBeenCalledWith("/v1/outlook/messages/omg_test/attachments/zip", "Attachments.zip", "application/zip"); });
+
+  expect(screen.queryByRole("button", { name: "Role.docx" }), "a Word file is downloaded, not viewed").toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Nadia – CV.pdf" }));
+  const viewer = await screen.findByRole("dialog", { name: "Nadia – CV.pdf" });
+  expect(fetched).toHaveBeenCalledWith("/v1/outlook/messages/omg_test/attachments/cv/file", "application/pdf");
+  expect(await within(viewer).findByTitle("Nadia – CV.pdf")).toBeTruthy();
+  fireEvent.click(within(viewer).getByRole("button", { name: "Download" }));
+  await waitFor(() => { expect(download).toHaveBeenLastCalledWith("/v1/outlook/messages/omg_test/attachments/cv/file", "Nadia – CV.pdf", "application/octet-stream"); });
+});
+
+it("offers no Download all for a single file", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{ id: "cv", fileName: "CV.pdf", sizeBytes: 10, downloadable: true, savable: true }], more: false }));
+  renderWithClient(<OutlookAttachments messageId="omg_test" />);
+  await screen.findByRole("button", { name: "Download CV.pdf" });
+  expect(screen.queryByRole("button", { name: "Download all" })).toBeNull();
 });

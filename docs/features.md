@@ -2328,7 +2328,11 @@ a stored CV or its formatted Word or PDF version when available. Send and
 Schedule wait for the selected attachment to finish uploading. The page uses the width of the screen: drag
 the bars between the folders, the list and the reading pane, or either side of
 the editor, to resize them (kept in this browser). Download attachments of up to
-20 MiB from the reading pane. **Create job** on a job description (PDF, Word or
+20 MiB from the reading pane; with two files or more, **Download all** gives
+them in one .zip (60 MiB in all; files too large listed in "Left out.txt").
+Clicking a PDF's or picture's name opens it to view, with Download beside
+Close (1.54.0). After Send (or Schedule) the mail stays where it was, with a
+short line that it went; scheduled mail is under the clock icon. **Create job** on a job description (PDF, Word or
 text) opens Jobs with the Add job form reading it and filling itself in, as if
 the file were dropped there; the file is kept with the job (1.39.0). A folder
 Outlook will not hand over (a special or shared one) waits ten minutes while the
