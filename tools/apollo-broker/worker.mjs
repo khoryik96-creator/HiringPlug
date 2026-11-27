@@ -1,5 +1,6 @@
 import { emailResult } from "./identity.mjs";
 import { digest, random, seal, unseal } from "./secrets.mjs";
+import { SignInFailure, apolloError, grantedScopes, signInMessage } from "./signin.mjs";
 
 // Shared OAuth broker. No Apollo client secret or provider token ships to a
 // colleague. Every opaque connection key binds one installation to one account.
@@ -17,13 +18,8 @@ const headers = {
 };
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...headers, "Content-Type": "application/json" } });
-const page = (ok) =>
-  new Response(
-    ok
-      ? "Apollo connected. Return to the app where you started. You can close this tab."
-      : "Apollo sign-in was declined or interrupted. Return to the app where you started and check your account permissions before connecting again.",
-    { headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" } },
-  );
+const page = (failure) =>
+  new Response(signInMessage(failure), { headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" } });
 const statement = (env, sql, ...args) => env.DB.prepare(sql).bind(...args);
 async function bodyJSON(request) {
   if (!(request.headers.get("Content-Type") || "").startsWith("application/json")) throw Error("input");
@@ -92,11 +88,12 @@ function tokenRecord(data, now) {
     !Number.isSafeInteger(data.expires_in) ||
     data.expires_in < 60 ||
     data.expires_in > 5184000 ||
-    typeof data.scope !== "string" ||
-    !data.scope.split(/\s+/).includes("people_match") ||
-    !data.scope.split(/\s+/).includes("read_user_profile")
+    typeof data.scope !== "string"
   )
-    throw Error("token");
+    throw new SignInFailure("token");
+  const scopes = data.scope.split(/\s+/);
+  if (!scopes.includes("people_match") || !scopes.includes("read_user_profile"))
+    throw new SignInFailure("scope", grantedScopes(data.scope));
   return {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
@@ -159,14 +156,14 @@ async function callback(request, env, now, fetcher) {
   const query = new URL(request.url).searchParams,
     id = query.get("state");
   if (!HEX.test(id || "") || query.getAll("state").length !== 1 || query.getAll("code").length > 1)
-    return page(false);
+    return page({ step: "expired" });
   const flow = await statement(
     env,
     "UPDATE flows SET status='exchanging' WHERE id=? AND status='pending' AND expires>? RETURNING *",
     id,
     now,
   ).first();
-  if (!flow) return page(false); // Never replay a code exchange, including after a timeout.
+  if (!flow) return page({ step: "expired" }); // Never replay a code exchange, including after a timeout.
   try {
     if (
       query.has("error") ||
@@ -175,7 +172,7 @@ async function callback(request, env, now, fetcher) {
       !query.get("code") ||
       query.get("code").length > 2048
     )
-      throw Error("authorization");
+      throw new SignInFailure("declined", apolloError(query.get("error")));
     const reply = await exchange(
       env,
       {
@@ -185,7 +182,7 @@ async function callback(request, env, now, fetcher) {
       },
       fetcher,
     );
-    if (reply.status !== 200) throw Error("authorization");
+    if (reply.status !== 200) throw new SignInFailure("credentials", String(reply.status));
     const tokens = tokenRecord(reply.data, now);
     const profile = await external(
       "https://app.apollo.io/api/v1/users/api_profile",
@@ -202,7 +199,7 @@ async function callback(request, env, now, fetcher) {
       name.length > 160 ||
       /[\x00-\x1f\x7f]/.test(name)
     )
-      throw Error("identity");
+      throw new SignInFailure("profile", String(profile.status));
     const cipher = await seal(env, { ...tokens, name }, id);
     await env.DB.batch([
       statement(
@@ -215,10 +212,11 @@ async function callback(request, env, now, fetcher) {
       ),
       statement(env, "UPDATE flows SET status='connected' WHERE id=? AND status='exchanging'", id),
     ]);
-    return page(Boolean(await statement(env, "SELECT id FROM connections WHERE id=?", id).first()));
-  } catch {
+    const saved = await statement(env, "SELECT id FROM connections WHERE id=?", id).first();
+    return page(saved ? { step: "connected" } : null);
+  } catch (error) {
     await statement(env, "UPDATE flows SET status='failed' WHERE id=? AND status='exchanging'", id).run();
-    return page(false);
+    return page(error instanceof SignInFailure ? error : null);
   }
 }
 const BUSY_LEASE = 120; // seconds: more than a token refresh plus People Match

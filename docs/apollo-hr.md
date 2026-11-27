@@ -54,6 +54,12 @@ search so HyPlug can bind the company page used in that scan.
 - **Apollo doesn't recognise the app or denies consent.** Check the partner
   OAuth client, approved scopes, exact registered redirect, and the account's
   Apollo plan and permissions. Then cancel the existing attempt and reconnect.
+- **The sign-in tab says it failed.** The broker's page names the step:
+  Apollo declined (with Apollo's reason), the broker's Client ID or Secret
+  was refused, Apollo did not grant `people_match` (it lists what it did
+  grant), the answer was incomplete, or the profile could not be read.
+  Fix that setting, then connect again. Redeploy the Worker after updating
+  HyPlug to get these messages.
 - **Apollo says sign-in succeeded, but HyPlug is still waiting.** Click
   **Check connection** in the browser where you started. If the ten-minute
   window elapsed, sign in again. Verify the Worker origin and deployed callback

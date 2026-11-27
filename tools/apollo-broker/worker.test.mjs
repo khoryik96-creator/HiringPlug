@@ -131,6 +131,7 @@ function fixture() {
   const op = (digit) => ({ operation_id: digit.repeat(64), confirmed: true, person });
   return {
     sql,
+    env,
     id,
     connect,
     post,
@@ -211,4 +212,41 @@ test("a storage failure before Apollo is called can be confirmed again", async (
   assert.deepEqual(await (await f.post("/lookup-status-v2", f.op("a"))).json(), failed);
   assert.equal(f.paid(), 0);
   assert.equal((await (await f.post("/reveal-v2", f.op("b"))).json()).email, contact.email);
+});
+
+test("a failed Apollo sign-in says which step failed, never the code or token", async () => {
+  const { sql, env } = fixture();
+  const token = (over = {}) => ({
+    access_token: "fictional-access",
+    refresh_token: "fictional-refresh",
+    expires_in: 3600,
+    scope: "read_user_profile app_scopes people_match",
+    ...over,
+  });
+  let n = 0;
+  async function signIn(query, apollo) {
+    const id = (++n).toString(16).padStart(2, "0").repeat(32);
+    sql.prepare("INSERT INTO flows VALUES (?, 'proof', 'pending', 1000, 0, 'test')").run(id);
+    const url = env.PUBLIC_ORIGIN + "/callback?" + query.replace("STATE", id);
+    const response = await handle(new Request(url), env, apollo, 100);
+    return response.text();
+  }
+  const answers = (tokenReply, profileReply = { status: 200, body: { user: { id: "u1", name: "Sample Person" } } }) =>
+    (url) =>
+      url.endsWith("/oauth/token")
+        ? Response.json(tokenReply.body ?? {}, { status: tokenReply.status })
+        : Response.json(profileReply.body ?? {}, { status: profileReply.status });
+
+  assert.match(await signIn("error=access_denied&state=STATE", answers({ status: 200 })), /declined \(Apollo said: access_denied\)/);
+  assert.match(await signIn("code=c&state=STATE", answers({ status: 401 })), /refused this broker's app details \(Apollo answered 401\)/);
+  const scope = await signIn("code=c&state=STATE", answers({ status: 200, body: token({ scope: "read_user_profile app_scopes" }) }));
+  assert.match(scope, /did not grant email lookup\. Granted: read_user_profile, app_scopes\. Needed: read_user_profile and people_match/);
+  assert.match(await signIn("code=c&state=STATE", answers({ status: 200, body: token({ refresh_token: undefined }) })), /incomplete/);
+  assert.match(
+    await signIn("code=c&state=STATE", answers({ status: 200, body: token() }, { status: 403 })),
+    /did not return your profile \(Apollo answered 403\)/,
+  );
+  assert.match(await signIn("code=c&state=STATE", answers({ status: 200, body: token() })), /^Apollo connected/);
+  assert.match(await signIn("code=c&state=" + "ff".repeat(32), answers({ status: 200 })), /expired or was already used/);
+  assert.doesNotMatch(scope, /fictional|test-secret|code=/);
 });
