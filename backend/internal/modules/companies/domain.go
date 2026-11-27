@@ -66,6 +66,7 @@ type Summary struct {
 	Website            *string
 	LinkedinURL        *string
 	UpdatedAt          time.Time
+	TouchedAt          time.Time // when someone last did something with the company or one of its people
 }
 
 // Patch is a partial update of Details.
@@ -206,3 +207,7 @@ func nameText(s string) (string, bool) {
 	}, s)
 	return strings.Join(strings.Fields(spaced), " "), true
 }
+
+// StaleSince is the time before which a company nobody touched since counts
+// as stale: a year before now.
+func StaleSince(now time.Time) time.Time { return now.AddDate(-1, 0, 0) }

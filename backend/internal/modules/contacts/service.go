@@ -231,6 +231,7 @@ type Filter struct {
 	Role             *string // a key of the contact_role list
 	RoleNotSet       bool    // only contacts without a role (ignored with Role)
 	Folder           *string // only the contacts in this folder
+	Stale            bool    // only contacts nobody touched for a year (StaleSince)
 	// Similar: names like Query (typos), the closest first, one page only.
 	Similar bool
 }

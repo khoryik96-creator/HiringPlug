@@ -2239,6 +2239,10 @@ paths:
           in: query
           description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
           schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        - name: stale
+          in: query
+          description: "Only companies nobody touched for a year: not edited, written a note on, given or changed a job, nor any of their people touched (touchedAt)."
+          schema: {type: boolean, default: false}
         - name: folder
           in: query
           description: Only the records in this folder (yours, or shared with you).
@@ -2288,6 +2292,10 @@ paths:
           in: query
           description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
           schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        - name: stale
+          in: query
+          description: "Only companies nobody touched for a year: not edited, written a note on, given or changed a job, nor any of their people touched (touchedAt)."
+          schema: {type: boolean, default: false}
         - name: folder
           in: query
           description: Only the records in this folder (yours, or shared with you).
@@ -2726,6 +2734,10 @@ paths:
           in: query
           description: Only contacts whose role is not set yet (ignored with role).
           schema: {type: boolean, default: false}
+        - name: stale
+          in: query
+          description: "Only contacts nobody touched for a year: not edited, written a note on, emailed or named on a job (touchedAt)."
+          schema: {type: boolean, default: false}
         - name: status
           in: query
           description: Only contacts who still work there (active) or have left.
@@ -2783,6 +2795,10 @@ paths:
         - name: roleNotSet
           in: query
           description: Only contacts whose role is not set yet (ignored with role).
+          schema: {type: boolean, default: false}
+        - name: stale
+          in: query
+          description: "Only contacts nobody touched for a year: not edited, written a note on, emailed or named on a job (touchedAt)."
           schema: {type: boolean, default: false}
         - name: status
           in: query
@@ -12619,7 +12635,7 @@ components:
         items: {type: array, items: {$ref: '#/components/schemas/CompanyDuplicateGroup'}}
     CompanySummary:
       type: object
-      required: [id, name, type, category, industry, city, country, website, linkedinUrl, updatedAt]
+      required: [id, name, type, category, industry, city, country, website, linkedinUrl, updatedAt, touchedAt]
       properties:
         id: {$ref: '#/components/schemas/CompanyId'}
         name: {type: string}
@@ -12631,6 +12647,7 @@ components:
         website: {type: string, nullable: true}
         linkedinUrl: {type: string, nullable: true}
         updatedAt: {type: string, format: date-time}
+        touchedAt: {type: string, format: date-time, description: "When someone last did something with the company or one of its people."}
     CompanyPage:
       type: object
       required: [items, nextCursor]
@@ -13087,7 +13104,7 @@ components:
         items: {type: array, items: {$ref: '#/components/schemas/ContactDuplicateGroup'}}
     ContactSummary:
       type: object
-      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, mailboxCheckedAt, linkedinEmployment, phone, mobile, status, role, updatedAt]
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, mailboxCheckedAt, linkedinEmployment, phone, mobile, status, role, updatedAt, touchedAt]
       properties:
         id: {$ref: '#/components/schemas/ContactId'}
         fullName: {type: string}
@@ -13115,6 +13132,7 @@ components:
           allOf: [{$ref: '#/components/schemas/ContactRole'}]
           nullable: true
         updatedAt: {type: string, format: date-time}
+        touchedAt: {type: string, format: date-time, description: "When someone last did something with the contact (edited, a note, an email to them, a job naming them)."}
     ContactPage:
       type: object
       required: [items, nextCursor]

@@ -114,3 +114,13 @@ func (a notificationMailer) EmailUser(ctx context.Context, tx pgx.Tx, tenantID, 
 	}
 	return true, a.m.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: []string{c.Email}, Subject: subject, Body: body, AccountNotice: true})
 }
+
+// Stale counts the contacts and companies nobody touched since then (as the user).
+func (a notificationSources) Stale(ctx context.Context, tx pgx.Tx, since time.Time) (notifications.Stale, error) {
+	contacts, err := a.m.Contacts.Untouched(ctx, tx, since)
+	if err != nil {
+		return notifications.Stale{}, err
+	}
+	companies, err := a.m.Companies.Untouched(ctx, tx, since)
+	return notifications.Stale{Contacts: contacts, Companies: companies}, err
+}

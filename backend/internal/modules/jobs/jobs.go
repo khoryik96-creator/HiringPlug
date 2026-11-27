@@ -34,6 +34,8 @@ type Companies interface {
 	Website(ctx context.Context, tx pgx.Tx, companyID string) (string, error)
 	// WordHits: "n:companyId" for each word n of a search found in a company's name.
 	WordHits(ctx context.Context, tx pgx.Tx, query string) ([]string, error)
+	// Touch notes that someone did something with the company (a job opened or changed).
+	Touch(ctx context.Context, tx pgx.Tx, companyID string) error
 }
 
 // ContactInfo is what a job shows of its hiring contact.
@@ -46,6 +48,8 @@ type ContactInfo struct {
 // internal/app, so the modules stay independent).
 type Contacts interface {
 	Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]ContactInfo, error)
+	// Touch notes that someone did something with the contact (the job's hiring contact).
+	Touch(ctx context.Context, tx pgx.Tx, contactID string) error
 }
 
 // Users is what this module needs from the identity module: owners' names,

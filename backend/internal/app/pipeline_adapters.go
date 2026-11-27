@@ -18,6 +18,11 @@ import (
 // types, so neither module imports the other.
 type jobContacts struct{ contacts *contacts.Module }
 
+// Touch marks the job's hiring contact (and their company) as touched.
+func (a jobContacts) Touch(ctx context.Context, tx pgx.Tx, id string) error {
+	return a.contacts.Touch(ctx, tx, id)
+}
+
 func (a jobContacts) Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]jobs.ContactInfo, error) {
 	briefs, err := a.contacts.Briefs(ctx, tx, ids)
 	out := make(map[string]jobs.ContactInfo, len(briefs))

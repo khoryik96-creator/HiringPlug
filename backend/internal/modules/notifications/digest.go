@@ -53,9 +53,15 @@ func (s *Service) sendDigest(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 		ran["skipped"] = "already emailed today"
 	default:
 		var items []Item
+		var stale Stale
 		// As the user, so the email holds only what they may see.
 		if err := database.AsPrincipal(ctx, tx, p, func() error {
-			items, err = s.items(ctx, tx, p, state, now)
+			if items, err = s.items(ctx, tx, p, state, now); err != nil {
+				return err
+			}
+			if StaleDay(now, s.cfg.TimeZone) {
+				stale, err = s.src.Stale(ctx, tx, StaleSinceAt(now))
+			}
 			return err
 		}); err != nil {
 			return err
@@ -65,12 +71,15 @@ func (s *Service) sendDigest(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 			last = state.EmailedOn.Time
 		}
 		items = DigestFor(items, DigestSince(last, now, s.cfg.TimeZone))
-		if subject, body, ok := DigestText(items, s.cfg.PublicURL); ok {
+		if subject, body, ok := DigestWith(items, stale, s.cfg.PublicURL); ok {
 			sent, err := s.mail.EmailUser(ctx, tx, job.TenantID, p.UserID, subject, body)
 			if err != nil {
 				return err
 			}
 			ran["items"], ran["emailed"] = len(items), sent
+			if stale.Contacts+stale.Companies > 0 {
+				ran["stale"] = stale.Contacts + stale.Companies
+			}
 			emailed = &today
 		}
 	}

@@ -23,7 +23,10 @@ func (h *HTTP) ListCompanies(ctx context.Context, req api.ListCompaniesRequestOb
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, req.Params.Boolean, c.Convert[string](req.Params.Type), req.Params.Category, req.Params.LinkedinCompany, req.Params.Folder, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), ListFilter{
+		Query: req.Params.Q, Boolean: req.Params.Boolean, Type: c.Convert[string](req.Params.Type), Category: req.Params.Category,
+		LinkedinCompany: req.Params.LinkedinCompany, Folder: req.Params.Folder, Stale: req.Params.Stale != nil && *req.Params.Stale,
+	}, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +34,7 @@ func (h *HTTP) ListCompanies(ctx context.Context, req api.ListCompaniesRequestOb
 	for i, s := range page.Items {
 		out.Items[i] = api.CompanySummary{
 			Id: s.ID, Name: s.Name, Type: api.CompanyType(s.Type), Category: c.OrNull(s.Category), Industry: c.OrNull(s.Industry),
-			City: c.OrNull(s.City), Country: c.OrNull(s.Country), Website: c.OrNull(s.Website), LinkedinUrl: c.OrNull(s.LinkedinURL), UpdatedAt: s.UpdatedAt,
+			City: c.OrNull(s.City), Country: c.OrNull(s.Country), Website: c.OrNull(s.Website), LinkedinUrl: c.OrNull(s.LinkedinURL), UpdatedAt: s.UpdatedAt, TouchedAt: s.TouchedAt,
 		}
 	}
 	return out, nil

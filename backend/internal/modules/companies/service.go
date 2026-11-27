@@ -236,8 +236,7 @@ type Page struct {
 
 // List returns up to limit companies, optionally matching query and type, or
 // only those in a folder, starting after cursor (the last ID of the previous page).
-func (s *Service) List(ctx context.Context, p authz.Principal, query, boolean, companyType, category, linkedinCompany, folder, cursor *string, limit int) (Page, error) {
-	f := ListFilter{Query: query, Boolean: boolean, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Folder: folder}
+func (s *Service) List(ctx context.Context, p authz.Principal, f ListFilter, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
@@ -250,6 +249,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, boolean, c
 // ListFilter is what the company list is narrowed by.
 type ListFilter struct {
 	Query, Boolean, Type, Category, LinkedinCompany, Folder *string
+	Stale                                                   bool // only companies nobody touched for a year (StaleSince)
 }
 
 func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f ListFilter, cursor *string, limit int) (Page, error) {
@@ -267,8 +267,13 @@ func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f Li
 	if err != nil {
 		return page, err
 	}
+	var untouchedSince *time.Time
+	if f.Stale {
+		since := StaleSince(time.Now())
+		untouchedSince = &since
+	}
 	rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
-		Cursor: cursor, Type: f.Type, Category: f.Category, LinkedinCompany: f.LinkedinCompany, Query: f.Query, Tsquery: tsquery, InIds: inIDs, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+		Cursor: cursor, Type: f.Type, Category: f.Category, LinkedinCompany: f.LinkedinCompany, Query: f.Query, Tsquery: tsquery, InIds: inIDs, UntouchedSince: untouchedSince, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	})
 	if err != nil {
 		return page, err
@@ -280,7 +285,7 @@ func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f Li
 	}
 	page.Items = make([]Summary, len(rows))
 	for i, r := range rows {
-		page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Country: r.Country, Website: r.Website, LinkedinURL: r.LinkedinUrl, UpdatedAt: r.UpdatedAt}
+		page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Country: r.Country, Website: r.Website, LinkedinURL: r.LinkedinUrl, UpdatedAt: r.UpdatedAt, TouchedAt: r.TouchedAt}
 	}
 	return page, nil
 }

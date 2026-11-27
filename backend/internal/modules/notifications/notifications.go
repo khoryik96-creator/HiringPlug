@@ -52,6 +52,9 @@ type Sources interface {
 	// AILimits is the levels the company's AI use reached in now's month
 	// (its warning percent, AILimitLevel).
 	AILimits(ctx context.Context, tx pgx.Tx, now time.Time) ([]AILimit, error)
+	// Stale counts the contacts and companies nobody touched since then
+	// (the morning email's monthly line).
+	Stale(ctx context.Context, tx pgx.Tx, since time.Time) (Stale, error)
 	// Applications names the candidate and job of applications (missing ones are left out).
 	Applications(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
 }

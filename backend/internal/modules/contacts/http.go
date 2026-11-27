@@ -25,7 +25,7 @@ func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObje
 	params := req.Params
 	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
 		Query: params.Q, Boolean: params.Boolean, CompanyID: params.CompanyId, Status: c.Convert[string](params.Status), Role: params.Role,
-		RoleNotSet: params.RoleNotSet != nil && *params.RoleNotSet, Similar: params.Similar != nil && *params.Similar, Folder: params.Folder,
+		RoleNotSet: params.RoleNotSet != nil && *params.RoleNotSet, Stale: params.Stale != nil && *params.Stale, Similar: params.Similar != nil && *params.Similar, Folder: params.Folder,
 	}, params.Cursor, limit)
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObje
 			MailboxStatus:      c.OrNull(c.Convert[api.MailboxCheckStatus](s.MailboxStatus)),
 			LinkedinEmployment: c.OrNull(linkedinEmploymentToAPI(s.Linkedin)),
 			MailboxCheckedAt:   c.OrNull(s.MailboxCheckedAt),
-			Phone:              c.OrNull(s.Phone), Mobile: c.OrNull(s.Mobile), Status: api.ContactStatus(s.Status), Role: c.OrNull(s.Role), UpdatedAt: s.UpdatedAt,
+			Phone:              c.OrNull(s.Phone), Mobile: c.OrNull(s.Mobile), Status: api.ContactStatus(s.Status), Role: c.OrNull(s.Role), UpdatedAt: s.UpdatedAt, TouchedAt: s.TouchedAt,
 		}
 	}
 	return out, nil

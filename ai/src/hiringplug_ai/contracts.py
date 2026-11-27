@@ -2218,6 +2218,10 @@ class CompanySummary(BaseModel):
     website: Annotated[str | None, Field(...)]
     linkedinUrl: Annotated[str | None, Field(...)]
     updatedAt: AwareDatetime
+    touchedAt: Annotated[
+        AwareDatetime,
+        Field(description="When someone last did something with the company or one of its people."),
+    ]
 
 
 class CompanyPage(BaseModel):
@@ -8529,6 +8533,12 @@ class ContactSummary(BaseModel):
         Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
     ]
     updatedAt: AwareDatetime
+    touchedAt: Annotated[
+        AwareDatetime,
+        Field(
+            description="When someone last did something with the contact (edited, a note, an email to them, a job naming them)."
+        ),
+    ]
 
 
 class ContactPage(BaseModel):

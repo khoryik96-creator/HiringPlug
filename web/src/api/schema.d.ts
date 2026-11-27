@@ -8072,6 +8072,11 @@ export interface components {
             linkedinUrl: string | null;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: date-time
+             * @description When someone last did something with the company or one of its people.
+             */
+            touchedAt: string;
         };
         CompanyPage: {
             items: components["schemas"]["CompanySummary"][];
@@ -8431,6 +8436,11 @@ export interface components {
             role: components["schemas"]["ContactRole"] | null;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: date-time
+             * @description When someone last did something with the contact (edited, a note, an email to them, a job naming them).
+             */
+            touchedAt: string;
         };
         ContactPage: {
             items: components["schemas"]["ContactSummary"][];
@@ -15703,6 +15713,8 @@ export interface operations {
                 category?: string;
                 /** @description Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case). */
                 linkedinCompany?: string;
+                /** @description Only companies nobody touched for a year: not edited, written a note on, given or changed a job, nor any of their people touched (touchedAt). */
+                stale?: boolean;
                 /** @description Only the records in this folder (yours, or shared with you). */
                 folder?: string;
             };
@@ -15749,6 +15761,8 @@ export interface operations {
                 category?: string;
                 /** @description Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case). */
                 linkedinCompany?: string;
+                /** @description Only companies nobody touched for a year: not edited, written a note on, given or changed a job, nor any of their people touched (touchedAt). */
+                stale?: boolean;
                 /** @description Only the records in this folder (yours, or shared with you). */
                 folder?: string;
                 limit?: number;
@@ -16314,6 +16328,8 @@ export interface operations {
                 role?: components["schemas"]["ContactRole"];
                 /** @description Only contacts whose role is not set yet (ignored with role). */
                 roleNotSet?: boolean;
+                /** @description Only contacts nobody touched for a year: not edited, written a note on, emailed or named on a job (touchedAt). */
+                stale?: boolean;
                 /** @description Only contacts who still work there (active) or have left. */
                 status?: components["schemas"]["ContactStatus"];
                 /** @description Only the records in this folder (yours, or shared with you). */
@@ -16365,6 +16381,8 @@ export interface operations {
                 role?: components["schemas"]["ContactRole"];
                 /** @description Only contacts whose role is not set yet (ignored with role). */
                 roleNotSet?: boolean;
+                /** @description Only contacts nobody touched for a year: not edited, written a note on, emailed or named on a job (touchedAt). */
+                stale?: boolean;
                 /** @description Only contacts who still work there (active) or have left. */
                 status?: components["schemas"]["ContactStatus"];
                 /** @description Only the records in this folder (yours, or shared with you). */

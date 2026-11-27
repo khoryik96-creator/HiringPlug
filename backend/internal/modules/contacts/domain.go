@@ -52,6 +52,7 @@ type Summary struct {
 	ID, CompanyID, CompanyName, FirstName, LastName, Status            string
 	Title, Email, EmailCheckStatus, MailboxStatus, Phone, Mobile, Role *string
 	UpdatedAt                                                          time.Time
+	TouchedAt                                                          time.Time           // when someone last did something with the contact
 	Linkedin                                                           *LinkedinEmployment // nil before the first LinkedIn check
 	MailboxCheckedAt                                                   *time.Time
 }
@@ -175,3 +176,7 @@ func PersonalAddress(email string) bool {
 	at := strings.LastIndex(email, "@")
 	return at >= 0 && personalDomains[strings.ToLower(strings.TrimSpace(email[at+1:]))]
 }
+
+// StaleSince is the time before which a contact nobody touched since counts
+// as stale: a year before now.
+func StaleSince(now time.Time) time.Time { return now.AddDate(-1, 0, 0) }

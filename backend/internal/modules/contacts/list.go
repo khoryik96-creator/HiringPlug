@@ -4,6 +4,7 @@ package contacts
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -38,8 +39,13 @@ func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f Fi
 	if err != nil {
 		return page, err
 	}
+	var untouchedSince *time.Time
+	if f.Stale {
+		since := StaleSince(time.Now())
+		untouchedSince = &since
+	}
 	rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-		Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Tsquery: tsquery, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet, InIds: inIDs,
+		Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Tsquery: tsquery, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet, InIds: inIDs, UntouchedSince: untouchedSince,
 		SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	})
 	if err != nil {
@@ -66,7 +72,7 @@ func (s *Service) listTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f Fi
 		page.Items[i] = Summary{
 			ID: r.ID, CompanyID: r.CompanyID, CompanyName: names[r.CompanyID], FirstName: r.FirstName, LastName: r.LastName,
 			Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus, MailboxStatus: r.MailboxStatus,
-			Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt,
+			Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt, TouchedAt: r.TouchedAt,
 		}
 		page.Items[i].MailboxCheckedAt = r.MailboxCheckedAt
 		if r.LinkedinCheckedAt != nil {

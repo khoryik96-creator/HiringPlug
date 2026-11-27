@@ -55,6 +55,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, jdF
 		if err != nil {
 			return err
 		}
+		if err := s.touch(ctx, tx, d.CompanyID, d.ContactID); err != nil {
+			return err
+		}
 		if err := audit.Record(ctx, tx, audit.Entry{
 			Action: "job.created", EntityType: "job", EntityID: row.ID, Changes: audit.Diff(map[string]any{}, fields(d)),
 		}); err != nil {
@@ -125,6 +128,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 			return apperr.StaleVersion("job")
 		}
 		if err != nil {
+			return err
+		}
+		if err := s.touch(ctx, tx, after.CompanyID, after.ContactID); err != nil {
 			return err
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "job.updated", EntityType: "job", EntityID: id, Changes: changes}); err != nil {
@@ -403,4 +409,15 @@ func fields(d Details) map[string]any {
 		"openings": d.Openings, "description": d.Description, "country": d.Country,
 		"intakeDate": d.IntakeDate.Format(time.DateOnly),
 	}
+}
+
+// touch marks the job's company and hiring contact as touched by someone now
+// (a company or contact nobody touched for a year shows as stale).
+func (s *Service) touch(ctx context.Context, tx pgx.Tx, companyID string, contactID *string) error {
+	if contactID != nil {
+		if err := s.contacts.Touch(ctx, tx, *contactID); err != nil {
+			return err
+		}
+	}
+	return s.companies.Touch(ctx, tx, companyID)
 }

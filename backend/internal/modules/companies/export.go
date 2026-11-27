@@ -70,7 +70,7 @@ func (h *HTTP) ExportCompanies(ctx context.Context, req api.ExportCompaniesReque
 		kind = &k
 	}
 	file, err := h.svc.Export(ctx, authz.MustFromContext(ctx), ListFilter{
-		Query: q.Q, Boolean: q.Boolean, Type: kind, Category: q.Category, LinkedinCompany: q.LinkedinCompany, Folder: q.Folder,
+		Query: q.Q, Boolean: q.Boolean, Type: kind, Category: q.Category, LinkedinCompany: q.LinkedinCompany, Folder: q.Folder, Stale: q.Stale != nil && *q.Stale,
 	}, string(q.Format))
 	if err != nil {
 		return nil, err

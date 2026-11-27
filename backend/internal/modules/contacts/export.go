@@ -84,7 +84,7 @@ func (h *HTTP) ExportContacts(ctx context.Context, req api.ExportContactsRequest
 	q := req.Params
 	file, err := h.svc.Export(ctx, authz.MustFromContext(ctx), Filter{
 		Query: q.Q, Boolean: q.Boolean, CompanyID: q.CompanyId, Status: c.Convert[string](q.Status), Role: q.Role,
-		RoleNotSet: q.RoleNotSet != nil && *q.RoleNotSet, Folder: q.Folder,
+		RoleNotSet: q.RoleNotSet != nil && *q.RoleNotSet, Folder: q.Folder, Stale: q.Stale != nil && *q.Stale,
 	}, string(q.Format))
 	if err != nil {
 		return nil, err
