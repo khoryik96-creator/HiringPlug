@@ -123,9 +123,12 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 		if err != nil {
 			return err
 		}
-		js, err := s.jobStages(ctx, tx, current.JobID)
-		if err != nil {
-			return err
+		var js JobStages
+		var cats []Category
+		if !IsClosed(move.To) { // the job's stages: the step moved to, and the category it falls under
+			if js, cats, err = s.jobStagesAndCategories(ctx, tx, current.JobID); err != nil {
+				return err
+			}
 		}
 		if move.Step != nil { // one of the job's own stages, of the kind moved to
 			if _, ok := StepFor(js.Steps, *move.Step, move.To); !ok {
@@ -135,10 +138,6 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 			}
 		}
 		if changed {
-			cats, _, err := categories(ctx, tx)
-			if err != nil {
-				return err
-			}
 			row, err = q.MoveApplication(ctx, store.MoveApplicationParams{
 				ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
 				Stage: move.To, Step: move.Step, Category: AppCategory(js.Steps, cats, move.To, move.Step), Reason: move.Reason, ReasonNote: move.Note,

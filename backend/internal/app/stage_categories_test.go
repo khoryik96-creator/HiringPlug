@@ -80,6 +80,17 @@ func TestStageCategories(t *testing.T) {
 		res.JSON(&app)
 		assert.Equal(t, "technical_test", app.Category.MustGet())
 
+		var moves api.StageMoveList
+		res = a.request(http.MethodGet, "/v1/pipeline/moves?candidateId="+app.CandidateId, recruiter, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&moves)
+		require.NotEmpty(t, moves.Items)
+		last := moves.Items[0]
+		assert.Equal(t, api.StageInterview, last.FromStage.MustGet(), "a move between rounds keeps the stage...")
+		assert.Equal(t, api.StageInterview, last.ToStage)
+		assert.Equal(t, "interview", last.FromCategory.MustGet(), "...and names the rounds")
+		assert.Equal(t, "technical_test", last.ToCategory.MustGet())
+
 		day := func(d int) string { return time.Now().UTC().AddDate(0, 0, d).Format(time.DateOnly) }
 		reached := map[string]int{}
 		var rows []string

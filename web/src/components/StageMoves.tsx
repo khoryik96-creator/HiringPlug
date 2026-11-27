@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { stageMovesKey } from "../api/keys";
-import { STAGE } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { stageName, useStageCategories } from "./stages/categories";
 
 type Move = Schemas["StageMove"];
 
@@ -37,6 +37,7 @@ export function StageMoves({ candidateId, title = "Recent moves", limit = 30 }: 
     queryFn: async () => unwrap(await api.GET("/v1/pipeline/moves", { params: { query: { candidateId, limit } } })),
   });
   const items = moves.data?.items;
+  const cats = useStageCategories().data?.items; // a move between rounds keeps the stage: name the rounds
   return (
     <section className="panel" aria-label={title}>
       <h3>{title}</h3>
@@ -51,11 +52,11 @@ export function StageMoves({ candidateId, title = "Recent moves", limit = 30 }: 
                 <time dateTime={m.changedAt}>{new Date(m.changedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</time>{" "}
                 {!candidateId && <><a href={`#/candidates/${m.candidateId}`}>{m.candidateName}</a>{" "}</>}
                 {m.fromStage ? (
-                  <><span className={`badge ${m.fromStage}`}>{STAGE[m.fromStage]}</span> → </>
+                  <><span className={`badge ${m.fromStage}`}>{stageName(m.fromStage, m.fromCategory, cats)}</span> → </>
                 ) : (
                   <span className="muted">added at </span>
                 )}
-                <span className={`badge ${m.toStage}`}>{STAGE[m.toStage]}</span>{" "}
+                <span className={`badge ${m.toStage}`}>{stageName(m.toStage, m.toCategory, cats)}</span>{" "}
                 <span className="muted">on</span> <a href={`#/jobs/${m.jobId}`}>{m.jobTitle}</a> <span className="muted">({m.companyName})</span>
                 {m.changedByName && <span className="muted"> · by {m.changedByName}</span>}
               </li>

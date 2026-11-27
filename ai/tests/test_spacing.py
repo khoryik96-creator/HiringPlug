@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import io
 
+import pdfplumber
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from hiringplug_ai.extraction import extract
+from hiringplug_ai.extraction.spacing import word_options
 
 LINES = [
     "NURUL AINA BINTI KAMAL",
@@ -55,3 +57,21 @@ def test_a_pdf_with_spaces_reads_as_before() -> None:
     text = extract(buffer.getvalue(), ocr=None).text or ""
     for line in LINES:
         assert line in text, text
+
+
+def test_a_column_without_spaces_on_a_page_with_them_reads_as_before() -> None:
+    """The choice is the page's: a crop holding one word per line (a sidebar)
+    has no space character, yet its page stores them, so it is read as usual."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    c.setFont("Helvetica", 9)
+    for i, word in enumerate(["Python", "SQL", "Excel"]):
+        c.drawString(40, 780 - 14 * i, word)
+    c.drawString(300, 780, "Database Administrator")
+    c.showPage()
+    c.save()
+    with pdfplumber.open(io.BytesIO(buffer.getvalue())) as pdf:
+        page = pdf.pages[0]
+        sidebar = page.within_bbox((0, 0, 200, page.height))
+        assert not any(ch["text"] == " " for ch in sidebar.chars)
+        assert word_options(sidebar) == word_options(page) == {}

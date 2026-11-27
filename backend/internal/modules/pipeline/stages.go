@@ -206,16 +206,23 @@ func (s *Service) DeleteTemplate(ctx context.Context, p authz.Principal, id stri
 
 // jobStages reads a job's stages in tx, each with its category.
 func (s *Service) jobStages(ctx context.Context, tx pgx.Tx, jobID string) (JobStages, error) {
+	js, _, err := s.jobStagesAndCategories(ctx, tx, jobID)
+	return js, err
+}
+
+// jobStagesAndCategories reads a job's stages and the company's categories
+// in tx (both are needed to know the category a move falls under).
+func (s *Service) jobStagesAndCategories(ctx context.Context, tx pgx.Tx, jobID string) (JobStages, []Category, error) {
 	js, err := s.jobStagesSaved(ctx, tx, jobID)
 	if err != nil {
-		return js, err
+		return js, nil, err
 	}
 	cats, _, err := categories(ctx, tx)
 	if js.Source == FromStandard {
 		js.Steps = StandardStepsOf(cats)
 	}
 	js.Steps = ResolveSteps(js.Steps, cats)
-	return js, err
+	return js, cats, err
 }
 
 func (s *Service) jobStagesSaved(ctx context.Context, tx pgx.Tx, jobID string) (JobStages, error) {

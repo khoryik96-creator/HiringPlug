@@ -1057,9 +1057,13 @@ running.
   remove them. A category keeps its kind, each kind keeps one, and one still
   used by a stage or an open candidate cannot be removed. In a template or a
   job's own stages, each stage picks its category ("falls under"). A move
-  between rounds (1st to 2nd Interview) is in the stage history, and the
-  report counts who reached each round (a candidate further on passed the
-  rounds before).
+  between rounds (1st to 2nd Interview) is in the stage history, named by
+  its rounds, and the report counts who reached each round (a candidate
+  further on passed the rounds before). Moves from before 1.57.0 count
+  under their kind's first category, so removing that first category moves
+  them to the next one. A new category never takes the key of one removed.
+  The page opens with either "Manage stage templates" or "Change the stage
+  categories" (only the categories can be changed with the second alone).
 - **The job page** ✅: the pipeline comes first, across the width of the
   screen, with the possible candidates folded under it; the rest is in tabs
   under it, like a candidate's: **Notes & activity**, **Job details** (and its

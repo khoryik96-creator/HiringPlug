@@ -18,7 +18,13 @@ GAP_RATIO = 0.15
 
 
 def word_options(page: Any) -> dict[str, Any]:
-    """The pdfplumber options for reading this page's words and text."""
+    """The pdfplumber options for reading this page's words and text.
+
+    Decided on the whole page, never on a crop of it (a column or a region):
+    a narrow column of one-word lines holds no space of its own although its
+    page stores them."""
+    while getattr(page, "parent_page", None) is not None:
+        page = page.parent_page
     chars = page.chars
     if chars and not any(c.get("text") == " " for c in chars):
         return {"x_tolerance_ratio": GAP_RATIO}

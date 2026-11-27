@@ -7,12 +7,15 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { fieldErrors } from "../components/forms";
 import { STANDARD } from "../components/stages/columns";
 import { type Draft, draftsOf, StepsEditor, stepsBody } from "../components/stages/StepsEditor";
+import { useCan } from "../components/useCan";
 import { StageCategories } from "./StageCategories";
 
 type Template = Schemas["StageTemplate"];
 
 /** Settings › Pipeline stages: the company's stage templates. */
 export function StageTemplates() {
+  // Templates need pipeline.templates:manage; with only pipeline.categories:manage the page shows the categories.
+  const canTemplates = useCan("pipeline.templates:manage");
   const list = useQuery({ queryKey: stageTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/stage-templates")) });
   const [editing, setEditing] = useState<Template | "new" | null>(null);
   const items = list.data?.items ?? [];
@@ -27,11 +30,11 @@ export function StageTemplates() {
       <StageCategories />
       <ErrorMessage error={list.error} />
       {editing === "new" && <TemplateForm standard={list.data?.standard} onClose={() => { setEditing(null); }} />}
-      {editing === null && <button type="button" className="primary" onClick={() => { setEditing("new"); }}>New template</button>}
+      {editing === null && canTemplates && <button type="button" className="primary" onClick={() => { setEditing("new"); }}>New template</button>}
       <ul className="stage-templates">
         {items.map((t) => editing !== "new" && editing?.id === t.id
           ? <li key={t.id}><TemplateForm template={t} onClose={() => { setEditing(null); }} /></li>
-          : <li key={t.id}><TemplateCard template={t} onEdit={editing === null ? () => { setEditing(t); } : undefined} /></li>)}
+          : <li key={t.id}><TemplateCard template={t} onEdit={editing === null && canTemplates ? () => { setEditing(t); } : undefined} /></li>)}
         {list.data && (
           <li className="panel stage-template standard">
             <div className="row spread"><h3>Standard stages</h3><span className="muted small">One per category</span></div>

@@ -17961,7 +17961,7 @@ components:
         stageCounts: {$ref: '#/components/schemas/StageCounts'}
     StageMove:
       type: object
-      required: [id, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, fromStage, toStage, changedAt, changedByName]
+      required: [id, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, fromStage, toStage, fromCategory, toCategory, changedAt, changedByName]
       properties:
         id: {type: string}
         applicationId: {$ref: '#/components/schemas/ApplicationId'}
@@ -17975,6 +17975,8 @@ components:
           allOf: [{$ref: '#/components/schemas/Stage'}]
           nullable: true
         toStage: {$ref: '#/components/schemas/Stage'}
+        fromCategory: {type: string, nullable: true, description: "The category (StageCategory.key) moved from; null when none was recorded."}
+        toCategory: {type: string, nullable: true, description: "The category moved to (a move between rounds keeps the stage); null when closed or not recorded."}
         changedAt: {type: string, format: date-time}
         changedByName: {type: string, nullable: true, description: Who moved them; null when the app did (or before this was recorded).}
     StageMoveList:

@@ -1150,7 +1150,7 @@ func (q *Queries) StageCounts(ctx context.Context, jobIds []string) ([]StageCoun
 }
 
 const stageMoves = `-- name: StageMoves :many
-SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id
+SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.from_category, c.to_category, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
 WHERE ($1::text IS NULL OR a.candidate_id = $1::text)
 ORDER BY c.changed_at DESC, c.id DESC
@@ -1167,6 +1167,8 @@ type StageMovesRow struct {
 	ApplicationID string
 	FromStage     *string
 	ToStage       string
+	FromCategory  *string
+	ToCategory    *string
 	ChangedAt     time.Time
 	ChangedBy     *string
 	CandidateID   string
@@ -1188,6 +1190,8 @@ func (q *Queries) StageMoves(ctx context.Context, arg StageMovesParams) ([]Stage
 			&i.ApplicationID,
 			&i.FromStage,
 			&i.ToStage,
+			&i.FromCategory,
+			&i.ToCategory,
 			&i.ChangedAt,
 			&i.ChangedBy,
 			&i.CandidateID,

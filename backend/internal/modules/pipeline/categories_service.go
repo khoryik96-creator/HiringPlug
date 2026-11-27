@@ -33,11 +33,12 @@ func categories(ctx context.Context, tx pgx.Tx) ([]Category, string, error) {
 // appCategory is the category of an application on jobID at stage (and
 // step), in tx: nil when the stage closes it.
 func (s *Service) appCategory(ctx context.Context, tx pgx.Tx, jobID, stage string, step *string) (*string, error) {
-	js, err := s.jobStages(ctx, tx, jobID)
-	if err != nil {
-		return nil, err
+	var js JobStages
+	var cats []Category
+	var err error
+	if !IsClosed(stage) { // a closed application falls under none: nothing to read
+		js, cats, err = s.jobStagesAndCategories(ctx, tx, jobID)
 	}
-	cats, _, err := categories(ctx, tx)
 	return AppCategory(js.Steps, cats, stage, step), err
 }
 

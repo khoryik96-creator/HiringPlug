@@ -111,7 +111,10 @@ export function StageCategories() {
           </div>
           {errors.items && <small className="error">{errors.items}</small>}
           <ErrorMessage error={Object.keys(errors).length > 0 ? null : save.error} />
-          <p className="muted small">A category in use (by a stage or a candidate) cannot be removed: move them first. Renaming keeps it.</p>
+          <p className="muted small">
+            A category in use (by a stage or a candidate) cannot be removed: move them first. Renaming keeps it. Moves recorded before
+            categories count under each kind&apos;s first one.
+          </p>
           <div className="row">
             <button type="submit" className="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save categories"}</button>
             <button type="button" onClick={() => { setRows(null); save.reset(); }} disabled={save.isPending}>Cancel</button>

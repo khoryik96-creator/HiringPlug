@@ -28,6 +28,7 @@ type StageMove struct {
 	ID, ApplicationID, CandidateID, CandidateName, JobID, JobTitle, CompanyName string
 	From                                                                        *string
 	To                                                                          string
+	FromCategory, ToCategory                                                    *string // the rounds (category keys), when recorded
 	At                                                                          time.Time
 	ByName                                                                      *string // nil when the app moved it
 }
@@ -64,7 +65,7 @@ func (s *Service) Moves(ctx context.Context, p authz.Principal, candidateID *str
 			v := views[i]
 			out[i] = StageMove{
 				ID: r.ID, ApplicationID: r.ApplicationID, CandidateID: r.CandidateID, CandidateName: v.CandidateName,
-				JobID: r.JobOrderID, JobTitle: v.JobTitle, CompanyName: v.CompanyName, From: r.FromStage, To: r.ToStage, At: r.ChangedAt,
+				JobID: r.JobOrderID, JobTitle: v.JobTitle, CompanyName: v.CompanyName, From: r.FromStage, To: r.ToStage, FromCategory: r.FromCategory, ToCategory: r.ToCategory, At: r.ChangedAt,
 			}
 			if r.ChangedBy != nil {
 				if n, ok := names[*r.ChangedBy]; ok {
@@ -92,7 +93,7 @@ func (h *HTTP) ListStageMoves(ctx context.Context, req api.ListStageMovesRequest
 		item := api.StageMove{
 			Id: m.ID, ApplicationId: m.ApplicationID, CandidateId: m.CandidateID, CandidateName: m.CandidateName,
 			JobId: m.JobID, JobTitle: m.JobTitle, CompanyName: m.CompanyName, ToStage: api.Stage(m.To),
-			ChangedAt: m.At, ChangedByName: c.OrNull(m.ByName),
+			ChangedAt: m.At, ChangedByName: c.OrNull(m.ByName), FromCategory: c.OrNull(m.FromCategory), ToCategory: c.OrNull(m.ToCategory),
 		}
 		item.FromStage = c.OrNull(c.Convert[api.Stage](m.From))
 		out.Items[i] = item

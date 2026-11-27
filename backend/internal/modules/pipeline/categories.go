@@ -107,11 +107,11 @@ func NormalizeCategories(in, existing []Category) ([]Category, apperr.FieldError
 	for _, c := range existing {
 		before[c.Key] = c
 	}
+	// Every key there was is taken, kept or not: a new category never gets a
+	// removed one's key (it would take over its history and skip the in-use check).
 	taken, names, seen := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	for _, c := range in {
-		if _, ok := before[c.Key]; ok {
-			taken[c.Key] = true
-		}
+	for _, c := range existing {
+		taken[c.Key] = true
 	}
 	out := make([]Category, 0, len(in))
 	for i, c := range in {

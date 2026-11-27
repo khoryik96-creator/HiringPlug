@@ -21,10 +21,11 @@ const CATEGORIES: Schemas["StageCategories"] = {
     { key: "offer", label: "Offer", kind: "offer" }, { key: "placed", label: "Placed", kind: "placed" },
   ],
 };
-const serve = (items: Schemas["StageTemplate"][], categories: Schemas["StageCategories"] | null = CATEGORIES) =>
+const serve = (items: Schemas["StageTemplate"][], categories: Schemas["StageCategories"] | null = CATEGORIES,
+  permissions: string[] = ["pipeline:read", "pipeline.templates:manage"]) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/stage-categories"
     ? (categories ? ok(categories) : ok({ items: [], version: "0" }))
-    : path === "/v1/me" ? ok({ permissions: [] }) : ok({ items, standard: STANDARD }))) as never);
+    : path === "/v1/me" ? ok({ permissions }) : ok({ items, standard: STANDARD }))) as never);
 
 it("lists the templates, the default first, with the standard stages", async () => {
   serve([tech]);
@@ -83,4 +84,13 @@ it("deletes a template after asking, saying the jobs using it keep their stages"
   fireEvent.click(within(await screen.findByRole("region", { name: "Tech hiring" })).getByRole("button", { name: "Delete" }));
   expect(confirm.mock.calls[0]?.[0]).toBe('Delete the template "Tech hiring"? The 3 jobs using it keep their stages.');
   await waitFor(() => { expect(del).toHaveBeenCalled(); });
+});
+
+it("with only the right to change the categories, shows the templates without changing them", async () => {
+  serve([tech], CATEGORIES, ["pipeline:read", "pipeline.categories:manage"]);
+  renderWithClient(<StageTemplates />);
+  const card = await screen.findByRole("region", { name: "Tech hiring" });
+  expect(await screen.findByRole("button", { name: "Edit categories" })).toBeTruthy();
+  expect(within(card).queryByRole("button", { name: "Edit" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "New template" })).toBeNull();
 });

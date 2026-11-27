@@ -70,3 +70,18 @@ func TestStepsAndApplicationsFallUnderACategoryOfTheirKind(t *testing.T) {
 	assert.Nil(t, AppCategory(steps, cats, Rejected, nil), "closed: none")
 	assert.Equal(t, "offer", *AppCategory(nil, cats, Offer, nil))
 }
+
+func TestANewCategoryNeverTakesARemovedOnesKey(t *testing.T) {
+	before := StandardCategories()
+	var in []Category
+	for _, c := range before {
+		if c.Key != "interview_2" { // removed...
+			in = append(in, c)
+		}
+	}
+	in = append(in, Category{Label: "Interview 2", Kind: Offer}) // ...and one added with a name that makes the same key
+	got, errs := NormalizeCategories(in, before)
+	require.Empty(t, errs)
+	assert.Equal(t, "interview_2_2", got[len(got)-2].Key, "a key of its own")
+	assert.Equal(t, []string{"interview_2"}, Removed(before, got), "the removed one is seen as removed (its use is checked)")
+}

@@ -102,7 +102,7 @@ LIMIT 20000;
 
 -- Stage moves, newest first (the dashboard's timeline, or one candidate's).
 -- name: StageMoves :many
-SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id
+SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.from_category, c.to_category, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
 WHERE (sqlc.narg(candidate_id)::text IS NULL OR a.candidate_id = sqlc.narg(candidate_id)::text)
 ORDER BY c.changed_at DESC, c.id DESC

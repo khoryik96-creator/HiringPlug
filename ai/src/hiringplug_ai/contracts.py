@@ -6675,6 +6675,16 @@ class StageMove(BaseModel):
         Stage | None, Field(description="Null when the candidate was added to the job at toStage.")
     ]
     toStage: Stage
+    fromCategory: Annotated[
+        str | None,
+        Field(description="The category (StageCategory.key) moved from; null when none was recorded."),
+    ]
+    toCategory: Annotated[
+        str | None,
+        Field(
+            description="The category moved to (a move between rounds keeps the stage); null when closed or not recorded."
+        ),
+    ]
     changedAt: AwareDatetime
     changedByName: Annotated[
         str | None, Field(description="Who moved them; null when the app did (or before this was recorded).")

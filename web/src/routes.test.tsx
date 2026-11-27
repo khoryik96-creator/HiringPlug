@@ -42,6 +42,12 @@ describe("the route table", () => {
     expect(menu("settings", OWNERISH).filter((r) => r.section === "ai-provider")).toHaveLength(1);
   });
 
+  it("opens Settings › Pipeline stages with either of its rights (templates, or the categories alone)", () => {
+    expect(resolve("#/settings/stages", [...RECRUITER, "pipeline.categories:manage"]).route.section).toBe("settings-stages");
+    expect(resolve("#/settings/stages", [...RECRUITER, "pipeline.templates:manage"]).route.section).toBe("settings-stages");
+    expect(resolve("#/settings/stages", RECRUITER).route.section).not.toBe("settings-stages");
+  });
+
   it("opens Settings › AI usage only with aiusage:read", () => {
     expect(resolve("#/settings/ai-usage", [...RECRUITER, "aiusage:read"]).route.section).toBe("ai-usage");
     expect(resolve("#/settings/ai-usage", RECRUITER).route.section).not.toBe("ai-usage");

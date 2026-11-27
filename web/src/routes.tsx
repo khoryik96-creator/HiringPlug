@@ -84,6 +84,8 @@ export type Route = {
   permission?: Permission;
   /** Left out for those who have this permission (they get the full page instead). */
   unless?: Permission;
+  /** Opens it too, without `permission` (a page with two parts, each with its own right). */
+  orPermission?: Permission;
   /** Listed in the top bar or the Settings menu, with this label. */
   menu?: { in: "main" | "settings"; label: string; href: string; /** In the top bar's "More" list, not on the bar itself. */ more?: boolean };
   render: (c: PageContext) => ReactNode;
@@ -150,7 +152,7 @@ export const ROUTES: Route[] = [
     render: () => <ListSettings /> },
   { section: "settings-targets", path: /^#\/settings\/targets/, permission: "reports.settings:manage",
     menu: { in: "settings", label: "Targets & forecast", href: "#/settings/targets" }, render: () => <TargetSettings /> },
-  { section: "settings-stages", path: /^#\/settings\/stages/, permission: "pipeline.templates:manage", menu: { in: "settings", label: "Pipeline stages", href: "#/settings/stages" },
+  { section: "settings-stages", path: /^#\/settings\/stages/, permission: "pipeline.templates:manage", orPermission: "pipeline.categories:manage", menu: { in: "settings", label: "Pipeline stages", href: "#/settings/stages" },
     render: () => <StageTemplates /> },
   { section: "settings-claims-storage", path: /^#\/settings\/claims-storage/, permission: "claims.storage:manage",
     menu: { in: "settings", label: "Claims storage", href: "#/settings/claims-storage" }, render: () => <ClaimsStorage /> },
@@ -209,7 +211,8 @@ export const ROUTES: Route[] = [
 ];
 
 const allowed = (r: Route, permissions: readonly Permission[]) =>
-  (!r.permission || permissions.includes(r.permission)) && !(r.unless && permissions.includes(r.unless));
+  (!r.permission || permissions.includes(r.permission) || (r.orPermission !== undefined && permissions.includes(r.orPermission))) &&
+  !(r.unless && permissions.includes(r.unless));
 
 /** The entries of a menu this user may open, in order. */
 export function menu(which: "main" | "settings", permissions: readonly Permission[]): Route[] {

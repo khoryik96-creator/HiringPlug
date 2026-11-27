@@ -18,7 +18,7 @@ afterEach(() => {
 
 const move = (over: Partial<Schemas["StageMove"]>): Schemas["StageMove"] => ({
   id: "stg_1", applicationId: "appl_1", candidateId: "cand_1", candidateName: "Siti Aisyah", jobId: "job_1", jobTitle: "Auditor",
-  companyName: "Maybank", fromStage: "applied", toStage: "screening", changedAt: new Date().toISOString(), changedByName: "Aina", ...over,
+  companyName: "Maybank", fromStage: "applied", toStage: "screening", fromCategory: null, toCategory: null, changedAt: new Date().toISOString(), changedByName: "Aina", ...over,
 });
 
 describe("stage move timeline", () => {
@@ -51,6 +51,17 @@ describe("stage move timeline", () => {
     expect(added?.textContent).toMatch(/Bala added at Applied/);
     expect(added?.textContent).not.toContain("by");
     expect(get).toHaveBeenCalledWith("/v1/pipeline/moves", { params: { query: { candidateId: undefined, limit: 30 } } });
+  });
+
+  it("names the rounds of a move between them (the stage stays the same)", async () => {
+    const cats = { version: "0", items: [
+      { key: "interview", label: "1st Interview", kind: "interview" }, { key: "interview_2", label: "2nd Interview", kind: "interview" },
+    ] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/stage-categories" ? cats
+      : { items: [move({ fromStage: "interview", toStage: "interview", fromCategory: "interview", toCategory: "interview_2" })] }))) as never);
+    renderWithClient(<StageMoves />);
+    const panel = await screen.findByRole("region", { name: "Recent moves" });
+    await waitFor(() => { expect(within(panel).getByRole("listitem").textContent).toMatch(/1st Interview → 2nd Interview on Auditor/); });
   });
 
   it("on a candidate's page, lists only theirs without repeating their name", async () => {

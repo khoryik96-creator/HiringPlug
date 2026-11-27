@@ -11823,6 +11823,10 @@ export interface components {
             /** @description Null when the candidate was added to the job at toStage. */
             fromStage: components["schemas"]["Stage"] | null;
             toStage: components["schemas"]["Stage"];
+            /** @description The category (StageCategory.key) moved from; null when none was recorded. */
+            fromCategory: string | null;
+            /** @description The category moved to (a move between rounds keeps the stage); null when closed or not recorded. */
+            toCategory: string | null;
             /** Format: date-time */
             changedAt: string;
             /** @description Who moved them; null when the app did (or before this was recorded). */
