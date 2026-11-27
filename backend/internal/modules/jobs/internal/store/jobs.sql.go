@@ -671,6 +671,31 @@ func (q *Queries) InsertJobSalary(ctx context.Context, arg InsertJobSalaryParams
 	return i, err
 }
 
+const jobIDsOwnedBy = `-- name: JobIDsOwnedBy :many
+SELECT id FROM job_order WHERE owner_id = ANY($1::text[]) LIMIT 20000
+`
+
+// The jobs some people own, open or not (the dashboard's numbers for them).
+func (q *Queries) JobIDsOwnedBy(ctx context.Context, ownerIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, jobIDsOwnedBy, ownerIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const jobOrderExists = `-- name: JobOrderExists :one
 SELECT EXISTS (SELECT 1 FROM job_order WHERE id = $1)
 `
@@ -1166,18 +1191,26 @@ func (q *Queries) NewJdFileID(ctx context.Context) (string, error) {
 }
 
 const openJobOrders = `-- name: OpenJobOrders :many
-SELECT id, title, company_id, created_at FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
+SELECT id, title, company_id, created_at, owner_id FROM job_order
+WHERE status = 'open' AND (cardinality($1::text[]) = 0 OR owner_id = ANY($1::text[]))
+ORDER BY id DESC LIMIT $2
 `
+
+type OpenJobOrdersParams struct {
+	OwnerIds []string
+	RowLimit int32
+}
 
 type OpenJobOrdersRow struct {
 	ID        string
 	Title     string
 	CompanyID string
 	CreatedAt time.Time
+	OwnerID   *string
 }
 
-func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobOrdersRow, error) {
-	rows, err := q.db.Query(ctx, openJobOrders, rowLimit)
+func (q *Queries) OpenJobOrders(ctx context.Context, arg OpenJobOrdersParams) ([]OpenJobOrdersRow, error) {
+	rows, err := q.db.Query(ctx, openJobOrders, arg.OwnerIds, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -1190,6 +1223,7 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 			&i.Title,
 			&i.CompanyID,
 			&i.CreatedAt,
+			&i.OwnerID,
 		); err != nil {
 			return nil, err
 		}

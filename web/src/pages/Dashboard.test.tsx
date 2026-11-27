@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
@@ -44,5 +44,38 @@ describe("dashboard", () => {
     const company = screen.getByText("Maju");
     expect(company.className, "the company sits on its own line under the job title").toContain("job-company");
     expect(company.previousElementSibling?.textContent).toBe("Finance Manager");
+  });
+
+  it("lets owners and admins choose whose numbers: someone, several people, or the whole team", async () => {
+    localStorage.removeItem("hyplug.dashboard.people");
+    const done = { calls: 1, cvsSent: 2, interviews: 0, placements: 0, categories: {} };
+    const activity = { period: "week", from: "2026-11-23", to: "2026-11-29", team: true, rows: [
+      { userId: "usr_me", userName: "Demo owner", done, target: null },
+      { userId: "usr_aina", userName: "Aina", done: { ...done, calls: 5 }, target: { calls: 10, cvsSent: null, interviews: null, placements: null } },
+      { userId: "usr_wei", userName: "Wei", done: { ...done, calls: 3 }, target: { calls: 10, cvsSent: null, interviews: null, placements: null } },
+    ] };
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/summary" ? summary
+      : path === "/v1/reports/activity" ? activity : path === "/v1/settings/fields" ? testFieldSettings() : { items: [] }))) as never);
+    renderWithClient(<Dashboard permissions={["pipeline:read", "reports:read", "reports.team:read"]} meId="usr_me" />);
+    const picker = await screen.findByRole("button", { name: /Showing Me/ });
+    expect(await screen.findByRole("region", { name: "Your activity" })).toBeTruthy();
+    expect(get).toHaveBeenCalledWith("/v1/pipeline/summary", { params: { query: { owner: ["usr_me"] } } });
+
+    fireEvent.click(picker);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Demo owner (me)" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Aina" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Wei" }));
+    expect(screen.getByRole("button", { name: /Showing Aina, Wei/ })).toBeTruthy();
+    const both = await screen.findByRole("region", { name: "Activity: Aina, Wei" });
+    expect(await within(both).findByRole("row", { name: /Together/ })).toBeTruthy();
+    expect(within(both).getByText("8 of 20"), "their calls and targets added up").toBeTruthy();
+    expect(get).toHaveBeenCalledWith("/v1/pipeline/summary", { params: { query: { owner: ["usr_aina", "usr_wei"] } } });
+    expect(screen.getByRole("heading", { name: "Open jobs: Aina, Wei" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Whole team" }));
+    const all = await screen.findByRole("region", { name: "Activity: Whole team" });
+    expect(within(all).getByText("9"), "everyone's calls together").toBeTruthy();
+    expect(get).toHaveBeenLastCalledWith("/v1/pipeline/summary", { params: { query: {} } });
+    expect(JSON.parse(localStorage.getItem("hyplug.dashboard.people") ?? "null"), "remembered").toBe("team");
   });
 });

@@ -37,11 +37,12 @@ type Summary struct {
 }
 
 // Summary returns the dashboard: open jobs with their pipelines, applications
-// stuck longer than stuckDays in one stage, and recent results.
-func (s *Service) Summary(ctx context.Context, p authz.Principal, stuckDays int) (Summary, error) {
+// stuck longer than stuckDays in one stage, and recent results. With owners,
+// all of it is about the jobs those people own.
+func (s *Service) Summary(ctx context.Context, p authz.Principal, stuckDays int, owners []string) (Summary, error) {
 	var out Summary
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		open, err := s.jobs.OpenJobs(ctx, tx, dashboardJobs)
+		open, err := s.jobs.OpenJobs(ctx, tx, dashboardJobs, owners)
 		if err != nil {
 			return err
 		}
@@ -82,11 +83,17 @@ func (s *Service) Summary(ctx context.Context, p authz.Principal, stuckDays int)
 		if out.Stuck, err = s.views(ctx, tx, stuck); err != nil {
 			return err
 		}
-		recent, err := q.RecentResults(ctx)
+		scoped, owned := len(owners) > 0, []string{}
+		if scoped {
+			if owned, err = s.jobs.OwnedJobs(ctx, tx, owners); err != nil {
+				return err
+			}
+		}
+		recent, err := q.RecentResults(ctx, store.RecentResultsParams{Scoped: scoped, JobIds: owned})
 		if err != nil {
 			return err
 		}
-		week, err := q.WeekTrends(ctx)
+		week, err := q.WeekTrends(ctx, store.WeekTrendsParams{Scoped: scoped, JobIds: owned})
 		if err != nil {
 			return err
 		}

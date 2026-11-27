@@ -47,8 +47,12 @@ func (a pipelineCandidates) Info(ctx context.Context, tx pgx.Tx, ids []string) (
 
 type pipelineJobs struct{ *jobs.Module }
 
-func (a pipelineJobs) OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]pipeline.OpenJob, error) {
-	open, err := a.Open(ctx, tx, limit)
+func (a pipelineJobs) OwnedJobs(ctx context.Context, tx pgx.Tx, owners []string) ([]string, error) {
+	return a.IDsOwnedBy(ctx, tx, owners)
+}
+
+func (a pipelineJobs) OpenJobs(ctx context.Context, tx pgx.Tx, limit int, owners []string) ([]pipeline.OpenJob, error) {
+	open, err := a.Open(ctx, tx, limit, owners)
 	out := make([]pipeline.OpenJob, len(open))
 	for i, j := range open {
 		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID, CreatedAt: j.CreatedAt}

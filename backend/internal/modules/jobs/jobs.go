@@ -134,8 +134,12 @@ type OpenJob struct {
 	CreatedAt            time.Time
 }
 
-// Open returns the newest open jobs, at most limit.
-func (m *Module) Open(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, error) {
-	rows, err := m.service.Open(ctx, tx, limit)
-	return rows, err
+// Open returns the newest open jobs, at most limit; with owners, only theirs.
+func (m *Module) Open(ctx context.Context, tx pgx.Tx, limit int, owners []string) ([]OpenJob, error) {
+	return m.service.Open(ctx, tx, limit, owners)
+}
+
+// IDsOwnedBy returns the ids of the jobs some people own, open or not.
+func (m *Module) IDsOwnedBy(ctx context.Context, tx pgx.Tx, owners []string) ([]string, error) {
+	return store.New(tx).JobIDsOwnedBy(ctx, owners)
 }

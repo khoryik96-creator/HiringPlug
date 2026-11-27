@@ -285,8 +285,11 @@ func (s *Service) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error
 }
 
 // Open returns the newest open jobs, at most limit.
-func (s *Service) Open(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, error) {
-	rows, err := store.New(tx).OpenJobOrders(ctx, int32(limit)) //nolint:gosec // small constant
+func (s *Service) Open(ctx context.Context, tx pgx.Tx, limit int, owners []string) ([]OpenJob, error) {
+	if owners == nil {
+		owners = []string{}
+	}
+	rows, err := store.New(tx).OpenJobOrders(ctx, store.OpenJobOrdersParams{OwnerIds: owners, RowLimit: int32(limit)}) //nolint:gosec // small constant
 	out := make([]OpenJob, len(rows))
 	for i, r := range rows {
 		out[i] = OpenJob{ID: r.ID, Title: r.Title, CompanyID: r.CompanyID, CreatedAt: r.CreatedAt}

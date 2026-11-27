@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
@@ -14,6 +14,7 @@ import { useJobProgress } from "../components/JobProgressTable";
 import { MyTasks } from "../components/MyTasks";
 import { NeedsYouToday } from "../components/NeedsYouToday";
 import { OffersToApprove } from "../components/Offers";
+import { PeoplePicker, peopleLabel, useRememberedPeople } from "../components/PeoplePicker";
 import { QuickSearch } from "../components/QuickSearch";
 import { OPEN_STAGES, STAGE } from "../labels";
 
@@ -23,10 +24,24 @@ const active = (c: Counts) => c.applied + c.screening + c.submitted + c.intervie
 
 /** The home page: search, what needs you today, importing CVs, open jobs and their pipelines. */
 export function Dashboard({ permissions, meId }: { permissions: Permission[]; meId?: string }) {
-  const summary = useQuery({
-    queryKey: summaryKey,
-    queryFn: async () => unwrap(await api.GET("/v1/pipeline/summary")),
+  // Owners and admins choose whose numbers: theirs, some people's, or the team's.
+  const canChoose = permissions.includes("reports.team:read") && permissions.includes("reports:read");
+  const [chosen, choose] = useRememberedPeople(meId);
+  const people = canChoose ? chosen : undefined;
+  const team = useQuery({
+    queryKey: ["reports", "activity", "week"],
+    queryFn: async () => unwrap(await api.GET("/v1/reports/activity", { params: { query: { period: "week" } } })),
+    enabled: canChoose,
   });
+  const everyone = (team.data?.rows ?? []).map((r) => ({ id: r.userId, name: r.userName }));
+  // The team: every open job, as before; people: the jobs they own.
+  const owners = people === undefined || people === "team" ? [] : people;
+  const summary = useQuery({
+    queryKey: [...summaryKey, owners],
+    queryFn: async () => unwrap(await api.GET("/v1/pipeline/summary", { params: { query: owners.length > 0 ? { owner: owners } : {} } })),
+    placeholderData: keepPreviousData, // the last numbers stay while someone else's load
+  });
+  const whose = people === undefined ? "" : peopleLabel(people, new Map(everyone.map((p) => [p.id, p.name])), meId);
   const [now] = useState(() => Date.now());
   const progress = useJobProgress((summary.data?.jobs ?? []).map((j) => j.jobId));
   const s = summary.data;
@@ -34,7 +49,10 @@ export function Dashboard({ permissions, meId }: { permissions: Permission[]; me
 
   return (
     <main>
-      <h2>Dashboard</h2>
+      <div className="row spread">
+        <h2>Dashboard</h2>
+        {people !== undefined && <PeoplePicker people={people} onChange={choose} everyone={everyone} meId={meId} />}
+      </div>
       <FirstRunGuide permissions={permissions} />
       <QuickSearch permissions={permissions} />
       <DashboardBlocks blocks={[
@@ -47,7 +65,9 @@ export function Dashboard({ permissions, meId }: { permissions: Permission[]; me
       </div>
         ) },
         ...(permissions.includes("reports:read") && meId
-          ? [{ id: "activity" as const, label: "Your activity", node: <ActivityProgress onlyUser={meId} title="Your activity" /> }] : []),
+          ? [{ id: "activity" as const, label: "Your activity", node: people === undefined || whose === "Me"
+            ? <ActivityProgress onlyUser={meId} title="Your activity" />
+            : <ActivityProgress people={people} title={`Activity: ${whose}`} /> }] : []),
         { id: "needsYou", label: "Needs you today", node: <NeedsYouToday permissions={permissions} jobs={s.jobs} progress={progress.data} /> },
         ...(permissions.includes("intake:create") ? [{ id: "import" as const, label: "Import profiles", node: <CvImports foldedHistory /> }] : []),
         ...(permissions.includes("automations.tasks:read")
@@ -58,7 +78,7 @@ export function Dashboard({ permissions, meId }: { permissions: Permission[]; me
           ? [{ id: "interviews" as const, label: "My upcoming interviews", node: <MyInterviews permissions={permissions} /> }] : []),
         { id: "openJobs", label: "Open jobs", node: (
       <section className="panel" aria-label="Open jobs">
-        <h3>Open jobs</h3>
+        <h3>{whose === "" || whose === "Whole team" ? "Open jobs" : `Open jobs: ${whose}`}</h3>
         <div className="table-scroll">
         <table className="heat-table">
           <thead>
@@ -90,7 +110,7 @@ export function Dashboard({ permissions, meId }: { permissions: Permission[]; me
               {OPEN_STAGES.map((st) => <td key={st}>{s.stageCounts[st]}</td>)}
               <td />
             </tr>
-            {s.jobs.length === 0 && <tr><td colSpan={8} className="muted">No open jobs. Add one under Jobs.</td></tr>}
+            {s.jobs.length === 0 && <tr><td colSpan={8} className="muted">{owners.length > 0 ? `No open jobs owned by ${whose}.` : "No open jobs. Add one under Jobs."}</td></tr>}
           </tbody>
         </table>
         </div>

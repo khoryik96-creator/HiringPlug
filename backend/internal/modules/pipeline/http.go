@@ -87,7 +87,11 @@ func (h *HTTP) GetPipelineSummary(ctx context.Context, req api.GetPipelineSummar
 	if req.Params.StuckDays != nil {
 		stuckDays = *req.Params.StuckDays
 	}
-	sum, err := h.svc.Summary(ctx, authz.MustFromContext(ctx), stuckDays)
+	var owners []string
+	if req.Params.Owner != nil {
+		owners = *req.Params.Owner
+	}
+	sum, err := h.svc.Summary(ctx, authz.MustFromContext(ctx), stuckDays, owners)
 	if err != nil {
 		return nil, err
 	}

@@ -23462,6 +23462,8 @@ export interface operations {
             query?: {
                 /** @description An application is stuck after this many days in one open stage (offer and earlier). Default 14. */
                 stuckDays?: number;
+                /** @description Only the jobs these people own (repeat for more than one): the open jobs and every number. None: the whole company's. */
+                owner?: components["schemas"]["UserId"][];
             };
             header?: never;
             path?: never;

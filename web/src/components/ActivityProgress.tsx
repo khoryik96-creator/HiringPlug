@@ -8,6 +8,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { formatDay } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import type { People } from "./PeoplePicker";
 import { targetCategories, useStageCategories } from "./stages/categories";
 
 type Period = Schemas["ActivityPeriod"];
@@ -59,17 +60,44 @@ export function measuresOf(rows: Schemas["ActivityRow"][], cats: Schemas["StageC
   return out;
 }
 
-/** A panel of activity against targets; onlyUser shows just that person (the dashboard). */
-export function ActivityProgress({ onlyUser, title = "Activity against targets" }: { onlyUser?: string; title?: string }) {
+/**
+ * Several people's activity added up, with their targets added up (null
+ * where none of them has one).
+ */
+export function sumRows(rows: Schemas["ActivityRow"][], userName: string): Schemas["ActivityRow"] {
+  const done: Counts = { calls: 0, cvsSent: 0, interviews: 0, placements: 0, categories: {} };
+  const target: Goal = { calls: null, cvsSent: null, interviews: null, placements: null };
+  const add = (a: number | null | undefined, b: number | null | undefined) => (b === null || b === undefined ? a ?? null : (a ?? 0) + b);
+  for (const r of rows) {
+    for (const [k] of ACTIVITIES) {
+      done[k] += r.done[k];
+      target[k] = add(target[k], r.target?.[k]);
+    }
+    for (const [key, n] of Object.entries(r.done.categories)) done.categories[key] = (done.categories[key] ?? 0) + n;
+    for (const [key, n] of Object.entries(r.target?.categories ?? {})) target.categories = { ...target.categories, [key]: (target.categories?.[key] ?? 0) + n };
+  }
+  const any = rows.some((r) => r.target !== null);
+  return { userId: "total", userName, done, target: any ? target : null };
+}
+
+/**
+ * A panel of activity against targets. people chooses whose: one person
+ * (cards), several (a row each and their total), or the whole team (its
+ * total); onlyUser is one person. Without either, everyone listed.
+ */
+export function ActivityProgress({ onlyUser, people, title = "Activity against targets" }: { onlyUser?: string; people?: People; title?: string }) {
+  const chosen: People | undefined = people ?? (onlyUser ? [onlyUser] : undefined);
   const [period, setPeriod] = useState<Period>("week");
   const activity = useQuery({
     queryKey: activityKey(period),
     queryFn: async () => unwrap(await api.GET("/v1/reports/activity", { params: { query: { period } } })),
   });
   const a = activity.data;
-  const rows = (a?.rows ?? []).filter((r) => !onlyUser || r.userId === onlyUser);
-  const single = rows.length === 1 && (onlyUser !== undefined || !a?.team);
-  const me = single ? rows[0] : undefined;
+  const all = a?.rows ?? [];
+  const rows = chosen === undefined || chosen === "team" ? all : all.filter((r) => chosen.includes(r.userId));
+  const single = rows.length === 1 && (chosen !== undefined || !a?.team);
+  const me = chosen === "team" ? sumRows(all, "Whole team") : single ? rows[0] : undefined;
+  const total = Array.isArray(chosen) && rows.length > 1 ? sumRows(rows, "Together") : undefined;
   const measures = measuresOf(rows, useStageCategories().data?.items ?? []);
   return (
     <section className="panel" aria-label={title}>
@@ -104,8 +132,8 @@ export function ActivityProgress({ onlyUser, title = "Activity against targets" 
         <div className="table-scroll"><table>
           <thead><tr><th>Who</th>{measures.map(({ key, label }) => <th key={key}>{label}</th>)}</tr></thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.userId}>
+            {[...rows, ...(total ? [total] : [])].map((r) => (
+              <tr key={r.userId} className={r === total ? "total" : undefined}>
                 <td>{r.userName}</td>
                 {measures.map(({ key, label, done, target }) => (
                   <td key={key}><Meter label={`${r.userName}, ${label}: progress`} done={done(r)} target={target(r)} /></td>
@@ -115,7 +143,7 @@ export function ActivityProgress({ onlyUser, title = "Activity against targets" 
           </tbody>
         </table></div>
       )}
-      {a && rows.length === 0 && <p className="muted">Nobody to show.</p>}
+      {a && !me && rows.length === 0 && <p className="muted">Nobody to show.</p>}
       {a && (
         <p className="muted small">
           Calls: screening calls, reference checks and call notes. CVs sent: candidates moved to Submitted, and CVs emailed (a candidate once a day).

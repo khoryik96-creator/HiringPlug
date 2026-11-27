@@ -49,7 +49,10 @@ type OpenJob struct {
 type Jobs interface {
 	Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error)
 	Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]JobInfo, error)
-	OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, error)
+	// OpenJobs are the newest open jobs (with owners: only theirs).
+	OpenJobs(ctx context.Context, tx pgx.Tx, limit int, owners []string) ([]OpenJob, error)
+	// OwnedJobs are the ids of the jobs some people own, open or not.
+	OwnedJobs(ctx context.Context, tx pgx.Tx, owners []string) ([]string, error)
 }
 
 // Companies is what this module needs from the companies module.
