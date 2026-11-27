@@ -2338,13 +2338,19 @@ class Action1(StrEnum):
     preview = "preview"
     unlock = "unlock"
     check = "check"
+    save = "save"
 
 
 class ApolloLookupRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    action: Action1
+    action: Annotated[
+        Action1,
+        Field(
+            description="save puts the work email Apollo found on this person's contact (needs contacts:update)."
+        ),
+    ]
     profileUrl: Annotated[str, Field(max_length=500, min_length=1)]
     confirmation: Annotated[
         str | None,

@@ -139,6 +139,11 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
       if (action === "unlock") {
         setPolling(true);
         setConfirmed((n) => n + 1);
+      } else if (action === "save") {
+        // The address is on the contact now: the scan and contact lists show it.
+        void cache.invalidateQueries({ queryKey: ["hr-scan", companyId] });
+        void cache.invalidateQueries({ queryKey: ["contacts"] });
+        void cache.invalidateQueries({ queryKey: ["contact"] });
       } else if ((next.state === "cancelled" || next.state === "ready") && !next.confirmation && next.reason !== "reconnect_required") {
         // A status check found the lookup never reached Apollo: preview again so it can be confirmed.
         void cache.invalidateQueries({ queryKey: key });
@@ -153,6 +158,8 @@ export function ApolloLookupDialog({ companyId, companyName, person, onClose, op
     {result && <div aria-live="polite">
       {result.email && <p className="hr-apollo-address"><strong>{result.email}</strong><br />
         <span className="muted">{result.state === "existing" ? "Already in HyPlug. No Apollo credit used." : statusLabel[result.emailStatus ?? "unknown"]}</span></p>}
+      {result.state === "found" && <button type="button" className="primary" disabled={change.isPending}
+        onClick={() => { change.mutate({ action: "save" }); }}>{change.isPending ? "Saving…" : "Save to contact"}</button>}
       {issues[result.state] && <p>{(result.state === "cancelled" || result.state === "limited") && result.reason ? absent[result.reason] : issues[result.state]}</p>}
       {result.state === "not_found" && <p>{absent[result.reason ?? "email_not_returned"]} Check Apollo for any credit use.</p>}
       {(result.state === "ready" || result.state === "cancelled") && result.confirmation && <>

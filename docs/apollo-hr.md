@@ -8,7 +8,10 @@ Choose **Work email** on a Find HR result. HyPlug first checks for a work
 address on a contact with that exact LinkedIn profile at that company. If
 there is no usable address, review the person and confirm the Apollo lookup.
 Apollo may use a credit even without returning an email. HyPlug shows
-Apollo's verification status and leaves the contact unchanged.
+Apollo's verification status. **Save to contact** puts the address on the
+person's contact (the one active contact with that LinkedIn profile at the
+company, while it has no email), checked and verified like a typed address;
+it never replaces an email the contact already has.
 
 If the result is unconfirmed, use **Check lookup status** to retrieve the
 original result. The broker retains its lookup status for 24 hours. After

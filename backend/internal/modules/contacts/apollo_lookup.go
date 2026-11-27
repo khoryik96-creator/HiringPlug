@@ -94,6 +94,9 @@ func (s *Service) lookupApollo(ctx context.Context, p authz.Principal, companyID
 	if profile == "" || !in.Action.Valid() {
 		return api.ApolloLookup{}, apperr.Validation(apperr.FieldErrors{{Field: "profileUrl", Message: "choose a LinkedIn profile from this scan"}})
 	}
+	if in.Action == api.ApolloLookupRequestActionSave {
+		return s.saveApolloEmail(ctx, p, companyID, in)
+	}
 	var out api.ApolloLookup
 	var recoverWork apolloWork
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {

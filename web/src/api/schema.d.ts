@@ -8179,8 +8179,11 @@ export interface components {
             action: "start" | "poll" | "disconnect" | "forget";
         };
         ApolloLookupRequest: {
-            /** @enum {string} */
-            action: "preview" | "unlock" | "check";
+            /**
+             * @description save puts the work email Apollo found on this person's contact (needs contacts:update).
+             * @enum {string}
+             */
+            action: "preview" | "unlock" | "check" | "save";
             profileUrl: string;
             /** @description Required for unlock. Use the value from preview. */
             confirmation?: string;

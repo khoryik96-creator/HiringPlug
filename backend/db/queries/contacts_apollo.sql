@@ -81,3 +81,8 @@ DELETE FROM hr_apollo_lookup WHERE id = $1 AND state = 'cancelled';
 -- to the company kept (app_move_company_apollo_lookups, 00164).
 -- name: MoveCompanyApolloLookups :exec
 SELECT app_move_company_apollo_lookups(@from_id::text, @to_id::text);
+
+-- name: HRProfileContacts :many
+SELECT c.id, c.version, c.email FROM contact c
+WHERE c.company_id = $1 AND lower(rtrim(c.linkedin_url, '/')) = lower(sqlc.arg(profile_url)::text) AND c.status = 'active'
+ORDER BY c.id LIMIT 2;

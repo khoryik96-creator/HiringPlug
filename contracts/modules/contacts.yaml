@@ -698,7 +698,8 @@ components:
       properties:
         action:
           type: string
-          enum: [preview, unlock, check]
+          enum: [preview, unlock, check, save]
+          description: save puts the work email Apollo found on this person's contact (needs contacts:update).
         profileUrl: { type: string, minLength: 1, maxLength: 500 }
         confirmation: { type: string, pattern: '^[a-f0-9]{64}$', description: Required for unlock. Use the value from preview. }
     ApolloLookup:

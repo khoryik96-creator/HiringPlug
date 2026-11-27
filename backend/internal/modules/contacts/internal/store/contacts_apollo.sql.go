@@ -318,6 +318,43 @@ func (q *Queries) GetApolloLookup(ctx context.Context, id string) (HrApolloLooku
 	return i, err
 }
 
+const hRProfileContacts = `-- name: HRProfileContacts :many
+SELECT c.id, c.version, c.email FROM contact c
+WHERE c.company_id = $1 AND lower(rtrim(c.linkedin_url, '/')) = lower($2::text) AND c.status = 'active'
+ORDER BY c.id LIMIT 2
+`
+
+type HRProfileContactsParams struct {
+	CompanyID  string
+	ProfileUrl string
+}
+
+type HRProfileContactsRow struct {
+	ID      string
+	Version int32
+	Email   *string
+}
+
+func (q *Queries) HRProfileContacts(ctx context.Context, arg HRProfileContactsParams) ([]HRProfileContactsRow, error) {
+	rows, err := q.db.Query(ctx, hRProfileContacts, arg.CompanyID, arg.ProfileUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []HRProfileContactsRow
+	for rows.Next() {
+		var i HRProfileContactsRow
+		if err := rows.Scan(&i.ID, &i.Version, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const hRWorkEmail = `-- name: HRWorkEmail :many
 SELECT c.email FROM contact c
 WHERE c.company_id = $1 AND lower(rtrim(c.linkedin_url, '/')) = lower($2::text)

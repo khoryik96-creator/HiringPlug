@@ -234,6 +234,28 @@ func TestFindHRApolloChecksExistingAndRecoversWithoutRepeatingThePaidCall(t *tes
 	assert.Equal(t, api.ApolloLookupStateFound, state(recruiter, "preview", "sen", nil).State)
 	assert.EqualValues(t, 2, senCalls.Load(), "the expired job never reached the broker")
 
+	// Saving the found email to the person's contact: only onto their own
+	// contact, only while it has none, checked like a typed address.
+	save := func(name string) *response {
+		return a.request(http.MethodPost, base, recruiter, api.ApolloLookupRequest{Action: api.ApolloLookupRequestActionSave, ProfileUrl: "https://www.linkedin.com/in/" + name})
+	}
+	noContact := save("sen")
+	assert.Equal(t, http.StatusBadRequest, noContact.Status)
+	assert.Contains(t, string(noContact.Body), "add this person as a contact")
+	senContact := a.createContact(recruiter, map[string]any{"companyId": bank.Id, "firstName": "Sen", "lastName": "Foo",
+		"linkedinUrl": "https://www.linkedin.com/in/sen/"})
+	saved := save("sen")
+	require.Equal(t, http.StatusOK, saved.Status, "%s", saved.Body)
+	var afterSave api.ApolloLookup
+	saved.JSON(&afterSave)
+	assert.Equal(t, api.ApolloLookupStateExisting, afterSave.State, "now in HyPlug: no credit for it again")
+	var onContact api.Contact
+	a.request(http.MethodGet, "/v1/contacts/"+senContact.Id, recruiter, nil).JSON(&onContact)
+	email, err := onContact.Email.Get()
+	require.NoError(t, err)
+	assert.Equal(t, "sen@maju.example", email)
+	assert.EqualValues(t, 3, revealed.Load(), "saving never asks Apollo again")
+
 	disconnect := map[string]string{"action": "disconnect"}
 	assert.Equal(t, "disconnected_locally", a.request(http.MethodPost, connection, recruiter, disconnect).Map()["state"])
 	assert.Equal(t, "disconnected_locally", a.request(http.MethodGet, connection, recruiter, nil).Map()["state"])

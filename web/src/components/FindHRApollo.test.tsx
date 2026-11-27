@@ -54,6 +54,17 @@ describe("Apollo work email", () => {
     expect(await screen.findByText(/Check your plan, credits, and account activity/)).toBeTruthy();
   });
 
+  it("saves a found work email to the person's contact", async () => {
+    const post = serve((body) => body.action === "save"
+      ? { state: "existing", email: "farah@maju.example" }
+      : { state: "found", email: "farah@maju.example", emailStatus: "verified" });
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Save to contact" }));
+    expect(await screen.findByText("Already in HyPlug. No Apollo credit used.")).toBeTruthy();
+    expect(post.mock.calls.some((c) => (c[1] as { body: LookupRequest }).body.action === "save")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Save to contact" })).toBeNull();
+  });
+
   it("keeps checking a lookup confirmed after the dialog has been open a while", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let state: Lookup["state"] = "ready";
