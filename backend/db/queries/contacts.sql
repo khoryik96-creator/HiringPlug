@@ -40,7 +40,8 @@ UPDATE contact SET
   role = sqlc.narg(role),
   notes = sqlc.narg(notes),
   version = version + 1,
-  updated_at = now()
+  updated_at = now(),
+  touched_at = now()
 WHERE id = @id AND version = @expected_version
 RETURNING *;
 
@@ -58,7 +59,7 @@ RETURNING *;
 -- With @role_not_set, only contacts without a role.
 -- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
-  contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
+  contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at, contact.touched_at,
   m.status AS mailbox_status, m.checked_at AS mailbox_checked_at, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
   l.checked_at AS linkedin_checked_at, coalesce(l.matched_by_name, false)::boolean AS linkedin_matched_by_name
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
@@ -71,6 +72,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR contact.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(status)::text IS NULL OR contact.status = sqlc.narg(status)::text)
   AND (sqlc.narg(role)::text IS NULL OR contact.role = sqlc.narg(role)::text)
   AND (NOT sqlc.arg(role_not_set)::boolean OR contact.role IS NULL)
+  AND (sqlc.narg(untouched_since)::timestamptz IS NULL OR contact.touched_at < sqlc.narg(untouched_since)::timestamptz) -- stale
   AND (sqlc.narg(in_ids)::text[] IS NULL OR contact.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
   AND (sqlc.narg(query)::text IS NULL
        OR CASE WHEN sqlc.arg(similar_names)::boolean
@@ -188,7 +190,7 @@ ORDER BY checked_at DESC, id DESC LIMIT 1;
 
 -- A contact found to have left (an edit: the version changes).
 -- name: MarkContactLeft :one
-UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
+UPDATE contact SET status = 'left', version = version + 1, updated_at = now(), touched_at = now()
 WHERE id = @id AND status = 'active' AND company_id = @company_id
 RETURNING version;
 
@@ -380,3 +382,12 @@ SELECT set_config('app.show_binned', 'on', true);
 -- name: EndMailboxCheck :execrows
 UPDATE contact_mailbox_check SET status = 'unknown', reason = @reason, recheck_at = NULL, checked_at = now()
 WHERE contact_id = @contact_id AND email = @email AND status = 'checking';
+
+-- Someone did something with the contact (a note, an email to them): see
+-- 00206. Their company is touched too (the caller does it, by company_id).
+-- name: MarkContactTouched :one
+UPDATE contact SET touched_at = now() WHERE id = @id RETURNING company_id;
+
+-- How many contacts nobody touched since then (the morning email's line).
+-- name: CountUntouchedContacts :one
+SELECT count(*)::integer FROM contact WHERE touched_at < @since;

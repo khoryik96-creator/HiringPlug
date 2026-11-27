@@ -34,6 +34,8 @@ type Companies interface {
 	Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool, error)
 	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 	LinkedinURL(ctx context.Context, tx pgx.Tx, companyID string) (string, error)
+	// Touch notes that someone did something with the company (one of its people).
+	Touch(ctx context.Context, tx pgx.Tx, companyID string) error
 }
 
 // Roles checks a role against Settings' contact roles (settings module).
@@ -108,3 +110,16 @@ func (m *Module) LockInvoiceRecipient(ctx context.Context, tx pgx.Tx, id, compan
 
 // UseTimeZone sets the agency's time zone (dates in exports).
 func (m *Module) UseTimeZone(loc *time.Location) { m.service.zone = loc }
+
+// Touch notes, in the caller's transaction, that someone did something with
+// the contact (a note on them, an email to them): their company too. A
+// contact nobody touched for a year shows as stale (00206).
+func (m *Module) Touch(ctx context.Context, tx pgx.Tx, contactID string) error {
+	return m.service.touch(ctx, tx, contactID)
+}
+
+// Untouched counts the contacts nobody touched since then, in the caller's transaction.
+func (m *Module) Untouched(ctx context.Context, tx pgx.Tx, since time.Time) (int, error) {
+	n, err := store.New(tx).CountUntouchedContacts(ctx, since)
+	return int(n), err
+}

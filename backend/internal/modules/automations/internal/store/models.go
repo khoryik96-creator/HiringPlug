@@ -613,6 +613,7 @@ type Company struct {
 	BinnedAt            *time.Time
 	NameCore            *string
 	SiteKey             *string
+	TouchedAt           time.Time
 }
 
 type CompanyBenefit struct {
@@ -701,6 +702,7 @@ type Contact struct {
 	Role              *string
 	BinnedAt          *time.Time
 	NameWords         []string
+	TouchedAt         time.Time
 }
 
 type ContactEmploymentCheck struct {

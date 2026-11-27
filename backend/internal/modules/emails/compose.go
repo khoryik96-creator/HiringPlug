@@ -228,6 +228,9 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err != nil {
 			return err
 		}
+		if err := s.touchContact(ctx, tx, r.ContactID); err != nil {
+			return err
+		}
 		mode, err := s.bindDelivery(ctx, tx, row.ID, p.UserID)
 		if err != nil {
 			return err
@@ -394,4 +397,13 @@ func newKey() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
+}
+
+// touchContact marks the contact an email is written to as touched by
+// someone now (a stale contact is one nobody touched for a year: 00206).
+func (s *Service) touchContact(ctx context.Context, tx pgx.Tx, contactID *string) error {
+	if contactID == nil {
+		return nil
+	}
+	return s.deps.Contacts.Touch(ctx, tx, *contactID)
 }

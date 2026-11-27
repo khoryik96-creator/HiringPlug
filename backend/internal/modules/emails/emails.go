@@ -125,6 +125,8 @@ type Deps struct {
 	// (contacts and companies modules); NOT_FOUND when missing.
 	Contacts interface {
 		Contact(ctx context.Context, tx pgx.Tx, id string) (Contact, error)
+		// Touch notes that someone wrote to the contact (and so their company).
+		Touch(ctx context.Context, tx pgx.Tx, id string) error
 	}
 	// Undeliverable says which addresses would not reach their contact
 	// (contacts module: they left, or the mailbox does not exist), with why

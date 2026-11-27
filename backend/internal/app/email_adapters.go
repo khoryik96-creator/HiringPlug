@@ -240,6 +240,11 @@ type emailContacts struct {
 	companies *companies.Module
 }
 
+// Touch marks the contact (and their company) as touched: someone wrote to them.
+func (a emailContacts) Touch(ctx context.Context, tx pgx.Tx, id string) error {
+	return a.contacts.Touch(ctx, tx, id)
+}
+
 func (a emailContacts) Contact(ctx context.Context, tx pgx.Tx, id string) (emails.Contact, error) {
 	briefs, err := a.contacts.Briefs(ctx, tx, []string{id})
 	if err != nil {

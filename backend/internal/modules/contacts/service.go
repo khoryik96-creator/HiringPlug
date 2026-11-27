@@ -74,6 +74,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 		if err != nil {
 			return err
 		}
+		if err := s.companies.Touch(ctx, tx, row.CompanyID); err != nil {
+			return err
+		}
 		if err := audit.Record(ctx, tx, audit.Entry{
 			Action: "contact.created", EntityType: "contact", EntityID: row.ID,
 			Changes: audit.Diff(map[string]any{}, fields(d)),
@@ -169,6 +172,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		case database.IsUniqueViolation(err, emailUniqueIndex):
 			return duplicateEmail("")
 		case err != nil:
+			return err
+		}
+		if err := s.companies.Touch(ctx, tx, updated.CompanyID); err != nil {
 			return err
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "contact.updated", EntityType: "contact", EntityID: id, Changes: changes}); err != nil {
@@ -416,4 +422,16 @@ func fields(d Details) map[string]any {
 		"email": d.Email, "phone": d.Phone, "mobile": d.Mobile, "linkedinUrl": d.LinkedinURL,
 		"status": d.Status, "role": d.Role, "notes": d.Notes,
 	}
+}
+
+// touch marks the contact, and their company, as touched by someone now.
+func (s *Service) touch(ctx context.Context, tx pgx.Tx, contactID string) error {
+	companyID, err := store.New(tx).MarkContactTouched(ctx, contactID)
+	if database.IsNoRows(err) {
+		return nil // gone (binned, merged): nothing to mark
+	}
+	if err != nil {
+		return err
+	}
+	return s.companies.Touch(ctx, tx, companyID)
 }

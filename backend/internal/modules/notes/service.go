@@ -21,6 +21,7 @@ type Service struct {
 	pool     *pgxpool.Pool
 	subjects Subjects
 	users    Users
+	touch    map[string]Touch
 }
 
 // Create writes a note on an existing record.
@@ -52,6 +53,11 @@ func (s *Service) createIn(ctx context.Context, tx pgx.Tx, p authz.Principal, in
 	})
 	if err != nil {
 		return Note{}, err
+	}
+	if touch := s.touch[d.SubjectType]; touch != nil {
+		if err := touch(ctx, tx, d.SubjectID); err != nil {
+			return Note{}, err
+		}
 	}
 	// The note's text is not copied into the audit log (it may be sensitive).
 	return fromRow(row), audit.Record(ctx, tx, audit.Entry{

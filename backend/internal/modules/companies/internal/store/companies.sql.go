@@ -313,6 +313,18 @@ func (q *Queries) CountCompaniesInCategory(ctx context.Context, category *string
 	return count, err
 }
 
+const countUntouchedCompanies = `-- name: CountUntouchedCompanies :one
+SELECT count(*)::integer FROM company WHERE touched_at < $1
+`
+
+// How many companies nobody touched since then (the morning email's line).
+func (q *Queries) CountUntouchedCompanies(ctx context.Context, since time.Time) (int32, error) {
+	row := q.db.QueryRow(ctx, countUntouchedCompanies, since)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const decideSuggestion = `-- name: DecideSuggestion :exec
 UPDATE company_suggestion SET status = $1 WHERE id = $2
 `
@@ -368,7 +380,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key, touched_at FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -408,6 +420,7 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.BinnedAt,
 		&i.NameCore,
 		&i.SiteKey,
+		&i.TouchedAt,
 	)
 	return i, err
 }
@@ -540,7 +553,7 @@ INSERT INTO company (
   $8, $9, $10, $11,
   $12, $13, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key, touched_at
 `
 
 type InsertCompanyParams struct {
@@ -612,6 +625,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.BinnedAt,
 		&i.NameCore,
 		&i.SiteKey,
+		&i.TouchedAt,
 	)
 	return i, err
 }
@@ -787,24 +801,25 @@ func (q *Queries) LegacyIndustries(ctx context.Context) ([]LegacyIndustriesRow, 
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT id, name, type, category, industry, city, country, website, linkedin_url, updated_at
+SELECT id, name, type, category, industry, city, country, website, linkedin_url, updated_at, touched_at
 FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
   AND ($3::text IS NULL OR category = $3::text)
   AND ($4::text[] IS NULL OR id = ANY ($4::text[])) -- a folder's
+  AND ($5::timestamptz IS NULL OR touched_at < $5::timestamptz) -- stale
   -- The page's name is letters, digits, _ and - only (the contract), so it is safe in the pattern.
-  AND ($5::text IS NULL
-       OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || $5::text || '(/|$)'))
   AND ($6::text IS NULL
-       OR search_text LIKE ALL (app_search_patterns($6::text))
-       OR phone_digits LIKE '%' || app_phone_key($6::text) || '%')
+       OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || $6::text || '(/|$)'))
+  AND ($7::text IS NULL
+       OR search_text LIKE ALL (app_search_patterns($7::text))
+       OR phone_digits LIKE '%' || app_phone_key($7::text) || '%')
   -- A boolean search (boolsearch's query for to_tsquery).
   -- The expression of company_search_doc_idx (00116), so the index answers.
-  AND ($7::text IS NULL
-       OR app_search_doc(name, website, industry, industry_terms, industry_hint, city, about) @@ to_tsquery('english', $7::text))
+  AND ($8::text IS NULL
+       OR app_search_doc(name, website, industry, industry_terms, industry_hint, city, about) @@ to_tsquery('english', $8::text))
 ORDER BY id DESC
-LIMIT $8
+LIMIT $9
 `
 
 type ListCompaniesParams struct {
@@ -812,6 +827,7 @@ type ListCompaniesParams struct {
 	Type            *string
 	Category        *string
 	InIds           []string
+	UntouchedSince  *time.Time
 	LinkedinCompany *string
 	Query           *string
 	Tsquery         *string
@@ -829,6 +845,7 @@ type ListCompaniesRow struct {
 	Website     *string
 	LinkedinUrl *string
 	UpdatedAt   time.Time
+	TouchedAt   time.Time
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
@@ -838,6 +855,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 		arg.Type,
 		arg.Category,
 		arg.InIds,
+		arg.UntouchedSince,
 		arg.LinkedinCompany,
 		arg.Query,
 		arg.Tsquery,
@@ -861,6 +879,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.Website,
 			&i.LinkedinUrl,
 			&i.UpdatedAt,
+			&i.TouchedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -906,6 +925,16 @@ func (q *Queries) ListCompanyDocuments(ctx context.Context, companyID string) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const markCompanyTouched = `-- name: MarkCompanyTouched :exec
+UPDATE company SET touched_at = now() WHERE id = $1
+`
+
+// Someone did something with the company or one of its people (00206).
+func (q *Queries) MarkCompanyTouched(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, markCompanyTouched, id)
+	return err
 }
 
 const moveBenefitsIfNone = `-- name: MoveBenefitsIfNone :exec
@@ -1248,7 +1277,7 @@ func (q *Queries) SimilarCompanies(ctx context.Context, id string) ([]SimilarCom
 }
 
 const touchCompany = `-- name: TouchCompany :one
-UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key
+UPDATE company SET version = version + 1, updated_at = now(), touched_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key, touched_at
 `
 
 type TouchCompanyParams struct {
@@ -1293,6 +1322,7 @@ func (q *Queries) TouchCompany(ctx context.Context, arg TouchCompanyParams) (Com
 		&i.BinnedAt,
 		&i.NameCore,
 		&i.SiteKey,
+		&i.TouchedAt,
 	)
 	return i, err
 }
@@ -1313,9 +1343,10 @@ UPDATE company SET
   registration_number = $12,
   about = $13,
   version = version + 1,
-  updated_at = now()
+  updated_at = now(),
+  touched_at = now()
 WHERE id = $14 AND version = $15
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at, name_core, site_key, touched_at
 `
 
 type UpdateCompanyParams struct {
@@ -1390,6 +1421,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.BinnedAt,
 		&i.NameCore,
 		&i.SiteKey,
+		&i.TouchedAt,
 	)
 	return i, err
 }

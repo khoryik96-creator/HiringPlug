@@ -29,6 +29,14 @@ type Exists func(ctx context.Context, tx pgx.Tx, id string) (bool, error)
 // owning module's check, passed in by internal/app.
 type Subjects map[string]Exists
 
+// Touch notes that someone did something with a record (contacts and
+// companies keep when they were last touched: 00206).
+type Touch func(ctx context.Context, tx pgx.Tx, id string) error
+
+// TouchWith tells the module which subject types to mark as touched when a
+// note is written on them (by subject type: company, contact).
+func (m *Module) TouchWith(t map[string]Touch) { m.service.touch = t }
+
 // Users is what this module needs from the identity module.
 type Users interface {
 	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)

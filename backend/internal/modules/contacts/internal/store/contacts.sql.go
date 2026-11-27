@@ -439,6 +439,18 @@ func (q *Queries) CountMailboxesChecking(ctx context.Context) (int32, error) {
 	return column_1, err
 }
 
+const countUntouchedContacts = `-- name: CountUntouchedContacts :one
+SELECT count(*)::integer FROM contact WHERE touched_at < $1
+`
+
+// How many contacts nobody touched since then (the morning email's line).
+func (q *Queries) CountUntouchedContacts(ctx context.Context, since time.Time) (int32, error) {
+	row := q.db.QueryRow(ctx, countUntouchedContacts, since)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const deleteMergedContact = `-- name: DeleteMergedContact :execrows
 DELETE FROM contact WHERE id = $1
 `
@@ -512,7 +524,7 @@ func (q *Queries) FindContactIDByEmail(ctx context.Context, email *string) (stri
 }
 
 const getContact = `-- name: GetContact :one
-SELECT id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words FROM contact WHERE id = $1
+SELECT id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words, touched_at FROM contact WHERE id = $1
 `
 
 func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
@@ -544,6 +556,7 @@ func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
 		&i.Role,
 		&i.BinnedAt,
 		&i.NameWords,
+		&i.TouchedAt,
 	)
 	return i, err
 }
@@ -668,7 +681,7 @@ INSERT INTO contact (
   $6, $7, $8,
   $9, $10, $11, $12, $13, $14, app_current_user()
 )
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words, touched_at
 `
 
 type InsertContactParams struct {
@@ -734,6 +747,7 @@ func (q *Queries) InsertContact(ctx context.Context, arg InsertContactParams) (C
 		&i.Role,
 		&i.BinnedAt,
 		&i.NameWords,
+		&i.TouchedAt,
 	)
 	return i, err
 }
@@ -873,7 +887,7 @@ func (q *Queries) LatestLinkedinCheck(ctx context.Context, contactID string) (Co
 
 const listContacts = `-- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
-  contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
+  contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at, contact.touched_at,
   m.status AS mailbox_status, m.checked_at AS mailbox_checked_at, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
   l.checked_at AS linkedin_checked_at, coalesce(l.matched_by_name, false)::boolean AS linkedin_matched_by_name
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
@@ -886,32 +900,34 @@ WHERE ($1::text IS NULL OR contact.id < $1::text)
   AND ($3::text IS NULL OR contact.status = $3::text)
   AND ($4::text IS NULL OR contact.role = $4::text)
   AND (NOT $5::boolean OR contact.role IS NULL)
-  AND ($6::text[] IS NULL OR contact.id = ANY ($6::text[])) -- a folder's
-  AND ($7::text IS NULL
-       OR CASE WHEN $8::boolean
-            THEN app_normalize_text($7::text) <% contact.name_text
-            ELSE contact.search_text LIKE ALL (app_search_patterns($7::text))
-              OR contact.phone_digits LIKE '%' || app_phone_key($7::text) || '%'
+  AND ($6::timestamptz IS NULL OR contact.touched_at < $6::timestamptz) -- stale
+  AND ($7::text[] IS NULL OR contact.id = ANY ($7::text[])) -- a folder's
+  AND ($8::text IS NULL
+       OR CASE WHEN $9::boolean
+            THEN app_normalize_text($8::text) <% contact.name_text
+            ELSE contact.search_text LIKE ALL (app_search_patterns($8::text))
+              OR contact.phone_digits LIKE '%' || app_phone_key($8::text) || '%'
           END)
   -- A boolean search (boolsearch's query for to_tsquery).
   -- The expression of contact_search_doc_idx (00115), so the index answers.
-  AND ($9::text IS NULL
-       OR app_search_doc(contact.first_name || ' ' || contact.last_name, contact.title, contact.email) @@ to_tsquery('english', $9::text))
-ORDER BY CASE WHEN $8::boolean THEN word_similarity(app_normalize_text(coalesce($7::text, '')), contact.name_text) END DESC, contact.id DESC
-LIMIT $10
+  AND ($10::text IS NULL
+       OR app_search_doc(contact.first_name || ' ' || contact.last_name, contact.title, contact.email) @@ to_tsquery('english', $10::text))
+ORDER BY CASE WHEN $9::boolean THEN word_similarity(app_normalize_text(coalesce($8::text, '')), contact.name_text) END DESC, contact.id DESC
+LIMIT $11
 `
 
 type ListContactsParams struct {
-	Cursor       *string
-	CompanyID    *string
-	Status       *string
-	Role         *string
-	RoleNotSet   bool
-	InIds        []string
-	Query        *string
-	SimilarNames bool
-	Tsquery      *string
-	RowLimit     int32
+	Cursor         *string
+	CompanyID      *string
+	Status         *string
+	Role           *string
+	RoleNotSet     bool
+	UntouchedSince *time.Time
+	InIds          []string
+	Query          *string
+	SimilarNames   bool
+	Tsquery        *string
+	RowLimit       int32
 }
 
 type ListContactsRow struct {
@@ -927,6 +943,7 @@ type ListContactsRow struct {
 	Status                string
 	Role                  *string
 	UpdatedAt             time.Time
+	TouchedAt             time.Time
 	MailboxStatus         *string
 	MailboxCheckedAt      *time.Time
 	LinkedinCurrent       *bool
@@ -946,6 +963,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 		arg.Status,
 		arg.Role,
 		arg.RoleNotSet,
+		arg.UntouchedSince,
 		arg.InIds,
 		arg.Query,
 		arg.SimilarNames,
@@ -972,6 +990,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 			&i.Status,
 			&i.Role,
 			&i.UpdatedAt,
+			&i.TouchedAt,
 			&i.MailboxStatus,
 			&i.MailboxCheckedAt,
 			&i.LinkedinCurrent,
@@ -1039,7 +1058,7 @@ func (q *Queries) LockInvoiceRecipient(ctx context.Context, arg LockInvoiceRecip
 }
 
 const markContactLeft = `-- name: MarkContactLeft :one
-UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
+UPDATE contact SET status = 'left', version = version + 1, updated_at = now(), touched_at = now()
 WHERE id = $1 AND status = 'active' AND company_id = $2
 RETURNING version
 `
@@ -1055,6 +1074,19 @@ func (q *Queries) MarkContactLeft(ctx context.Context, arg MarkContactLeftParams
 	var version int32
 	err := row.Scan(&version)
 	return version, err
+}
+
+const markContactTouched = `-- name: MarkContactTouched :one
+UPDATE contact SET touched_at = now() WHERE id = $1 RETURNING company_id
+`
+
+// Someone did something with the contact (a note, an email to them): see
+// 00206. Their company is touched too (the caller does it, by company_id).
+func (q *Queries) MarkContactTouched(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, markContactTouched, id)
+	var company_id string
+	err := row.Scan(&company_id)
+	return company_id, err
 }
 
 const markMailboxBounced = `-- name: MarkMailboxBounced :many
@@ -1454,7 +1486,7 @@ UPDATE contact SET
   email_check_reasons = $2,
   email_checked_at = $3
 WHERE id = $4 AND email = $5
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words, touched_at
 `
 
 type SetEmailCheckParams struct {
@@ -1501,6 +1533,7 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 		&i.Role,
 		&i.BinnedAt,
 		&i.NameWords,
+		&i.TouchedAt,
 	)
 	return i, err
 }
@@ -1758,9 +1791,10 @@ UPDATE contact SET
   role = $13,
   notes = $14,
   version = version + 1,
-  updated_at = now()
+  updated_at = now(),
+  touched_at = now()
 WHERE id = $15 AND version = $16
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at, name_words, touched_at
 `
 
 type UpdateContactParams struct {
@@ -1829,6 +1863,7 @@ func (q *Queries) UpdateContact(ctx context.Context, arg UpdateContactParams) (C
 		&i.Role,
 		&i.BinnedAt,
 		&i.NameWords,
+		&i.TouchedAt,
 	)
 	return i, err
 }

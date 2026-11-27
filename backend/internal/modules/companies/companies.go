@@ -130,3 +130,16 @@ type Labeler interface {
 // UseLabels sets where exports find the words for the company's lists
 // (settings module).
 func (m *Module) UseLabels(l Labeler) { m.service.labels = l }
+
+// Touch notes, in the caller's transaction, that someone did something with
+// the company or one of its people (a note, a job, an email): a company
+// nobody touched for a year shows as stale (00206).
+func (m *Module) Touch(ctx context.Context, tx pgx.Tx, companyID string) error {
+	return store.New(tx).MarkCompanyTouched(ctx, companyID)
+}
+
+// Untouched counts the companies nobody touched since then, in the caller's transaction.
+func (m *Module) Untouched(ctx context.Context, tx pgx.Tx, since time.Time) (int, error) {
+	n, err := store.New(tx).CountUntouchedCompanies(ctx, since)
+	return int(n), err
+}

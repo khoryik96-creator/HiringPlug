@@ -38,18 +38,20 @@ UPDATE company SET
   registration_number = sqlc.narg(registration_number),
   about = sqlc.narg(about),
   version = version + 1,
-  updated_at = now()
+  updated_at = now(),
+  touched_at = now()
 WHERE id = @id AND version = @expected_version
 RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- name: ListCompanies :many
-SELECT id, name, type, category, industry, city, country, website, linkedin_url, updated_at
+SELECT id, name, type, category, industry, city, country, website, linkedin_url, updated_at, touched_at
 FROM company
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(type)::text IS NULL OR type = sqlc.narg(type)::text)
   AND (sqlc.narg(category)::text IS NULL OR category = sqlc.narg(category)::text)
   AND (sqlc.narg(in_ids)::text[] IS NULL OR id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
+  AND (sqlc.narg(untouched_since)::timestamptz IS NULL OR touched_at < sqlc.narg(untouched_since)::timestamptz) -- stale
   -- The page's name is letters, digits, _ and - only (the contract), so it is safe in the pattern.
   AND (sqlc.narg(linkedin_company)::text IS NULL
        OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || sqlc.narg(linkedin_company)::text || '(/|$)'))
@@ -180,7 +182,7 @@ WHERE r.id = v.id AND r.industry IS DISTINCT FROM v.industry;
 -- name: IndustryEmployerID :one
 SELECT id FROM company WHERE name_key = app_normalize_text(@name::text);
 -- name: TouchCompany :one
-UPDATE company SET version = version + 1, updated_at = now() WHERE id = @id AND version = @expected_version RETURNING *;
+UPDATE company SET version = version + 1, updated_at = now(), touched_at = now() WHERE id = @id AND version = @expected_version RETURNING *;
 
 -- How many companies are in a category (Settings refuses to remove one in use).
 -- name: CountCompaniesInCategory :one
@@ -294,3 +296,11 @@ SELECT id, name, city, website, industry FROM company WHERE id = ANY(@ids::text[
 -- duplicate would otherwise block deleting it).
 -- name: ShowBinnedForMerge :exec
 SELECT set_config('app.show_binned', 'on', true);
+
+-- Someone did something with the company or one of its people (00206).
+-- name: MarkCompanyTouched :exec
+UPDATE company SET touched_at = now() WHERE id = @id;
+
+-- How many companies nobody touched since then (the morning email's line).
+-- name: CountUntouchedCompanies :one
+SELECT count(*)::integer FROM company WHERE touched_at < @since;

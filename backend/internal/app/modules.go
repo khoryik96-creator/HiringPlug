@@ -129,6 +129,7 @@ func NewModules(d Deps) *Modules {
 	m.Notes = notes.New(d.Pool, notes.Subjects{
 		"candidate": m.Candidates.Exists, "job": m.Jobs.Exists, "company": m.Companies.Exists, "contact": m.Contacts.Exists,
 	}, m.Identity)
+	m.Notes.TouchWith(map[string]notes.Touch{"company": m.Companies.Touch, "contact": m.Contacts.Touch}) // stale records (00206)
 	// Before careers and emails, which record and check consent with it.
 	m.Privacy = privacy.New(d.Pool, privacy.Deps{
 		Candidates: privacyCandidates{m.Candidates}, Users: m.Identity, Tenants: m.Identity, Data: privacyData{m},

@@ -144,6 +144,9 @@ func (s *Service) SendSeparately(ctx context.Context, p authz.Principal, r Batch
 			if err != nil {
 				return err
 			}
+			if err := s.touchContact(ctx, tx, rec.ContactID); err != nil {
+				return err
+			}
 			// The uploads go with the first email; the others carry the same files.
 			if !claimed && len(staged) > 0 {
 				n, err := q.AttachToEmail(ctx, store.AttachToEmailParams{EmailID: &row.ID, Ids: r.AttachmentIDs})
