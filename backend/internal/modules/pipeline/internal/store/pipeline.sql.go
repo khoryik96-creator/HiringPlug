@@ -183,6 +183,37 @@ func (q *Queries) ApplicationsOf(ctx context.Context, arg ApplicationsOfParams) 
 	return items, nil
 }
 
+const categoriesReached = `-- name: CategoriesReached :many
+SELECT DISTINCT application_id, to_category::text AS category FROM application_stage_change
+WHERE application_id = ANY($1::text[]) AND to_category IS NOT NULL
+`
+
+type CategoriesReachedRow struct {
+	ApplicationID string
+	Category      string
+}
+
+// Every category some applications have been in (reports: conversions).
+func (q *Queries) CategoriesReached(ctx context.Context, ids []string) ([]CategoriesReachedRow, error) {
+	rows, err := q.db.Query(ctx, categoriesReached, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CategoriesReachedRow
+	for rows.Next() {
+		var i CategoriesReachedRow
+		if err := rows.Scan(&i.ApplicationID, &i.Category); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearDefaultStageTemplate = `-- name: ClearDefaultStageTemplate :exec
 UPDATE stage_template SET is_default = false, updated_at = now() WHERE is_default AND id <> $1
 `
@@ -317,6 +348,45 @@ func (q *Queries) FirstPlacedBetween(ctx context.Context, arg FirstPlacedBetween
 			&i.CreatedAt,
 			&i.PlacedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const firstSubmittedBetween = `-- name: FirstSubmittedBetween :many
+SELECT a.job_order_id, min(c.changed_at)::timestamptz AS first_at
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'submitted'
+GROUP BY a.job_order_id
+HAVING min(c.changed_at) >= $1 AND min(c.changed_at) < $2
+LIMIT 20000
+`
+
+type FirstSubmittedBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type FirstSubmittedBetweenRow struct {
+	JobOrderID string
+	FirstAt    time.Time
+}
+
+// Jobs whose first CV was sent (first move to submitted) between two instants.
+func (q *Queries) FirstSubmittedBetween(ctx context.Context, arg FirstSubmittedBetweenParams) ([]FirstSubmittedBetweenRow, error) {
+	rows, err := q.db.Query(ctx, firstSubmittedBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FirstSubmittedBetweenRow
+	for rows.Next() {
+		var i FirstSubmittedBetweenRow
+		if err := rows.Scan(&i.JobOrderID, &i.FirstAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

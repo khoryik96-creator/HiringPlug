@@ -6,6 +6,7 @@ import { ActivityProgress } from "../components/ActivityProgress";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { downloadExport } from "../api/files";
 import { ExportButton } from "../components/ExportButton";
+import { PerformanceReport } from "../components/PerformanceReport";
 import { RevenueForecast } from "../components/RevenueForecast";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { formatDay, formatMoney } from "../labels";
@@ -29,7 +30,7 @@ const pct = (part: number, whole: number) => (whole > 0 ? `${String(Math.round((
  * activity against targets, and (for those who may see fees) the revenue
  * forecast.
  */
-export function Reports({ permissions = [] }: { permissions?: Permission[] }) {
+export function Reports({ permissions = [], meId }: { permissions?: Permission[]; meId?: string }) {
   const forecast = permissions.includes("reports.forecast:read") && permissions.includes("placements.fees:read");
   const [preset, setPreset] = useState<Preset>("recent");
   const [period, setPeriod] = useState({ from: "", to: "" });
@@ -54,6 +55,7 @@ export function Reports({ permissions = [] }: { permissions?: Permission[] }) {
         }} />
       </div>
       <ActivityProgress />
+      <PerformanceReport canChoose={permissions.includes("reports.team:read")} meId={meId} />
       {forecast && <RevenueForecast />}
       <div className="row spread report-period">
         <h3>Pipeline and placements</h3>

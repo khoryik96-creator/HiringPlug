@@ -181,6 +181,7 @@ type Placement struct {
 	RecruiterID            *string
 	Status                 string
 	FeeAmount, FeeCurrency *string
+	StartDate              time.Time
 }
 
 // MoneyTotal is an amount in one currency.

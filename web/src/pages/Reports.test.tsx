@@ -27,8 +27,12 @@ const report = (over: Partial<Schemas["Report"]> = {}): Schemas["Report"] => ({
 const noActivity: Schemas["ActivityReport"] = { period: "week", from: "2026-11-16", to: "2026-11-22", team: false, rows: [] };
 
 /** The report for the summary, the company's settings for source names, no activity. */
+const empty: Schemas["PerformanceRow"] = { from: "2026-01-01", to: "2026-11-03", cvsSent: 0, categories: {}, placements: 0, fees: [] };
+const noPerformance: Schemas["Performance"] = { grain: "month", from: "2026-01-01", to: "2026-11-03", users: [], team: false, feesHidden: false,
+  rows: [], total: empty, conversions: [], daysToFirstCv: { average: null, jobs: 0 }, daysToFill: { average: null, jobs: 0 } };
 const reads = (summary: unknown) => vi.spyOn(api, "GET").mockImplementation(((path: string) =>
-  Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : path === "/v1/reports/activity" ? ok(noActivity) : ok(summary))) as never);
+  Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : path === "/v1/reports/activity" ? ok(noActivity)
+    : path === "/v1/reports/performance" ? ok(noPerformance) : ok(summary))) as never);
 
 describe("reports", () => {
   it("shows conversion, sources, recruiters' fees and time to fill", async () => {
@@ -49,12 +53,13 @@ describe("reports", () => {
     renderWithClient(<Reports />);
     expect(await screen.findByText(/Fees are not shown to your role/)).toBeTruthy();
     expect(screen.queryByLabelText("From"), "dates only for a custom period").toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Last year" }));
+    const period = screen.getByRole("group", { name: "Period" });
+    fireEvent.click(within(period).getByRole("button", { name: "Last year" }));
     const y = new Date().getFullYear() - 1;
     await waitFor(() => {
       expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: `${String(y)}-01-01`, to: `${String(y)}-12-31` } } });
     });
-    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.click(within(period).getByRole("button", { name: "Custom" }));
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
     await waitFor(() => {
       expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: "2026-01-01", to: `${String(y)}-12-31` } } });
@@ -65,7 +70,7 @@ describe("reports", () => {
     const settings = testFieldSettings() as unknown as Schemas["FieldSettings"];
     settings.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hint: null, color: null, hidden: false, builtIn: false });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(settings)
-      : path === "/v1/reports/activity" ? ok(noActivity)
+      : path === "/v1/reports/activity" ? ok(noActivity) : path === "/v1/reports/performance" ? ok(noPerformance)
       : ok(report({ sources: [{ source: "job_fair", applications: 2, interviewed: 1, placed: 0 }] })))) as never);
     renderWithClient(<Reports />);
     expect(await screen.findByRole("cell", { name: "Job fair" })).toBeTruthy();
@@ -74,7 +79,8 @@ describe("reports", () => {
   it("shows activity to everyone, and the revenue forecast only to those who may see fees", async () => {
     const forecast: Schemas["Forecast"] = { months: [], recruiters: [], lines: [], gaps: [], stageWeights: [] };
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings())
-      : path === "/v1/reports/activity" ? ok(noActivity) : path === "/v1/reports/forecast" ? ok(forecast) : ok(report()))) as never);
+      : path === "/v1/reports/activity" ? ok(noActivity) : path === "/v1/reports/forecast" ? ok(forecast)
+        : path === "/v1/reports/performance" ? ok(noPerformance) : ok(report()))) as never);
     renderWithClient(<Reports permissions={["reports:read", "placements.fees:read"]} />);
     expect(await screen.findByRole("region", { name: "Activity against targets" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Revenue forecast" })).toBeNull();

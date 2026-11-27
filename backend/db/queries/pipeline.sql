@@ -101,6 +101,19 @@ GROUP BY a.id
 HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
 LIMIT 20000;
 
+-- Jobs whose first CV was sent (first move to submitted) between two instants.
+-- name: FirstSubmittedBetween :many
+SELECT a.job_order_id, min(c.changed_at)::timestamptz AS first_at
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'submitted'
+GROUP BY a.job_order_id
+HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
+LIMIT 20000;
+
+-- Every category some applications have been in (reports: conversions).
+-- name: CategoriesReached :many
+SELECT DISTINCT application_id, to_category::text AS category FROM application_stage_change
+WHERE application_id = ANY(@ids::text[]) AND to_category IS NOT NULL;
+
 -- Stage moves, newest first (the dashboard's timeline, or one candidate's).
 -- name: StageMoves :many
 SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.from_category, c.to_category, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id

@@ -48,8 +48,15 @@ type Placed struct {
 
 // Job is what reports need to know about a job (jobs module).
 type Job struct {
-	Title  string
-	Opened time.Time
+	Title   string
+	Opened  time.Time
+	OwnerID *string
+}
+
+// FirstCV is when a job's first CV was sent (its first move to submitted).
+type FirstCV struct {
+	JobID string
+	At    time.Time
 }
 
 // Deps is what the module reads from other modules, in its transaction.
@@ -57,6 +64,10 @@ type Deps struct {
 	Applications interface {
 		Facts(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Application, error)
 		FirstPlaced(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Placed, error)
+		// FirstCVs are the jobs whose first CV was sent from one instant to another.
+		FirstCVs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]FirstCV, error)
+		// CategoriesReached gives every category each application has been in.
+		CategoriesReached(ctx context.Context, tx pgx.Tx, applicationIDs []string) (map[string][]string, error)
 		// Categories are the company's stage categories, in order.
 		Categories(ctx context.Context, tx pgx.Tx) ([]Category, error)
 	}

@@ -13,7 +13,7 @@ export function useRememberedPeople(meId: string | undefined): [People, (p: Peop
   const [people, setPeople] = useState<People | null>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORE) ?? "null") as unknown;
-      if (saved === "team" || (Array.isArray(saved) && saved.length > 0 && saved.every((s) => typeof s === "string"))) return saved as People;
+      if (saved === "team" || (Array.isArray(saved) && saved.length > 0 && saved.every((s) => typeof s === "string"))) return saved;
     } catch { /* fall back to yourself */ }
     return null;
   });

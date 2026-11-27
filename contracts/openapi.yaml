@@ -8937,6 +8937,36 @@ paths:
               schema: {$ref: '#/components/schemas/Forecast'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/reports/performance:
+    get:
+      operationId: getPerformance
+      tags: [reports]
+      summary: "Performance over time: CVs sent, each stage category, placements and fees by week, month, quarter or year; conversions; days to first CV and to fill"
+      x-permission: reports:read
+      parameters:
+        - name: grain
+          in: query
+          required: false
+          description: How the range is split (month unless given).
+          schema: {$ref: '#/components/schemas/PerformanceGrain'}
+        - {name: from, in: query, required: false, description: First day (1 January this year unless given)., schema: {type: string, format: date}}
+        - {name: to, in: query, required: false, description: Last day (today unless given)., schema: {type: string, format: date}}
+        - name: user
+          in: query
+          required: false
+          description: "Whose numbers (repeat for more than one); none: the whole team's. Without reports.team:read, only your own."
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/UserId'}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Performance'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/reports/summary/export:
     get:
       operationId: exportReport
@@ -18665,6 +18695,64 @@ components:
         jobTitle: {type: string}
         daysToFill: {type: integer, description: From the job being opened to its first placement in the period.}
         placements: {type: integer}
+    PerformanceGrain:
+      type: string
+      enum: [week, month, quarter, year]
+    PerformanceRow:
+      type: object
+      required: [from, to, cvsSent, categories, placements, fees]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        cvsSent: {type: integer, description: "CVs sent to clients (moved to submitted or emailed; a candidate once a day per person)."}
+        categories:
+          type: object
+          description: "Candidates moved into each stage category (StageCategory.key), each once per person and category in the period."
+          additionalProperties: {type: integer}
+        placements: {type: integer, description: "Placements that stand, by their start date."}
+        fees:
+          type: array
+          description: Their fees per currency (empty when fees are hidden).
+          items: {$ref: '#/components/schemas/MoneyTotal'}
+    PerformanceConversion:
+      type: object
+      required: [from, to, entered, reached, percent]
+      properties:
+        from: {type: string, description: The category (StageCategory.key) candidates were moved into in the range.}
+        to: {type: string, description: The next category; reached counts those who got to it or further by now.}
+        entered: {type: integer}
+        reached: {type: integer}
+        percent: {type: integer, nullable: true, description: Rounded; null when none entered.}
+    PerformanceDays:
+      type: object
+      required: [average, jobs]
+      properties:
+        average: {type: number, nullable: true, description: Days on average (one decimal); null when no job counts.}
+        jobs: {type: integer}
+    Performance:
+      type: object
+      required: [grain, from, to, users, team, rows, total, conversions, daysToFirstCv, daysToFill, feesHidden]
+      properties:
+        grain: {$ref: '#/components/schemas/PerformanceGrain'}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        users:
+          type: array
+          description: Whose numbers; empty for the whole team.
+          items: {$ref: '#/components/schemas/UserId'}
+        team: {type: boolean, description: 'You may see others'' numbers (reports.team:read).'}
+        rows:
+          type: array
+          description: Each period, in order (the first and last cut to the range).
+          items: {$ref: '#/components/schemas/PerformanceRow'}
+        total: {$ref: '#/components/schemas/PerformanceRow'}
+        conversions:
+          type: array
+          description: "For each stage category after the first, in the company's order: of the candidates moved into the one before it in the range, how many went on."
+          items: {$ref: '#/components/schemas/PerformanceConversion'}
+        daysToFirstCv: {allOf: [{$ref: '#/components/schemas/PerformanceDays'}], description: "From a job being opened to its first CV sent, for jobs whose first CV was sent in the range (the chosen people's jobs)."}
+        daysToFill: {allOf: [{$ref: '#/components/schemas/PerformanceDays'}], description: "From a job being opened to its first placement, for jobs first placed in the range (the chosen people's jobs)."}
+        feesHidden: {type: boolean, description: "Fees are left out (placements.fees:read is needed)."}
     ActivityPeriod:
       type: string
       enum: [week, month]

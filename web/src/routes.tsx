@@ -126,7 +126,7 @@ export const ROUTES: Route[] = [
   { section: "leads", path: /^#\/leads/, permission: "leads:read", menu: { in: "main", label: "Leads", href: "#/leads", more: true },
     render: (c) => <Leads permissions={c.permissions} /> },
   { section: "reports", path: /^#\/reports/, permission: "reports:read", menu: { in: "main", label: "Reports", href: "#/reports", more: true },
-    render: (c) => <Reports permissions={c.permissions} /> },
+    render: (c) => <Reports permissions={c.permissions} meId={c.me.user.id} /> },
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 

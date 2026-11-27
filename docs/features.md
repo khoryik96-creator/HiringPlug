@@ -1956,6 +1956,27 @@ history before this was rebuilt from the audit log.
   (`reports.settings:manage`): per week and per month, one row for everyone
   and a row per person (a person's own target replaces everyone's); an empty
   box means no target for that activity.
+- **Targets for stage categories (1.59.0):** beside those four, a target per
+  stage category of the company (1st, 2nd and Final Interview, Offer, or its
+  own; the Submitted and Placed kinds are what CVs sent and Placements count):
+  the candidates the person moves into a stage of it, each once however often
+  moved back in. The activity shows a category someone shown has a target for.
+- **Whose numbers (1.59.0):** owners and admins choose on the dashboard
+  (**Showing ▾**): themselves, one or more people, or the **Whole team**.
+  Activity shows one person's cards, several people's rows with their total,
+  or the team's total against the targets added up; **Open jobs** and the job
+  numbers (in progress, moved this week, placed in 30 days) count the jobs the
+  chosen people own (the whole team: every job). Remembered on that computer.
+- **Performance (1.59.0, Reports):** by week, month, quarter or year over this
+  year to date, last year, the last 12 months or chosen dates, for chosen
+  people or the team (others' numbers need `reports.team:read`): **billings**
+  (fees of placements that stand, by start date, per currency; with
+  `placements.fees:read`), **placements**, **CVs sent** and each stage
+  category, with the total (year to date); **conversion** from each category
+  to the next (of the candidates moved into one in the range, how many reached
+  the next or went further by now); and the **average days** from a job
+  opening to its first CV and to its first placement (the jobs the chosen
+  people own).
 - **Revenue forecast** (owners and admins: `reports.forecast:read` and
   `placements.fees:read`): the fees expected from candidates now at
   Submitted, Interview, Offer and Placed (a placement until it is invoiced),

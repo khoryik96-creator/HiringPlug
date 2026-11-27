@@ -5630,6 +5630,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Performance over time: CVs sent, each stage category, placements and fees by week, month, quarter or year; conversions; days to first CV and to fill */
+        get: operations["getPerformance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/summary/export": {
         parameters: {
             query?: never;
@@ -12421,6 +12438,61 @@ export interface components {
             /** @description From the job being opened to its first placement in the period. */
             daysToFill: number;
             placements: number;
+        };
+        /** @enum {string} */
+        PerformanceGrain: "week" | "month" | "quarter" | "year";
+        PerformanceRow: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description CVs sent to clients (moved to submitted or emailed; a candidate once a day per person). */
+            cvsSent: number;
+            /** @description Candidates moved into each stage category (StageCategory.key), each once per person and category in the period. */
+            categories: {
+                [key: string]: number;
+            };
+            /** @description Placements that stand, by their start date. */
+            placements: number;
+            /** @description Their fees per currency (empty when fees are hidden). */
+            fees: components["schemas"]["MoneyTotal"][];
+        };
+        PerformanceConversion: {
+            /** @description The category (StageCategory.key) candidates were moved into in the range. */
+            from: string;
+            /** @description The next category; reached counts those who got to it or further by now. */
+            to: string;
+            entered: number;
+            reached: number;
+            /** @description Rounded; null when none entered. */
+            percent: number | null;
+        };
+        PerformanceDays: {
+            /** @description Days on average (one decimal); null when no job counts. */
+            average: number | null;
+            jobs: number;
+        };
+        Performance: {
+            grain: components["schemas"]["PerformanceGrain"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description Whose numbers; empty for the whole team. */
+            users: components["schemas"]["UserId"][];
+            /** @description You may see others' numbers (reports.team:read). */
+            team: boolean;
+            /** @description Each period, in order (the first and last cut to the range). */
+            rows: components["schemas"]["PerformanceRow"][];
+            total: components["schemas"]["PerformanceRow"];
+            /** @description For each stage category after the first, in the company's order: of the candidates moved into the one before it in the range, how many went on. */
+            conversions: components["schemas"]["PerformanceConversion"][];
+            /** @description From a job being opened to its first CV sent, for jobs whose first CV was sent in the range (the chosen people's jobs). */
+            daysToFirstCv: components["schemas"]["PerformanceDays"];
+            /** @description From a job being opened to its first placement, for jobs first placed in the range (the chosen people's jobs). */
+            daysToFill: components["schemas"]["PerformanceDays"];
+            /** @description Fees are left out (placements.fees:read is needed). */
+            feesHidden: boolean;
         };
         /** @enum {string} */
         ActivityPeriod: "week" | "month";
@@ -24382,6 +24454,38 @@ export interface operations {
                     "application/json": components["schemas"]["Forecast"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPerformance: {
+        parameters: {
+            query?: {
+                /** @description How the range is split (month unless given). */
+                grain?: components["schemas"]["PerformanceGrain"];
+                /** @description First day (1 January this year unless given). */
+                from?: string;
+                /** @description Last day (today unless given). */
+                to?: string;
+                /** @description Whose numbers (repeat for more than one); none: the whole team's. Without reports.team:read, only your own. */
+                user?: components["schemas"]["UserId"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Performance"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

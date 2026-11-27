@@ -44,6 +44,19 @@ func (a reportApplications) FirstPlaced(ctx context.Context, tx pgx.Tx, from, to
 	return out, err
 }
 
+func (a reportApplications) FirstCVs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.FirstCV, error) {
+	firsts, err := a.pipeline.FirstSubmitted(ctx, tx, from, to)
+	out := make([]reports.FirstCV, len(firsts))
+	for i, f := range firsts {
+		out[i] = reports.FirstCV{JobID: f.JobID, At: f.At}
+	}
+	return out, err
+}
+
+func (a reportApplications) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]string, error) {
+	return a.pipeline.CategoriesReached(ctx, tx, ids)
+}
+
 type reportSources struct{ candidates *candidates.Module }
 
 func (a reportSources) Sources(ctx context.Context, tx pgx.Tx, ids []string) (map[string]*string, error) {
@@ -61,7 +74,7 @@ func (a reportJobs) Jobs(ctx context.Context, tx pgx.Tx, ids []string) (map[stri
 	briefs, err := a.jobs.Briefs(ctx, tx, ids)
 	out := make(map[string]reports.Job, len(briefs))
 	for id, b := range briefs {
-		out[id] = reports.Job{Title: b.Title, Opened: b.CreatedAt}
+		out[id] = reports.Job{Title: b.Title, Opened: b.CreatedAt, OwnerID: b.OwnerID}
 	}
 	return out, err
 }
@@ -72,7 +85,7 @@ func (a reportPlacements) Facts(ctx context.Context, tx pgx.Tx, fromDay, toDay t
 	facts, err := a.placements.Facts(ctx, tx, fromDay, toDay)
 	out := make([]reports.Placement, len(facts))
 	for i, f := range facts {
-		out[i] = reports.Placement{RecruiterID: f.RecruiterID, Status: f.Status, FeeAmount: f.FeeAmount, FeeCurrency: f.FeeCurrency}
+		out[i] = reports.Placement{RecruiterID: f.RecruiterID, Status: f.Status, FeeAmount: f.FeeAmount, FeeCurrency: f.FeeCurrency, StartDate: f.StartDate}
 	}
 	return out, err
 }

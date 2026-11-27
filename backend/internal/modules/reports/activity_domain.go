@@ -59,7 +59,10 @@ type Facts struct {
 }
 
 // CategoryMove is a user moving an application into a stage of a category.
-type CategoryMove struct{ By, ApplicationID, Category string }
+type CategoryMove struct {
+	By, ApplicationID, Category string
+	At                          time.Time
+}
 
 // CountActivity adds up each user's activity. A screening call counts once
 // (its note is the call); a CV sent counts once per candidate per day for the

@@ -7118,6 +7118,89 @@ class JobFill(BaseModel):
     placements: int
 
 
+class PerformanceGrain(StrEnum):
+    week = "week"
+    month = "month"
+    quarter = "quarter"
+    year = "year"
+
+
+class PerformanceRow(BaseModel):
+    from_: Annotated[date, Field(alias="from")]
+    to: date
+    cvsSent: Annotated[
+        int,
+        Field(
+            description="CVs sent to clients (moved to submitted or emailed; a candidate once a day per person)."
+        ),
+    ]
+    categories: Annotated[
+        dict[str, int],
+        Field(
+            description="Candidates moved into each stage category (StageCategory.key), each once per person and category in the period."
+        ),
+    ]
+    placements: Annotated[int, Field(description="Placements that stand, by their start date.")]
+    fees: Annotated[
+        list[MoneyTotal], Field(description="Their fees per currency (empty when fees are hidden).")
+    ]
+
+
+class PerformanceConversion(BaseModel):
+    from_: Annotated[
+        str,
+        Field(
+            alias="from",
+            description="The category (StageCategory.key) candidates were moved into in the range.",
+        ),
+    ]
+    to: Annotated[
+        str, Field(description="The next category; reached counts those who got to it or further by now.")
+    ]
+    entered: int
+    reached: int
+    percent: Annotated[int | None, Field(description="Rounded; null when none entered.")]
+
+
+class PerformanceDays(BaseModel):
+    average: Annotated[
+        float | None, Field(description="Days on average (one decimal); null when no job counts.")
+    ]
+    jobs: int
+
+
+class Performance(BaseModel):
+    grain: PerformanceGrain
+    from_: Annotated[date, Field(alias="from")]
+    to: date
+    users: Annotated[list[UserId], Field(description="Whose numbers; empty for the whole team.")]
+    team: Annotated[bool, Field(description="You may see others' numbers (reports.team:read).")]
+    rows: Annotated[
+        list[PerformanceRow],
+        Field(description="Each period, in order (the first and last cut to the range)."),
+    ]
+    total: PerformanceRow
+    conversions: Annotated[
+        list[PerformanceConversion],
+        Field(
+            description="For each stage category after the first, in the company's order: of the candidates moved into the one before it in the range, how many went on."
+        ),
+    ]
+    daysToFirstCv: Annotated[
+        PerformanceDays,
+        Field(
+            description="From a job being opened to its first CV sent, for jobs whose first CV was sent in the range (the chosen people's jobs)."
+        ),
+    ]
+    daysToFill: Annotated[
+        PerformanceDays,
+        Field(
+            description="From a job being opened to its first placement, for jobs first placed in the range (the chosen people's jobs)."
+        ),
+    ]
+    feesHidden: Annotated[bool, Field(description="Fees are left out (placements.fees:read is needed).")]
+
+
 class ActivityPeriod(StrEnum):
     week = "week"
     month = "month"

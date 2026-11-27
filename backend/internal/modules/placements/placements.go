@@ -170,6 +170,7 @@ type Fact struct {
 	RecruiterID            *string
 	Status                 string
 	FeeAmount, FeeCurrency *string
+	StartDate              time.Time
 }
 
 // Facts returns the placements starting between two days (inclusive), in the
@@ -185,7 +186,7 @@ func (m *Module) Facts(ctx context.Context, tx pgx.Tx, fromDay, toDay time.Time)
 		if err != nil {
 			return nil, err
 		}
-		out[i] = Fact{RecruiterID: r.RecruiterID, Status: r.Status, FeeAmount: fee, FeeCurrency: r.FeeCurrency}
+		out[i] = Fact{RecruiterID: r.RecruiterID, Status: r.Status, FeeAmount: fee, FeeCurrency: r.FeeCurrency, StartDate: r.StartDate}
 	}
 	return out, nil
 }

@@ -253,6 +253,34 @@ func (m *Module) FirstPlaced(ctx context.Context, tx pgx.Tx, from, to time.Time)
 	return out, err
 }
 
+// JobFirst is when something first happened on a job.
+type JobFirst struct {
+	JobID string
+	At    time.Time
+}
+
+// FirstSubmitted returns the jobs whose first CV was sent (their first move
+// to submitted) between two instants, in the caller's transaction.
+func (m *Module) FirstSubmitted(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]JobFirst, error) {
+	rows, err := store.New(tx).FirstSubmittedBetween(ctx, store.FirstSubmittedBetweenParams{FromTime: from, ToTime: to})
+	out := make([]JobFirst, len(rows))
+	for i, r := range rows {
+		out[i] = JobFirst{JobID: r.JobOrderID, At: r.FirstAt}
+	}
+	return out, err
+}
+
+// CategoriesReached returns every category each of some applications has
+// been in, in the caller's transaction.
+func (m *Module) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]string, error) {
+	rows, err := store.New(tx).CategoriesReached(ctx, ids)
+	out := map[string][]string{}
+	for _, r := range rows {
+		out[r.ApplicationID] = append(out[r.ApplicationID], r.Category)
+	}
+	return out, err
+}
+
 // moveTo moves an application to stage (its kind's first step), with the
 // category it then falls under.
 func (m *Module) moveTo(ctx context.Context, tx pgx.Tx, row store.Application, stage string) error {
