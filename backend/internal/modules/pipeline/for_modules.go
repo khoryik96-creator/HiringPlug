@@ -6,6 +6,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -263,6 +264,9 @@ type JobFirst struct {
 // to submitted) between two instants, in the caller's transaction.
 func (m *Module) FirstSubmitted(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]JobFirst, error) {
 	rows, err := store.New(tx).FirstSubmittedBetween(ctx, store.FirstSubmittedBetweenParams{FromTime: from, ToTime: to})
+	if err == nil && len(rows) >= MaxReportJobs {
+		return nil, ErrTooManyMoves
+	}
 	out := make([]JobFirst, len(rows))
 	for i, r := range rows {
 		out[i] = JobFirst{JobID: r.JobOrderID, At: r.FirstAt}
@@ -288,11 +292,11 @@ func (m *Module) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string)
 	if err != nil {
 		return nil, err
 	}
-	first := firstOfKind(cats)
+	history := historyOf(cats)
 	out := map[string][]Reached{}
 	for _, r := range rows {
-		if c := categoryOf(r.ToStage, r.ToCategory, first); c != "" {
-			out[r.ApplicationID] = append(out[r.ApplicationID], Reached{Category: c, At: r.ChangedAt})
+		if c := history.categoryOf(r.ToStage, r.ToCategory); c != "" {
+			out[r.ApplicationID] = append(out[r.ApplicationID], Reached{Category: c, At: r.LastAt})
 		}
 	}
 	return out, nil
@@ -302,6 +306,9 @@ func (m *Module) CategoriesReached(ctx context.Context, tx pgx.Tx, ids []string)
 // instants, in the caller's transaction.
 func (m *Module) FirstPlacedJobs(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]JobFirst, error) {
 	rows, err := store.New(tx).FirstPlacedJobsBetween(ctx, store.FirstPlacedJobsBetweenParams{FromTime: from, ToTime: to})
+	if err == nil && len(rows) >= MaxReportJobs {
+		return nil, ErrTooManyMoves
+	}
 	out := make([]JobFirst, len(rows))
 	for i, r := range rows {
 		out[i] = JobFirst{JobID: r.JobOrderID, At: r.FirstAt}
@@ -309,24 +316,48 @@ func (m *Module) FirstPlacedJobs(ctx context.Context, tx pgx.Tx, from, to time.T
 	return out, err
 }
 
-// firstOfKind is each stage kind's first category (by position).
-func firstOfKind(cats []Category) map[string]string {
-	out := map[string]string{}
-	for _, c := range cats {
-		if _, ok := out[c.Kind]; !ok {
-			out[c.Kind] = c.Key
-		}
-	}
-	return out
+// ErrTooManyMoves is returned when a period holds more moves than one read
+// takes (MaxReportMoves): the caller asks for a shorter period instead of
+// counting a part of them.
+var ErrTooManyMoves = errors.New("pipeline: too many moves in the period")
+
+// MaxReportMoves is the most stage moves one report read takes, and
+// MaxReportJobs the most jobs (the queries' LIMIT).
+const (
+	MaxReportMoves = 1000000
+	MaxReportJobs  = 200000
+)
+
+// history reads the categories of recorded moves against today's categories.
+type history struct {
+	known map[string]bool
+	first map[string]string // each kind's first category, by position
 }
 
-// categoryOf is the category a stage move is in: the one recorded, else (a
-// move from before categories) its stage's first; "" for a closed stage.
-func categoryOf(stage string, category *string, first map[string]string) string {
-	if category != nil && *category != "" {
+func historyOf(cats []Category) history {
+	h := history{known: map[string]bool{}, first: map[string]string{}}
+	for _, c := range cats {
+		h.known[c.Key] = true
+		if _, ok := h.first[c.Kind]; !ok {
+			h.first[c.Kind] = c.Key
+		}
+	}
+	return h
+}
+
+// categoryOf is the category a recorded move is in: the one recorded while
+// the company still has it; else (a move from before categories, or one
+// into a category removed since) its stage's standard category while the
+// company keeps it, else its stage's first. Reordering categories never moves
+// past numbers. "" for a closed stage.
+func (h history) categoryOf(stage string, category *string) string {
+	if category != nil && h.known[*category] {
 		return *category
 	}
-	return first[stage]
+	if h.known[stage] { // the standard key of each kind is the stage's own name
+		return stage
+	}
+	return h.first[stage]
 }
 
 // moveTo moves an application to stage (its kind's first step), with the

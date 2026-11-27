@@ -21,6 +21,7 @@ package placements
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -173,12 +174,23 @@ type Fact struct {
 	StartDate              time.Time
 }
 
+// ErrTooManyPlacements is returned when a period holds more placements than
+// one read takes (MaxReportPlacements): the caller asks for a shorter period.
+var ErrTooManyPlacements = errors.New("placements: too many placements in the period")
+
+// MaxReportPlacements is the most placements one report read takes (the
+// query's LIMIT).
+const MaxReportPlacements = 200000
+
 // Facts returns the placements starting between two days (inclusive), in the
 // caller's transaction.
 func (m *Module) Facts(ctx context.Context, tx pgx.Tx, fromDay, toDay time.Time) ([]Fact, error) {
 	rows, err := store.New(tx).PlacementFacts(ctx, store.PlacementFactsParams{FromDay: fromDay, ToDay: toDay})
 	if err != nil {
 		return nil, err
+	}
+	if len(rows) >= MaxReportPlacements {
+		return nil, ErrTooManyPlacements
 	}
 	out := make([]Fact, len(rows))
 	for i, r := range rows {

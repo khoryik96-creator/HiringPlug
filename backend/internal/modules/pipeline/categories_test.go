@@ -85,3 +85,22 @@ func TestANewCategoryNeverTakesARemovedOnesKey(t *testing.T) {
 	assert.Equal(t, "interview_2_2", got[len(got)-2].Key, "a key of its own")
 	assert.Equal(t, []string{"interview_2"}, Removed(before, got), "the removed one is seen as removed (its use is checked)")
 }
+
+// A recorded move reads as today's category: the one recorded while the
+// company keeps it, else its stage's standard one, else its stage's first.
+// Reordering categories never moves past numbers.
+func TestHistoryReadsMovesAgainstTodaysCategories(t *testing.T) {
+	str := func(s string) *string { return &s }
+	reordered := []Category{
+		{Key: "technical_test", Kind: Interview}, {Key: Interview, Kind: Interview}, {Key: "interview_final", Kind: Interview},
+		{Key: Offer, Kind: Offer},
+	}
+	h := historyOf(reordered)
+	assert.Equal(t, Interview, h.categoryOf(Interview, nil), "before categories: the standard 1st Interview, not the first listed")
+	assert.Equal(t, "technical_test", h.categoryOf(Interview, str("technical_test")))
+	assert.Equal(t, Interview, h.categoryOf(Interview, str("interview_2")), "a round removed since: the stage's standard one")
+	assert.Empty(t, h.categoryOf("rejected", nil), "a closed stage has none")
+
+	custom := historyOf([]Category{{Key: "phone_screen", Kind: Interview}, {Key: "panel", Kind: Interview}})
+	assert.Equal(t, "phone_screen", custom.categoryOf(Interview, nil), "without the standard one: the stage's first")
+}

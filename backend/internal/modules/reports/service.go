@@ -69,7 +69,7 @@ func (s *Service) Report(ctx context.Context, p authz.Principal, from, to *time.
 		out.TimeToFill, out.JobTitles, err = s.timeToFill(ctx, tx, start, end)
 		return err
 	})
-	return out, err
+	return out, tooMuch(err)
 }
 
 // applications are those made in the period, each with its source: the

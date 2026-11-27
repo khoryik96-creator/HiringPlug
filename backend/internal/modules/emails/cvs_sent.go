@@ -6,6 +6,7 @@ package emails
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -49,10 +50,20 @@ type CVEmailed struct {
 	At                    time.Time
 }
 
+// ErrTooManyEmails is returned when a period holds more emails with CVs than
+// one read takes (MaxReportEmails): the caller asks for a shorter period.
+var ErrTooManyEmails = errors.New("emails: too many CVs emailed in the period")
+
+// MaxReportEmails is the most emails one report read takes (the query's LIMIT).
+const MaxReportEmails = 500000
+
 // CVsEmailed returns the CVs emailed in [from, to) (not failed), one per
 // candidate per email, in the caller's transaction.
 func (m *Module) CVsEmailed(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]CVEmailed, error) {
 	rows, err := store.New(tx).CVsEmailedBetween(ctx, store.CVsEmailedBetweenParams{FromTime: from, ToTime: to})
+	if err == nil && len(rows) >= MaxReportEmails {
+		return nil, ErrTooManyEmails
+	}
 	var out []CVEmailed
 	for _, r := range rows {
 		for _, id := range r.CvCandidateIds {

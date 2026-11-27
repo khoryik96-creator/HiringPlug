@@ -6,6 +6,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -56,8 +57,17 @@ func (a reportActivity) ScreeningCallNotes(ctx context.Context, tx pgx.Tx, noteI
 	return a.candidates.ScreeningCallNotes(ctx, tx, noteIDs)
 }
 
+// tooMuch is a source's "more than one read takes" as the reports module's.
+func tooMuch(err error) error {
+	if errors.Is(err, pipeline.ErrTooManyMoves) || errors.Is(err, emails.ErrTooManyEmails) || errors.Is(err, placements.ErrTooManyPlacements) {
+		return reports.ErrTooMuchData
+	}
+	return err
+}
+
 func (a reportActivity) Submitted(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.CVSent, error) {
 	moves, err := a.pipeline.MovesTo(ctx, tx, pipeline.Submitted, from, to)
+	err = tooMuch(err)
 	out := make([]reports.CVSent, len(moves))
 	for i, m := range moves {
 		out[i] = reports.CVSent{By: m.By, CandidateID: m.CandidateID, At: m.At}
@@ -67,6 +77,7 @@ func (a reportActivity) Submitted(ctx context.Context, tx pgx.Tx, from, to time.
 
 func (a reportActivity) CVsEmailed(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.CVSent, error) {
 	sent, err := a.emails.CVsEmailed(ctx, tx, from, to)
+	err = tooMuch(err)
 	out := make([]reports.CVSent, len(sent))
 	for i, s := range sent {
 		out[i] = reports.CVSent{By: s.SenderID, CandidateID: s.CandidateID, At: s.At}
@@ -94,6 +105,7 @@ func (a reportActivity) Placements(ctx context.Context, tx pgx.Tx, from, to time
 
 func (a reportActivity) CategoryMoves(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]reports.CategoryMove, error) {
 	moves, err := a.pipeline.MovesToCategory(ctx, tx, from, to)
+	err = tooMuch(err)
 	out := make([]reports.CategoryMove, len(moves))
 	for i, m := range moves {
 		out[i] = reports.CategoryMove{By: m.By, ApplicationID: m.ApplicationID, CandidateID: m.CandidateID, Category: m.Category, At: m.At}

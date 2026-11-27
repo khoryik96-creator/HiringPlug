@@ -1,10 +1,16 @@
 package reports
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -114,4 +120,13 @@ func TestExportedSourcesUseSettingsNames(t *testing.T) {
 	sources := Tables(r)[1]
 	assert.Equal(t, "Sources", sources.Name)
 	assert.Equal(t, []string{"JobStreet (SEEK)", "Walk in", "Not recorded"}, []string{sources.Rows[0][0], sources.Rows[1][0], sources.Rows[2][0]})
+}
+
+func TestTooMuchAsksForAShorterPeriod(t *testing.T) {
+	var e *apperr.Error
+	require.ErrorAs(t, tooMuch(fmt.Errorf("reading moves: %w", ErrTooMuchData)), &e)
+	assert.Equal(t, api.ErrorCodeVALIDATIONFAILED, e.Code, "a request for a shorter period, not a part counted")
+	assert.NoError(t, tooMuch(nil))
+	other := errors.New("boom")
+	assert.Equal(t, other, tooMuch(other))
 }

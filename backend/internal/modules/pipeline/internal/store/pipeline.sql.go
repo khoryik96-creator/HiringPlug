@@ -184,20 +184,20 @@ func (q *Queries) ApplicationsOf(ctx context.Context, arg ApplicationsOfParams) 
 }
 
 const categoriesReached = `-- name: CategoriesReached :many
-SELECT application_id, to_stage, to_category, changed_at FROM application_stage_change
+SELECT application_id, to_stage, to_category, max(changed_at)::timestamptz AS last_at FROM application_stage_change
 WHERE application_id = ANY($1::text[])
-ORDER BY changed_at, id
+GROUP BY application_id, to_stage, to_category
 `
 
 type CategoriesReachedRow struct {
 	ApplicationID string
 	ToStage       string
 	ToCategory    *string
-	ChangedAt     time.Time
+	LastAt        time.Time
 }
 
-// Every stage move of some applications, oldest first (reports: conversions).
-// A move without a category (before categories) is in its stage's first.
+// For each of some applications, each stage and category it got to and the
+// last time (reports: conversions ask whether it got there after a moment).
 func (q *Queries) CategoriesReached(ctx context.Context, ids []string) ([]CategoriesReachedRow, error) {
 	rows, err := q.db.Query(ctx, categoriesReached, ids)
 	if err != nil {
@@ -211,7 +211,7 @@ func (q *Queries) CategoriesReached(ctx context.Context, ids []string) ([]Catego
 			&i.ApplicationID,
 			&i.ToStage,
 			&i.ToCategory,
-			&i.ChangedAt,
+			&i.LastAt,
 		); err != nil {
 			return nil, err
 		}

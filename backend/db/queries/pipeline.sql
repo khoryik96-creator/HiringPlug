@@ -120,12 +120,12 @@ HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
 ORDER BY a.job_order_id
 LIMIT 200000;
 
--- Every stage move of some applications, oldest first (reports: conversions).
--- A move without a category (before categories) is in its stage's first.
+-- For each of some applications, each stage and category it got to and the
+-- last time (reports: conversions ask whether it got there after a moment).
 -- name: CategoriesReached :many
-SELECT application_id, to_stage, to_category, changed_at FROM application_stage_change
+SELECT application_id, to_stage, to_category, max(changed_at)::timestamptz AS last_at FROM application_stage_change
 WHERE application_id = ANY(@ids::text[])
-ORDER BY changed_at, id;
+GROUP BY application_id, to_stage, to_category;
 
 -- Stage moves, newest first (the dashboard's timeline, or one candidate's).
 -- name: StageMoves :many

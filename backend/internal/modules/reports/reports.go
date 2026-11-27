@@ -26,10 +26,13 @@ package reports
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 )
 
 // Application is an application made in the period (pipeline module).
@@ -44,6 +47,18 @@ type Application struct {
 type Placed struct {
 	JobID               string
 	CreatedAt, PlacedAt time.Time
+}
+
+// ErrTooMuchData is what a source returns when a period holds more than one
+// read takes: the report asks for a shorter period instead of counting part.
+var ErrTooMuchData = errors.New("reports: too much data in the period")
+
+// tooMuch turns ErrTooMuchData into a request for a shorter period.
+func tooMuch(err error) error {
+	if errors.Is(err, ErrTooMuchData) {
+		return apperr.Validation(apperr.FieldErrors{{Field: "from", Message: "this period holds too much to count at once; choose a shorter one"}})
+	}
+	return err
 }
 
 // Job is what reports need to know about a job (jobs module).

@@ -79,6 +79,18 @@ describe("dashboard", () => {
     expect(JSON.parse(localStorage.getItem("hyplug.dashboard.people.usr_me") ?? "null"), "remembered, for this person").toBe("team");
   });
 
+  it("takes over the choice 1.59.0 kept for the whole computer, once", async () => {
+    localStorage.setItem("hyplug.dashboard.people", JSON.stringify("team"));
+    const team = { period: "week", from: "2026-11-23", to: "2026-11-29", team: true, rows: [] };
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/summary" ? summary
+      : path === "/v1/reports/activity" ? team : path === "/v1/settings/fields" ? testFieldSettings() : { items: [] }))) as never);
+    renderWithClient(<Dashboard permissions={["pipeline:read", "reports:read", "reports.team:read"]} meId="usr_me" />);
+    expect(await screen.findByRole("button", { name: /Showing Whole team/ })).toBeTruthy();
+    expect(get).toHaveBeenCalledWith("/v1/pipeline/summary", { params: { query: {} } });
+    expect(localStorage.getItem("hyplug.dashboard.people"), "the old one goes").toBeNull();
+    expect(localStorage.getItem("hyplug.dashboard.people.usr_me")).toBe(JSON.stringify("team"));
+  });
+
   it("keeps each person's choice to them, and drops people no longer in the team", async () => {
     localStorage.setItem("hyplug.dashboard.people.usr_other", JSON.stringify("team")); // someone else on this computer
     const team = { period: "week", from: "2026-11-23", to: "2026-11-29", team: true, rows: [

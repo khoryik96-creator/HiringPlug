@@ -22,6 +22,9 @@ type MovedBy struct {
 // the app), in the caller's transaction.
 func (m *Module) MovesTo(ctx context.Context, tx pgx.Tx, stage string, from, to time.Time) ([]MovedBy, error) {
 	rows, err := store.New(tx).MovesToStageBetween(ctx, store.MovesToStageBetweenParams{Stage: stage, FromTime: from, ToTime: to})
+	if err == nil && len(rows) >= MaxReportMoves {
+		return nil, ErrTooManyMoves
+	}
 	out := make([]MovedBy, len(rows))
 	for i, r := range rows {
 		out[i] = MovedBy{By: r.ChangedBy, CandidateID: r.CandidateID, At: r.ChangedAt}
@@ -44,17 +47,20 @@ func (m *Module) MovesToCategory(ctx context.Context, tx pgx.Tx, from, to time.T
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) >= MaxReportMoves {
+		return nil, ErrTooManyMoves
+	}
 	cats, _, err := categories(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	first := firstOfKind(cats)
+	history := historyOf(cats)
 	var out []CategoryMove
 	for _, r := range rows {
-		into := categoryOf(r.ToStage, r.ToCategory, first)
+		into := history.categoryOf(r.ToStage, r.ToCategory)
 		was := ""
 		if r.FromStage != nil {
-			was = categoryOf(*r.FromStage, r.FromCategory, first)
+			was = history.categoryOf(*r.FromStage, r.FromCategory)
 		}
 		if into == "" || into == was {
 			continue

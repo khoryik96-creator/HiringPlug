@@ -45,6 +45,7 @@ func (a reportApplications) FirstPlaced(ctx context.Context, tx pgx.Tx, from, to
 }
 
 func jobFirsts(firsts []pipeline.JobFirst, err error) ([]reports.JobFirst, error) {
+	err = tooMuch(err)
 	out := make([]reports.JobFirst, len(firsts))
 	for i, f := range firsts {
 		out[i] = reports.JobFirst{JobID: f.JobID, At: f.At}
@@ -97,6 +98,7 @@ type reportPlacements struct{ placements *placements.Module }
 
 func (a reportPlacements) Facts(ctx context.Context, tx pgx.Tx, fromDay, toDay time.Time) ([]reports.Placement, error) {
 	facts, err := a.placements.Facts(ctx, tx, fromDay, toDay)
+	err = tooMuch(err)
 	out := make([]reports.Placement, len(facts))
 	for i, f := range facts {
 		out[i] = reports.Placement{RecruiterID: f.RecruiterID, Status: f.Status, FeeAmount: f.FeeAmount, FeeCurrency: f.FeeCurrency, StartDate: f.StartDate}

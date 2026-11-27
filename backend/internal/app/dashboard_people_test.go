@@ -48,9 +48,19 @@ func TestTheDashboardShowsChosenPeoplesJobs(t *testing.T) {
 		}
 		return out
 	}
+	// Older activity is not this week's, for the team or for chosen people.
+	old := a.addToJob(owner, weis.Id, a.createCandidate(owner, map[string]any{"firstName": "Lama"}).Id)
+	require.Equal(t, http.StatusOK, a.move(owner, old, map[string]any{"stage": "screening"}).Status)
+	_, err := testutil.Current.Admin.Exec(t.Context(), `UPDATE application SET created_at = now() - interval '30 days' WHERE tenant_id = $1 AND id = $2`, tenant.ID, old.Id)
+	require.NoError(t, err)
+	_, err = testutil.Current.Admin.Exec(t.Context(), `UPDATE application_stage_change SET changed_at = now() - interval '30 days' WHERE tenant_id = $1 AND application_id = $2`, tenant.ID, old.Id)
+	require.NoError(t, err)
+
 	all := summary("")
 	assert.Equal(t, 3, all.OpenJobs)
-	assert.Equal(t, 3, all.AddedLast7Days)
+	assert.Equal(t, 3, all.AddedLast7Days, "Lama was added a month ago")
+	assert.Equal(t, 1, all.MovedLast7Days, "and moved a month ago: only Farid this week")
+	assert.Zero(t, all.MovedPrev7Days)
 
 	mine := summary("?owner=" + aina.ID)
 	assert.Equal(t, []string{"Accountant"}, titles(mine))
@@ -62,4 +72,5 @@ func TestTheDashboardShowsChosenPeoplesJobs(t *testing.T) {
 	assert.ElementsMatch(t, []string{"Accountant", "Engineer"}, titles(both))
 	assert.Equal(t, 1, both.MovedLast7Days)
 	assert.Equal(t, 3, both.AddedLast7Days)
+	assert.Equal(t, 2, both.StageCounts.Screening, "Farid and Lama are in screening now")
 }

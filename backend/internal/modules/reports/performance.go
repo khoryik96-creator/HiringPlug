@@ -84,7 +84,7 @@ func (s *Service) Performance(ctx context.Context, p authz.Principal, grain stri
 		}
 		return s.jobTimes(ctx, tx, &out, start, end, counts)
 	})
-	return out, err
+	return out, tooMuch(err)
 }
 
 func (s *Service) perfFacts(ctx context.Context, tx pgx.Tx, first, last, start, end time.Time, feesHidden bool) (PerfFacts, error) {

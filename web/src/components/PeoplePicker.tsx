@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 /** Everyone together, or some people by id. */
 export type People = "team" | string[];
 
+const LEGACY_STORE = "hyplug.dashboard.people";
+
 /** Each person's choice is their own, on a computer people share. */
 export const peopleStore = (meId: string | undefined) => `hyplug.dashboard.people.${meId ?? "anyone"}`;
 
@@ -18,6 +20,13 @@ export function useRememberedPeople(meId: string | undefined, known?: string[]):
   const STORE = peopleStore(meId);
   const [people, setPeople] = useState<People | null>(() => {
     try {
+      // 1.59.0 kept one choice for the whole computer: the first person to
+      // open the dashboard since takes it over, and it goes.
+      const old = localStorage.getItem(LEGACY_STORE);
+      if (old !== null) {
+        if (localStorage.getItem(STORE) === null) localStorage.setItem(STORE, old);
+        localStorage.removeItem(LEGACY_STORE);
+      }
       const saved = JSON.parse(localStorage.getItem(STORE) ?? "null") as unknown;
       if (saved === "team" || (Array.isArray(saved) && saved.length > 0 && saved.every((s) => typeof s === "string"))) return saved;
     } catch { /* fall back to yourself */ }
