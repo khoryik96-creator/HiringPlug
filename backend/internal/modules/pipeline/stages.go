@@ -68,9 +68,12 @@ func decodeSteps(raw []byte) []Step {
 	return out
 }
 
-func checkTemplate(in TemplateInput) (TemplateInput, error) {
+func checkTemplate(in TemplateInput, cats []Category) (TemplateInput, error) {
 	in.Name = joinSpaces(in.Name)
 	steps, errs := NormalizeSteps(in.Steps, newStepKey)
+	if len(errs) == 0 {
+		steps, errs = CheckStepCategories(steps, cats)
+	}
 	switch n := len([]rune(in.Name)); {
 	case n == 0:
 		errs.Add("name", "enter a name, e.g. Tech hiring")
@@ -90,32 +93,43 @@ func nameTaken(err error) error {
 	return err
 }
 
-func templateOf(r store.StageTemplate, jobs int) Template {
-	return Template{ID: r.ID, Name: r.Name, Version: int(r.Version), JobCount: jobs, IsDefault: r.IsDefault, Steps: decodeSteps(r.Steps), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+func templateOf(r store.StageTemplate, jobs int, cats []Category) Template {
+	return Template{ID: r.ID, Name: r.Name, Version: int(r.Version), JobCount: jobs, IsDefault: r.IsDefault, Steps: ResolveSteps(decodeSteps(r.Steps), cats),
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
-// Templates returns the company's stage templates, the default first.
-func (s *Service) Templates(ctx context.Context, p authz.Principal) ([]Template, error) {
+// Templates returns the company's stage templates, the default first, and
+// the standard stages (with their categories).
+func (s *Service) Templates(ctx context.Context, p authz.Principal) ([]Template, []Step, error) {
 	var out []Template
+	var standard []Step
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		cats, _, err := categories(ctx, tx)
+		if err != nil {
+			return err
+		}
+		standard = StandardStepsOf(cats)
 		rows, err := store.New(tx).ListStageTemplates(ctx)
 		for _, r := range rows {
-			out = append(out, templateOf(store.StageTemplate{ID: r.ID, Name: r.Name, Version: r.Version, IsDefault: r.IsDefault, Steps: r.Steps, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}, int(r.JobCount)))
+			out = append(out, templateOf(store.StageTemplate{ID: r.ID, Name: r.Name, Version: r.Version, IsDefault: r.IsDefault, Steps: r.Steps, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}, int(r.JobCount), cats))
 		}
 		return err
 	})
-	return out, err
+	return out, standard, err
 }
 
 // CreateTemplate saves a new stage template.
 func (s *Service) CreateTemplate(ctx context.Context, p authz.Principal, in TemplateInput) (Template, error) {
-	in, err := checkTemplate(in)
-	if err != nil {
-		return Template{}, err
-	}
 	var out Template
-	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		cats, _, err := categories(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if in, err = checkTemplate(in, cats); err != nil {
+			return err
+		}
 		if in.IsDefault {
 			if err := q.ClearDefaultStageTemplate(ctx, ""); err != nil {
 				return err
@@ -126,7 +140,7 @@ func (s *Service) CreateTemplate(ctx context.Context, p authz.Principal, in Temp
 		if err != nil {
 			return nameTaken(err)
 		}
-		out = templateOf(row, 0)
+		out = templateOf(row, 0, cats)
 		return audit.Record(ctx, tx, audit.Entry{Action: "stage_template.created", EntityType: "stage_template", EntityID: row.ID,
 			Changes: map[string]any{"name": in.Name, "default": in.IsDefault, "stages": len(in.Steps)}})
 	})
@@ -136,13 +150,16 @@ func (s *Service) CreateTemplate(ctx context.Context, p authz.Principal, in Temp
 // UpdateTemplate changes a template (version: the one loaded). Jobs that
 // chose it keep their copy; jobs following the default see the change.
 func (s *Service) UpdateTemplate(ctx context.Context, p authz.Principal, id string, version int, in TemplateInput) (Template, error) {
-	in, err := checkTemplate(in)
-	if err != nil {
-		return Template{}, err
-	}
 	var out Template
-	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		cats, _, err := categories(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if in, err = checkTemplate(in, cats); err != nil {
+			return err
+		}
 		if _, err := q.GetStageTemplate(ctx, id); database.IsNoRows(err) {
 			return apperr.NotFound("stage template")
 		} else if err != nil {
@@ -162,7 +179,7 @@ func (s *Service) UpdateTemplate(ctx context.Context, p authz.Principal, id stri
 		if err != nil {
 			return nameTaken(err)
 		}
-		out = templateOf(row, 0)
+		out = templateOf(row, 0, cats)
 		return audit.Record(ctx, tx, audit.Entry{Action: "stage_template.updated", EntityType: "stage_template", EntityID: id,
 			Changes: map[string]any{"name": in.Name, "default": in.IsDefault, "stages": len(in.Steps)}})
 	})
@@ -187,8 +204,21 @@ func (s *Service) DeleteTemplate(ctx context.Context, p authz.Principal, id stri
 	})
 }
 
-// jobStages reads a job's stages in tx.
+// jobStages reads a job's stages in tx, each with its category.
 func (s *Service) jobStages(ctx context.Context, tx pgx.Tx, jobID string) (JobStages, error) {
+	js, err := s.jobStagesSaved(ctx, tx, jobID)
+	if err != nil {
+		return js, err
+	}
+	cats, _, err := categories(ctx, tx)
+	if js.Source == FromStandard {
+		js.Steps = StandardStepsOf(cats)
+	}
+	js.Steps = ResolveSteps(js.Steps, cats)
+	return js, err
+}
+
+func (s *Service) jobStagesSaved(ctx context.Context, tx pgx.Tx, jobID string) (JobStages, error) {
 	q := store.New(tx)
 	out := JobStages{JobID: jobID}
 	plan, err := q.GetJobStagePlan(ctx, jobID)
@@ -256,6 +286,10 @@ func (s *Service) SetJobStages(ctx context.Context, p authz.Principal, jobID str
 				}
 			}
 		} else {
+			cats, _, err := categories(ctx, tx)
+			if err != nil {
+				return err
+			}
 			var from []Step
 			if templateID != nil {
 				t, err := q.GetStageTemplate(ctx, *templateID)
@@ -267,7 +301,7 @@ func (s *Service) SetJobStages(ctx context.Context, p authz.Principal, jobID str
 				if err != nil {
 					return err
 				}
-				from = decodeSteps(t.Steps)
+				from = ResolveSteps(decodeSteps(t.Steps), cats)
 			}
 			chosen := from
 			if steps != nil {
@@ -275,9 +309,12 @@ func (s *Service) SetJobStages(ctx context.Context, p authz.Principal, jobID str
 				if chosen, errs = NormalizeSteps(steps, newStepKey); len(errs) > 0 {
 					return errs.Err()
 				}
+				if chosen, errs = CheckStepCategories(chosen, cats); len(errs) > 0 {
+					return errs.Err()
+				}
 			}
 			raw, _ := json.Marshal(chosen)
-			_, err := q.UpsertJobStagePlan(ctx, store.UpsertJobStagePlanParams{JobOrderID: jobID, TemplateID: templateID, Steps: raw,
+			_, err = q.UpsertJobStagePlan(ctx, store.UpsertJobStagePlanParams{JobOrderID: jobID, TemplateID: templateID, Steps: raw,
 				Customized: templateID == nil || !SameSteps(chosen, from), ExpectedVersion: int32(version)}) //nolint:gosec // small
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("job stages")

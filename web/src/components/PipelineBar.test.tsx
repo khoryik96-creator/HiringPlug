@@ -17,7 +17,7 @@ const person = (n: number, stage: Application["stage"]): Application => {
   return {
     id: `appl_${id}`, candidateId: `cand_${id}`, candidateName: `Person ${String(n)}`, stage, version: 1,
     jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", jobTitle: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank",
-    candidateTitle: "Accountant", candidateAvailability: null, reason: stage === "rejected" ? "not_qualified" : null, reasonNote: null, channel: null,
+    candidateTitle: "Accountant", candidateAvailability: null, reason: stage === "rejected" ? "not_qualified" : null, reasonNote: null, category: null, channel: null,
     stageChangedAt: "2026-11-20T00:00:00Z", createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
   };
 };

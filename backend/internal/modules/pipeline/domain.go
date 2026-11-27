@@ -38,6 +38,7 @@ type Application struct {
 	CandidateID    string
 	Stage          string
 	Step           *string // the job's own stage it is in (Step.Key), when the job has custom stages
+	Category       *string // the category its stage falls under; nil when closed
 	Reason         *string
 	ReasonNote     *string
 	Channel        *string // where the application came from; nil when a recruiter added it
@@ -130,9 +131,10 @@ func same(a, b *string) bool {
 // standard stage it is a kind of (reports, automations, offers and
 // placements go by the kind).
 type Step struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Stage string `json:"stage"`
+	Key      string `json:"key"`
+	Label    string `json:"label"`
+	Stage    string `json:"stage"`
+	Category string `json:"category,omitempty"` // a category of its kind; none: the kind's first
 }
 
 // MaxSteps is the most stages a job or template has.

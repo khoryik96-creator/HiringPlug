@@ -8,7 +8,7 @@ import { downloadExport } from "../api/files";
 import { ExportButton } from "../components/ExportButton";
 import { RevenueForecast } from "../components/RevenueForecast";
 import { useFieldSettings } from "../components/useFieldSettings";
-import { formatDay, formatMoney, STAGE } from "../labels";
+import { formatDay, formatMoney } from "../labels";
 
 type Preset = "recent" | "this_year" | "last_year" | "custom";
 // Like the placements page: a few common periods, or two dates.
@@ -80,8 +80,8 @@ export function Reports({ permissions = [] }: { permissions?: Permission[] }) {
               <thead><tr><th>Stage</th><th>Reached</th><th>Of the stage before</th><th aria-hidden="true" className="bar-col" /></tr></thead>
               <tbody>
                 {r.funnel.map((f) => (
-                  <tr key={f.stage}>
-                    <td>{STAGE[f.stage]}</td><td>{f.reached}</td>
+                  <tr key={f.category}>
+                    <td>{f.label}</td><td>{f.reached}</td>
                     <td>{f.percentOfPrevious === null ? "" : `${String(f.percentOfPrevious)}%`}</td>
                     <td aria-hidden="true" className="bar-col"><span className="bar" style={{ width: top ? `${String((f.reached * 100) / top)}%` : 0 }} /></td>
                   </tr>

@@ -37,7 +37,7 @@ func (h *HTTP) GetReport(ctx context.Context, req api.GetReportRequestObject) (a
 		},
 	}
 	for i, f := range r.Funnel {
-		out.Funnel[i] = api.FunnelStage{Stage: api.Stage(f.Stage), Reached: f.Reached, PercentOfPrevious: c.OrNull(f.PercentOfPrevious)}
+		out.Funnel[i] = api.FunnelStage{Stage: api.Stage(f.Stage), Category: f.Category, Label: f.Label, Reached: f.Reached, PercentOfPrevious: c.OrNull(f.PercentOfPrevious)}
 	}
 	for i, s := range r.Sources {
 		out.Sources[i] = api.SourceRow{Source: s.Source, Applications: s.Applications, Interviewed: s.Interviewed, Placed: s.Placed}

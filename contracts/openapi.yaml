@@ -110,6 +110,11 @@ x-error-codes:
     module: careers
     status: 429
     description: Too many applications from one place in a short time. Try again later.
+  CATEGORY_IN_USE:
+    module: pipeline
+    status: 409
+    description: |
+      A category taken away is still used by a stage of a template or a job, or by an open application: it is kept. `details.stages` and `details.applications` say how many.
   CLAIM_DUPLICATE:
     module: claims
     status: 409
@@ -8289,6 +8294,43 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/stage-categories:
+    get:
+      operationId: listStageCategories
+      tags: [pipeline]
+      summary: The categories stages fall under, in order (the six standard ones when the company kept none of its own)
+      x-permission: pipeline:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StageCategories'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: setStageCategories
+      tags: [pipeline]
+      summary: Save the company's categories, in order (added, renamed, moved and taken away at once)
+      description: >
+        Every one of the six kinds keeps at least one category; a category keeps the kind it was made with. One taken away must be unused (CATEGORY_IN_USE).
+
+      x-permission: pipeline.categories:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StageCategoriesInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StageCategories'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/stage-templates:
     get:
       operationId: listStageTemplates
@@ -9902,6 +9944,7 @@ components:
         - offers:approve
         - offers:manage
         - offers:read
+        - pipeline.categories:manage
         - pipeline.templates:manage
         - pipeline:read
         - pipeline:update
@@ -9945,6 +9988,7 @@ components:
         - CALENDAR_NOT_CONNECTED
         - CANDIDATE_DUPLICATE_EMAIL
         - CAREERS_TOO_MANY_APPLICATIONS
+        - CATEGORY_IN_USE
         - CLAIM_DUPLICATE
         - CLAIM_STORAGE_NOT_CONNECTED
         - CLAIM_WRONG_STATUS
@@ -17639,13 +17683,56 @@ components:
       type: string
       description: The kind of a custom stage (reports, automations, offers and placements go by it).
       enum: [applied, screening, submitted, interview, offer, placed]
+    StageCategoryKey:
+      type: string
+      pattern: '^[a-z0-9_]{1,40}$'
+      description: A category's key; the six standard ones are keyed by their kind (interview, offer...).
+    StageCategory:
+      type: object
+      required: [key, label, kind]
+      properties:
+        key: {$ref: '#/components/schemas/StageCategoryKey'}
+        label: {type: string, minLength: 1, maxLength: 40}
+        kind: {$ref: '#/components/schemas/OpenStage'}
+    StageCategories:
+      type: object
+      required: [items, version]
+      properties:
+        items:
+          type: array
+          description: In order; grouped by kind (applied ... placed), in the company's order within a kind.
+          items: {$ref: '#/components/schemas/StageCategory'}
+        version: {type: string, description: "Send it back when saving: another save in between is refused (CONFLICT_STALE_VERSION)."}
+    StageCategoryInput:
+      type: object
+      additionalProperties: false
+      required: [label, kind]
+      properties:
+        key: {$ref: '#/components/schemas/StageCategoryKey'}
+        label: {type: string, maxLength: 60}
+        kind: {$ref: '#/components/schemas/OpenStage'}
+    StageCategoriesInput:
+      type: object
+      additionalProperties: false
+      required: [items, version]
+      properties:
+        items:
+          type: array
+          minItems: 6
+          maxItems: 40
+          description: "In order. An item with a key changes that category (its kind must stay); one without is new."
+          items: {$ref: '#/components/schemas/StageCategoryInput'}
+        version: {type: string}
     StageStep:
       type: object
-      required: [key, label, stage]
+      required: [key, label, stage, category]
       properties:
         key: {type: string, pattern: '^[a-z0-9_]{1,40}$', description: Stays the same when renamed.}
         label: {type: string, minLength: 1, maxLength: 40}
         stage: {$ref: '#/components/schemas/OpenStage'}
+        category:
+          allOf: [{$ref: '#/components/schemas/StageCategoryKey'}]
+          description: The category it falls under (of its kind); its kind's standard one unless chosen.
     StageStepInput:
       type: object
       additionalProperties: false
@@ -17654,6 +17741,9 @@ components:
         key: {type: string, pattern: '^[a-z0-9_]{1,40}$', description: A stage kept from before (renamed or moved); omit for a new one.}
         label: {type: string, maxLength: 60}
         stage: {$ref: '#/components/schemas/OpenStage'}
+        category:
+          allOf: [{$ref: '#/components/schemas/StageCategoryKey'}]
+          description: A category of the same kind; left out, the kind's standard one.
     StageTemplate:
       type: object
       required: [id, version, name, isDefault, steps, jobCount, createdAt, updatedAt]
@@ -17757,7 +17847,7 @@ components:
       enum: [careers_page, jobstreet, linkedin, indeed, facebook, referral, other]
     Application:
       type: object
-      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, candidateAvailability, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
+      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, candidateAvailability, stage, category, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
       properties:
         channel:
           allOf: [{$ref: '#/components/schemas/ApplicationChannel'}]
@@ -17777,6 +17867,10 @@ components:
           allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
           nullable: true
         stage: {$ref: '#/components/schemas/Stage'}
+        category:
+          type: string
+          nullable: true
+          description: The category its stage falls under (StageCategory.key); null when closed (rejected, withdrawn).
         step:
           type: string
           nullable: true
@@ -18484,9 +18578,11 @@ components:
         feesHidden: {type: boolean, description: "Fees are left out (placements.fees:read is needed)."}
     FunnelStage:
       type: object
-      required: [stage, reached, percentOfPrevious]
+      required: [stage, category, label, reached, percentOfPrevious]
       properties:
         stage: {$ref: '#/components/schemas/Stage'}
+        category: {type: string, description: "The category (StageCategory.key); a row per category, in the company's order."}
+        label: {type: string, description: The category's name.}
         reached: {type: integer}
         percentOfPrevious:
           type: integer
@@ -19887,6 +19983,11 @@ x-permissions:
     description: View offers (the salary needs offers.salary:read).
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  pipeline.categories:manage:
+    module: pipeline
+    description: Change the stage categories (1st, 2nd, Final Interview...) that reports count by.
+    sensitive: false
+    roles: [owner]
   pipeline.templates:manage:
     module: pipeline
     description: Create, change and delete the company's stage templates, and choose the default.

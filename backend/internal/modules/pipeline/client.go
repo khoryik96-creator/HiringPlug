@@ -60,7 +60,7 @@ func (m *Module) ClientApproved(ctx context.Context, tx pgx.Tx, id string) (stri
 	if !ok {
 		return row.Stage, nil
 	}
-	return Interview, clientMove(ctx, tx, row, Interview, step, nil, nil)
+	return Interview, m.clientMove(ctx, tx, row, Interview, step, nil, nil)
 }
 
 // ClientRejectedWith closes an application the client rejected, in the
@@ -87,12 +87,16 @@ func (m *Module) ClientRejectedWith(ctx context.Context, tx pgx.Tx, id, comment 
 		}
 		note = &c
 	}
-	return Rejected, clientMove(ctx, tx, row, Rejected, nil, &reason, note)
+	return Rejected, m.clientMove(ctx, tx, row, Rejected, nil, &reason, note)
 }
 
-func clientMove(ctx context.Context, tx pgx.Tx, row store.Application, to string, step, reason, note *string) error {
+func (m *Module) clientMove(ctx context.Context, tx pgx.Tx, row store.Application, to string, step, reason, note *string) error {
+	category, err := m.service.appCategory(ctx, tx, row.JobOrderID, to, step)
+	if err != nil {
+		return err
+	}
 	moved, err := store.New(tx).MoveApplication(ctx, store.MoveApplicationParams{
-		ID: row.ID, ExpectedVersion: row.Version, Stage: to, Step: step, Reason: reason, ReasonNote: note,
+		ID: row.ID, ExpectedVersion: row.Version, Stage: to, Step: step, Category: category, Reason: reason, ReasonNote: note,
 	})
 	if database.IsNoRows(err) {
 		return apperr.StaleVersion("application")

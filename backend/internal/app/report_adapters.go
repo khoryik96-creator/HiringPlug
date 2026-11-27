@@ -21,7 +21,16 @@ func (a reportApplications) Facts(ctx context.Context, tx pgx.Tx, from, to time.
 	facts, err := a.pipeline.Facts(ctx, tx, from, to)
 	out := make([]reports.Application, len(facts))
 	for i, f := range facts {
-		out[i] = reports.Application{CandidateID: f.CandidateID, Channel: f.Channel, Stages: f.Stages}
+		out[i] = reports.Application{CandidateID: f.CandidateID, Channel: f.Channel, Stages: f.Stages, Categories: f.Categories}
+	}
+	return out, err
+}
+
+func (a reportApplications) Categories(ctx context.Context, tx pgx.Tx) ([]reports.Category, error) {
+	cats, err := a.pipeline.CategoriesIn(ctx, tx)
+	out := make([]reports.Category, len(cats))
+	for i, c := range cats {
+		out[i] = reports.Category{Key: c.Key, Label: c.Label, Kind: c.Kind}
 	}
 	return out, err
 }

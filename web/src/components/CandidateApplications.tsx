@@ -4,11 +4,12 @@ import { useState } from "react";
 import type { Permission } from "../api/client";
 import { loadApplications } from "../api/applications";
 import { candidateApplicationsKey, jobsKey } from "../api/keys";
-import { CLOSE_REASON, STAGE } from "../labels";
+import { CLOSE_REASON } from "../labels";
 import { IconButton, MailIcon, PlusIcon } from "./ActionIcons";
 import { MoveMenu, timeInStage } from "./ApplicationCard";
 import { ApplicationPlacement } from "./ApplicationPlacement";
 import { ApplicationFit } from "./Fit";
+import { stageName, useStageCategories } from "./stages/categories";
 import { ApplicationOffers } from "./Offers";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import { ErrorMessage } from "./ErrorMessage";
@@ -24,6 +25,7 @@ export function CandidateApplications({ candidateId, candidateName, canUpdate, p
     queryKey: candidateApplicationsKey(candidateId),
     queryFn: ({ signal }) => loadApplications("candidate", candidateId, signal),
   });
+  const cats = useStageCategories().data?.items;
   const move = useMoveApplication();
   // Offer and Placed ask for the offer or the placement report first.
   const [asking, setAsking] = useState<MoveRequest | null>(null);
@@ -46,7 +48,7 @@ export function CandidateApplications({ candidateId, candidateName, canUpdate, p
                 <span className="muted small">{a.companyName}</span>
               </div>
               <div className="app-card-stage">
-                <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>
+                <span className={`badge ${a.stage}`}>{stageName(a.stage, a.category, cats)}</span>
                 <span className="muted small">{a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}</span>
               </div>
               <div className="app-card-actions">

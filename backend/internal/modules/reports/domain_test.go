@@ -16,7 +16,7 @@ func TestFunnelAndSources(t *testing.T) {
 		{Source: "linkedin", Stages: []string{"submitted", "interview", "offer", "placed"}}, // added at submitted
 		{Source: "linkedin", Stages: []string{"applied", "screening", "interview", "offer", "placed", "offer"}},
 	}
-	funnel := Funnel(apps)
+	funnel := Funnel(apps, nil)
 	reached := map[string]int{}
 	for _, f := range funnel {
 		reached[f.Stage] = f.Reached
@@ -33,6 +33,33 @@ func TestFunnelAndSources(t *testing.T) {
 		{Source: "jobstreet", Applications: 2, Interviewed: 1, Placed: 0},
 		{Source: "linkedin", Applications: 2, Interviewed: 2, Placed: 2},
 	}, Sources(apps))
+}
+
+func TestFunnelCountsEachCategory(t *testing.T) {
+	cats := []Category{{"applied", "Applied", "applied"}, {"screening", "Screening", "screening"}, {"submitted", "Submitted", "submitted"},
+		{"interview", "1st Interview", "interview"}, {"interview_2", "2nd Interview", "interview"}, {"interview_final", "Final Interview", "interview"},
+		{"offer", "Offer", "offer"}, {"placed", "Placed", "placed"}}
+	apps := []App{
+		// Two interview rounds, then rejected.
+		{Stages: []string{"applied", "interview", "interview", "rejected"}, Categories: []string{"applied", "interview", "interview_2", ""}},
+		// Before categories were recorded: its kind's first.
+		{Stages: []string{"applied", "interview"}, Categories: []string{"", ""}},
+		// A category since removed counts as its kind's first.
+		{Stages: []string{"submitted", "interview"}, Categories: []string{"submitted", "panel"}},
+		// Offered: it passed every interview round.
+		{Stages: []string{"applied", "offer"}, Categories: []string{"applied", "offer"}},
+	}
+	funnel := Funnel(apps, cats)
+	got := map[string]int{}
+	labels := []string{}
+	for _, f := range funnel {
+		got[f.Category] = f.Reached
+		labels = append(labels, f.Label)
+	}
+	assert.Equal(t, []string{"Applied", "Screening", "Submitted", "1st Interview", "2nd Interview", "Final Interview", "Offer", "Placed"}, labels)
+	assert.Equal(t, map[string]int{"applied": 4, "screening": 4, "submitted": 4, "interview": 4, "interview_2": 2, "interview_final": 1, "offer": 1, "placed": 0}, got)
+	assert.Equal(t, "interview", funnel[4].Stage, "each row says its kind")
+	assert.Equal(t, 50, *funnel[4].PercentOfPrevious, "half of those at 1st Interview got to the 2nd")
 }
 
 func TestRecruiters(t *testing.T) {

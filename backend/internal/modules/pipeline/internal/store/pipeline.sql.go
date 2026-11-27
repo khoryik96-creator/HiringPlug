@@ -51,7 +51,8 @@ func (q *Queries) ApplicantsSince(ctx context.Context, arg ApplicantsSinceParams
 
 const applicationFacts = `-- name: ApplicationFacts :many
 SELECT a.id, a.job_order_id, a.candidate_id, a.channel, a.created_at,
-  array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages
+  array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages,
+  array_agg(coalesce(c.to_category, '') ORDER BY c.changed_at, c.id)::text[] AS categories
 FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id
 WHERE a.created_at >= $1 AND a.created_at < $2
 GROUP BY a.id
@@ -70,6 +71,7 @@ type ApplicationFactsRow struct {
 	Channel     *string
 	CreatedAt   time.Time
 	Stages      []string
+	Categories  []string
 }
 
 // Applications created in a period, with every stage they have been at (in
@@ -90,6 +92,7 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 			&i.Channel,
 			&i.CreatedAt,
 			&i.Stages,
+			&i.Categories,
 		); err != nil {
 			return nil, err
 		}
@@ -102,7 +105,7 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 }
 
 const applicationsAtStages = `-- name: ApplicationsAtStages :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE stage = ANY($1::text[]) ORDER BY id LIMIT 5000
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application WHERE stage = ANY($1::text[]) ORDER BY id LIMIT 5000
 `
 
 // Applications now at some stages (reports: the revenue forecast).
@@ -131,6 +134,7 @@ func (q *Queries) ApplicationsAtStages(ctx context.Context, stages []string) ([]
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -240,6 +244,15 @@ func (q *Queries) DeleteJobStagePlan(ctx context.Context, arg DeleteJobStagePlan
 	return result.RowsAffected(), nil
 }
 
+const deleteStageCategories = `-- name: DeleteStageCategories :exec
+DELETE FROM stage_category WHERE true
+`
+
+func (q *Queries) DeleteStageCategories(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteStageCategories)
+	return err
+}
+
 const deleteStageTemplate = `-- name: DeleteStageTemplate :execrows
 DELETE FROM stage_template WHERE id = $1
 `
@@ -325,7 +338,7 @@ func (q *Queries) ForgetStageTemplate(ctx context.Context, templateID *string) e
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE id = $1
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application WHERE id = $1
 `
 
 func (q *Queries) GetApplication(ctx context.Context, id string) (Application, error) {
@@ -347,6 +360,7 @@ func (q *Queries) GetApplication(ctx context.Context, id string) (Application, e
 		&i.Channel,
 		&i.Binned,
 		&i.Step,
+		&i.Category,
 	)
 	return i, err
 }
@@ -394,16 +408,17 @@ func (q *Queries) GetStageTemplate(ctx context.Context, id string) (StageTemplat
 
 const insertApplication = `-- name: InsertApplication :one
 
-INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, channel, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, category, channel, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
 ON CONFLICT (tenant_id, job_order_id, candidate_id) DO NOTHING
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category
 `
 
 type InsertApplicationParams struct {
 	JobOrderID  string
 	CandidateID string
 	Stage       string
+	Category    *string
 	Channel     *string
 }
 
@@ -414,6 +429,7 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 		arg.JobOrderID,
 		arg.CandidateID,
 		arg.Stage,
+		arg.Category,
 		arg.Channel,
 	)
 	var i Application
@@ -433,8 +449,31 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 		&i.Channel,
 		&i.Binned,
 		&i.Step,
+		&i.Category,
 	)
 	return i, err
+}
+
+const insertStageCategory = `-- name: InsertStageCategory :exec
+INSERT INTO stage_category (tenant_id, key, label, kind, position, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+`
+
+type InsertStageCategoryParams struct {
+	Key      string
+	Label    string
+	Kind     string
+	Position int32
+}
+
+func (q *Queries) InsertStageCategory(ctx context.Context, arg InsertStageCategoryParams) error {
+	_, err := q.db.Exec(ctx, insertStageCategory,
+		arg.Key,
+		arg.Label,
+		arg.Kind,
+		arg.Position,
+	)
+	return err
 }
 
 const insertStageTemplate = `-- name: InsertStageTemplate :one
@@ -509,7 +548,7 @@ func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivi
 }
 
 const listCandidateApplications = `-- name: ListCandidateApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE candidate_id = $1 ORDER BY id DESC
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application WHERE candidate_id = $1 ORDER BY id DESC
 `
 
 func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID string) ([]Application, error) {
@@ -537,6 +576,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -549,7 +589,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 }
 
 const listJobApplications = `-- name: ListJobApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1 ORDER BY id
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application WHERE job_order_id = $1 ORDER BY id
 `
 
 // A job's pipeline, oldest first (the order cards were added).
@@ -578,6 +618,40 @@ func (q *Queries) ListJobApplications(ctx context.Context, jobOrderID string) ([
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+			&i.Category,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStageCategories = `-- name: ListStageCategories :many
+SELECT tenant_id, key, label, kind, position, updated_by, updated_at FROM stage_category ORDER BY position, key
+`
+
+// Stage categories (empty: the standard ones), in order.
+func (q *Queries) ListStageCategories(ctx context.Context) ([]StageCategory, error) {
+	rows, err := q.db.Query(ctx, listStageCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StageCategory
+	for rows.Next() {
+		var i StageCategory
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.Key,
+			&i.Label,
+			&i.Kind,
+			&i.Position,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -639,22 +713,34 @@ func (q *Queries) ListStageTemplates(ctx context.Context) ([]ListStageTemplatesR
 	return items, nil
 }
 
+const lockStageCategories = `-- name: LockStageCategories :exec
+SELECT pg_advisory_xact_lock(hashtext('stage_category:' || app_current_tenant()))
+`
+
+// Saving the categories replaces the list; the lock keeps two saves apart.
+func (q *Queries) LockStageCategories(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockStageCategories)
+	return err
+}
+
 const moveApplication = `-- name: MoveApplication :one
 UPDATE application SET
   stage = $1,
   step = $2,
-  reason = $3,
-  reason_note = $4,
+  category = $3,
+  reason = $4,
+  reason_note = $5,
   stage_changed_at = now(),
   version = version + 1,
   updated_at = now()
-WHERE id = $5 AND version = $6
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step
+WHERE id = $6 AND version = $7
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category
 `
 
 type MoveApplicationParams struct {
 	Stage           string
 	Step            *string
+	Category        *string
 	Reason          *string
 	ReasonNote      *string
 	ID              string
@@ -666,6 +752,7 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 	row := q.db.QueryRow(ctx, moveApplication,
 		arg.Stage,
 		arg.Step,
+		arg.Category,
 		arg.Reason,
 		arg.ReasonNote,
 		arg.ID,
@@ -688,6 +775,7 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 		&i.Channel,
 		&i.Binned,
 		&i.Step,
+		&i.Category,
 	)
 	return i, err
 }
@@ -712,7 +800,7 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 const movesToStageBetween = `-- name: MovesToStageBetween :many
 SELECT c.changed_by::text AS changed_by, c.changed_at, a.candidate_id
 FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
-WHERE c.to_stage = $1 AND c.changed_at >= $2 AND c.changed_at < $3 AND c.changed_by IS NOT NULL
+WHERE c.to_stage = $1 AND c.from_stage IS DISTINCT FROM c.to_stage AND c.changed_at >= $2 AND c.changed_at < $3 AND c.changed_by IS NOT NULL
 LIMIT 50000
 `
 
@@ -792,7 +880,7 @@ func (q *Queries) OverlappingApplications(ctx context.Context, arg OverlappingAp
 }
 
 const pageCandidateApplications = `-- name: PageCandidateApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE candidate_id = $1
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application WHERE candidate_id = $1
   AND ($2::text IS NULL OR id < $2::text)
 ORDER BY id DESC LIMIT $3
 `
@@ -828,6 +916,7 @@ func (q *Queries) PageCandidateApplications(ctx context.Context, arg PageCandida
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -840,7 +929,7 @@ func (q *Queries) PageCandidateApplications(ctx context.Context, arg PageCandida
 }
 
 const pageJobApplications = `-- name: PageJobApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application WHERE job_order_id = $1
   AND ($2::text IS NULL OR stage = $2::text)
   AND ($3::text IS NULL OR id > $3::text)
 ORDER BY id LIMIT $4
@@ -883,6 +972,7 @@ func (q *Queries) PageJobApplications(ctx context.Context, arg PageJobApplicatio
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -1005,6 +1095,27 @@ func (q *Queries) SetApplicationsBinned(ctx context.Context, arg SetApplications
 	return err
 }
 
+const stageCategoryUse = `-- name: StageCategoryUse :one
+SELECT
+  ((SELECT count(*) FROM stage_template t, jsonb_array_elements(t.steps) s WHERE s->>'category' = ANY($1::text[]))
+   + (SELECT count(*) FROM job_stage_plan p, jsonb_array_elements(p.steps) s WHERE s->>'category' = ANY($1::text[])))::integer AS stages,
+  (SELECT count(*) FROM application WHERE category = ANY($1::text[]) AND stage NOT IN ('rejected', 'withdrawn'))::integer AS applications
+`
+
+type StageCategoryUseRow struct {
+	Stages       int32
+	Applications int32
+}
+
+// How much still uses some categories: stages of templates and jobs, and
+// open applications.
+func (q *Queries) StageCategoryUse(ctx context.Context, keys []string) (StageCategoryUseRow, error) {
+	row := q.db.QueryRow(ctx, stageCategoryUse, keys)
+	var i StageCategoryUseRow
+	err := row.Scan(&i.Stages, &i.Applications)
+	return i, err
+}
+
 const stageCounts = `-- name: StageCounts :many
 SELECT job_order_id, stage, count(*)::integer AS n
 FROM application WHERE job_order_id = ANY($1::text[])
@@ -1093,7 +1204,7 @@ func (q *Queries) StageMoves(ctx context.Context, arg StageMovesParams) ([]Stage
 }
 
 const stuckApplications = `-- name: StuckApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step, category FROM application
 WHERE job_order_id = ANY($1::text[])
   AND stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
   AND stage_changed_at < now() - make_interval(days => $2::integer)
@@ -1131,6 +1242,7 @@ func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsPa
 			&i.Channel,
 			&i.Binned,
 			&i.Step,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}

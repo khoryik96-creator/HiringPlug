@@ -16,7 +16,7 @@ afterEach(() => {
 const siti: Application = {
   id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w1", version: 3, jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", jobTitle: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7",
   companyName: "Maybank", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w1", candidateName: "Siti Aisyah", candidateTitle: "Accountant", candidateAvailability: null, stage: "interview",
-  reason: null, reasonNote: null, channel: null, stageChangedAt: new Date().toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
+  reason: null, reasonNote: null, category: null, channel: null, stageChangedAt: new Date().toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 const permissions: Permission[] = ["pipeline:read", "pipeline:update", "offers:manage", "offers.salary:update", "placements:manage"];
 

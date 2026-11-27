@@ -6,7 +6,8 @@ import { stageTemplatesKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { fieldErrors } from "../components/forms";
 import { STANDARD } from "../components/stages/columns";
-import { type Draft, draftsOf, StepsEditor } from "../components/stages/StepsEditor";
+import { type Draft, draftsOf, StepsEditor, stepsBody } from "../components/stages/StepsEditor";
+import { StageCategories } from "./StageCategories";
 
 type Template = Schemas["StageTemplate"];
 
@@ -19,12 +20,13 @@ export function StageTemplates() {
     <main>
       <h2>Pipeline stages</h2>
       <p className="muted">
-        Save the stages your jobs go through, e.g. Phone screen, Tech test and Panel. Each one counts as a standard stage, which
-        reports, automations, offers and placements go by. The default template is used by new jobs and by every job that has not
-        chosen its own; a job can choose another template, or change its stages, from its pipeline.
+        Save the stages your jobs go through, e.g. Phone screen, Tech test and Panel. Each one falls under a category, which reports
+        count by. The default template is used by new jobs and by every job that has not chosen its own; a job can choose another
+        template, or change its stages, from its pipeline.
       </p>
+      <StageCategories />
       <ErrorMessage error={list.error} />
-      {editing === "new" && <TemplateForm onClose={() => { setEditing(null); }} />}
+      {editing === "new" && <TemplateForm standard={list.data?.standard} onClose={() => { setEditing(null); }} />}
       {editing === null && <button type="button" className="primary" onClick={() => { setEditing("new"); }}>New template</button>}
       <ul className="stage-templates">
         {items.map((t) => editing !== "new" && editing?.id === t.id
@@ -32,7 +34,7 @@ export function StageTemplates() {
           : <li key={t.id}><TemplateCard template={t} onEdit={editing === null ? () => { setEditing(t); } : undefined} /></li>)}
         {list.data && (
           <li className="panel stage-template standard">
-            <div className="row spread"><h3>Standard stages</h3><span className="muted small">Built in</span></div>
+            <div className="row spread"><h3>Standard stages</h3><span className="muted small">One per category</span></div>
             <StageChips steps={list.data.standard} />
             <p className="muted small">{items.some((t) => t.isDefault) ? "Jobs can still choose these." : "What jobs use while no template is the default."}</p>
           </li>
@@ -81,14 +83,14 @@ function TemplateCard({ template: t, onEdit }: { template: Template; onEdit?: ()
   );
 }
 
-function TemplateForm({ template, onClose }: { template?: Template; onClose: () => void }) {
+function TemplateForm({ template, standard, onClose }: { template?: Template; standard?: Schemas["StageStep"][]; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(template?.name ?? "");
   const [isDefault, setDefault] = useState(template?.isDefault ?? false);
-  const [steps, setSteps] = useState<Draft[]>(draftsOf(template?.steps ?? STANDARD));
+  const [steps, setSteps] = useState<Draft[]>(draftsOf(template?.steps ?? standard ?? STANDARD));
   const save = useMutation({
     mutationFn: async () => {
-      const body = { name, isDefault, steps: steps.map((s) => ({ key: s.key, label: s.label, stage: s.stage })) };
+      const body = { name, isDefault, steps: stepsBody(steps) };
       return template
         ? unwrap(await api.PUT("/v1/stage-templates/{stageTemplateId}", { params: { path: { stageTemplateId: template.id } }, body: { ...body, version: template.version } }))
         : unwrap(await api.POST("/v1/stage-templates", { body }));

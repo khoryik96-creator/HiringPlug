@@ -14,7 +14,7 @@ beforeEach(() => { localStorage.removeItem("hp.pipelineView"); });
 const ago = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 const app = (n: number, stage: Application["stage"], days: number): Application => ({
   id: `appl_${String(n)}`, version: 2, jobId: "jo_1", jobTitle: "Risk Analyst", companyId: "comp_1", companyName: "Contoh", candidateId: `cand_${String(n)}`,
-  candidateName: `Person ${String(n)}`, candidateTitle: "Analyst", candidateAvailability: null, stage, reason: null, reasonNote: null, channel: null,
+  candidateName: `Person ${String(n)}`, candidateTitle: "Analyst", candidateAvailability: null, stage, reason: null, reasonNote: null, category: null, channel: null,
   stageChangedAt: ago(days), createdAt: ago(30), updatedAt: ago(1),
 });
 

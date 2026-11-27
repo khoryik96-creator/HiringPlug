@@ -51,7 +51,11 @@ func (s *Service) Report(ctx context.Context, p authz.Principal, from, to *time.
 		if err != nil {
 			return err
 		}
-		out.Funnel, out.Sources = Funnel(apps), Sources(apps)
+		cats, err := s.deps.Applications.Categories(ctx, tx)
+		if err != nil {
+			return err
+		}
+		out.Funnel, out.Sources = Funnel(apps, cats), Sources(apps)
 		if s.deps.Labels != nil {
 			labels, err := s.deps.Labels.Labels(ctx, tx)
 			if err != nil {
@@ -92,7 +96,7 @@ func (s *Service) applications(ctx context.Context, tx pgx.Tx, start, end time.T
 		case sources[f.CandidateID] != nil:
 			source = *sources[f.CandidateID]
 		}
-		apps[i] = App{Source: source, Stages: f.Stages}
+		apps[i] = App{Source: source, Stages: f.Stages, Categories: f.Categories}
 	}
 	return apps, nil
 }
