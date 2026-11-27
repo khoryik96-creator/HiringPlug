@@ -193,7 +193,7 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 	if folder.CursorUrl != nil {
 		target = *folder.CursorUrl
 		if !outlookContinuation(path, target) {
-			return &outlookGraphError{status: 502, badLink: true}
+			return &outlookGraphError{status: 502, badLink: true, why: "the saved link points elsewhere"}
 		}
 	} else {
 		fields := "id,parentFolderId,conversationId,subject,from,sender,toRecipients,ccRecipients,replyTo,receivedDateTime,createdDateTime,lastModifiedDateTime,isRead,isDraft,hasAttachments,webLink,flag"
@@ -219,12 +219,19 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 	if cursor == "" {
 		cursor, complete = page.Delta, true
 	}
-	if page.Value == nil || len(cursor) > 16384 || !outlookContinuation(path, cursor) || (!complete && cursor == target) {
-		return &outlookGraphError{status: 502, badLink: page.Value != nil}
+	switch {
+	case page.Value == nil:
+		return unreadable("it listed no messages")
+	case len(cursor) > 16384, !outlookContinuation(path, cursor):
+		return &outlookGraphError{status: 502, badLink: true, why: "its link to the next page points elsewhere"}
+	case !complete && cursor == target:
+		return &outlookGraphError{status: 502, badLink: true, why: "its next page was the same page"}
 	}
+	skipped := 0 // messages Outlook listed without what is needed to show them: left out, not the whole folder
 	for _, item := range *page.Value {
 		if item.ID == "" || len(item.ID) > 1024 {
-			return &outlookGraphError{status: 502}
+			skipped++
+			continue
 		}
 		if len(item.Removed) > 0 && string(item.Removed) != "null" {
 			if err := q.RemoveOutlookMessage(ctx, store.RemoveOutlookMessageParams{FolderID: folder.ID, RemoteID: item.ID}); err != nil {
@@ -238,20 +245,24 @@ func (s *Service) pullOutlookFolder(ctx context.Context, q *store.Queries, token
 		if item.ReceivedDateTime.IsZero() {
 			item.ReceivedDateTime = item.CreatedDateTime
 		}
-		if item.ReceivedDateTime.IsZero() || item.LastModifiedDateTime.IsZero() {
-			return &outlookGraphError{status: 502}
+		if item.LastModifiedDateTime.IsZero() {
+			item.LastModifiedDateTime = item.ReceivedDateTime
+		}
+		if item.ReceivedDateTime.IsZero() {
+			skipped++
+			continue
 		}
 		conversation := item.ConversationID
-		if conversation == "" {
+		if conversation == "" || len(conversation) > 1024 {
 			conversation = item.ID
-		}
-		if len(conversation) > 1024 {
-			return &outlookGraphError{status: 502}
 		}
 		if err := q.SaveOutlookMessage(ctx, store.SaveOutlookMessageParams{MailboxID: folder.MailboxID, FolderID: folder.ID, RemoteID: item.ID, Conversation: conversation, Subject: truncate(item.Subject, 300), Sender: truncate(item.sender(), 254), Participants: outlookParticipants(item), ReceivedAt: item.ReceivedDateTime, ChangedAt: item.LastModifiedDateTime, IsRead: item.IsRead, IsDraft: item.IsDraft, HasAttachments: item.HasAttachments, WebUrl: outlookWebLink(item.WebLink),
 			SenderName: truncate(strings.TrimSpace(item.senderName()), 300), Flagged: item.Flag.FlagStatus == "flagged"}); err != nil {
 			return err
 		}
+	}
+	if skipped > 0 {
+		logx.From(ctx).Warn("outlook mail: messages without an id or a date were left out", "folder_id", folder.ID, "skipped", skipped)
 	}
 	now := time.Now()
 	return q.SaveOutlookCursor(ctx, store.SaveOutlookCursorParams{ID: folder.ID, CursorUrl: &cursor, Complete: complete, CheckedAt: &now})

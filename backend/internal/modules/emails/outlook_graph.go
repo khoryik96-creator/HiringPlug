@@ -22,6 +22,14 @@ type outlookGraphError struct {
 	// badLink: the folder's saved link (or the next one Outlook gave) is not
 	// one to follow: the folder starts afresh rather than retry it.
 	badLink bool
+	// why: what in Microsoft's answer could not be read (a 502 made here),
+	// shown and logged so a failing mailbox can be told apart from another.
+	why string
+}
+
+// unreadable is Microsoft's answer that could not be read, and why.
+func unreadable(why string) *outlookGraphError {
+	return &outlookGraphError{status: http.StatusBadGateway, why: why}
 }
 
 // outlookErrorCode is Microsoft's error code from an error response's body,
@@ -49,6 +57,8 @@ func outlookReason(err *outlookGraphError) string {
 		return "Microsoft said " + err.code
 	case err.status == 0:
 		return "Microsoft could not be reached"
+	case err.status == http.StatusBadGateway && err.why != "":
+		return "Microsoft's answer could not be read: " + err.why
 	case err.status == http.StatusBadGateway:
 		return "Microsoft's answer could not be read"
 	default:
@@ -92,8 +102,14 @@ func (s *Service) outlookConditional(ctx context.Context, token, method, target 
 	}
 	const limit = 6 << 20
 	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
-	if err != nil || len(raw) > limit || json.Unmarshal(raw, out) != nil {
-		return &outlookGraphError{status: 502}
+	switch {
+	case err != nil:
+		return unreadable("it was cut off")
+	case len(raw) > limit:
+		return unreadable("it was larger than 6 MB")
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return unreadable("it was not in the expected form (" + truncate(err.Error(), 160) + ")")
 	}
 	return nil
 }
@@ -133,8 +149,22 @@ func outlookContinuation(initial, next string) bool {
 	if e1 != nil || e2 != nil || target.User != nil || target.Fragment != "" || target.Scheme != base.Scheme || target.Host != base.Host {
 		return false
 	}
-	return outlookFolderPath(base.Path) == outlookFolderPath(target.Path)
+	return graphScope(outlookFolderPath(base.Path)) == graphScope(outlookFolderPath(target.Path))
 }
+
+// graphScope is a Graph path from its mail folders on, with its version: the
+// same mailbox's folder whether a link says /me/... or /users/{id}/...
+// (Microsoft writes either in the links it hands back).
+func graphScope(path string) string {
+	at := strings.Index(path, "/mailfolders")
+	if at < 0 {
+		return path
+	}
+	return graphMailbox.ReplaceAllString(path[:at], "") + path[at:]
+}
+
+// graphMailbox is the mailbox part of a Graph path: /me, or /users/{id}.
+var graphMailbox = regexp.MustCompile(`/(me|users/[^/]+)$`)
 
 // Graph may return either /mailFolders/ID or /mailfolders('ID').
 // Normalize route segments while preserving the case of opaque folder IDs.

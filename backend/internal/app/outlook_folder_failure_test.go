@@ -130,9 +130,11 @@ func TestTheInboxFailingIsSaidWithMicrosoftsReason(t *testing.T) {
 	assert.Nil(t, cursor, "the rejected link is dropped: the Inbox starts afresh")
 }
 
-// One message Outlook sends that cannot be read (no change date) does not
-// send its folder back to the start: it keeps its place and tries again.
-func TestABadMessageDoesNotRestartItsFolder(t *testing.T) {
+// A message Outlook lists without a change date is kept (its received date
+// stands in), and one with no date at all is left out: neither holds up its
+// folder, which used to retry the same page for ever ("Outlook could not
+// sync").
+func TestABadMessageDoesNotHoldUpItsFolder(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
@@ -142,10 +144,14 @@ func TestABadMessageDoesNotRestartItsFolder(t *testing.T) {
 		if strings.Contains(r.URL.Path, "inbox") && strings.HasSuffix(r.URL.Path, "/messages/delta") {
 			w.Header().Set("Content-Type", "application/json")
 			now := time.Now().UTC()
-			if r.URL.Query().Has("$skiptoken") { // the second page: a message with no change date
+			if r.URL.Query().Has("$skiptoken") { // the second page: a message with no change date, one with no date at all
 				_ = json.NewEncoder(w).Encode(map[string]any{
-					"value":            []any{map[string]any{"id": "broken", "parentFolderId": "inbox", "receivedDateTime": now}},
-					"@odata.deltaLink": "http://" + r.Host + "/me/mailFolders/inbox/messages/delta?$deltatoken=three",
+					"value": []any{
+						map[string]any{"id": "no-change-date", "parentFolderId": "inbox", "subject": "Second", "receivedDateTime": now},
+						map[string]any{"id": "no-date", "parentFolderId": "inbox", "subject": "Undated"},
+					},
+					// Microsoft may write the mailbox as /users/{id}: the same folder.
+					"@odata.deltaLink": "http://" + r.Host + "/users/abc-123/mailFolders('inbox')/messages/delta?$deltatoken=three",
 				})
 				return
 			}
@@ -166,6 +172,14 @@ func TestABadMessageDoesNotRestartItsFolder(t *testing.T) {
 	var cursor *string
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
 		"SELECT cursor_url FROM email_outlook_folder WHERE tenant_id=$1 AND remote_id='inbox'", tenant.ID).Scan(&cursor))
-	require.NotNil(t, cursor, "it keeps its place")
-	assert.Contains(t, *cursor, "skiptoken=two")
+	require.NotNil(t, cursor)
+	assert.Contains(t, *cursor, "deltatoken=three", "the folder got through both pages")
+	var mail api.OutlookMailPage
+	a.request("GET", "/v1/outlook/mail", token, nil).JSON(&mail)
+	assert.True(t, mail.Error.IsNull(), "no 'could not sync': %v", mail.Error)
+	var subjects []string
+	for _, m := range mail.Items {
+		subjects = append(subjects, m.Subject)
+	}
+	assert.ElementsMatch(t, []string{"First", "Second"}, subjects, "the undated one is left out")
 }
