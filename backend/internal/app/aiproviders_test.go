@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -51,16 +52,25 @@ func claimCheck(t *testing.T, conn *pgx.Conn, sealed string) claimedJob {
 	_, err := testutil.Current.Admin.Exec(ctx,
 		`UPDATE job SET run_after = now() - interval '1 hour', priority = 1 WHERE queue = 'ai' AND payload->'access'->>'sealedKey' = $1`, sealed)
 	require.NoError(t, err)
-	var j claimedJob
-	var reqID *string
-	require.NoError(t, conn.QueryRow(ctx, `SELECT id, tenant_id, kind, payload, request_id FROM job_claim('ai', 'python-test', 60)`).
-		Scan(&j.ID, &j.TenantID, &j.Kind, &j.Payload, &reqID))
-	require.Equal(t, string(api.JobKindAiproviderCheck), j.Kind)
-	require.Contains(t, string(j.Payload), sealed)
-	if reqID != nil {
-		j.RequestID = *reqID
+	// Only key checks, and only this one: other tests' AI jobs (left early in
+	// the queue by their own helpers) are put back.
+	for range 20 {
+		var j claimedJob
+		var reqID *string
+		require.NoError(t, conn.QueryRow(ctx, `SELECT id, tenant_id, kind, payload, request_id FROM job_claim_kinds('ai', 'python-test', 60, $1)`,
+			[]string{string(api.JobKindAiproviderCheck)}).Scan(&j.ID, &j.TenantID, &j.Kind, &j.Payload, &reqID))
+		if strings.Contains(string(j.Payload), sealed) {
+			if reqID != nil {
+				j.RequestID = *reqID
+			}
+			return j
+		}
+		_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET status = 'pending', attempts = greatest(attempts - 1, 0),
+			locked_by = NULL, locked_until = NULL, run_after = now(), priority = 9 WHERE id = $1`, j.ID)
+		require.NoError(t, err)
 	}
-	return j
+	require.Fail(t, "the key check was not claimed")
+	return claimedJob{}
 }
 
 func savedSealed(t *testing.T, tenantID, provider string) string {
