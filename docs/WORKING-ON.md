@@ -20,6 +20,16 @@ How to write an entry (newest at the top, one per task):
 
 ## In progress
 
+### Targets by stage category, people picker, deeper reports
+- Who: Claude (account B), session "brave-thompson"
+- Branch: claude/brave-thompson-k08hlg
+- Touches: reports module (targets, activity, summary), web/src/pages/Dashboard*, Reports*, TargetSettings*
+- Started: 27 Nov 2026    Last update: 27 Nov 2026
+- State: in progress
+- Next: 1) targets for any stage category (set by admins); 2) choose one or more people, or the team, on the
+  dashboard's targets and jobs; 3) reports: billings by month/quarter/YTD/year, CVs sent and each category,
+  conversions between them, placements, average days to fill and to the first CV, by week/month/quarter/year.
+
 ### Post-migration fixes and the HyPlug rename (taken over)
 - Who: Claude (account B), taken over from Claude (account A) on 26 Nov at the owner's request
 - Branch: claude/brave-thompson-k08hlg
