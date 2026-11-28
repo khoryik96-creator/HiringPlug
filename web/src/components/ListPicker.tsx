@@ -5,8 +5,9 @@
 // until removed.
 import { FavDropdown } from "./FavDropdown";
 import type { Fav } from "./favourites";
+import type { ListManager } from "./listManagers";
 
-export function ListPicker({ value, onChange, options, addLabel, noun, fav, ...aria }: {
+export function ListPicker({ value, onChange, options, addLabel, noun, fav, manage, ...aria }: {
   value: string[];
   onChange: (labels: string[]) => void;
   /** The list's words, in its order. */
@@ -16,6 +17,8 @@ export function ListPicker({ value, onChange, options, addLabel, noun, fav, ...a
   /** The list's name, plural: "IT skills". */
   noun: string;
   fav?: Fav;
+  /** Adding, renaming and removing the list's words (only for those who manage it). */
+  manage?: ListManager;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
   id?: string;
@@ -35,8 +38,8 @@ export function ListPicker({ value, onChange, options, addLabel, noun, fav, ...a
         </div>
       )}
       <FavDropdown id={aria.id} aria-invalid={aria["aria-invalid"]} aria-describedby={aria["aria-describedby"]}
-        text={left.length === 0 && options.length > 0 ? "All chosen" : addLabel} disabled={left.length === 0}
-        noun={noun} fav={fav} choices={left.map((o) => ({ value: o, label: o }))} onPick={(v) => { if (v) onChange([...value, v]); }} />
+        text={left.length === 0 && options.length > 0 ? "All chosen" : addLabel} disabled={left.length === 0 && !manage}
+        noun={noun} fav={fav} manage={manage} choices={left.map((o) => ({ value: o, label: o }))} onPick={(v) => { if (v && !has(v)) onChange([...value, v]); }} />
     </div>
   );
 }

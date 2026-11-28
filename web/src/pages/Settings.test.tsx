@@ -38,6 +38,21 @@ describe("settings", () => {
     expect(body.options[5]).toEqual({ label: "Job fair", hidden: false });
   });
 
+  it("renames an IT skill under its old word, saying candidates get the new one", async () => {
+    answerGets();
+    const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { options: { label: string }[] } }) =>
+      Promise.resolve(ok({ name: "it_skill", label: "IT skills", kind: "open", hints: false, colors: false,
+        options: init.body.options.map((o) => ({ key: o.label, label: o.label, hint: null, color: null, hidden: false, builtIn: false })) }))) as never);
+    renderWithClient(<ListSettings />);
+    const skills = await screen.findByRole("region", { name: "IT skills" });
+    expect(within(skills).getByText("Renaming a word renames it on the candidates who have it. A word removed stays on the candidates who have it.")).toBeTruthy();
+    expect(within(await screen.findByRole("region", { name: "Candidate source" })).queryByText(/Renaming a word/)).toBeNull();
+    fireEvent.change(within(skills).getByLabelText("IT skills option 3"), { target: { value: "SAP S/4HANA" } });
+    fireEvent.click(within(skills).getByRole("button", { name: "Save it skills" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect((sentBody(put) as { options: unknown[] }).options[2]).toEqual({ key: "SAP", label: "SAP S/4HANA", hidden: false });
+  });
+
   it("edits the company benefits template: items with what to write for each", async () => {
     answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ name: "company_benefits", label: "Company benefits", kind: "open", hints: true, options: [] }));

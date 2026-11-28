@@ -9,6 +9,7 @@ import { FavDropdown } from "./FavDropdown";
 import { useFavourites } from "./favourites";
 import { type Category, categoryLabel, IndustrySummary, useIndustries } from "./IndustryPicker";
 import { Chips } from "./LabelInput";
+import { useIndustryManager, useWordListManager } from "./listManagers";
 import { useCandidateUpdate } from "./useCandidateUpdate";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -33,12 +34,13 @@ export function QuickSpecialization({ candidate, canEdit }: { candidate: Candida
   const fs = useFieldSettings();
   const favs = useFavourites();
   const save = useQuickSave(candidate);
+  const manage = useWordListManager("specialization", favs.of("specialization"));
   if (!canEdit) return <>{candidate.specialization ?? "—"}</>;
   const current = candidate.specialization ?? "";
   return (
     <div className={`quick-edit${current ? "" : " fav-dropdown-add"}`}>
       <FavDropdown inline aria-label={`Specialization: ${current || "not set"}. Change`} text={current || "+ Choose"} clear="— None" noun="specializations"
-        disabled={save.busy} fav={favs.of("specialization")}
+        disabled={save.busy} fav={favs.of("specialization")} manage={manage}
         choices={fs.options("specialization", current || null).map((o) => ({ value: o.key, label: o.label }))}
         onPick={(v) => { if (v !== current) save.mutate({ specialization: v || null }); }} />
       {save.status}
@@ -52,6 +54,8 @@ export function QuickWords({ candidate, canEdit, field }: { candidate: Candidate
   const favs = useFavourites();
   const save = useQuickSave(candidate);
   const words = candidate[field];
+  const list = field === "skills" ? "it_skill" as const : "certification" as const;
+  const manage = useWordListManager(list, favs.of(field === "skills" ? "itSkill" : "certification"));
   if (!canEdit) return <Chips labels={words} />;
   const meta = field === "skills"
     ? { list: "it_skill" as const, fav: favs.of("itSkill"), noun: "IT skills", one: "IT skill" }
@@ -66,10 +70,10 @@ export function QuickWords({ candidate, canEdit, field }: { candidate: Candidate
             onClick={() => { save.mutate({ [field]: words.filter((x) => x !== w) }); }}>×</button>
         </span>
       ))}
-      {left.length > 0 && (
+      {(left.length > 0 || manage) && (
         <span className="fav-dropdown-add">
-          <FavDropdown inline aria-label={`Add ${meta.one === "IT skill" ? "an" : "a"} ${meta.one}`} text="+ Add" noun={meta.noun} fav={meta.fav} disabled={save.busy}
-            choices={left.map((w) => ({ value: w, label: w }))} onPick={(v) => { if (v) save.mutate({ [field]: [...words, v] }); }} />
+          <FavDropdown inline aria-label={`Add ${meta.one === "IT skill" ? "an" : "a"} ${meta.one}`} text="+ Add" noun={meta.noun} fav={meta.fav} disabled={save.busy} manage={manage}
+            choices={left.map((w) => ({ value: w, label: w }))} onPick={(v) => { if (v && !has(v)) save.mutate({ [field]: [...words, v] }); }} />
         </span>
       )}
       {words.length === 0 && left.length === 0 && "—"}
@@ -83,6 +87,7 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
   const industries = useIndustries();
   const favs = useFavourites();
   const save = useQuickSave(candidate);
+  const manage = useIndustryManager();
   const data = industries.data;
   if (!canEdit || !data) return <IndustrySummary value={candidate.industrySelections} legacy={candidate.industry} />;
   const items = data.items;
@@ -117,8 +122,8 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
         );
       })}
       <span className="fav-dropdown-add">
-        <FavDropdown inline aria-label="Add an industry" text="+ Add" noun="industries" fav={favs.of("industry")} disabled={save.busy}
-          choices={choices} onPick={(v) => { if (v) change([...chosen, v], primary ?? v); }} />
+        <FavDropdown inline aria-label="Add an industry" text="+ Add" noun="industries" fav={favs.of("industry")} disabled={save.busy} manage={manage}
+          choices={choices} onPick={(v) => { if (v && !chosen.includes(v)) change([...chosen, v], primary ?? v); }} />
       </span>
       {save.status}
     </div>

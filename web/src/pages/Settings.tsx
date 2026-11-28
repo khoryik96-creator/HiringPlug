@@ -84,6 +84,9 @@ function SettingsPart({ id, label, children }: { id: string; label: string; chil
 /** The expense claims' dropdowns, in their own part of the page. */
 const CLAIM_LISTS: Schemas["FieldListName"][] = ["claim_receipt_type", "claim_type"];
 
+/** Lists kept on candidates as their words: a rename carries over to them. */
+const WORD_LISTS: Schemas["FieldListName"][] = ["specialization", "it_skill", "certification"];
+
 const useFieldSettingsQuery = () => useQuery({ queryKey: fieldSettingsKey, queryFn: async () => unwrap(await api.GET("/v1/settings/fields")) });
 
 const SALARY_CHOICES: Record<Schemas["EmailSalaryVisibility"], string> = {
@@ -225,6 +228,7 @@ function ListEditor({ list }: { list: List }) {
   return (
     <section className="panel" aria-label={list.label} id={noticeId} ref={target} tabIndex={notice ? -1 : undefined}>
       <h4>{list.label}</h4>
+      {WORD_LISTS.includes(list.name) && <p className="muted small">Renaming a word renames it on the candidates who have it. A word removed stays on the candidates who have it.</p>}
       <div className="table-scroll">
         <table>
           <tbody>

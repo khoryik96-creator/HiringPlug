@@ -22,6 +22,7 @@ import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
 import { IndustryPicker } from "./IndustryPicker";
+import { useWordListManager } from "./listManagers";
 import { SourcePicker } from "./SourcePicker";
 
 type TextKey = "firstName" | "lastName" | "email" | "phone" | "linkedinUrl" | "nationality" | "waNote" | "industry"
@@ -55,6 +56,9 @@ export function CandidateForm({ candidate, onDone, canMerge = false }: { candida
   const used = useUsedValues();
   const fs = useFieldSettings();
   const favs = useFavourites();
+  const manageSpecialization = useWordListManager("specialization", favs.of("specialization"));
+  const manageSkills = useWordListManager("it_skill", favs.of("itSkill"));
+  const manageCertifications = useWordListManager("certification", favs.of("certification"));
   const req = (label: string, field: string) => labelFor(label, fs.mandatory("candidate", field));
   const errors = fieldErrors(save.error);
   const errorFor = (key: keyof CandidateFormState) => errors[FIELD_PATHS[key]];
@@ -101,7 +105,7 @@ export function CandidateForm({ candidate, onDone, canMerge = false }: { candida
         sourceChanged={form.currentCompany !== opened.form.currentCompany || form.currentTitle !== opened.form.currentTitle}
         onChange={(industrySelections, industry) => { change({ industrySelections, industry }); }} />
       <Field label="Specialization" error={errorFor("specialization")}>
-        <FavDropdown text={form.specialization || "—"} clear="—" noun="specializations" fav={favs.of("specialization")}
+        <FavDropdown text={form.specialization || "—"} clear="—" noun="specializations" fav={favs.of("specialization")} manage={manageSpecialization}
           choices={fs.options("specialization", form.specialization || null).map((o) => ({ value: o.key, label: o.label }))}
           onPick={(v) => { set("specialization", v); }} />
       </Field>
@@ -117,13 +121,13 @@ export function CandidateForm({ candidate, onDone, canMerge = false }: { candida
       <div className="full">
         <Field label="IT skills" error={errorFor("skills")}>
           <ListPicker value={form.skills} onChange={(v) => { set("skills", v); }} options={fs.options("it_skill").map((o) => o.label)}
-            addLabel="Add an IT skill…" noun="IT skills" fav={favs.of("itSkill")} />
+            addLabel="Add an IT skill…" noun="IT skills" fav={favs.of("itSkill")} manage={manageSkills} />
         </Field>
       </div>
       <div className="full">
         <Field label="Professional certifications" error={errorFor("certifications")}>
           <ListPicker value={form.certifications} onChange={(v) => { set("certifications", v); }}
-            options={fs.options("certification").map((o) => o.label)} addLabel="Add a certification…" noun="certifications" fav={favs.of("certification")} />
+            options={fs.options("certification").map((o) => o.label)} addLabel="Add a certification…" noun="certifications" fav={favs.of("certification")} manage={manageCertifications} />
         </Field>
       </div>
       <div className="full">
