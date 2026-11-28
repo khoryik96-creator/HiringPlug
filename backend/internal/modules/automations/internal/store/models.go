@@ -124,6 +124,7 @@ type AppUser struct {
 	TeamID                 *string
 	MicrosoftSessionsAfter *time.Time
 	MicrosoftConnectOnly   bool
+	NamedRoleID            *string
 }
 
 type Application struct {
@@ -1588,6 +1589,20 @@ type MicrosoftSignInFlow struct {
 	TicketHash  *string
 	ExpiresAt   time.Time
 	CreatedAt   time.Time
+}
+
+type NamedRole struct {
+	ID               string
+	TenantID         string
+	Version          int32
+	Name             string
+	BaseRole         string
+	Permissions      []string
+	KnownPermissions []string
+	CandidateScope   string
+	JobCandidates    bool
+	UpdatedBy        string
+	UpdatedAt        time.Time
 }
 
 type Note struct {

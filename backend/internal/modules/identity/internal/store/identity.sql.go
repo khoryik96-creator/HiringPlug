@@ -187,6 +187,18 @@ func (q *Queries) DeleteInvited(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const deleteNamedRole = `-- name: DeleteNamedRole :execrows
+DELETE FROM named_role r WHERE r.id = $1 AND NOT EXISTS (SELECT 1 FROM app_user u WHERE u.named_role_id = r.id)
+`
+
+func (q *Queries) DeleteNamedRole(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteNamedRole, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteRoleSetting = `-- name: DeleteRoleSetting :exec
 DELETE FROM role_setting WHERE role = $1
 `
@@ -316,6 +328,29 @@ UPDATE app_user SET tokens_valid_after = greatest(date_trunc('second', clock_tim
 func (q *Queries) EndUserSessions(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, endUserSessions, id)
 	return err
+}
+
+const getNamedRole = `-- name: GetNamedRole :one
+SELECT id, tenant_id, version, name, base_role, permissions, known_permissions, candidate_scope, job_candidates, updated_by, updated_at FROM named_role WHERE id = $1
+`
+
+func (q *Queries) GetNamedRole(ctx context.Context, id string) (NamedRole, error) {
+	row := q.db.QueryRow(ctx, getNamedRole, id)
+	var i NamedRole
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.BaseRole,
+		&i.Permissions,
+		&i.KnownPermissions,
+		&i.CandidateScope,
+		&i.JobCandidates,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getPreferences = `-- name: GetPreferences :one
@@ -547,6 +582,47 @@ func (q *Queries) InsertLink(ctx context.Context, arg InsertLinkParams) (string,
 	return id, err
 }
 
+const insertNamedRole = `-- name: InsertNamedRole :one
+INSERT INTO named_role (tenant_id, name, base_role, permissions, known_permissions, candidate_scope, job_candidates, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, app_current_user())
+RETURNING id, tenant_id, version, name, base_role, permissions, known_permissions, candidate_scope, job_candidates, updated_by, updated_at
+`
+
+type InsertNamedRoleParams struct {
+	Name             string
+	BaseRole         string
+	Permissions      []string
+	KnownPermissions []string
+	CandidateScope   string
+	JobCandidates    bool
+}
+
+func (q *Queries) InsertNamedRole(ctx context.Context, arg InsertNamedRoleParams) (NamedRole, error) {
+	row := q.db.QueryRow(ctx, insertNamedRole,
+		arg.Name,
+		arg.BaseRole,
+		arg.Permissions,
+		arg.KnownPermissions,
+		arg.CandidateScope,
+		arg.JobCandidates,
+	)
+	var i NamedRole
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.BaseRole,
+		&i.Permissions,
+		&i.KnownPermissions,
+		&i.CandidateScope,
+		&i.JobCandidates,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertRoleSetting = `-- name: InsertRoleSetting :one
 INSERT INTO role_setting (tenant_id, role, permissions, known_permissions, candidate_scope, job_candidates, updated_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
@@ -639,7 +715,7 @@ func (q *Queries) InviteEmails(ctx context.Context) ([]InviteEmailsRow, error) {
 const inviteUser = `-- name: InviteUser :one
 INSERT INTO app_user (tenant_id, email, name, role, active, invited)
 VALUES (app_current_tenant(), $1, $2, $3, false, true)
-RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at
+RETURNING id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at
 `
 
 type InviteUserParams struct {
@@ -654,6 +730,7 @@ type InviteUserRow struct {
 	Name         string
 	Role         string
 	TeamID       *string
+	NamedRoleID  *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -669,6 +746,7 @@ func (q *Queries) InviteUser(ctx context.Context, arg InviteUserParams) (InviteU
 		&i.Name,
 		&i.Role,
 		&i.TeamID,
+		&i.NamedRoleID,
 		&i.Active,
 		&i.Invited,
 		&i.LastSignInAt,
@@ -763,6 +841,61 @@ func (q *Queries) ListActiveUsers(ctx context.Context) ([]ListActiveUsersRow, er
 	return items, nil
 }
 
+const listNamedRoles = `-- name: ListNamedRoles :many
+SELECT r.id, r.tenant_id, r.version, r.name, r.base_role, r.permissions, r.known_permissions, r.candidate_scope, r.job_candidates, r.updated_by, r.updated_at, (SELECT count(*) FROM app_user u WHERE u.named_role_id = r.id AND (u.active OR u.invited))::integer AS member_count
+FROM named_role r ORDER BY lower(r.name) LIMIT 200
+`
+
+type ListNamedRolesRow struct {
+	ID               string
+	TenantID         string
+	Version          int32
+	Name             string
+	BaseRole         string
+	Permissions      []string
+	KnownPermissions []string
+	CandidateScope   string
+	JobCandidates    bool
+	UpdatedBy        string
+	UpdatedAt        time.Time
+	MemberCount      int32
+}
+
+// Named roles (owners): roles of the company's own, each built on an
+// editable role, with their own access.
+func (q *Queries) ListNamedRoles(ctx context.Context) ([]ListNamedRolesRow, error) {
+	rows, err := q.db.Query(ctx, listNamedRoles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNamedRolesRow
+	for rows.Next() {
+		var i ListNamedRolesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.Name,
+			&i.BaseRole,
+			&i.Permissions,
+			&i.KnownPermissions,
+			&i.CandidateScope,
+			&i.JobCandidates,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRoleSettings = `-- name: ListRoleSettings :many
 SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at, known_permissions FROM role_setting ORDER BY role
 `
@@ -798,7 +931,7 @@ func (q *Queries) ListRoleSettings(ctx context.Context) ([]RoleSetting, error) {
 }
 
 const listTeam = `-- name: ListTeam :many
-SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000
+SELECT id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000
 `
 
 type ListTeamRow struct {
@@ -807,6 +940,7 @@ type ListTeamRow struct {
 	Name         string
 	Role         string
 	TeamID       *string
+	NamedRoleID  *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -828,6 +962,7 @@ func (q *Queries) ListTeam(ctx context.Context) ([]ListTeamRow, error) {
 			&i.Name,
 			&i.Role,
 			&i.TeamID,
+			&i.NamedRoleID,
 			&i.Active,
 			&i.Invited,
 			&i.LastSignInAt,
@@ -1055,6 +1190,30 @@ func (q *Queries) MyMicrosoft(ctx context.Context, userID string) (MyMicrosoftRo
 	var i MyMicrosoftRow
 	err := row.Scan(&i.SignIn, &i.Linked)
 	return i, err
+}
+
+const namedRoleUsers = `-- name: NamedRoleUsers :many
+SELECT name FROM app_user WHERE named_role_id = $1 ORDER BY lower(name) LIMIT 20
+`
+
+func (q *Queries) NamedRoleUsers(ctx context.Context, id *string) ([]string, error) {
+	rows, err := q.db.Query(ctx, namedRoleUsers, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const noteMicrosoftClaims = `-- name: NoteMicrosoftClaims :exec
@@ -1418,6 +1577,22 @@ func (q *Queries) SetTwoStepRequired(ctx context.Context, required bool) (int64,
 	return result.RowsAffected(), nil
 }
 
+const setUserNamedRole = `-- name: SetUserNamedRole :exec
+UPDATE app_user SET named_role_id = $1 WHERE id = $2
+`
+
+type SetUserNamedRoleParams struct {
+	NamedRoleID *string
+	ID          string
+}
+
+// A person's named role (null: their role's own access). Its base role is
+// their role: it moves with it.
+func (q *Queries) SetUserNamedRole(ctx context.Context, arg SetUserNamedRoleParams) error {
+	_, err := q.db.Exec(ctx, setUserNamedRole, arg.NamedRoleID, arg.ID)
+	return err
+}
+
 const signInMethods = `-- name: SignInMethods :many
 SELECT u.id, (u.password_hash IS NOT NULL)::boolean AS has_password,
   EXISTS (SELECT 1 FROM user_microsoft m WHERE m.user_id = u.id)::boolean AS microsoft
@@ -1504,7 +1679,7 @@ func (q *Queries) TakeMicrosoftFlow(ctx context.Context, ticketHash string) (Tak
 }
 
 const teamMember = `-- name: TeamMember :one
-SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = $1
+SELECT id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = $1
 `
 
 type TeamMemberRow struct {
@@ -1513,6 +1688,7 @@ type TeamMemberRow struct {
 	Name         string
 	Role         string
 	TeamID       *string
+	NamedRoleID  *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -1528,6 +1704,7 @@ func (q *Queries) TeamMember(ctx context.Context, id string) (TeamMemberRow, err
 		&i.Name,
 		&i.Role,
 		&i.TeamID,
+		&i.NamedRoleID,
 		&i.Active,
 		&i.Invited,
 		&i.LastSignInAt,
@@ -1649,7 +1826,7 @@ const updateMember = `-- name: UpdateMember :one
 UPDATE app_user SET role = $1, active = $2, team_id = $3,
   tokens_valid_after = CASE WHEN active AND NOT $2 THEN greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
 WHERE id = $4
-RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at
+RETURNING id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at
 `
 
 type UpdateMemberParams struct {
@@ -1665,6 +1842,7 @@ type UpdateMemberRow struct {
 	Name         string
 	Role         string
 	TeamID       *string
+	NamedRoleID  *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -1692,10 +1870,57 @@ func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (Upd
 		&i.Name,
 		&i.Role,
 		&i.TeamID,
+		&i.NamedRoleID,
 		&i.Active,
 		&i.Invited,
 		&i.LastSignInAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateNamedRole = `-- name: UpdateNamedRole :one
+UPDATE named_role
+SET name = $1, permissions = $2, known_permissions = $3, candidate_scope = $4,
+    job_candidates = $5, updated_by = app_current_user(), version = version + 1, updated_at = now()
+WHERE id = $6 AND version = $7
+RETURNING id, tenant_id, version, name, base_role, permissions, known_permissions, candidate_scope, job_candidates, updated_by, updated_at
+`
+
+type UpdateNamedRoleParams struct {
+	Name             string
+	Permissions      []string
+	KnownPermissions []string
+	CandidateScope   string
+	JobCandidates    bool
+	ID               string
+	Version          int32
+}
+
+// Optimistic concurrency: no row returned = stale version (or gone).
+func (q *Queries) UpdateNamedRole(ctx context.Context, arg UpdateNamedRoleParams) (NamedRole, error) {
+	row := q.db.QueryRow(ctx, updateNamedRole,
+		arg.Name,
+		arg.Permissions,
+		arg.KnownPermissions,
+		arg.CandidateScope,
+		arg.JobCandidates,
+		arg.ID,
+		arg.Version,
+	)
+	var i NamedRole
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.BaseRole,
+		&i.Permissions,
+		&i.KnownPermissions,
+		&i.CandidateScope,
+		&i.JobCandidates,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -1799,7 +2024,7 @@ func (q *Queries) UsedMicrosoft(ctx context.Context, arg UsedMicrosoftParams) (i
 }
 
 const userAuth = `-- name: UserAuth :one
-SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
+SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.named_role_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
   u.microsoft_sessions_after, u.microsoft_connect_only,
   coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
   coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
@@ -1813,6 +2038,7 @@ type UserAuthRow struct {
 	Name                   string
 	Role                   string
 	TeamID                 *string
+	NamedRoleID            *string
 	Active                 bool
 	Invited                bool
 	PasswordHash           *string
@@ -1835,6 +2061,7 @@ func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) 
 		&i.Name,
 		&i.Role,
 		&i.TeamID,
+		&i.NamedRoleID,
 		&i.Active,
 		&i.Invited,
 		&i.PasswordHash,

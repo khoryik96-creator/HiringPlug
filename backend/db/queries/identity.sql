@@ -443,7 +443,7 @@ RETURNING *;
 SELECT name FROM app_user WHERE named_role_id = @id ORDER BY lower(name) LIMIT 20;
 
 -- name: DeleteNamedRole :execrows
-DELETE FROM named_role WHERE id = @id AND NOT EXISTS (SELECT 1 FROM app_user WHERE named_role_id = @id);
+DELETE FROM named_role r WHERE r.id = @id AND NOT EXISTS (SELECT 1 FROM app_user u WHERE u.named_role_id = r.id);
 
 -- A person's named role (null: their role's own access). Its base role is
 -- their role: it moves with it.

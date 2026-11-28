@@ -50,6 +50,9 @@ func roleAccess(ctx context.Context, q *store.Queries, role string) (Access, err
 // settings for their role: permissions, and which candidates they see.
 func principalOf(ctx context.Context, q *store.Queries, u store.UserAuthRow) (authz.Principal, error) {
 	a, err := roleAccess(ctx, q, u.Role)
+	if u.NamedRoleID != nil && u.Role != string(api.RoleOwner) { // their named role's access, not their role's
+		a, err = namedRoleAccess(ctx, q, *u.NamedRoleID)
+	}
 	if err != nil {
 		return authz.Principal{}, err
 	}
