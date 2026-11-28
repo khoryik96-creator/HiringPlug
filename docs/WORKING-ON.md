@@ -30,6 +30,8 @@ How to write an entry (newest at the top, one per task):
   1st, 2nd and Final Interview on the board, tags and report; owners edit them in Settings › Pipeline stages),
   1.58.0 (Apollo email saved to the contact), 1.59.0 to 1.59.2 (targets per stage category, people picker,
   performance report), 1.60.0 and 1.60.1 (a word renamed in Settings is renamed on every candidate and in
-  everyone's favourites; the dropdowns only offer the list). In progress: 1.60.2, the review fixes for 1.60.1.
+  everyone's favourites; the dropdowns only offer the list), 1.60.2 (its review fixes), 1.61.0 (a Microsoft sign-in
+  can connect Outlook mail and calendar too). Nothing in progress. Queued by the owner, in order: new named roles
+  (beyond the six), faster backend tests, accessibility and visual checks in the browser tests.
 - Next: the LinkedIn companion's listed name (manifest "name") becomes "HyPlug LinkedIn Companion" once companions
   run 1.7.0 (its updater takes either name from then on).
