@@ -218,11 +218,11 @@ func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principa
 		logx.From(ctx).Info("microsoft connect refused", "reason", "another browser, person or purpose")
 		return connectFailed(ReasonFailed)
 	}
-	id, err := m.microsoftIdentity(ctx, flow)
+	id, grant, err := m.microsoftIdentity(ctx, flow)
 	if err != nil {
 		return asConnectFailed(err)
 	}
-	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
+	err = database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
 		// Held first, like every change of their row and link; then the
 		// settings are read: a change of organisation that held them
@@ -247,6 +247,10 @@ func (m *Module) FinishConnectingMicrosoft(ctx context.Context, p authz.Principa
 			return err
 		}
 	})
+	if err == nil && grant != nil && m.outlook != nil {
+		m.outlook.ConnectOutlook(ctx, p, *grant)
+	}
+	return err
 }
 
 // UnlinkMicrosoft removes the Microsoft account linked to someone and ends

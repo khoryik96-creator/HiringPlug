@@ -973,14 +973,15 @@ func (q *Queries) MicrosoftConnectOnly(ctx context.Context, id string) error {
 }
 
 const microsoftSettings = `-- name: MicrosoftSettings :one
-SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app FROM tenant WHERE id = app_current_tenant()
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app, microsoft_connects_outlook FROM tenant WHERE id = app_current_tenant()
 `
 
 type MicrosoftSettingsRow struct {
-	MicrosoftSignIn         bool
-	MicrosoftTenantID       *string
-	MicrosoftRequired       bool
-	MicrosoftAcctMissingApp *string
+	MicrosoftSignIn          bool
+	MicrosoftTenantID        *string
+	MicrosoftRequired        bool
+	MicrosoftAcctMissingApp  *string
+	MicrosoftConnectsOutlook bool
 }
 
 // The company's Microsoft sign-in settings.
@@ -992,6 +993,7 @@ func (q *Queries) MicrosoftSettings(ctx context.Context) (MicrosoftSettingsRow, 
 		&i.MicrosoftTenantID,
 		&i.MicrosoftRequired,
 		&i.MicrosoftAcctMissingApp,
+		&i.MicrosoftConnectsOutlook,
 	)
 	return i, err
 }
@@ -1310,27 +1312,40 @@ func (q *Queries) SetInviteEmail(ctx context.Context, arg SetInviteEmailParams) 
 
 const setMicrosoftSettings = `-- name: SetMicrosoftSettings :one
 UPDATE tenant SET microsoft_sign_in = $1, microsoft_tenant_id = $2, microsoft_required = $3,
+  microsoft_connects_outlook = $4,
   microsoft_acct_missing_app = CASE WHEN microsoft_tenant_id IS NOT DISTINCT FROM $2 THEN microsoft_acct_missing_app END
 WHERE id = app_current_tenant()
-RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required
+RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_connects_outlook
 `
 
 type SetMicrosoftSettingsParams struct {
 	Enabled           bool
 	MicrosoftTenantID *string
 	Required          bool
+	ConnectsOutlook   bool
 }
 
 type SetMicrosoftSettingsRow struct {
-	MicrosoftSignIn   bool
-	MicrosoftTenantID *string
-	MicrosoftRequired bool
+	MicrosoftSignIn          bool
+	MicrosoftTenantID        *string
+	MicrosoftRequired        bool
+	MicrosoftConnectsOutlook bool
 }
 
 func (q *Queries) SetMicrosoftSettings(ctx context.Context, arg SetMicrosoftSettingsParams) (SetMicrosoftSettingsRow, error) {
-	row := q.db.QueryRow(ctx, setMicrosoftSettings, arg.Enabled, arg.MicrosoftTenantID, arg.Required)
+	row := q.db.QueryRow(ctx, setMicrosoftSettings,
+		arg.Enabled,
+		arg.MicrosoftTenantID,
+		arg.Required,
+		arg.ConnectsOutlook,
+	)
 	var i SetMicrosoftSettingsRow
-	err := row.Scan(&i.MicrosoftSignIn, &i.MicrosoftTenantID, &i.MicrosoftRequired)
+	err := row.Scan(
+		&i.MicrosoftSignIn,
+		&i.MicrosoftTenantID,
+		&i.MicrosoftRequired,
+		&i.MicrosoftConnectsOutlook,
+	)
 	return i, err
 }
 

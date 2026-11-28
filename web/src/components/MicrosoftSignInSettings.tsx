@@ -45,21 +45,22 @@ export function MicrosoftSignInSettings() {
 
 function SettingsForm({ saved }: { saved: Settings }) {
   const cache = useQueryClient();
-  const [form, setForm] = useState({ enabled: saved.enabled, organisationId: saved.organisationId ?? "", required: saved.required });
+  const [form, setForm] = useState({ enabled: saved.enabled, organisationId: saved.organisationId ?? "", required: saved.required, connectsOutlook: saved.connectsOutlook });
   const [done, setDone] = useState(false);
   const save = useMutation({
     mutationFn: async () => unwrap(await api.PUT("/v1/agency/microsoft-sign-in", {
-      body: { enabled: form.enabled, organisationId: form.organisationId.trim() || null, required: form.enabled && form.required },
+      body: { enabled: form.enabled, organisationId: form.organisationId.trim() || null, required: form.enabled && form.required, connectsOutlook: form.connectsOutlook },
     })),
     onSuccess: (s) => {
       cache.setQueryData(settingsKey, s);
-      setForm({ enabled: s.enabled, organisationId: s.organisationId ?? "", required: s.required }); // as the server keeps them
+      setForm({ enabled: s.enabled, organisationId: s.organisationId ?? "", required: s.required, connectsOutlook: s.connectsOutlook }); // as the server keeps them
       setDone(true);
     },
   });
   const fields = fieldErrors(save.error);
   const shown = ["enabled", "organisationId", "required"];
-  const changed = form.enabled !== saved.enabled || form.required !== saved.required || form.organisationId.trim() !== (saved.organisationId ?? "");
+  const changed = form.enabled !== saved.enabled || form.required !== saved.required || form.organisationId.trim() !== (saved.organisationId ?? "")
+    || form.connectsOutlook !== saved.connectsOutlook;
   const submit = () => {
     const newlyRequired = form.enabled && form.required && !saved.required;
     if (newlyRequired && !window.confirm("Require Microsoft for everyone? Everyone but owners signed in with a password is signed out now, and passwords stop working for them.")) return;
@@ -114,6 +115,14 @@ function SettingsForm({ saved }: { saved: Settings }) {
         <span>Everyone must sign in with Microsoft (owners keep their password as a backup)</span>
       </label>
       {fields.required && <p className="field-error" role="alert">{fields.required}</p>}
+      <label className="check">
+        <input type="checkbox" checked={form.connectsOutlook} onChange={(e) => { edit({ connectsOutlook: e.target.checked }); }} />
+        <span>
+          Also connect Outlook mail and calendar when people sign in with Microsoft
+          <span className="muted small"> (one Microsoft approval instead of three; a mailbox or calendar someone connected to another account is left as it is.
+            If your organisation lets only admins approve apps, grant admin consent once in Microsoft Entra: API permissions › Grant admin consent)</span>
+        </span>
+      </label>
       <ErrorMessage error={Object.keys(fields).some((f) => shown.includes(f)) ? null : save.error} />
       {done && <p role="status" className="muted">Saved. The change is in the audit log, with who made it.</p>}
       <div className="row"><button type="submit" disabled={!changed || save.isPending}>Save</button></div>

@@ -9947,6 +9947,8 @@ export interface components {
         MicrosoftSignInSettings: {
             /** @description The team may sign in with Microsoft accounts of the organisation. */
             enabled: boolean;
+            /** @description Signing in with Microsoft also connects each person's Outlook mail (Settings > Email connection) and calendar, in the same Microsoft consent (Mail.Send, Mail.ReadWrite, Calendars.ReadWrite, offline access). A mailbox or calendar someone connected to another account is left as it is; one of this account is refreshed. */
+            connectsOutlook: boolean;
             /** @description The company's Microsoft organisation (Entra tenant ID, e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47): only its accounts are accepted. */
             organisationId: string | null;
             /** @description Passwords work only for owners: everyone else signs in with Microsoft. */
@@ -9973,6 +9975,8 @@ export interface components {
             enabled: boolean;
             organisationId: string | null;
             required: boolean;
+            /** @description Also connect Outlook mail and calendar at each Microsoft sign-in (kept as it is when left out). */
+            connectsOutlook?: boolean;
         };
         PasswordResetRequest: {
             /** Format: email */

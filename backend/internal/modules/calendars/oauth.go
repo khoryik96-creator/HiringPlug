@@ -140,6 +140,22 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 	if err != nil {
 		return authorizationProblem(err.Error())
 	}
+	return s.connect(ctx, p, app, secret, profile, problem, func(q *store.Queries) error {
+		claimed, err := q.ClaimCalendarCode(ctx, saved.StateHash)
+		if err != nil {
+			return err
+		}
+		if claimed != 1 {
+			return problem
+		}
+		return nil
+	})
+}
+
+// connect saves an Outlook calendar connection for the person (replacing
+// theirs), once claim (when given) says the sign-in it came from is still
+// theirs to finish; problem is the answer when the company's app changed.
+func (s *Service) connect(ctx context.Context, p authz.Principal, app Application, secret tokens, profile outlookIdentity, problem error, claim func(*store.Queries) error) error {
 	sealed, err := s.seal(p.TenantID, p.UserID, "tokens", secret)
 	if err != nil {
 		return err
@@ -168,12 +184,10 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 			if currentApp.ClientID != app.ClientID {
 				return problem
 			}
-			claimed, err := q.ClaimCalendarCode(ctx, saved.StateHash)
-			if err != nil {
-				return err
-			}
-			if claimed != 1 {
-				return problem
+			if claim != nil {
+				if err := claim(q); err != nil {
+					return err
+				}
 			}
 			previous, oldErr := q.PreviousCalendarConnection(ctx, p.UserID)
 			if oldErr != nil && !database.IsNoRows(oldErr) {

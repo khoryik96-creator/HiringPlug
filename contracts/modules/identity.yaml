@@ -1311,9 +1311,17 @@ components:
         company: { type: string, maxLength: 100, description: "The company's careers page address, when the account is at several." }
     MicrosoftSignInSettings:
       type: object
-      required: [enabled, organisationId, required, callbackUrl, appSource, clientId, acctClaimMissing]
+      required: [enabled, organisationId, required, callbackUrl, appSource, clientId, acctClaimMissing, connectsOutlook]
       properties:
         enabled: { type: boolean, description: The team may sign in with Microsoft accounts of the organisation. }
+        connectsOutlook:
+          type: boolean
+          description: >
+            Signing in with Microsoft also connects each person's Outlook mail
+            (Settings > Email connection) and calendar, in the same Microsoft
+            consent (Mail.Send, Mail.ReadWrite, Calendars.ReadWrite, offline
+            access). A mailbox or calendar someone connected to another account
+            is left as it is; one of this account is refreshed.
         organisationId:
           type: string
           nullable: true
@@ -1343,6 +1351,7 @@ components:
         enabled: { type: boolean }
         organisationId: { type: string, nullable: true, maxLength: 64 }
         required: { type: boolean }
+        connectsOutlook: { type: boolean, description: "Also connect Outlook mail and calendar at each Microsoft sign-in (kept as it is when left out)." }
     PasswordResetRequest:
       type: object
       additionalProperties: false

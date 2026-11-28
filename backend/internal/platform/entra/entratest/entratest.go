@@ -43,12 +43,17 @@ func NewKey(t testing.TB, id string) Key {
 type Grant struct {
 	Claims jwt.MapClaims
 	Key    *Key // nil: the server's current key
+	// Graph tokens too (a sign-in that asked for Outlook): given when
+	// RefreshToken is set, with what was granted (Scope).
+	AccessToken, RefreshToken, Scope string
+	ExpiresIn                        int // seconds; 3600 when 0
 }
 
 // Exchange is a code exchange the server received.
 type Exchange struct {
 	Path                                             string
 	ClientID, ClientSecret, Code, Redirect, Verifier string
+	Scope                                            string // what the exchange asked for
 }
 
 // Server is the fake sign-in service.
@@ -237,7 +242,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		f := r.PostForm
 		s.mu.Lock()
 		s.exchanges = append(s.exchanges, Exchange{Path: r.URL.Path, ClientID: f.Get("client_id"), ClientSecret: f.Get("client_secret"),
-			Code: f.Get("code"), Redirect: f.Get("redirect_uri"), Verifier: f.Get("code_verifier")})
+			Code: f.Get("code"), Redirect: f.Get("redirect_uri"), Verifier: f.Get("code_verifier"), Scope: f.Get("scope")})
 		g, ok := s.grants[f.Get("code")]
 		key := s.signWith
 		s.mu.Unlock()
@@ -249,7 +254,15 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		if g.Key != nil {
 			key = *g.Key
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"id_token": Sign(s.t, key, g.Claims), "token_type": "Bearer", "access_token": "unused"})
+		answer := map[string]any{"id_token": Sign(s.t, key, g.Claims), "token_type": "Bearer", "access_token": "unused"}
+		if g.RefreshToken != "" {
+			expires := g.ExpiresIn
+			if expires == 0 {
+				expires = 3600
+			}
+			answer["access_token"], answer["refresh_token"], answer["scope"], answer["expires_in"] = g.AccessToken, g.RefreshToken, g.Scope, expires
+		}
+		_ = json.NewEncoder(w).Encode(answer)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}

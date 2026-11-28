@@ -74,7 +74,7 @@ func (f *msTest) enable(ownerToken, org string, required bool) api.MicrosoftSign
 type msFlow struct {
 	binding                                     string
 	authority, clientID, state, nonce, redirect string
-	challenge, loginHint                        string
+	challenge, loginHint, scope                 string
 }
 
 // start starts a sign-in (body: email, company or invite).
@@ -140,7 +140,7 @@ func (f *msTest) begin(path, token string, body map[string]any) (msFlow, *respon
 	assert.Equal(f.t, "code", q.Get("response_type"))
 	flow.authority = strings.Split(strings.TrimPrefix(u.Path, "/"), "/")[0]
 	flow.clientID, flow.state, flow.nonce, flow.redirect, flow.challenge = q.Get("client_id"), q.Get("state"), q.Get("nonce"), q.Get("redirect_uri"), q.Get("code_challenge")
-	flow.loginHint = q.Get("login_hint")
+	flow.loginHint, flow.scope = q.Get("login_hint"), q.Get("scope")
 	require.NotEmpty(f.t, flow.state)
 	require.NotEmpty(f.t, flow.nonce)
 	return flow, res

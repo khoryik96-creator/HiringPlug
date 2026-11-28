@@ -2237,7 +2237,7 @@ still use a password); only people already on the Team page get in, an
 invitation (or a reconnect link an owner sends from the Team page) links a
 Microsoft account whatever its address, connecting one from Your account asks
 for the password (and two-step code), and Microsoft sign-ins need no
-two-step code. ✅ **Roles and access** (owners): each company chooses what each role may
+two-step code. ✅ **Outlook connected at sign-in** (1.61.0): owners can also have a Microsoft sign-in connect the person's Outlook mail (Settings › Email connection) and calendar, in the same Microsoft approval (one instead of three); a mailbox or calendar someone connected to another account is left as it is, one of the same account gets fresh tokens, and nothing about it ever stops the sign-in ([setup](mailbox-connections.md#outlook-connected-at-sign-in)). ✅ **Roles and access** (owners): each company chooses what each role may
 do and which candidates it sees (all, its team's or its own, plus those on
 the jobs it owns); teams of people on the Team page; an owner on every
 candidate and job, changeable on their pages; a "Mine" filter on the candidate

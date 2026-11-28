@@ -37,6 +37,10 @@ const (
 	Organizations = "organizations"
 	// Scope asks only who the person is.
 	Scope = "openid profile email"
+	// OutlookScope also asks for the person's Outlook mail and calendar
+	// (Microsoft Graph, delegated), with a refresh token: one consent for
+	// signing in, the mailbox (Settings > Email connection) and the calendar.
+	OutlookScope = Scope + " offline_access User.Read Mail.Send Mail.ReadWrite Calendars.ReadWrite"
 )
 
 var guidRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -91,6 +95,7 @@ type Authorize struct {
 	Authority, ClientID, RedirectURI string
 	State, Nonce, Challenge          string // Challenge: base64url SHA-256 of the PKCE verifier
 	LoginHint                        string // optional: the email they typed
+	Scope                            string // Scope (the default) or OutlookScope
 }
 
 // AuthorizeURL is the address that sends someone to Microsoft to sign in.
@@ -100,7 +105,7 @@ func (c *Client) AuthorizeURL(a Authorize) (string, error) {
 	}
 	q := url.Values{
 		"client_id": {a.ClientID}, "response_type": {"code"}, "response_mode": {"query"}, "redirect_uri": {a.RedirectURI},
-		"scope": {Scope}, "state": {a.State}, "nonce": {a.Nonce},
+		"scope": {scopeOr(a.Scope)}, "state": {a.State}, "nonce": {a.Nonce},
 		"code_challenge": {a.Challenge}, "code_challenge_method": {"S256"}, "prompt": {"select_account"},
 	}
 	if a.LoginHint != "" {
@@ -113,6 +118,24 @@ func (c *Client) AuthorizeURL(a Authorize) (string, error) {
 type Exchange struct {
 	Authority, ClientID, ClientSecret string
 	Code, RedirectURI, Verifier       string
+	Scope                             string // what the sign-in asked for (Scope when empty)
+}
+
+// Tokens are what Microsoft gives for a code: the ID token (not yet checked:
+// see Validate) and, when Outlook was asked for too, Graph tokens.
+type Tokens struct {
+	IDToken      string
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int    // seconds
+	Scope        string // what was granted
+}
+
+func scopeOr(s string) string {
+	if s == "" {
+		return Scope
+	}
+	return s
 }
 
 // maxAnswer bounds what is read from Microsoft.
@@ -121,33 +144,44 @@ const maxAnswer = 1 << 20
 // IDToken exchanges the code Microsoft sent back for an ID token (not yet
 // checked: see Validate). Microsoft's error text is never returned.
 func (c *Client) IDToken(ctx context.Context, e Exchange) (string, error) {
+	t, err := c.Tokens(ctx, e)
+	return t.IDToken, err
+}
+
+// Tokens exchanges the code Microsoft sent back for its tokens (the ID token
+// not yet checked: see Validate). Microsoft's error text is never returned.
+func (c *Client) Tokens(ctx context.Context, e Exchange) (Tokens, error) {
 	if !validAuthority(e.Authority) {
-		return "", errors.New("entra: invalid authority")
+		return Tokens{}, errors.New("entra: invalid authority")
 	}
 	form := url.Values{
 		"client_id": {e.ClientID}, "client_secret": {e.ClientSecret}, "grant_type": {"authorization_code"},
-		"code": {e.Code}, "redirect_uri": {e.RedirectURI}, "code_verifier": {e.Verifier}, "scope": {Scope},
+		"code": {e.Code}, "redirect_uri": {e.RedirectURI}, "code_verifier": {e.Verifier}, "scope": {scopeOr(e.Scope)},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.login+"/"+e.Authority+"/oauth2/v2.0/token", strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", err
+		return Tokens{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	res, err := c.http.Do(req)
 	if err != nil {
-		return "", errors.New("entra: Microsoft's token service could not be reached")
+		return Tokens{}, errors.New("entra: Microsoft's token service could not be reached")
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, maxAnswer))
-		return "", fmt.Errorf("entra: Microsoft's token service answered %d", res.StatusCode)
+		return Tokens{}, fmt.Errorf("entra: Microsoft's token service answered %d", res.StatusCode)
 	}
 	var out struct {
-		IDToken string `json:"id_token"`
+		IDToken      string `json:"id_token"`
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, maxAnswer)).Decode(&out); err != nil || out.IDToken == "" {
-		return "", errors.New("entra: Microsoft's token service sent no ID token")
+		return Tokens{}, errors.New("entra: Microsoft's token service sent no ID token")
 	}
-	return out.IDToken, nil
+	return Tokens{IDToken: out.IDToken, AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, ExpiresIn: out.ExpiresIn, Scope: out.Scope}, nil
 }

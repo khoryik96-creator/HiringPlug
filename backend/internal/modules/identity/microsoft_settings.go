@@ -26,6 +26,17 @@ type MicrosoftSignIn struct {
 	// account was linked by its address (Settings warns: the claim is set on
 	// that app, so not for the server's app, nor another of the company's).
 	AcctMissing bool
+	// ConnectsOutlook: a Microsoft sign-in also connects the person's
+	// Outlook mail and calendar (one consent: outlook_connect.go).
+	ConnectsOutlook bool
+}
+
+// MicrosoftSignInChange is what an owner sets (ConnectsOutlook nil: kept).
+type MicrosoftSignInChange struct {
+	Enabled         bool
+	Organisation    *string
+	Required        bool
+	ConnectsOutlook *bool
 }
 
 // MicrosoftSignInSettings returns the company's settings.
@@ -45,7 +56,7 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 		return MicrosoftSignIn{}, err
 	}
 	out := MicrosoftSignIn{Enabled: s.MicrosoftSignIn, OrganisationID: s.MicrosoftTenantID, Required: s.MicrosoftRequired,
-		CallbackURL: m.microsoftCallback(), AppSource: "none"}
+		CallbackURL: m.microsoftCallback(), AppSource: "none", ConnectsOutlook: s.MicrosoftConnectsOutlook}
 	if m.ms == nil {
 		return out, nil
 	}
@@ -71,7 +82,8 @@ func (m *Module) microsoftSignIn(ctx context.Context, tx pgx.Tx, q *store.Querie
 // and removes the links to the old organisation's accounts (counted in the
 // audit entry): everyone links an account of the new one at their next
 // sign-in (owners from Your account).
-func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enabled bool, organisation *string, required bool) (MicrosoftSignIn, error) {
+func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, in MicrosoftSignInChange) (MicrosoftSignIn, error) {
+	enabled, organisation, required := in.Enabled, in.Organisation, in.Required
 	var org *string
 	if organisation != nil && *organisation != "" {
 		id := entra.NormalizeID(*organisation)
@@ -108,18 +120,25 @@ func (m *Module) SetMicrosoftSignIn(ctx context.Context, p authz.Principal, enab
 			return apperr.Validation(apperr.FieldErrors{{Field: "enabled",
 				Message: "set up the Microsoft app first (Settings > Email connection), or ask the server's administrator to"}})
 		}
-		if _, err := q.SetMicrosoftSettings(ctx, store.SetMicrosoftSettingsParams{Enabled: enabled, MicrosoftTenantID: org, Required: required}); err != nil {
+		outlook := before.ConnectsOutlook
+		if in.ConnectsOutlook != nil {
+			outlook = *in.ConnectsOutlook
+		}
+		if _, err := q.SetMicrosoftSettings(ctx, store.SetMicrosoftSettingsParams{Enabled: enabled, MicrosoftTenantID: org, Required: required, ConnectsOutlook: outlook}); err != nil {
 			return err
 		}
 		if out, err = m.microsoftSignIn(ctx, tx, q, p.TenantID); err != nil {
 			return err
 		}
 		orgChanged := deref(before.OrganisationID) != deref(out.OrganisationID)
-		if before.Enabled == out.Enabled && before.Required == out.Required && !orgChanged {
+		if before.Enabled == out.Enabled && before.Required == out.Required && !orgChanged && before.ConnectsOutlook == out.ConnectsOutlook {
 			return nil
 		}
-		changes := map[string]any{"enabled": enabled, "organisationId": org, "required": required,
-			"before": map[string]any{"enabled": before.Enabled, "organisationId": before.OrganisationID, "required": before.Required}}
+		was := map[string]any{"enabled": before.Enabled, "organisationId": before.OrganisationID, "required": before.Required}
+		changes := map[string]any{"enabled": enabled, "organisationId": org, "required": required, "before": was}
+		if before.ConnectsOutlook != out.ConnectsOutlook {
+			changes["connectsOutlook"], was["connectsOutlook"] = out.ConnectsOutlook, before.ConnectsOutlook
+		}
 		if (before.Enabled && !out.Enabled) || (orgChanged && before.OrganisationID != nil) {
 			// Everyone's row first, then their links (the order a sign-in
 			// and an unlink take them in): the two wait, never deadlock.

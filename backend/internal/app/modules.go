@@ -236,6 +236,7 @@ func NewModules(d Deps) *Modules {
 		Recipients:   calendarRecipients{m.Pipeline, m.Candidates, m.Privacy},
 		ReminderMail: calendarReminderMail{m}, Interviews: calendarInterviews{m.Interviews},
 	}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL, TimeZone: d.Config.TimeZone})
+	m.Identity.ConnectOutlookWith(outlookAtSignIn{m.Emails, m.Calendars}) // one Microsoft consent signs in and connects Outlook
 	m.Interviews.UseCalendar(m.Calendars)
 	m.Scheduling.UseCalendar(m.Calendars)
 	m.Claims = claims.New(d.Pool, d.Files, claims.Deps{

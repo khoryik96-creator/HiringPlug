@@ -58,12 +58,16 @@ func (m *Module) CompleteMicrosoft(ctx context.Context, clientAddr string, in Mi
 		logx.From(ctx).Info("microsoft sign-in refused", "reason", "finished in another browser, or not a sign-in")
 		return Session{}, microsoftFailed(ReasonFailed)
 	}
-	id, err := m.microsoftIdentity(ctx, flow)
+	id, grant, err := m.microsoftIdentity(ctx, flow)
 	if err != nil {
 		return Session{}, err
 	}
 	if flow.LinkID != "" { // started from an invitation or reconnect link
-		return m.signInThroughLink(ctx, flow, id)
+		sess, err := m.signInThroughLink(ctx, flow, id)
+		if err == nil {
+			m.connectOutlook(ctx, sess, grant)
+		}
+		return sess, err
 	}
 	rows, err := store.New(m.pool).MicrosoftAccounts(ctx, store.MicrosoftAccountsParams{MsTenantID: id.TenantID, MsObjectID: id.ObjectID, Addresses: id.Addresses()})
 	if err != nil {
@@ -82,52 +86,62 @@ func (m *Module) CompleteMicrosoft(ctx context.Context, clientAddr string, in Mi
 		}
 		return Session{}, microsoftFailed(ReasonNotOnTeam)
 	case 1:
-		return m.signInWithMicrosoft(ctx, accounts[0], id)
+		sess, err := m.signInWithMicrosoft(ctx, accounts[0], id)
+		if err == nil {
+			m.connectOutlook(ctx, sess, grant)
+		}
+		return sess, err
 	}
 	return Session{}, m.chooseCompany(ctx, flow, id, accounts)
 }
 
 // microsoftIdentity is the Microsoft account a sign-in is for: checked now
 // (the code exchanged, its ID token validated), or before a company choice.
-func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoftFlowRow) (entra.Identity, error) {
+// When the sign-in asked for Outlook too, the grant for it comes with it (not
+// after a company choice: that sign-in connects nothing).
+func (m *Module) microsoftIdentity(ctx context.Context, flow store.TakeMicrosoftFlowRow) (entra.Identity, *OutlookGrant, error) {
 	var id entra.Identity
 	if flow.Verified {
 		if err := m.ms.openJSON("identity:"+flow.KeyHash, flow.Sealed, &id); err != nil {
-			return id, microsoftFailed(ReasonFailed)
+			return id, nil, microsoftFailed(ReasonFailed)
 		}
-		return id, nil
+		return id, nil, nil
 	}
 	var secret flowSecret
 	var code string
 	if flow.SealedCode == "" || m.ms.openJSON("flow:"+flow.KeyHash, flow.Sealed, &secret) != nil ||
 		m.ms.openJSON("code:"+flow.KeyHash, flow.SealedCode, &code) != nil {
-		return id, microsoftFailed(ReasonFailed)
+		return id, nil, microsoftFailed(ReasonFailed)
 	}
 	app, organisation, err := m.flowApp(ctx, flow)
 	if err != nil {
-		return id, err
+		return id, nil, err
 	}
-	raw, err := m.ms.entra.IDToken(ctx, entra.Exchange{Authority: flow.Authority, ClientID: app.ClientID, ClientSecret: app.ClientSecret,
-		Code: code, RedirectURI: m.microsoftCallback(), Verifier: secret.Verifier})
+	scope := entra.Scope
+	if secret.Outlook {
+		scope = entra.OutlookScope
+	}
+	tokens, err := m.ms.entra.Tokens(ctx, entra.Exchange{Authority: flow.Authority, ClientID: app.ClientID, ClientSecret: app.ClientSecret,
+		Code: code, RedirectURI: m.microsoftCallback(), Verifier: secret.Verifier, Scope: scope})
 	if err == nil {
-		id, err = m.ms.entra.Validate(ctx, raw, entra.Expect{ClientID: flow.ClientID, Nonce: secret.Nonce, Organisation: organisation})
+		id, err = m.ms.entra.Validate(ctx, tokens.IDToken, entra.Expect{ClientID: flow.ClientID, Nonce: secret.Nonce, Organisation: organisation})
 	}
 	if err == nil && app.Agency { // Settings warns while the company's app leaves out acct (no account is linked by address then)
 		if err := m.noteClaims(ctx, flow.TenantID, app.ClientID, id); err != nil {
-			return id, err
+			return id, nil, err
 		}
 	}
 	if err != nil {
 		logx.From(ctx).Info("microsoft sign-in refused", "reason", err.Error())
 		switch {
 		case errors.Is(err, entra.ErrPersonalAccount):
-			return id, microsoftFailed(ReasonPersonalAccount)
+			return id, nil, microsoftFailed(ReasonPersonalAccount)
 		case errors.Is(err, entra.ErrOtherOrganisation), errors.Is(err, entra.ErrGuestAccount): // a guest's home is another organisation
-			return id, microsoftFailed(ReasonOtherOrganisation)
+			return id, nil, microsoftFailed(ReasonOtherOrganisation)
 		}
-		return id, microsoftFailed(ReasonFailed)
+		return id, nil, microsoftFailed(ReasonFailed)
 	}
-	return id, nil
+	return id, outlookGrant(secret.Outlook, app.ClientID, tokens), nil
 }
 
 // noteClaims keeps, for the company whose own app a sign-in went through,

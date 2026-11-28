@@ -287,7 +287,7 @@ WHERE id = app_current_tenant() AND microsoft_sign_in AND microsoft_tenant_id = 
 
 -- The company's Microsoft sign-in settings.
 -- name: MicrosoftSettings :one
-SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app FROM tenant WHERE id = app_current_tenant();
+SELECT microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_acct_missing_app, microsoft_connects_outlook FROM tenant WHERE id = app_current_tenant();
 
 -- The company's settings, kept from changing until the transaction ends:
 -- changing them (FOR NO KEY UPDATE), or the Microsoft app they rely on (FOR
@@ -302,9 +302,10 @@ SELECT microsoft_sign_in FROM tenant WHERE id = app_current_tenant() FOR SHARE;
 
 -- name: SetMicrosoftSettings :one
 UPDATE tenant SET microsoft_sign_in = @enabled, microsoft_tenant_id = sqlc.narg(microsoft_tenant_id), microsoft_required = @required,
+  microsoft_connects_outlook = @connects_outlook,
   microsoft_acct_missing_app = CASE WHEN microsoft_tenant_id IS NOT DISTINCT FROM sqlc.narg(microsoft_tenant_id) THEN microsoft_acct_missing_app END
 WHERE id = app_current_tenant()
-RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required;
+RETURNING microsoft_sign_in, microsoft_tenant_id, microsoft_required, microsoft_connects_outlook;
 
 -- A link to another organisation (left from before the company changed it)
 -- makes way for a new one.

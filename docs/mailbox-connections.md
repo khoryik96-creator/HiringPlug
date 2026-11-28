@@ -330,3 +330,35 @@ receipt without resubmitting. **Check Outlook** means the outcome could not
 be confirmed. **Check Outlook again** checks the original message. If Outlook
 still has the draft, you can review it and verify Sent Items before scheduling
 it again. Rechecking never sends email.
+
+## Outlook connected at sign-in
+
+A company that signs in with Microsoft (Settings › Roles and access ›
+Microsoft sign-in) can tick **Also connect Outlook mail and calendar when
+people sign in with Microsoft**. The sign-in then asks Microsoft, in the same
+single approval, for `offline_access User.Read Mail.Send Mail.ReadWrite
+Calendars.ReadWrite` besides who the person is. Once they are signed in:
+
+- their Outlook mailbox is connected (as Settings › Email connection would), or,
+  if the same Outlook mailbox was connected already, its tokens are renewed;
+- their Outlook calendar is connected the same way (one waiting to be
+  reconnected syncs again);
+- a mailbox or calendar they connected to **another** account (or SMTP, or
+  Google) is left as it is;
+- anything that cannot be connected (Microsoft gave no mail or calendar
+  permission, another app) is skipped and logged, and the person connects it in
+  Settings as before. The sign-in itself never fails because of it.
+
+In Microsoft Entra, on the app HyPlug uses (App registrations › your app):
+
+1. **API permissions** › Add a permission › Microsoft Graph › Delegated:
+   `offline_access`, `User.Read`, `Mail.Send`, `Mail.ReadWrite`,
+   `Calendars.ReadWrite` (most are there already if mail or calendar was
+   connected before).
+2. If your organisation lets only administrators approve apps, **Grant admin
+   consent for <your organisation>** on the same page, once: otherwise each
+   person is asked to approve at their first sign-in.
+
+The same app is used for signing in, mail and calendar, so its tokens refresh
+for all three. Turning the setting off changes nothing already connected; it
+only stops asking at later sign-ins.

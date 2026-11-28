@@ -140,7 +140,10 @@ func randomToken() string {
 }
 
 // flowSecret is what the start keeps sealed for the end.
-type flowSecret struct{ Verifier, Nonce string }
+type flowSecret struct {
+	Verifier, Nonce string
+	Outlook         bool `json:",omitempty"` // Outlook mail and calendar were asked for too (entra.OutlookScope)
+}
 
 func microsoftUnavailable() error {
 	return apperr.New(api.ErrorCodeMICROSOFTSIGNINUNAVAILABLE, "Signing in with Microsoft is not set up here. Sign in with your email and password, or ask an owner.")
@@ -181,13 +184,17 @@ const (
 func (m *Module) startFlow(ctx context.Context, route msRoute, purpose, bindingHash, loginHint string) (string, error) {
 	state, verifier, nonce := randomToken(), randomToken(), randomToken()
 	key := hashLink(state)
-	sealed, err := m.ms.sealJSON("flow:"+key, flowSecret{Verifier: verifier, Nonce: nonce})
+	sealed, err := m.ms.sealJSON("flow:"+key, flowSecret{Verifier: verifier, Nonce: nonce, Outlook: route.outlook})
 	if err != nil {
 		return "", err
 	}
+	scope := entra.Scope
+	if route.outlook {
+		scope = entra.OutlookScope
+	}
 	target, err := m.ms.entra.AuthorizeURL(entra.Authorize{
 		Authority: route.authority, ClientID: route.app.ClientID, RedirectURI: m.microsoftCallback(),
-		State: state, Nonce: nonce, Challenge: pkceChallenge(verifier), LoginHint: loginHint,
+		State: state, Nonce: nonce, Challenge: pkceChallenge(verifier), LoginHint: loginHint, Scope: scope,
 	})
 	if err != nil {
 		return "", err
@@ -221,6 +228,7 @@ type msRoute struct {
 	tenantID, authority, userID string
 	linkID, linkKind            string
 	app                         MicrosoftApp
+	outlook                     bool // the company connects Outlook at sign-in (outlook_connect.go)
 }
 
 // routeMicrosoft finds the company a sign-in is for: the invitation's (or
@@ -268,8 +276,13 @@ func (m *Module) routeMicrosoft(ctx context.Context, company, link string) (msRo
 func (m *Module) tenantRoute(ctx context.Context, tenantID string) (msRoute, error) {
 	var out msRoute
 	err := database.InTx(ctx, m.pool, authz.System(tenantID), func(tx pgx.Tx) error {
-		org, app, err := m.tenantMicrosoft(ctx, tx, store.New(tx), tenantID)
-		out = msRoute{tenantID: tenantID, authority: org, app: app}
+		q := store.New(tx)
+		org, app, err := m.tenantMicrosoft(ctx, tx, q, tenantID)
+		if err != nil {
+			return err
+		}
+		s, err := q.MicrosoftSettings(ctx)
+		out = msRoute{tenantID: tenantID, authority: org, app: app, outlook: s.MicrosoftConnectsOutlook}
 		return err
 	})
 	return out, err

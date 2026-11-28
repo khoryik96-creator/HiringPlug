@@ -71,8 +71,9 @@ type Module struct {
 	ms         *microsoftSignIn // nil until UseMicrosoft
 	// now is the app server's clock (links, two-step codes). Sessions are
 	// issued and ended by the database's clock instead (databaseSecond).
-	now  func() time.Time
-	HTTP *HTTP
+	now     func() time.Time
+	HTTP    *HTTP
+	outlook OutlookConnector // connects Outlook at a Microsoft sign-in (outlook_connect.go)
 }
 
 // New wires the module. Links in emails point to publicURL (the web app).

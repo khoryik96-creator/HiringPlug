@@ -4332,6 +4332,12 @@ class MicrosoftSignInSettings(BaseModel):
     enabled: Annotated[
         bool, Field(description="The team may sign in with Microsoft accounts of the organisation.")
     ]
+    connectsOutlook: Annotated[
+        bool,
+        Field(
+            description="Signing in with Microsoft also connects each person's Outlook mail (Settings > Email connection) and calendar, in the same Microsoft consent (Mail.Send, Mail.ReadWrite, Calendars.ReadWrite, offline access). A mailbox or calendar someone connected to another account is left as it is; one of this account is refreshed.\n"
+        ),
+    ]
     organisationId: Annotated[
         str | None,
         Field(
@@ -4373,6 +4379,12 @@ class MicrosoftSignInInput(BaseModel):
     enabled: bool
     organisationId: Annotated[str | None, Field(max_length=64)]
     required: bool
+    connectsOutlook: Annotated[
+        bool | None,
+        Field(
+            description="Also connect Outlook mail and calendar at each Microsoft sign-in (kept as it is when left out)."
+        ),
+    ] = None
 
 
 class PasswordResetRequest(BaseModel):

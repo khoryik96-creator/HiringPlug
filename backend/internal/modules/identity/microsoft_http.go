@@ -87,7 +87,7 @@ func (h *HTTP) SendMicrosoftReconnectLink(ctx context.Context, req api.SendMicro
 func microsoftSignInToAPI(s MicrosoftSignIn) api.MicrosoftSignInSettings {
 	return api.MicrosoftSignInSettings{Enabled: s.Enabled, OrganisationId: c.OrNull(s.OrganisationID), Required: s.Required,
 		CallbackUrl: s.CallbackURL, AppSource: api.MicrosoftSignInSettingsAppSource(s.AppSource), ClientId: c.OrNull(s.ClientID),
-		AcctClaimMissing: s.AcctMissing}
+		AcctClaimMissing: s.AcctMissing, ConnectsOutlook: s.ConnectsOutlook}
 }
 
 // GetMicrosoftSignIn handles GET /v1/agency/microsoft-sign-in.
@@ -102,7 +102,8 @@ func (h *HTTP) GetMicrosoftSignIn(ctx context.Context, _ api.GetMicrosoftSignInR
 // SetMicrosoftSignIn handles PUT /v1/agency/microsoft-sign-in.
 func (h *HTTP) SetMicrosoftSignIn(ctx context.Context, req api.SetMicrosoftSignInRequestObject) (api.SetMicrosoftSignInResponseObject, error) {
 	b := req.Body
-	s, err := h.m.SetMicrosoftSignIn(ctx, authz.MustFromContext(ctx), b.Enabled, c.ValueOrNil(b.OrganisationId), b.Required)
+	s, err := h.m.SetMicrosoftSignIn(ctx, authz.MustFromContext(ctx), MicrosoftSignInChange{
+		Enabled: b.Enabled, Organisation: c.ValueOrNil(b.OrganisationId), Required: b.Required, ConnectsOutlook: b.ConnectsOutlook})
 	if err != nil {
 		return nil, err
 	}
