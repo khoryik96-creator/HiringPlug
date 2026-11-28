@@ -23,10 +23,13 @@ How to write an entry (newest at the top, one per task):
 ### Post-migration fixes and the HyPlug rename (taken over)
 - Who: Claude (account B), taken over from Claude (account A) on 26 Nov at the owner's request
 - Branch: claude/brave-thompson-k08hlg
-- Touches: the product's name everywhere people see it (1.56.0, the rename), then the PDF text reader
-- Started: 25 Nov 2026    Last update: 27 Nov 2026
+- Touches: since 1.57: stage categories, targets, the performance report, Settings lists (renames reach candidates)
+- Started: 25 Nov 2026    Last update: 28 Nov 2026
 - State: merged: 1.50.1 to 1.55.0, the rename 1.56.0, 1.56.1 (the committed migrations 1.56.0 changed put back),
   1.56.2 (PDFs saved without spaces between words read right; the owner's CV), 1.57.0 (stage categories:
-  1st, 2nd and Final Interview on the board, tags and report; owners edit them in Settings › Pipeline stages).
+  1st, 2nd and Final Interview on the board, tags and report; owners edit them in Settings › Pipeline stages),
+  1.58.0 (Apollo email saved to the contact), 1.59.0 to 1.59.2 (targets per stage category, people picker,
+  performance report), 1.60.0 and 1.60.1 (a word renamed in Settings is renamed on every candidate and in
+  everyone's favourites; the dropdowns only offer the list). In progress: 1.60.2, the review fixes for 1.60.1.
 - Next: the LinkedIn companion's listed name (manifest "name") becomes "HyPlug LinkedIn Companion" once companions
   run 1.7.0 (its updater takes either name from then on).
