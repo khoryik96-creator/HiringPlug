@@ -125,8 +125,13 @@ func (h *HTTP) UpdateTeamMember(ctx context.Context, req api.UpdateTeamMemberReq
 		t := c.ValueOrNil(b.TeamId)
 		team = &t
 	}
+	var named **string
+	if b.NamedRoleId.IsSpecified() {
+		n := c.ValueOrNil(b.NamedRoleId)
+		named = &n
+	}
 	p := authz.MustFromContext(ctx)
-	row, err := h.m.UpdateMember(ctx, p, req.UserId, c.Convert[string](b.Role), b.Active, team)
+	row, err := h.m.UpdateMember(ctx, p, req.UserId, c.Convert[string](b.Role), b.Active, team, named)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +154,7 @@ func methodsToAPI(methods []string) []api.SignInMethod {
 
 func memberToAPI(r TeamMember) api.TeamMember {
 	return api.TeamMember{
-		Id: r.ID, Name: r.Name, Email: r.Email, Role: api.Role(r.Role), TeamId: c.OrNull(r.TeamID), Status: api.TeamStatus(Status(r)),
+		Id: r.ID, Name: r.Name, Email: r.Email, Role: api.Role(r.Role), TeamId: c.OrNull(r.TeamID), NamedRoleId: c.OrNull(r.NamedRoleID), Status: api.TeamStatus(Status(r)),
 		LastSignInAt: c.OrNull(r.LastSignInAt), CreatedAt: r.CreatedAt, SignInMethods: []api.SignInMethod{},
 	}
 }

@@ -3985,6 +3985,44 @@ class RoleAccess(BaseModel):
     version: Annotated[int, Field(description="0 while the role has the defaults.", ge=0)]
 
 
+class NamedRoleId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^role_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class NamedRole(BaseModel):
+    id: NamedRoleId
+    name: str
+    baseRole: Role
+    permissions: list[Permission]
+    candidateScope: CandidateScope
+    jobCandidates: bool
+    members: Annotated[int, Field(description="How many people (active or invited) are given it.")]
+    version: int
+
+
+class NamedRoleList(BaseModel):
+    items: list[NamedRole]
+
+
+class NamedRoleCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=60, min_length=1)]
+    baseRole: Role
+
+
+class NamedRoleInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=60, min_length=1)]
+    version: Annotated[int, Field(ge=1)]
+    permissions: Annotated[list[Permission], Field(max_length=500)]
+    candidateScope: CandidateScope
+    jobCandidates: bool
+
+
 class RoleAccessInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -4480,6 +4518,12 @@ class TeamMemberUpdate(BaseModel):
     role: Role | None = None
     active: bool | None = None
     teamId: Annotated[TeamGroupId | None, Field(description="The team they are in; null for none.")] = None
+    namedRoleId: Annotated[
+        NamedRoleId | None,
+        Field(
+            description="A named role of the company's: their role becomes its base role, and their access is the named role's. Null for none (their role's own access)."
+        ),
+    ] = None
 
 
 class IndustryId(RootModel[str]):
@@ -9402,6 +9446,9 @@ class TeamMember(BaseModel):
     email: str
     role: Role
     teamId: Annotated[TeamGroupId | None, Field(...)]
+    namedRoleId: Annotated[
+        NamedRoleId | None, Field(description="Their named role (null for none); role is its base role.")
+    ]
     status: TeamStatus
     lastSignInAt: Annotated[AwareDatetime | None, Field(...)]
     createdAt: AwareDatetime

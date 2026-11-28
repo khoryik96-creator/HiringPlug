@@ -6157,6 +6157,76 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/RoleNotEditable'}
+  /v1/access/named-roles:
+    get:
+      operationId: listNamedRoles
+      tags: [identity]
+      summary: The company's named roles (roles of its own, each built on one of the editable roles)
+      description: Readable by those who manage the team, to give someone a named role on the Team page.
+      x-permission: identity.team:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NamedRoleList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createNamedRole
+      tags: [identity]
+      summary: Add a named role, starting from its base role's access in the company
+      x-permission: identity.roles:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NamedRoleCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NamedRole'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/access/named-roles/{namedRoleId}:
+    parameters:
+      - {name: namedRoleId, in: path, required: true, schema: {$ref: '#/components/schemas/NamedRoleId'}}
+    put:
+      operationId: updateNamedRole
+      tags: [identity]
+      summary: Rename a named role and choose its permissions and which candidates it sees
+      description: Its base role stays. People given it get the change on their next request.
+      x-permission: identity.roles:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NamedRoleInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NamedRole'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteNamedRole
+      tags: [identity]
+      summary: Remove a named role nobody is given (refused, naming them, while someone is)
+      x-permission: identity.roles:manage
+      responses:
+        '204': {description: Removed}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/teams:
     get:
       operationId: listTeams
@@ -15259,6 +15329,50 @@ components:
         custom: {type: boolean, description: The company changed this role from the defaults.}
         editable: {type: boolean, description: "False for the owner, who always has every permission and sees all candidates."}
         version: {type: integer, minimum: 0, description: 0 while the role has the defaults.}
+    NamedRoleId:
+      type: string
+      pattern: '^role_[0-9a-hjkmnp-tv-z]{26}$'
+    NamedRole:
+      type: object
+      required: [id, name, baseRole, permissions, candidateScope, jobCandidates, members, version]
+      properties:
+        id: {$ref: '#/components/schemas/NamedRoleId'}
+        name: {type: string}
+        baseRole: {$ref: '#/components/schemas/Role'}
+        permissions:
+          type: array
+          items: {$ref: '#/components/schemas/Permission'}
+        candidateScope: {$ref: '#/components/schemas/CandidateScope'}
+        jobCandidates: {type: boolean}
+        members: {type: integer, description: How many people (active or invited) are given it.}
+        version: {type: integer}
+    NamedRoleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/NamedRole'}
+    NamedRoleCreate:
+      type: object
+      additionalProperties: false
+      required: [name, baseRole]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 60}
+        baseRole: {$ref: '#/components/schemas/Role'}
+    NamedRoleInput:
+      type: object
+      additionalProperties: false
+      required: [name, version, permissions, candidateScope, jobCandidates]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 60}
+        version: {type: integer, minimum: 1}
+        permissions:
+          type: array
+          maxItems: 500
+          items: {$ref: '#/components/schemas/Permission'}
+        candidateScope: {$ref: '#/components/schemas/CandidateScope'}
+        jobCandidates: {type: boolean}
     RoleAccessInput:
       type: object
       additionalProperties: false
@@ -15636,7 +15750,7 @@ components:
       enum: [invited, active, deactivated]
     TeamMember:
       type: object
-      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt, twoStep, signInMethods]
+      required: [id, name, email, role, teamId, namedRoleId, status, lastSignInAt, createdAt, twoStep, signInMethods]
       properties:
         invitationEmail:
           description: While invited, how the latest invitation email went; absent when none is recorded.
@@ -15653,6 +15767,10 @@ components:
         teamId:
           nullable: true
           allOf: [{$ref: '#/components/schemas/TeamGroupId'}]
+        namedRoleId:
+          description: Their named role (null for none); role is its base role.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/NamedRoleId'}]
         status: {$ref: '#/components/schemas/TeamStatus'}
         lastSignInAt: {type: string, format: date-time, nullable: true}
         createdAt: {type: string, format: date-time}
@@ -15702,6 +15820,10 @@ components:
           description: The team they are in; null for none.
           nullable: true
           allOf: [{$ref: '#/components/schemas/TeamGroupId'}]
+        namedRoleId:
+          description: "A named role of the company's: their role becomes its base role, and their access is the named role's. Null for none (their role's own access)."
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/NamedRoleId'}]
     IndustryId:
       type: string
       pattern: '^industry_[0-9a-hjkmnp-tv-z]{26}$'

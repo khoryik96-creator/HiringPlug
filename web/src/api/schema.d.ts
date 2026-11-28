@@ -3729,6 +3729,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/access/named-roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The company's named roles (roles of its own, each built on one of the editable roles)
+         * @description Readable by those who manage the team, to give someone a named role on the Team page.
+         */
+        get: operations["listNamedRoles"];
+        put?: never;
+        /** Add a named role, starting from its base role's access in the company */
+        post: operations["createNamedRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/access/named-roles/{namedRoleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namedRoleId: components["schemas"]["NamedRoleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename a named role and choose its permissions and which candidates it sees
+         * @description Its base role stays. People given it get the change on their next request.
+         */
+        put: operations["updateNamedRole"];
+        post?: never;
+        /** Remove a named role nobody is given (refused, naming them, while someone is) */
+        delete: operations["deleteNamedRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/teams": {
         parameters: {
             query?: never;
@@ -9737,6 +9781,32 @@ export interface components {
             /** @description 0 while the role has the defaults. */
             version: number;
         };
+        NamedRoleId: string;
+        NamedRole: {
+            id: components["schemas"]["NamedRoleId"];
+            name: string;
+            baseRole: components["schemas"]["Role"];
+            permissions: components["schemas"]["Permission"][];
+            candidateScope: components["schemas"]["CandidateScope"];
+            jobCandidates: boolean;
+            /** @description How many people (active or invited) are given it. */
+            members: number;
+            version: number;
+        };
+        NamedRoleList: {
+            items: components["schemas"]["NamedRole"][];
+        };
+        NamedRoleCreate: {
+            name: string;
+            baseRole: components["schemas"]["Role"];
+        };
+        NamedRoleInput: {
+            name: string;
+            version: number;
+            permissions: components["schemas"]["Permission"][];
+            candidateScope: components["schemas"]["CandidateScope"];
+            jobCandidates: boolean;
+        };
         RoleAccessInput: {
             version: number;
             permissions: components["schemas"]["Permission"][];
@@ -10024,6 +10094,8 @@ export interface components {
             email: string;
             role: components["schemas"]["Role"];
             teamId: components["schemas"]["TeamGroupId"] | null;
+            /** @description Their named role (null for none); role is its base role. */
+            namedRoleId: components["schemas"]["NamedRoleId"] | null;
             status: components["schemas"]["TeamStatus"];
             /** Format: date-time */
             lastSignInAt: string | null;
@@ -10068,6 +10140,8 @@ export interface components {
             active?: boolean;
             /** @description The team they are in; null for none. */
             teamId?: components["schemas"]["TeamGroupId"] | null;
+            /** @description A named role of the company's: their role becomes its base role, and their access is the named role's. Null for none (their role's own access). */
+            namedRoleId?: components["schemas"]["NamedRoleId"] | null;
         };
         IndustryId: string;
         Industry: {
@@ -20780,6 +20854,110 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["RoleNotEditable"];
+        };
+    };
+    listNamedRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamedRoleList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createNamedRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NamedRoleCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamedRole"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateNamedRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namedRoleId: components["schemas"]["NamedRoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NamedRoleInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamedRole"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteNamedRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namedRoleId: components["schemas"]["NamedRoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listTeams: {

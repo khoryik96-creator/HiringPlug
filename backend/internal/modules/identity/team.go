@@ -181,7 +181,7 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 // them, by the team rules (ChangeProblem). Deactivating signs them out. A
 // change of role, or a deactivation, ends the reconnect link sent them. team
 // is nil to keep their team; a nil *string inside it means no team.
-func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID string, role *string, active *bool, team **string) (TeamMember, error) {
+func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID string, role *string, active *bool, team **string, named ...**string) (TeamMember, error) {
 	var out TeamMember
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
@@ -207,6 +207,24 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 		}
 		if active != nil {
 			newActive = *active
+		}
+		// A named role makes their role its base role; another role given
+		// alone takes their named role away (it is built on its base role).
+		newNamed := row.NamedRoleID
+		if len(named) > 0 && named[0] != nil {
+			newNamed = *named[0]
+		} else if role != nil && newNamed != nil {
+			newNamed = nil
+		}
+		if newNamed != nil {
+			nr, err := q.GetNamedRole(ctx, *newNamed)
+			if database.IsNoRows(err) {
+				return apperr.Validation(apperr.FieldErrors{{Field: "namedRoleId", Message: "no such role"}})
+			}
+			if err != nil {
+				return err
+			}
+			newRole = nr.BaseRole
 		}
 		if row.Invited && newActive {
 			return teamProblem("They have not joined yet: resend the invitation instead.")
@@ -236,6 +254,10 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 		if err != nil {
 			return err
 		}
+		if err := q.SetUserNamedRole(ctx, store.SetUserNamedRoleParams{ID: userID, NamedRoleID: newNamed}); err != nil {
+			return err
+		}
+		updated.NamedRoleID = newNamed
 		out = TeamMember(updated)
 		if newRole == string(api.RoleOwner) && row.Role != newRole {
 			if err := m.dropAddressLinkOfNewOwner(ctx, tx, q, userID); err != nil {
@@ -248,8 +270,8 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 			}
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.updated", EntityType: "user", EntityID: userID,
-			Changes: audit.Diff(map[string]any{"role": row.Role, "active": row.Active, "teamId": deref(row.TeamID)},
-				map[string]any{"role": newRole, "active": newActive, "teamId": deref(newTeam)})})
+			Changes: audit.Diff(map[string]any{"role": row.Role, "active": row.Active, "teamId": deref(row.TeamID), "namedRoleId": deref(row.NamedRoleID)},
+				map[string]any{"role": newRole, "active": newActive, "teamId": deref(newTeam), "namedRoleId": deref(newNamed)})})
 	})
 	return out, err
 }
