@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 const member = (id: string, name: string, role: Schemas["Role"], status: Schemas["TeamStatus"] = "active"): Schemas["TeamMember"] => ({
-  id, name, email: `${name.toLowerCase()}@contoh.my`, role, teamId: null, status, twoStep: false, signInMethods: ["password"], lastSignInAt: null, createdAt: "2026-11-01T00:00:00Z",
+  id, name, email: `${name.toLowerCase()}@contoh.my`, role, teamId: null, namedRoleId: null, status, twoStep: false, signInMethods: ["password"], lastSignInAt: null, createdAt: "2026-11-01T00:00:00Z",
 });
 const reads = () => vi.spyOn(api, "GET").mockResolvedValue(ok({
   items: [member("usr_me", "Aina", "admin"), member("usr_o", "Olivia", "owner"), member("usr_r", "Rizal", "recruiter"), member("usr_n", "Nur", "sourcer", "invited")],

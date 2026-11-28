@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useNamedRoles } from "./NamedRoles";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { setToken } from "../auth";
@@ -48,6 +49,7 @@ type Sent = { what: string; link?: string; delivery?: Schemas["Invitation"]["del
 
 function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[]; microsoft: boolean }) {
   const queryClient = useQueryClient();
+  const named = useNamedRoles().data?.items ?? [];
   const [sent, setSent] = useState<Sent | null>(null);
   const refresh = async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); };
   const update = useMutation({
@@ -119,10 +121,18 @@ function MemberRow({ member: m, myRole, me, groups, microsoft }: { member: Membe
           <SignInMethods methods={m.signInMethods} />
         </td>
         <td className="team-role">
-          {locked ? <span className="team-role-text">{ROLE[m.role]}</span> : (
-            <select aria-label={`Role of ${m.name}`} value={m.role} disabled={update.isPending}
-              onChange={(e) => { update.mutate({ role: e.target.value as Schemas["Role"] }); }}>
+          {locked ? <span className="team-role-text">{named.find((n) => n.id === m.namedRoleId)?.name ?? ROLE[m.role]}</span> : (
+            <select aria-label={`Role of ${m.name}`} value={m.namedRoleId ? `named:${m.namedRoleId}` : m.role} disabled={update.isPending}
+              onChange={(e) => {
+                const v = e.target.value;
+                update.mutate(v.startsWith("named:") ? { namedRoleId: v.slice(6) } : { role: v as Schemas["Role"] });
+              }}>
               {roles(myRole).map((r) => <option key={r} value={r}>{ROLE[r]}</option>)}
+              {named.filter((n) => rank(n.baseRole) <= rank(myRole)).length > 0 && (
+                <optgroup label="Named roles">
+                  {named.filter((n) => rank(n.baseRole) <= rank(myRole)).map((n) => <option key={n.id} value={`named:${n.id}`}>{n.name}</option>)}
+                </optgroup>
+              )}
             </select>
           )}
         </td>

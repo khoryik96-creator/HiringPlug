@@ -6,6 +6,7 @@ import { accessKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MicrosoftSignInSettings } from "../components/MicrosoftSignInSettings";
 import { RequireTwoStep } from "../components/TwoStep";
+import { NamedRoles } from "./NamedRoles";
 import { CANDIDATE_SCOPE, keysOf, MODULE, ROLE } from "../labels";
 
 type RoleAccess = Schemas["RoleAccess"];
@@ -34,6 +35,7 @@ export function Access({ owner = false }: { owner?: boolean }) {
       {owner && <MicrosoftSignInSettings />}
       <ErrorMessage error={settings.error} />
       {s?.roles.map((r) => <RoleCard key={`${r.role}-${String(r.version)}`} access={r} catalog={s.permissions} />)}
+      {owner && s && <NamedRoles catalog={s.permissions} />}
     </main>
   );
 }
@@ -63,6 +65,31 @@ function RoleCard({ access: a, catalog }: { access: RoleAccess; catalog: Info[] 
     );
   }
   const changed = scope !== a.candidateScope || jobs !== a.jobCandidates || perms.size !== a.permissions.length || a.permissions.some((p) => !perms.has(p));
+  return (
+    <section className="panel" aria-label={ROLE[a.role]}>
+      <details>
+        <summary>
+          <strong>{ROLE[a.role]}</strong>: {scopeText(a)} · {a.permissions.length} permissions{" "}
+          {a.custom ? <span className="badge draft">Changed by you</span> : <span className="badge">Default</span>}
+        </summary>
+        <AccessFields name={a.role} role={a.role} catalog={catalog} perms={perms} setPerms={setPerms} scope={scope} setScope={setScope} jobs={jobs} setJobs={setJobs} />
+        <div className="row">
+          <button type="button" disabled={!changed || save.isPending} onClick={() => { save.mutate(); }}>Save {ROLE[a.role].toLowerCase()}</button>
+          {a.custom && <button type="button" className="link" disabled={reset.isPending} onClick={() => { reset.mutate(); }}>Back to the defaults</button>}
+        </div>
+        <ErrorMessage error={save.error ?? reset.error} />
+      </details>
+    </section>
+  );
+}
+
+type Scope = Schemas["CandidateScope"];
+
+/** Which candidates a role sees, and what it may do (a role's own, or a named role's). */
+export function AccessFields({ name, role, catalog, perms, setPerms, scope, setScope, jobs, setJobs }: {
+  name: string; role: Schemas["Role"]; catalog: Info[]; perms: Set<Schemas["Permission"]>; setPerms: (p: Set<Schemas["Permission"]>) => void;
+  scope: Scope; setScope: (s: Scope) => void; jobs: boolean; setJobs: (j: boolean) => void;
+}) {
   const modules = [...new Set(catalog.map((p) => p.module))];
   const toggle = (p: Schemas["Permission"], on: boolean) => {
     const next = new Set(perms);
@@ -71,42 +98,31 @@ function RoleCard({ access: a, catalog }: { access: RoleAccess; catalog: Info[] 
     setPerms(next);
   };
   return (
-    <section className="panel" aria-label={ROLE[a.role]}>
-      <details>
-        <summary>
-          <strong>{ROLE[a.role]}</strong>: {scopeText(a)} · {a.permissions.length} permissions{" "}
-          {a.custom ? <span className="badge draft">Changed by you</span> : <span className="badge">Default</span>}
-        </summary>
-        <fieldset className="access-scope">
-          <legend>Which candidates they see</legend>
-          {keysOf(CANDIDATE_SCOPE).map((s) => (
-            <label key={s}><input type="radio" name={`scope-${a.role}`} checked={scope === s} onChange={() => { setScope(s); }} /> {CANDIDATE_SCOPE[s]}</label>
-          ))}
-          <label>
-            <input type="checkbox" checked={jobs} disabled={scope === "all"} onChange={(e) => { setJobs(e.target.checked); }} />{" "}
-            Also the candidates on jobs they (or their team) own
-          </label>
-        </fieldset>
-        {modules.map((m) => (
-          <fieldset key={m} className="access-perms">
-            <legend>{MODULE[m] ?? m}</legend>
-            {catalog.filter((p) => p.module === m).map((p) => (
-              <label key={p.permission} title={p.permission}>
-                <input type="checkbox" checked={perms.has(p.permission)} disabled={p.permission === "identity.roles:manage"}
-                  onChange={(e) => { toggle(p.permission, e.target.checked); }} />{" "}
-                {p.description}
-                {p.sensitive && <span className="badge draft"> sensitive</span>}
-                {!p.defaultRoles.includes(a.role) && perms.has(p.permission) && <span className="muted small"> (not by default)</span>}
-              </label>
-            ))}
-          </fieldset>
+    <>
+      <fieldset className="access-scope">
+        <legend>Which candidates they see</legend>
+        {keysOf(CANDIDATE_SCOPE).map((s) => (
+          <label key={s}><input type="radio" name={`scope-${name}`} checked={scope === s} onChange={() => { setScope(s); }} /> {CANDIDATE_SCOPE[s]}</label>
         ))}
-        <div className="row">
-          <button type="button" disabled={!changed || save.isPending} onClick={() => { save.mutate(); }}>Save {ROLE[a.role].toLowerCase()}</button>
-          {a.custom && <button type="button" className="link" disabled={reset.isPending} onClick={() => { reset.mutate(); }}>Back to the defaults</button>}
-        </div>
-        <ErrorMessage error={save.error ?? reset.error} />
-      </details>
-    </section>
+        <label>
+          <input type="checkbox" checked={jobs} disabled={scope === "all"} onChange={(e) => { setJobs(e.target.checked); }} />{" "}
+          Also the candidates on jobs they (or their team) own
+        </label>
+      </fieldset>
+      {modules.map((m) => (
+        <fieldset key={m} className="access-perms">
+          <legend>{MODULE[m] ?? m}</legend>
+          {catalog.filter((p) => p.module === m).map((p) => (
+            <label key={p.permission} title={p.permission}>
+              <input type="checkbox" checked={perms.has(p.permission)} disabled={p.permission === "identity.roles:manage"}
+                onChange={(e) => { toggle(p.permission, e.target.checked); }} />{" "}
+              {p.description}
+              {p.sensitive && <span className="badge draft"> sensitive</span>}
+              {!p.defaultRoles.includes(role) && perms.has(p.permission) && <span className="muted small"> (not by default)</span>}
+            </label>
+          ))}
+        </fieldset>
+      ))}
+    </>
   );
 }

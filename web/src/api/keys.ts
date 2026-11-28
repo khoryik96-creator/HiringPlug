@@ -57,3 +57,5 @@ export const clientShortlistsKey = (jobId: string) => ["client-shortlists", jobI
 export const whatsAppTemplatesKey = ["whatsapp-templates"] as const;
 /** WhatsApp messages filled in for one person (all of them start with this). */
 export const whatsAppDraftsKey = ["whatsapp-draft"] as const;
+/** The company's named roles (roles of its own). */
+export const namedRolesKey = ["access", "named-roles"] as const;
