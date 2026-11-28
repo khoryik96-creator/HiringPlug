@@ -52,8 +52,8 @@ func Record(ctx context.Context, tx pgx.Tx, e Entry) error {
 	return nil
 }
 
-// RecordAll writes many entries in one round trip (a change made to many
-// records at once).
+// RecordAll writes many entries in one statement (a change made to many
+// records at once, such as a word renamed on thousands of candidates).
 func RecordAll(ctx context.Context, tx pgx.Tx, entries []Entry) error {
 	if len(entries) == 0 {
 		return nil
@@ -62,22 +62,24 @@ func RecordAll(ctx context.Context, tx pgx.Tx, entries []Entry) error {
 	if id := requestid.From(ctx); id != "" {
 		reqID = &id
 	}
-	batch := &pgx.Batch{}
-	for _, e := range entries {
-		changes := e.Changes
-		if changes == nil {
-			changes = map[string]any{}
+	actions, types, ids, changes := make([]string, len(entries)), make([]string, len(entries)), make([]string, len(entries)), make([]string, len(entries))
+	for i, e := range entries {
+		c := e.Changes
+		if c == nil {
+			c = map[string]any{}
 		}
-		data, err := json.Marshal(changes)
+		data, err := json.Marshal(c)
 		if err != nil {
 			return fmt.Errorf("audit: %w", err)
 		}
-		batch.Queue(`
-		INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, changes, request_id)
-		VALUES (app_current_tenant(), coalesce(app_current_user(), 'system'), $1, $2, $3, $4, $5)`,
-			e.Action, e.EntityType, e.EntityID, data, reqID)
+		actions[i], types[i], ids[i], changes[i] = e.Action, e.EntityType, e.EntityID, string(data)
 	}
-	if err := tx.SendBatch(ctx, batch).Close(); err != nil {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, changes, request_id)
+		SELECT app_current_tenant(), coalesce(app_current_user(), 'system'), a, t, e, c::jsonb, $5
+		FROM unnest($1::text[], $2::text[], $3::text[], $4::text[]) AS x(a, t, e, c)`,
+		actions, types, ids, changes, reqID)
+	if err != nil {
 		return fmt.Errorf("audit: %w", err)
 	}
 	return nil

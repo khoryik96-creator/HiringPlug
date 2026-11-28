@@ -43,7 +43,8 @@ describe("settings", () => {
     const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { options: { label: string }[] } }) =>
       Promise.resolve(ok({ name: "it_skill", label: "IT skills", kind: "open", hints: false, colors: false,
         options: init.body.options.map((o) => ({ key: o.label, label: o.label, hint: null, color: null, hidden: false, builtIn: false })) }))) as never);
-    renderWithClient(<ListSettings />);
+    const { client } = renderWithClient(<ListSettings />);
+    const refreshed = vi.spyOn(client, "invalidateQueries");
     const skills = await screen.findByRole("region", { name: "IT skills" });
     expect(within(skills).getByText("Renaming a word renames it on the candidates who have it. A word removed stays on the candidates who have it.")).toBeTruthy();
     expect(within(await screen.findByRole("region", { name: "Candidate source" })).queryByText(/Renaming a word/)).toBeNull();
@@ -51,6 +52,12 @@ describe("settings", () => {
     fireEvent.click(within(skills).getByRole("button", { name: "Save it skills" }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect((sentBody(put) as { options: unknown[] }).options[2]).toEqual({ key: "SAP", label: "SAP S/4HANA", hidden: false });
+    expect((sentBody(put) as { basedOn: string[] }).basedOn, "the keys it loaded, so a colleague's change is not undone").toEqual(["Java", "Python", "SAP"]);
+    // Candidates who had it (and their versions) and everyone's favourites changed on the server.
+    await waitFor(() => {
+      const keys = refreshed.mock.calls.map(([f]) => JSON.stringify((f as { queryKey: unknown }).queryKey));
+      expect(keys).toEqual(expect.arrayContaining(['["candidates"]', '["candidate"]', '["me","preferences"]']));
+    });
   });
 
   it("edits the company benefits template: items with what to write for each", async () => {

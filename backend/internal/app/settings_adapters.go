@@ -52,3 +52,5 @@ func (r optionRenames) RenameOption(ctx context.Context, tx pgx.Tx, list, from, 
 	}
 	return r.candidates.RenameWord(ctx, tx, field, from, to)
 }
+
+func (r optionRenames) RenamesSaved() { r.candidates.ForgetUsedValues() }

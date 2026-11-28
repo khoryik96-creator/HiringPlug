@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
-import { fieldSettingsKey, policiesKey } from "../api/keys";
+import { candidatesKey, fieldSettingsKey, policiesKey } from "../api/keys";
+import { preferencesKey } from "../components/candidateColumns";
 import { SalaryCalculationSettings } from "../components/SalaryCalculationSettings";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { chipStyle } from "../components/companyCategory";
@@ -192,16 +193,25 @@ function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
 function ListEditor({ list }: { list: List }) {
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<Row[]>(() => list.options.map(rowOf));
+  // The keys as loaded: a list a colleague changed since is not overwritten.
+  const [basedOn, setBasedOn] = useState(() => list.options.map((o) => o.key));
   const [adding, setAdding] = useState({ label: "", hint: "", color: "#2563eb", value: "1", unit: "month" });
   const save = useMutation({
     mutationFn: async () => unwrap(await api.PUT("/v1/settings/fields/lists/{fieldList}", {
       params: { path: { fieldList: list.name } },
       body: { options: rows.map((r) => ({ ...(r.key ? { key: r.key } : {}), label: r.label, hidden: r.hidden, ...(list.hints ? { hint: r.hint } : {}),
-        ...(list.colors ? { color: r.color } : {}) })) },
+        ...(list.colors ? { color: r.color } : {}) })), basedOn },
     })),
     onSuccess: (saved) => {
       setRows(saved.options.map(rowOf));
+      setBasedOn(saved.options.map((o) => o.key));
       void queryClient.invalidateQueries({ queryKey: fieldSettingsKey });
+      if (WORD_LISTS.includes(list.name)) {
+        // A rename reaches candidates (and their versions) and everyone's favourites.
+        void queryClient.invalidateQueries({ queryKey: candidatesKey });
+        void queryClient.invalidateQueries({ queryKey: ["candidate"] });
+        void queryClient.invalidateQueries({ queryKey: preferencesKey });
+      }
     },
   });
   const errors = fieldErrors(save.error);

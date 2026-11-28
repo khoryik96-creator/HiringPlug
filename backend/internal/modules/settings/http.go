@@ -39,7 +39,11 @@ func (h *HTTP) PutFieldList(ctx context.Context, req api.PutFieldListRequestObje
 			in[i].Hidden = *o.Hidden
 		}
 	}
-	l, err := h.svc.PutList(ctx, authz.MustFromContext(ctx), string(req.FieldList), in)
+	var basedOn []string
+	if req.Body.BasedOn != nil {
+		basedOn = *req.Body.BasedOn
+	}
+	l, err := h.svc.PutList(ctx, authz.MustFromContext(ctx), string(req.FieldList), in, basedOn)
 	if err != nil {
 		return nil, err
 	}

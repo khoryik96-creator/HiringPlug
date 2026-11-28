@@ -7766,11 +7766,22 @@ class FieldOptionInput(BaseModel):
     hidden: bool | None = None
 
 
+class BasedOnItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=100)]
+
+
 class FieldListInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     options: Annotated[list[FieldOptionInput], Field(max_length=200)]
+    basedOn: Annotated[
+        list[BasedOnItem] | None,
+        Field(
+            description="The keys of the list as the editor loaded it, in any order. When given and the list has changed since (a colleague added, renamed or removed an option), the save is refused (CONFLICT_STALE_VERSION) instead of undoing their change.\n",
+            max_length=200,
+        ),
+    ] = None
 
 
 class FieldForm(StrEnum):

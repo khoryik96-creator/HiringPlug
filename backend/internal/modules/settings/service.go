@@ -85,8 +85,9 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Settings, error) 
 
 // PutList replaces one dropdown's options. A word renamed in the
 // specialization, IT skills or certifications list (sent with its old word as
-// its key) is renamed on the candidates who have it too.
-func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, in []OptionInput) (List, error) {
+// its key) is renamed on the candidates who have it too. basedOn, when given,
+// are the keys the editor loaded: a list changed since is not overwritten.
+func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, in []OptionInput, basedOn []string) (List, error) {
 	if name == "industry" {
 		return List{}, invalidIndustryList()
 	}
@@ -95,13 +96,17 @@ func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, i
 		return List{}, err
 	}
 	var out List
+	var renames []Rename
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
 		before, err := listIn(ctx, q, name)
 		if err != nil {
 			return err
 		}
-		renames, err := Renames(name, in, before.Options)
+		if basedOn != nil && !sameKeys(before.Options, basedOn) {
+			return apperr.StaleVersion("list")
+		}
+		renames, err = Renames(name, in, before.Options)
 		if err != nil {
 			return err
 		}
@@ -133,7 +138,27 @@ func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, i
 		out, err = listIn(ctx, q, name)
 		return err
 	})
+	if err == nil && len(renames) > 0 && s.renamer != nil {
+		s.renamer.RenamesSaved() // what was remembered of the old words, now committed
+	}
 	return out, err
+}
+
+// sameKeys is whether a list has exactly these keys (in any order).
+func sameKeys(options []Option, keys []string) bool {
+	if len(options) != len(keys) {
+		return false
+	}
+	have := make(map[string]bool, len(options))
+	for _, o := range options {
+		have[o.Key] = true
+	}
+	for _, k := range keys {
+		if !have[k] {
+			return false
+		}
+	}
+	return true
 }
 
 // listIn is one of the company's dropdowns as saved now.

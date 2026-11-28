@@ -123,7 +123,7 @@ func TestARenameReachesEveryCandidateAndFavourite(t *testing.T) {
 	assert.Equal(t, []string{"Go", "Java"}, *prefs.Favourites.ItSkill, "a colleague's star follows the word")
 
 	entry := auditEntryOf(t, a.auditLog(owner, "?entityType=candidate&entityId="+theirs.Id), "candidate.updated", theirs.Id)
-	assert.Equal(t, map[string]any{"from": "Golang", "to": "Go"}, entry.Changes["skills"])
+	assert.Equal(t, map[string]any{"skills": map[string]any{"from": "Golang", "to": "Go"}}, entry.Changes, "only the field, as every candidate.updated")
 	a.request(http.MethodGet, "/v1/candidates/used-values", recruiter, nil).JSON(&used)
 	assert.Contains(t, used.Skills, "Go", "suggestions have the new word at once")
 	assert.NotContains(t, used.Skills, "Golang")
@@ -176,4 +176,41 @@ func TestRemovingOrHidingAWordLeavesCandidatesAsTheyAre(t *testing.T) {
 	var page api.CandidatePage
 	a.request(http.MethodGet, "/v1/candidates?skill=php", recruiter, nil).JSON(&page)
 	require.Len(t, page.Items, 1, "still found by the word")
+}
+
+// A Settings page opened before a colleague changed the list does not undo
+// their change: a save based on the keys it loaded is refused once the list
+// has changed, and goes through while it has not.
+func TestASaveFromAStaleListIsRefused(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin)
+	owner, admin := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin].Token
+	put := func(token string, basedOn []string, options []map[string]any) *response {
+		return a.request(http.MethodPut, "/v1/settings/fields/lists/certification", token, map[string]any{"options": options, "basedOn": basedOn})
+	}
+	loaded := []string{"ACCA", "CFA", "CIA", "CIMA", "CPA", "MIA", "ICAEW", "CISCO", "CompTIA", "Palo Alto", "Fortinet"}
+	var opts []map[string]any
+	for _, k := range loaded {
+		opts = append(opts, map[string]any{"key": k, "label": k, "hidden": false})
+	}
+	renamed := append([]map[string]any{}, opts...)
+	renamed[7] = map[string]any{"key": "CISCO", "label": "Cisco CCNA", "hidden": false}
+	res := put(owner, loaded, renamed)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	res = put(admin, loaded, append(opts, map[string]any{"label": "PMP", "hidden": false}))
+	assert.Equal(t, http.StatusConflict, res.Status, "the admin's page still had CISCO: %s", res.Body)
+	var all api.FieldSettings
+	a.request(http.MethodGet, "/v1/settings/fields", admin, nil).JSON(&all)
+	for _, l := range all.Lists {
+		if l.Name == api.FieldListNameCertification {
+			assert.Equal(t, "Cisco CCNA", l.Options[7].Label, "the rename stands")
+		}
+	}
+
+	now := append([]string{}, loaded...)
+	now[7] = "Cisco CCNA"
+	res = put(admin, now, append(renamed, map[string]any{"label": "PMP", "hidden": false}))
+	assert.Equal(t, http.StatusOK, res.Status, "based on the list as it is: %s", res.Body)
 }

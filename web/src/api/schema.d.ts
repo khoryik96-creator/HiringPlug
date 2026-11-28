@@ -5826,7 +5826,7 @@ export interface paths {
         get?: never;
         /**
          * Replace a dropdown's options (in the order given)
-         * @description In the specialization, IT skills and certifications lists, an option sent with its old word as its key and a new label is a rename: the candidates who have the old word (ignoring case) get the new one, in the same save. Removing a word leaves it on the candidates who have it.
+         * @description In the specialization, IT skills and certifications lists, an option sent with its old word as its key and a new label is a rename: every candidate of the company who has the old word (ignoring case; whoever owns them, binned ones too) gets the new one, and so do everyone's favourites, in the same save; each candidate gets a candidate.updated entry. Removing a word leaves it on the candidates who have it.
          */
         put: operations["putFieldList"];
         post?: never;
@@ -13023,6 +13023,8 @@ export interface components {
         };
         FieldListInput: {
             options: components["schemas"]["FieldOptionInput"][];
+            /** @description The keys of the list as the editor loaded it, in any order. When given and the list has changed since (a colleague added, renamed or removed an option), the save is refused (CONFLICT_STALE_VERSION) instead of undoing their change. */
+            basedOn?: string[];
         };
         /** @enum {string} */
         FieldForm: "candidate" | "job";
@@ -24873,6 +24875,7 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
         };
     };
     putMandatoryFields: {

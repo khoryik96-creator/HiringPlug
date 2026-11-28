@@ -23,6 +23,9 @@ var renameLists = []string{"specialization", "it_skill", "certification"}
 // save's transaction, and says how many changed.
 type Renamer interface {
 	RenameOption(ctx context.Context, tx pgx.Tx, list, from, to string) (int, error)
+	// RenamesSaved is told once the renames are committed (to forget what
+	// was remembered of the old words).
+	RenamesSaved()
 }
 
 // RenameWith gives settings the module that holds the words (wired after it

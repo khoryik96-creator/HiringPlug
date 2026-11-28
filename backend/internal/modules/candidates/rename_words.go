@@ -30,13 +30,17 @@ func (m *Module) RenameWord(ctx context.Context, tx pgx.Tx, field, from, to stri
 	entries := make([]audit.Entry, len(ids))
 	for i, id := range ids {
 		entries[i] = audit.Entry{Action: "candidate.updated", EntityType: "candidate", EntityID: id,
-			Changes: map[string]any{field: map[string]any{"from": from, "to": to}, "renamedInList": true}}
+			Changes: map[string]any{field: map[string]any{"from": from, "to": to}}}
 	}
 	if err := audit.RecordAll(ctx, tx, entries); err != nil {
 		return 0, err
 	}
 	if len(ids) > 0 {
-		m.service.used.forgetAll() // the suggestions have the old word
+		m.service.used.forgetAll() // the suggestions have the old word (again once committed: ForgetUsedValues)
 	}
 	return len(ids), nil
 }
+
+// ForgetUsedValues forgets the suggestions of values already used (once a
+// rename is committed: suggestions counted meanwhile had the old words).
+func (m *Module) ForgetUsedValues() { m.service.used.forgetAll() }

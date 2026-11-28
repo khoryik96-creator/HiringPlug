@@ -97,9 +97,11 @@ paths:
       summary: Replace a dropdown's options (in the order given)
       description: >
         In the specialization, IT skills and certifications lists, an option
-        sent with its old word as its key and a new label is a rename: the
-        candidates who have the old word (ignoring case) get the new one, in
-        the same save. Removing a word leaves it on the candidates who have it.
+        sent with its old word as its key and a new label is a rename: every
+        candidate of the company who has the old word (ignoring case; whoever
+        owns them, binned ones too) gets the new one, and so do everyone's
+        favourites, in the same save; each candidate gets a candidate.updated
+        entry. Removing a word leaves it on the candidates who have it.
       x-permission: settings:manage
       requestBody:
         required: true
@@ -115,6 +117,7 @@ paths:
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/settings/fields/mandatory:
     put:
@@ -720,6 +723,15 @@ components:
           type: array
           maxItems: 200
           items: { $ref: '#/components/schemas/FieldOptionInput' }
+        basedOn:
+          type: array
+          maxItems: 200
+          items: { type: string, maxLength: 100 }
+          description: >
+            The keys of the list as the editor loaded it, in any order. When
+            given and the list has changed since (a colleague added, renamed or
+            removed an option), the save is refused (CONFLICT_STALE_VERSION)
+            instead of undoing their change.
     FieldForm:
       type: string
       enum: [candidate, job]
