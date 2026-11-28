@@ -2242,7 +2242,7 @@ do and which candidates it sees (all, its team's or its own, plus those on
 the jobs it owns); teams of people on the Team page; an owner on every
 candidate and job, changeable on their pages; a "Mine" filter on the candidate
 list. A candidate someone may not see is hidden from them everywhere, by the
-database. Later: new named roles, and signing in with Google. Details: [access-control.md](access-control.md).
+database. ✅ **Named roles** (1.62.0): owners add roles of their own ("Junior recruiter"), each built on Admin, Recruiter, Sourcer, Hiring manager or Viewer (its rank: who may manage whom), with their own permissions and candidates; given to people on the Team page (the role picker lists them under Named roles), removed only once nobody has them. Later: signing in with Google. Details: [access-control.md](access-control.md).
 
 ## Agency and in-house, own team and SaaS
 

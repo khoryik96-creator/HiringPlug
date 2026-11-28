@@ -20,7 +20,8 @@ const twoStep = { enabled: true, enabledAt: null, recoveryCodesLeft: 10, require
 
 function serve(ms: Schemas["MicrosoftSignInSettings"]) {
   return vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
-    path === "/v1/agency/microsoft-sign-in" ? ok(ms) : path === "/v1/me/two-step" ? ok(twoStep) : ok(access))) as never);
+    path === "/v1/agency/microsoft-sign-in" ? ok(ms) : path === "/v1/me/two-step" ? ok(twoStep)
+      : path === "/v1/access/named-roles" ? ok({ items: [] }) : ok(access))) as never);
 }
 
 describe("Roles and access › Microsoft sign-in", () => {

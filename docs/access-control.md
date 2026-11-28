@@ -337,7 +337,14 @@ pages, the job board, dashboards and reports therefore only ever count and
 show what the user may see. `TestOwnScopeHidesOtherPeoplesCandidatesEverywhere`
 checks it through the API and with raw SQL.
 
-Coming later: new named roles (beyond editing the six) and single sign-on.
+Named roles (1.62.0): owners add roles of their own under Roles and access ›
+Named roles, each built on one of the five editable roles. A person given one
+keeps its base role as their role (rank: who may manage whom, and the owner
+checks), and their permissions and candidate scope are the named role's
+(`principalOf` reads it instead of the role's settings). Giving someone a plain
+role takes their named role away; a named role still given to someone is not
+removed. Single sign-on with Microsoft is built (Roles and access › Microsoft
+sign-in); Google is still to come.
 
 ## Three layers of enforcement
 
