@@ -153,3 +153,11 @@ func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, erro
 	}
 	return out, err
 }
+
+// forgetAll forgets every company's suggestions (a word renamed on many
+// candidates at once, in a transaction that does not say whose).
+func (c *usedCache) forgetAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = nil
+}

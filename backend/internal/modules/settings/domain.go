@@ -58,6 +58,9 @@ func withHints(triples ...string) []Option {
 }
 
 func opts(pairs ...string) []Option {
+	if len(pairs)%2 != 0 {
+		panic(fmt.Sprintf("settings: built-in options come in key, label pairs: %q has one left over", pairs[len(pairs)-1]))
+	}
 	out := make([]Option, 0, len(pairs)/2)
 	for i := 0; i+1 < len(pairs); i += 2 {
 		out = append(out, Option{Key: pairs[i], Label: pairs[i+1], BuiltIn: true})

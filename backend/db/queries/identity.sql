@@ -410,3 +410,8 @@ SELECT DISTINCT ON (l.user_id) l.user_id, l.email_id::text AS email_id
 FROM user_link l JOIN app_user u ON u.tenant_id = l.tenant_id AND u.id = l.user_id
 WHERE l.kind = 'invite' AND l.email_id IS NOT NULL AND u.invited
 ORDER BY l.user_id, l.created_at DESC;
+
+-- A word renamed in one of the company's lists, renamed in everyone's
+-- favourites of that kind (app_rename_favourite checks settings:manage).
+-- name: RenameFavourite :one
+SELECT app_rename_favourite(@kind::text, @from_word::text, @to_word::text)::integer AS changed;

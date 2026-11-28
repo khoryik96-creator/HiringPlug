@@ -23,6 +23,10 @@ func TestRenamesAreOptionsSentWithTheirOldWord(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got, "the old word is still in the list: a new word, not a rename")
 
+	got, err = Renames("certification", []OptionInput{{Key: "CFA", Label: "CFA Level 3"}, {Label: "cfa"}}, saved)
+	require.NoError(t, err)
+	assert.Empty(t, got, "still in the list in another case: not a rename")
+
 	got, err = Renames("candidate_source", []OptionInput{{Key: "linkedin", Label: "LinkedIn Recruiter"}}, opts("linkedin", "LinkedIn"))
 	require.NoError(t, err)
 	assert.Empty(t, got, "other lists keep their keys: nothing to carry over")
@@ -38,4 +42,11 @@ func TestRenamesIntoEachOtherAreRefused(t *testing.T) {
 		_, err := Renames("certification", in, saved)
 		assert.Equal(t, []string{"options"}, fieldsOf(t, err), name)
 	}
+}
+
+func TestBuiltInOptionsComeInPairs(t *testing.T) {
+	assert.Len(t, opts("a", "A", "b", "B"), 2)
+	// (Written in place, the linter refuses an odd count already; a list built some other way is caught at start.)
+	odd := []string{"a", "A", "job_fair"}
+	assert.Panics(t, func() { opts(odd...) }, "a key without its label is a mistake, not an option to drop")
 }

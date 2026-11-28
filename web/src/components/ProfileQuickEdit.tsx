@@ -1,13 +1,14 @@
 // A candidate's specialization, industries, IT skills and certifications,
 // changed right in their Details (no Edit profile): a dropdown beside each,
 // saved at once. The person's favourites sit on top of each dropdown.
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import type { Candidate } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
 import { FavDropdown } from "./FavDropdown";
 import { useFavourites } from "./favourites";
-import { type Category, categoryLabel, IndustrySummary, useIndustries } from "./IndustryPicker";
+import { type Category, categoryLabel, IndustrySummary, industryKey, useIndustries } from "./IndustryPicker";
 import { Chips } from "./LabelInput";
 import { useIndustryManager, useWordListManager } from "./listManagers";
 import { useCandidateUpdate } from "./useCandidateUpdate";
@@ -34,7 +35,7 @@ export function QuickSpecialization({ candidate, canEdit }: { candidate: Candida
   const fs = useFieldSettings();
   const favs = useFavourites();
   const save = useQuickSave(candidate);
-  const manage = useWordListManager("specialization", favs.of("specialization"));
+  const manage = useWordListManager("specialization");
   if (!canEdit) return <>{candidate.specialization ?? "—"}</>;
   const current = candidate.specialization ?? "";
   return (
@@ -55,7 +56,7 @@ export function QuickWords({ candidate, canEdit, field }: { candidate: Candidate
   const save = useQuickSave(candidate);
   const words = candidate[field];
   const list = field === "skills" ? "it_skill" as const : "certification" as const;
-  const manage = useWordListManager(list, favs.of(field === "skills" ? "itSkill" : "certification"));
+  const manage = useWordListManager(list);
   if (!canEdit) return <Chips labels={words} />;
   const meta = field === "skills"
     ? { list: "it_skill" as const, fav: favs.of("itSkill"), noun: "IT skills", one: "IT skill" }
@@ -88,6 +89,7 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
   const favs = useFavourites();
   const save = useQuickSave(candidate);
   const manage = useIndustryManager();
+  const queryClient = useQueryClient();
   const data = industries.data;
   if (!canEdit || !data) return <IndustrySummary value={candidate.industrySelections} legacy={candidate.industry} />;
   const items = data.items;
@@ -98,14 +100,13 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
   const choices = active.filter((i) => !chosen.includes(i.id))
     .map((i) => ({ value: i.id, label: categoryLabel(i, items) }))
     .sort((a, b) => a.label.localeCompare(b.label));
-  const rootLabel = (id?: string) => {
-    const item = items.find((i) => i.id === id);
-    const root: Category | undefined = item?.parentId ? items.find((i) => i.id === item.parentId) : item;
-    return root?.label ?? null;
-  };
   const change = (ids: string[], primaryId?: string) => {
     const p = primaryId && ids.includes(primaryId) ? primaryId : ids[0];
-    save.mutate({ industrySelections: { catalogueVersion: data.version, ids, ...(p ? { primaryId: p } : {}) }, industry: rootLabel(p) });
+    // The catalogue as it is now: an industry just added from this dropdown made it newer.
+    const now = queryClient.getQueryData<typeof data>(industryKey) ?? data;
+    const item = now.items.find((i) => i.id === p);
+    const root: Category | undefined = item?.parentId ? now.items.find((i) => i.id === item.parentId) : item;
+    save.mutate({ industrySelections: { catalogueVersion: now.version, ids, ...(p ? { primaryId: p } : {}) }, industry: root?.label ?? null });
   };
   return (
     <div className="quick-edit">

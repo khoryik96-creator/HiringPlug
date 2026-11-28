@@ -22,7 +22,7 @@ import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
 import { IndustryPicker } from "./IndustryPicker";
-import { useWordListManager } from "./listManagers";
+import { type ListManager, useWordListManager } from "./listManagers";
 import { SourcePicker } from "./SourcePicker";
 
 type TextKey = "firstName" | "lastName" | "email" | "phone" | "linkedinUrl" | "nationality" | "waNote" | "industry"
@@ -56,9 +56,13 @@ export function CandidateForm({ candidate, onDone, canMerge = false }: { candida
   const used = useUsedValues();
   const fs = useFieldSettings();
   const favs = useFavourites();
-  const manageSpecialization = useWordListManager("specialization", favs.of("specialization"));
-  const manageSkills = useWordListManager("it_skill", favs.of("itSkill"));
-  const manageCertifications = useWordListManager("certification", favs.of("certification"));
+  // In the full form, a word typed can be added to a list, but not renamed or
+  // removed: that changes candidates (this one too) under the open form. In
+  // the candidate's Details or Settings it can.
+  const addOnly = (m: ListManager | undefined) => (m ? { ...m, rename: undefined, remove: undefined } : undefined);
+  const manageSpecialization = addOnly(useWordListManager("specialization"));
+  const manageSkills = addOnly(useWordListManager("it_skill"));
+  const manageCertifications = addOnly(useWordListManager("certification"));
   const req = (label: string, field: string) => labelFor(label, fs.mandatory("candidate", field));
   const errors = fieldErrors(save.error);
   const errorFor = (key: keyof CandidateFormState) => errors[FIELD_PATHS[key]];

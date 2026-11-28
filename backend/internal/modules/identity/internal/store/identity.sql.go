@@ -1102,6 +1102,25 @@ func (q *Queries) PruneRevokedSessions(ctx context.Context) error {
 	return err
 }
 
+const renameFavourite = `-- name: RenameFavourite :one
+SELECT app_rename_favourite($1::text, $2::text, $3::text)::integer AS changed
+`
+
+type RenameFavouriteParams struct {
+	Kind     string
+	FromWord string
+	ToWord   string
+}
+
+// A word renamed in one of the company's lists, renamed in everyone's
+// favourites of that kind (app_rename_favourite checks settings:manage).
+func (q *Queries) RenameFavourite(ctx context.Context, arg RenameFavouriteParams) (int32, error) {
+	row := q.db.QueryRow(ctx, renameFavourite, arg.Kind, arg.FromWord, arg.ToWord)
+	var changed int32
+	err := row.Scan(&changed)
+	return changed, err
+}
+
 const renameTeamGroup = `-- name: RenameTeamGroup :one
 UPDATE team_group SET name = $1, version = version + 1, updated_at = now()
 WHERE id = $2 AND version = $3

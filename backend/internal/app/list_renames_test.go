@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -91,4 +92,88 @@ func TestRenamingWordsIntoEachOtherIsRefused(t *testing.T) {
 	var got api.Candidate
 	a.request(http.MethodGet, "/v1/candidates/"+c.Id, owner, nil).JSON(&got)
 	assert.Equal(t, []string{"CFA"}, got.Certifications)
+}
+
+// An admin whose role sees only their own candidates still renames the word
+// on everyone's (the list is the company's), and in everyone's favourites;
+// each candidate's own log shows it, and the suggestions have the new word.
+func TestARenameReachesEveryCandidateAndFavourite(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleRecruiter)
+	owner, admin, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleRecruiter].Token
+	a.setRole(owner, "admin", map[string]any{"version": 0, "permissions": authz.PermissionsForRole(api.RoleAdmin), "candidateScope": "own", "jobCandidates": false}, http.StatusOK)
+
+	theirs := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "skills": []string{"Golang"}})
+	var used api.UsedValues
+	a.request(http.MethodGet, "/v1/candidates/used-values", recruiter, nil).JSON(&used) // remembered with the old word
+	res := a.request(http.MethodPut, "/v1/me/preferences", recruiter, map[string]any{"favourites": map[string]any{"itSkill": []string{"golang", "Java"}}})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	res = a.putRenamed(admin, api.FieldListNameItSkill, "Golang", "Go")
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+	var got api.Candidate
+	a.request(http.MethodGet, "/v1/candidates/"+theirs.Id, recruiter, nil).JSON(&got)
+	assert.Equal(t, []string{"Go"}, got.Skills, "a candidate the admin cannot see is renamed too")
+	var prefs api.Preferences
+	a.request(http.MethodGet, "/v1/me/preferences", recruiter, nil).JSON(&prefs)
+	require.NotNil(t, prefs.Favourites)
+	require.NotNil(t, prefs.Favourites.ItSkill)
+	assert.Equal(t, []string{"Go", "Java"}, *prefs.Favourites.ItSkill, "a colleague's star follows the word")
+
+	entry := auditEntryOf(t, a.auditLog(owner, "?entityType=candidate&entityId="+theirs.Id), "candidate.updated", theirs.Id)
+	assert.Equal(t, map[string]any{"from": "Golang", "to": "Go"}, entry.Changes["skills"])
+	a.request(http.MethodGet, "/v1/candidates/used-values", recruiter, nil).JSON(&used)
+	assert.Contains(t, used.Skills, "Go", "suggestions have the new word at once")
+	assert.NotContains(t, used.Skills, "Golang")
+}
+
+// Taking a word out of a list, or hiding it, changes nothing for candidates
+// who have it: they keep it, can still be saved, and are still found by it.
+func TestRemovingOrHidingAWordLeavesCandidatesAsTheyAre(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	c := a.createCandidate(recruiter, map[string]any{"firstName": "Aina", "skills": []string{"PHP", "Python"},
+		"certifications": []string{"CIMA"}, "specialization": "Marketing"})
+
+	for _, l := range []struct {
+		name  api.FieldListName
+		gone  string
+		hides string
+	}{{api.FieldListNameItSkill, "PHP", "Python"}, {api.FieldListNameCertification, "CIMA", ""}, {api.FieldListNameSpecialization, "", "Marketing"}} {
+		var all api.FieldSettings
+		a.request(http.MethodGet, "/v1/settings/fields", owner, nil).JSON(&all)
+		var options []map[string]any
+		for _, list := range all.Lists {
+			if list.Name != l.name {
+				continue
+			}
+			for _, o := range list.Options {
+				if o.Key != l.gone {
+					options = append(options, map[string]any{"key": o.Key, "label": o.Label, "hidden": o.Key == l.hides})
+				}
+			}
+		}
+		res := a.request(http.MethodPut, "/v1/settings/fields/lists/"+string(l.name), owner, map[string]any{"options": options})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	}
+
+	var got api.Candidate
+	a.request(http.MethodGet, "/v1/candidates/"+c.Id, recruiter, nil).JSON(&got)
+	assert.Equal(t, []string{"PHP", "Python"}, got.Skills)
+	assert.Equal(t, []string{"CIMA"}, got.Certifications)
+	assert.Equal(t, "Marketing", got.Specialization.MustGet())
+	assert.Equal(t, c.Version, got.Version, "untouched")
+
+	res := a.request(http.MethodPatch, "/v1/candidates/"+c.Id, recruiter, map[string]any{"version": got.Version, "currentTitle": "Developer"})
+	require.Equal(t, http.StatusOK, res.Status, "a candidate with a word no longer offered still saves: %s", res.Body)
+	res.JSON(&got)
+	assert.Equal(t, []string{"PHP", "Python"}, got.Skills)
+
+	var page api.CandidatePage
+	a.request(http.MethodGet, "/v1/candidates?skill=php", recruiter, nil).JSON(&page)
+	require.Len(t, page.Items, 1, "still found by the word")
 }

@@ -9,89 +9,39 @@ import (
 	"context"
 )
 
-const renameCertification = `-- name: RenameCertification :execrows
-UPDATE candidate SET
-  certifications = ARRAY(
-    SELECT w FROM (
-      SELECT DISTINCT ON (lower(w)) w, i FROM (
-        SELECT CASE WHEN lower(s) = lower($1::text) THEN $2::text ELSE s END AS w, i
-        FROM unnest(certifications) WITH ORDINALITY AS u(s, i)
-      ) renamed ORDER BY lower(w), i
-    ) once ORDER BY i),
-  version = version + 1
-WHERE app_lower_array(certifications) @> ARRAY[lower($1::text)]
+const renameCandidateWord = `-- name: RenameCandidateWord :many
+
+SELECT app_rename_candidate_word($1::text, $2::text, $3::text)::text AS id
 `
 
-type RenameCertificationParams struct {
-	FromWord string
-	ToWord   string
-}
-
-func (q *Queries) RenameCertification(ctx context.Context, arg RenameCertificationParams) (int64, error) {
-	result, err := q.db.Exec(ctx, renameCertification, arg.FromWord, arg.ToWord)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const renameSkill = `-- name: RenameSkill :execrows
-
-UPDATE candidate SET
-  skills = ARRAY(
-    SELECT w FROM (
-      SELECT DISTINCT ON (lower(w)) w, i FROM (
-        SELECT CASE WHEN lower(s) = lower($1::text) THEN $2::text ELSE s END AS w, i
-        FROM unnest(skills) WITH ORDINALITY AS u(s, i)
-      ) renamed ORDER BY lower(w), i
-    ) once ORDER BY i),
-  version = version + 1
-WHERE app_lower_array(skills) @> ARRAY[lower($1::text)]
-`
-
-type RenameSkillParams struct {
+type RenameCandidateWordParams struct {
+	Field    string
 	FromWord string
 	ToWord   string
 }
 
 // Renaming a word in the company's specialization, IT skills or
 // certifications list (Settings) renames it on every candidate who has it,
-// ignoring case. A candidate who already has the new word keeps it once, where
-// it came first. The version goes up, so a form opened before shows a conflict
-// instead of putting the old word back.
-func (q *Queries) RenameSkill(ctx context.Context, arg RenameSkillParams) (int64, error) {
-	result, err := q.db.Exec(ctx, renameSkill, arg.FromWord, arg.ToWord)
+// ignoring case: whoever owns them, binned ones too (app_rename_candidate_word,
+// which checks settings:manage). A candidate who already has the new word
+// keeps it once, where it came first. The version goes up, so a form opened
+// before shows a conflict instead of putting the old word back.
+func (q *Queries) RenameCandidateWord(ctx context.Context, arg RenameCandidateWordParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, renameCandidateWord, arg.Field, arg.FromWord, arg.ToWord)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
-}
-
-const renameSpecialization = `-- name: RenameSpecialization :execrows
-UPDATE candidate SET specialization = $1::text, version = version + 1
-WHERE lower(specialization) = lower($2::text)
-`
-
-type RenameSpecializationParams struct {
-	ToWord   string
-	FromWord string
-}
-
-func (q *Queries) RenameSpecialization(ctx context.Context, arg RenameSpecializationParams) (int64, error) {
-	result, err := q.db.Exec(ctx, renameSpecialization, arg.ToWord, arg.FromWord)
-	if err != nil {
-		return 0, err
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
-	return result.RowsAffected(), nil
-}
-
-const showBinnedWords = `-- name: ShowBinnedWords :exec
-SELECT set_config('app.show_binned', $1::text, true)
-`
-
-// Binned candidates are renamed too (they come back with the new word):
-// the renames run with app.show_binned on, and it goes back off after.
-func (q *Queries) ShowBinnedWords(ctx context.Context, value string) error {
-	_, err := q.db.Exec(ctx, showBinnedWords, value)
-	return err
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
