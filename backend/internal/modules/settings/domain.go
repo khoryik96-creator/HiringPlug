@@ -59,7 +59,7 @@ func withHints(triples ...string) []Option {
 
 func opts(pairs ...string) []Option {
 	out := make([]Option, 0, len(pairs)/2)
-	for i := 0; i < len(pairs); i += 2 {
+	for i := 0; i+1 < len(pairs); i += 2 {
 		out = append(out, Option{Key: pairs[i], Label: pairs[i+1], BuiltIn: true})
 	}
 	return out
