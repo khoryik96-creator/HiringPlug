@@ -44,22 +44,27 @@ func Renames(name string, in []OptionInput, saved []Option) ([]Rename, error) {
 	for _, o := range in {
 		kept[strings.Join(strings.Fields(o.Label), " ")] = true
 	}
-	var out []Rename
+	// Words sent under another word: renamed, unless a new option keeps the old word.
+	var changed []Rename
 	from := map[string]bool{}
 	for _, o := range in {
 		key, label := strings.TrimSpace(o.Key), strings.Join(strings.Fields(o.Label), " ")
-		if key == "" || label == "" || key == label || !had[key] || kept[key] {
-			continue // a new word, one unchanged, or the old word still in the list
+		if key == "" || label == "" || key == label || !had[key] {
+			continue // a new word or one unchanged
 		}
 		if from[strings.ToLower(key)] {
 			return nil, renameOneAtATime(key, label)
 		}
 		from[strings.ToLower(key)] = true
-		out = append(out, Rename{From: key, To: label})
+		changed = append(changed, Rename{From: key, To: label})
 	}
-	for _, r := range out {
+	var out []Rename
+	for _, r := range changed {
 		if !strings.EqualFold(r.From, r.To) && from[strings.ToLower(r.To)] {
 			return nil, renameOneAtATime(r.From, r.To)
+		}
+		if !kept[r.From] {
+			out = append(out, r)
 		}
 	}
 	return out, nil
