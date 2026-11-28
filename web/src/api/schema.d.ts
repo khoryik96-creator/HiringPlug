@@ -5824,7 +5824,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replace a dropdown's options (in the order given) */
+        /**
+         * Replace a dropdown's options (in the order given)
+         * @description In the specialization, IT skills and certifications lists, an option sent with its old word as its key and a new label is a rename: the candidates who have the old word (ignoring case) get the new one, in the same save. Removing a word leaves it on the candidates who have it.
+         */
         put: operations["putFieldList"];
         post?: never;
         delete?: never;
@@ -13009,7 +13012,7 @@ export interface components {
             options: components["schemas"]["FieldOption"][];
         };
         FieldOptionInput: {
-            /** @description Omit for a new option (made from the label); notice periods need number_unit. */
+            /** @description Omit for a new option (made from the label); notice periods need number_unit. In the specialization, IT skills and certifications lists, the word it had: a different label renames it on candidates too. */
             key?: string;
             label: string;
             /** @description For lists with hints; ignored elsewhere. */

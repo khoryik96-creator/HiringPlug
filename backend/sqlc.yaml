@@ -48,7 +48,7 @@ sql:
               type: string
               pointer: true
   - <<: *module
-    queries: db/queries/candidates.sql
+    queries: [db/queries/candidates.sql, db/queries/candidates_words.sql]
     gen:
       go:
         <<: *go

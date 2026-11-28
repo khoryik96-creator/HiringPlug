@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/claims"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
@@ -28,4 +29,18 @@ func (u optionUses) OptionUses(ctx context.Context, tx pgx.Tx, list, key string)
 		return u.claims.OptionUses(ctx, tx, list, key)
 	}
 	return 0, nil
+}
+
+// optionRenames carries a word renamed in a Settings list (specialization,
+// IT skills, certifications) over to the candidates who have it.
+type optionRenames struct{ candidates *candidates.Module }
+
+func (r optionRenames) RenameOption(ctx context.Context, tx pgx.Tx, list, from, to string) (int, error) {
+	field := map[string]string{
+		"it_skill": candidates.SkillsField, "certification": candidates.CertificationsField, "specialization": candidates.SpecializationField,
+	}[list]
+	if field == "" {
+		return 0, nil
+	}
+	return r.candidates.RenameWord(ctx, tx, field, from, to)
 }

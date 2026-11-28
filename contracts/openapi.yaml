@@ -9232,6 +9232,9 @@ paths:
       operationId: putFieldList
       tags: [settings]
       summary: Replace a dropdown's options (in the order given)
+      description: >
+        In the specialization, IT skills and certifications lists, an option sent with its old word as its key and a new label is a rename: the candidates who have the old word (ignoring case) get the new one, in the same save. Removing a word leaves it on the candidates who have it.
+
       x-permission: settings:manage
       requestBody:
         required: true
@@ -19307,7 +19310,7 @@ components:
       additionalProperties: false
       required: [label]
       properties:
-        key: {type: string, maxLength: 100, description: "Omit for a new option (made from the label); notice periods need number_unit."}
+        key: {type: string, maxLength: 100, description: "Omit for a new option (made from the label); notice periods need number_unit. In the specialization, IT skills and certifications lists, the word it had: a different label renames it on candidates too."}
         label: {type: string, minLength: 1, maxLength: 100}
         hint: {type: string, maxLength: 300, description: "For lists with hints; ignored elsewhere."}
         color: {type: string, pattern: '^#[0-9a-fA-F]{6}$', description: "For lists with colours; ignored elsewhere."}

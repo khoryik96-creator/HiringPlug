@@ -246,6 +246,7 @@ func NewModules(d Deps) *Modules {
 		Dropbox: claims.App{ClientID: d.Config.Dropbox.AppKey, ClientSecret: d.Config.Dropbox.AppSecret},
 	})
 	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies, m.Claims}) // records holding an option keep it
+	m.Settings.RenameWith(optionRenames{m.Candidates})                      // a renamed word is renamed on candidates
 	m.InterviewPrep = interviewprep.New(d.Pool, interviewprep.Deps{
 		Jobs: interviewPrepJobs{m.Jobs}, Companies: interviewPrepCompanies{m.Companies},
 		AI: cvReadingAI{aiLedger{m.AIUsage}, m.AIProviders}, // prep material, in the same monthly allowance

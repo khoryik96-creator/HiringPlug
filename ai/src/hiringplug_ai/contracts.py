@@ -7751,7 +7751,7 @@ class FieldOptionInput(BaseModel):
     key: Annotated[
         str | None,
         Field(
-            description="Omit for a new option (made from the label); notice periods need number_unit.",
+            description="Omit for a new option (made from the label); notice periods need number_unit. In the specialization, IT skills and certifications lists, the word it had: a different label renames it on candidates too.",
             max_length=100,
         ),
     ] = None
