@@ -1,16 +1,14 @@
 // A candidate's specialization, industries, IT skills and certifications,
 // changed right in their Details (no Edit profile): a dropdown beside each,
 // saved at once. The person's favourites sit on top of each dropdown.
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import type { Candidate } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
 import { FavDropdown } from "./FavDropdown";
 import { useFavourites } from "./favourites";
-import { type Category, categoryLabel, IndustrySummary, industryKey, useIndustries } from "./IndustryPicker";
+import { type Category, categoryLabel, IndustrySummary, useIndustries } from "./IndustryPicker";
 import { Chips } from "./LabelInput";
-import { useIndustryManager, useWordListManager } from "./listManagers";
 import { useCandidateUpdate } from "./useCandidateUpdate";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -35,13 +33,12 @@ export function QuickSpecialization({ candidate, canEdit }: { candidate: Candida
   const fs = useFieldSettings();
   const favs = useFavourites();
   const save = useQuickSave(candidate);
-  const manage = useWordListManager("specialization");
   if (!canEdit) return <>{candidate.specialization ?? "—"}</>;
   const current = candidate.specialization ?? "";
   return (
     <div className={`quick-edit${current ? "" : " fav-dropdown-add"}`}>
       <FavDropdown inline aria-label={`Specialization: ${current || "not set"}. Change`} text={current || "+ Choose"} clear="— None" noun="specializations"
-        disabled={save.busy} fav={favs.of("specialization")} manage={manage}
+        disabled={save.busy} fav={favs.of("specialization")}
         choices={fs.options("specialization", current || null).map((o) => ({ value: o.key, label: o.label }))}
         onPick={(v) => { if (v !== current) save.mutate({ specialization: v || null }); }} />
       {save.status}
@@ -55,8 +52,6 @@ export function QuickWords({ candidate, canEdit, field }: { candidate: Candidate
   const favs = useFavourites();
   const save = useQuickSave(candidate);
   const words = candidate[field];
-  const list = field === "skills" ? "it_skill" as const : "certification" as const;
-  const manage = useWordListManager(list);
   if (!canEdit) return <Chips labels={words} />;
   const meta = field === "skills"
     ? { list: "it_skill" as const, fav: favs.of("itSkill"), noun: "IT skills", one: "IT skill" }
@@ -71,10 +66,10 @@ export function QuickWords({ candidate, canEdit, field }: { candidate: Candidate
             onClick={() => { save.mutate({ [field]: words.filter((x) => x !== w) }); }}>×</button>
         </span>
       ))}
-      {(left.length > 0 || manage) && (
+      {left.length > 0 && (
         <span className="fav-dropdown-add">
-          <FavDropdown inline aria-label={`Add ${meta.one === "IT skill" ? "an" : "a"} ${meta.one}`} text="+ Add" noun={meta.noun} fav={meta.fav} disabled={save.busy} manage={manage}
-            choices={left.map((w) => ({ value: w, label: w }))} onPick={(v) => { if (v && !has(v)) save.mutate({ [field]: [...words, v] }); }} />
+          <FavDropdown inline aria-label={`Add ${meta.one === "IT skill" ? "an" : "a"} ${meta.one}`} text="+ Add" noun={meta.noun} fav={meta.fav} disabled={save.busy}
+            choices={left.map((w) => ({ value: w, label: w }))} onPick={(v) => { if (v) save.mutate({ [field]: [...words, v] }); }} />
         </span>
       )}
       {words.length === 0 && left.length === 0 && "—"}
@@ -88,8 +83,6 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
   const industries = useIndustries();
   const favs = useFavourites();
   const save = useQuickSave(candidate);
-  const manage = useIndustryManager();
-  const queryClient = useQueryClient();
   const data = industries.data;
   if (!canEdit || !data) return <IndustrySummary value={candidate.industrySelections} legacy={candidate.industry} />;
   const items = data.items;
@@ -100,13 +93,14 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
   const choices = active.filter((i) => !chosen.includes(i.id))
     .map((i) => ({ value: i.id, label: categoryLabel(i, items) }))
     .sort((a, b) => a.label.localeCompare(b.label));
+  const rootLabel = (id?: string) => {
+    const item = items.find((i) => i.id === id);
+    const root: Category | undefined = item?.parentId ? items.find((i) => i.id === item.parentId) : item;
+    return root?.label ?? null;
+  };
   const change = (ids: string[], primaryId?: string) => {
     const p = primaryId && ids.includes(primaryId) ? primaryId : ids[0];
-    // The catalogue as it is now: an industry just added from this dropdown made it newer.
-    const now = queryClient.getQueryData<typeof data>(industryKey) ?? data;
-    const item = now.items.find((i) => i.id === p);
-    const root: Category | undefined = item?.parentId ? now.items.find((i) => i.id === item.parentId) : item;
-    save.mutate({ industrySelections: { catalogueVersion: now.version, ids, ...(p ? { primaryId: p } : {}) }, industry: root?.label ?? null });
+    save.mutate({ industrySelections: { catalogueVersion: data.version, ids, ...(p ? { primaryId: p } : {}) }, industry: rootLabel(p) });
   };
   return (
     <div className="quick-edit">
@@ -123,8 +117,8 @@ export function QuickIndustries({ candidate, canEdit }: { candidate: Candidate; 
         );
       })}
       <span className="fav-dropdown-add">
-        <FavDropdown inline aria-label="Add an industry" text="+ Add" noun="industries" fav={favs.of("industry")} disabled={save.busy} manage={manage}
-          choices={choices} onPick={(v) => { if (v && !chosen.includes(v)) change([...chosen, v], primary ?? v); }} />
+        <FavDropdown inline aria-label="Add an industry" text="+ Add" noun="industries" fav={favs.of("industry")} disabled={save.busy}
+          choices={choices} onPick={(v) => { if (v) change([...chosen, v], primary ?? v); }} />
       </span>
       {save.status}
     </div>

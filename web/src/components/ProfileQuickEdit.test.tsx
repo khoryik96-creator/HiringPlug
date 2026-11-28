@@ -54,6 +54,18 @@ describe("editing a profile's lists in place", () => {
     });
   });
 
+  it("only offers the list, even to an admin: the lists are changed in Settings", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings())
+      : path === "/v1/me" ? ok({ permissions: ["settings:manage", "candidates:update"] }) : ok({ favourites: {} }))) as never);
+    renderWithClient(<QuickWords candidate={testCandidate({ skills: [] })} canEdit field="skills" />);
+    await open("Add an IT skill");
+    await screen.findByRole("button", { name: "SAP" });
+    expect(screen.queryByRole("button", { name: /^Rename / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /from the list$/ })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Find IT skills"), { target: { value: "Rust" } });
+    expect(screen.queryByRole("button", { name: /^\+ Add/ })).toBeNull();
+  });
+
   it("only shows them to someone who may not change the profile", () => {
     server();
     renderWithClient(<QuickWords candidate={testCandidate({ certifications: ["ACCA"] })} canEdit={false} field="certifications" />);
