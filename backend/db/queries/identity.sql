@@ -37,7 +37,7 @@ FROM app_user_link(sqlc.arg(token_hash)::text);
 -- microsoft_required: the company requires Microsoft (passwords only for owners);
 -- microsoft_sign_in: it signs in with Microsoft at all (else Microsoft sessions stop).
 -- name: UserAuth :one
-SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
+SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.team_id, u.named_role_id, u.active, u.invited, u.password_hash, u.tokens_valid_after,
   u.microsoft_sessions_after, u.microsoft_connect_only,
   coalesce((SELECT t.microsoft_required FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_required,
   coalesce((SELECT t.microsoft_sign_in FROM tenant t WHERE t.id = u.tenant_id), false)::boolean AS microsoft_sign_in
@@ -68,15 +68,15 @@ UPDATE user_link SET used_at = now() WHERE user_id = @user_id AND kind = @kind A
 UPDATE user_link SET used_at = now() WHERE kind = @kind AND used_at IS NULL;
 
 -- name: ListTeam :many
-SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000;
+SELECT id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000;
 
 -- name: InviteUser :one
 INSERT INTO app_user (tenant_id, email, name, role, active, invited)
 VALUES (app_current_tenant(), @email, @name, @role, false, true)
-RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
+RETURNING id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at;
 
 -- name: TeamMember :one
-SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
+SELECT id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
 
 -- Deactivating signs the user out: tokens issued up to the end of this second
 -- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go),
@@ -89,7 +89,7 @@ SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created
 UPDATE app_user SET role = @role, active = @active, team_id = sqlc.narg(team_id),
   tokens_valid_after = CASE WHEN active AND NOT @active THEN greatest(date_trunc('second', clock_timestamp()) + interval '1 second', tokens_valid_after + interval '1 second', microsoft_sessions_after + interval '1 second') ELSE tokens_valid_after END
 WHERE id = @id
-RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
+RETURNING id, email, name, role, team_id, named_role_id, active, invited, last_sign_in_at, created_at;
 
 -- Cancelling an invitation: only someone who never joined is removed (their
 -- links go with them).
@@ -416,3 +416,36 @@ ORDER BY l.user_id, l.created_at DESC;
 -- favourites of that kind (app_rename_favourite checks settings:manage).
 -- name: RenameFavourite :one
 SELECT app_rename_favourite(@kind::text, @from_word::text, @to_word::text)::integer AS changed;
+
+-- Named roles (owners): roles of the company's own, each built on an
+-- editable role, with their own access.
+-- name: ListNamedRoles :many
+SELECT r.*, (SELECT count(*) FROM app_user u WHERE u.named_role_id = r.id AND (u.active OR u.invited))::integer AS member_count
+FROM named_role r ORDER BY lower(r.name) LIMIT 200;
+
+-- name: GetNamedRole :one
+SELECT * FROM named_role WHERE id = @id;
+
+-- name: InsertNamedRole :one
+INSERT INTO named_role (tenant_id, name, base_role, permissions, known_permissions, candidate_scope, job_candidates, updated_by)
+VALUES (app_current_tenant(), @name, @base_role, @permissions, @known_permissions, @candidate_scope, @job_candidates, app_current_user())
+RETURNING *;
+
+-- Optimistic concurrency: no row returned = stale version (or gone).
+-- name: UpdateNamedRole :one
+UPDATE named_role
+SET name = @name, permissions = @permissions, known_permissions = @known_permissions, candidate_scope = @candidate_scope,
+    job_candidates = @job_candidates, updated_by = app_current_user(), version = version + 1, updated_at = now()
+WHERE id = @id AND version = @version
+RETURNING *;
+
+-- name: NamedRoleUsers :many
+SELECT name FROM app_user WHERE named_role_id = @id ORDER BY lower(name) LIMIT 20;
+
+-- name: DeleteNamedRole :execrows
+DELETE FROM named_role WHERE id = @id AND NOT EXISTS (SELECT 1 FROM app_user WHERE named_role_id = @id);
+
+-- A person's named role (null: their role's own access). Its base role is
+-- their role: it moves with it.
+-- name: SetUserNamedRole :exec
+UPDATE app_user SET named_role_id = sqlc.narg(named_role_id) WHERE id = @id;
